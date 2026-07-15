@@ -1,0 +1,19 @@
+/* ============================================================
+   Corre toda la batería de tests en orden y resume.
+   Uso: node tests/run-all.js
+   ============================================================ */
+import { spawnSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const DIR = path.dirname(fileURLToPath(import.meta.url));
+const FILES = ["teams.validate.js", "discipline.test.js", "smoke.js"];
+
+let fails = 0;
+for (const f of FILES) {
+  console.log(`\n━━━ ${f} ━━━`);
+  const r = spawnSync(process.execPath, [path.join(DIR, f)], { stdio: "inherit" });
+  if (r.status !== 0) fails++;
+}
+console.log(`\n${fails ? `❌ ${fails} suite(s) con fallos` : "✅ TODA la batería verde"}`);
+process.exit(fails ? 1 : 0);

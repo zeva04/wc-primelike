@@ -1,0 +1,197 @@
+/* ============================================================
+   game/match/Match — máquina de estados del partido interactivo.
+   La resolución de jugadas vive en módulos hermanos y opera
+   sobre esta instancia: chances.js (ocasiones, penales, goles),
+   incidents.js (faltas, tarjetas, lesiones), shootout.js (tanda).
+
+   CONTRATO DE DECISIONES (ARQUITECTURA §3.2) — agregar una
+   decisión nueva son SIEMPRE 3 pasos:
+     1. creador en chances.js/incidents.js (setea m.decision)
+     2. resolver aquí o en el módulo hermano
+     3. ruteo en ui.js handleDecision()
+   | id           | la crea      | la resuelve            |
+   |--------------|--------------|------------------------|
+   | chance       | chances.js   | resolveChance          |
+   | penalty_mine | chances.js   | resolvePenaltyMine     |
+   | penalty_opp  | chances.js   | resolvePenaltyOpp      |
+   | protect      | incidents.js | ruteo UI → makeSub     |
+   | forced_sub   | incidents.js | ruteo UI → makeSub     |
+   | gk_red       | incidents.js | ruteo UI → makeSub     |
+
+   La UI lo maneja así:
+     1. `tick()` cada ~1s → avanza 5 min y devuelve false | true (hay decisión) | "halftime" | "pens" | "end"
+     2. Si hay `decision`, la UI muestra el modal y llama al resolve* correspondiente según decision.id
+     3. En "pens": startShootout() + shootMyPen()/shootOppPen() hasta shootoutStatus().done
+     4. Al final: result()
+   ============================================================ */
+import { rnd, pick } from "../../core/rng.js";
+import { genOpponentLineup } from "../opponents.js";
+import { teamPowers } from "./powers.js";
+import * as Chances from "./chances.js";
+import * as Incidents from "./incidents.js";
+import * as Shootout from "./shootout.js";
+
+export class Match {
+  /**
+   * @param my      { team, lineup: [6 refs al plantel], bench: [refs], mentalidad, buffs }
+   * @param oppTeam equipo rival (jugable o no)
+   * @param knockout true = eliminatoria (empate → prórroga → penales)
+   */
+  constructor(my, oppTeam, knockout) {
+    this.my = my;
+    this.oppTeam = oppTeam;
+    this.oppLineup = genOpponentLineup(oppTeam);
+    this.knockout = knockout;
+    this.min = 0;
+    this.gMy = 0; this.gOpp = 0;
+    this.feed = [];
+    this.decision = null;      // decisión pendiente {id, title, text, options:[{label, hint, key}]}
+    this.finished = false;
+    this.subsLeft = 3;
+    this.phase = "regular";    // regular | extra | pens | done
+    this.pens = null;
+    this.stats = { misTiros: 0, oppTiros: 0, decisiones: 0, penalesAtajados: 0 };
+    this.scorers = [];
+    this._interactiveChanceCooldown = 0;
+  }
+
+  // ---------- Estado y consultas ----------
+
+  /** Agrega una línea al relato del partido (kind define el estilo visual en la UI). */
+  log(kind, text) { this.feed.push({ min: Math.min(this.min, this.phase === "extra" ? 120 : 90), kind, text }); }
+
+  /** Mis jugadores actualmente en cancha (sin expulsados ni lesionados). */
+  activeMine() { return this.my.lineup.filter(p => !p.expulsado && !p.lesionado); }
+
+  /** Suplentes que aún pueden entrar (no usados, no sustituidos previamente). */
+  availableBench() {
+    return this.my.bench.filter(b => !b.usado && !b.sustituido && !b.suspendido && !(b.lesionadoPartidos > 0));
+  }
+
+  /** Suplentes elegibles para reemplazar a `outPlayer`. Regla: un POR suplente SOLO entra por el POR. */
+  eligibleFor(outPlayer) {
+    return this.availableBench().filter(b => b.pos !== "POR" || outPlayer.pos === "POR");
+  }
+
+  /** Poderes actuales de ambos equipos (se recalculan en cada tick: cambios y tarjetas afectan). */
+  powers() {
+    const mine = teamPowers(this.my.lineup, this.my.mentalidad, this.my.buffs);
+    const opp = teamPowers(this.oppLineup, "normal", {});
+    return { mine, opp };
+  }
+
+  // ---------- Simulación por tick ----------
+
+  /** Avanza ~5 min de juego. Devuelve false (seguir) | true (decisión) | "halftime" | "pens" | "end". */
+  tick() {
+    if (this.finished || this.decision) return true;
+    const end = this.phase === "extra" ? 120 : 90;
+    if (this.min >= end) return this._finishRegular();
+
+    this.min += 5;
+    if (this._interactiveChanceCooldown > 0) this._interactiveChanceCooldown--;
+
+    const { mine, opp } = this.powers();
+
+    // Entretiempo
+    if (this.min === 45) { this.log("info", "⏸️ Entretiempo. Ajusta tu equipo si quieres."); return "halftime"; }
+    if (this.phase === "extra" && this.min === 105) { this.log("info", "⏸️ Fin del primer tiempo extra."); return "halftime"; }
+
+    // ¿Ocasión mía? (leve ventaja al DT humano: sus decisiones deben poder torcer partidos)
+    const ratioMy = mine.atk / (mine.atk + opp.def);
+    if (rnd() < 0.12 + 0.22 * ratioMy) return this._myChance(opp);
+
+    // ¿Ocasión rival?
+    const ratioOpp = opp.atk / (opp.atk + mine.def);
+    if (rnd() < 0.09 + 0.24 * ratioOpp) return this._oppChance(mine);
+
+    // Faltas / tarjetas / lesiones
+    if (rnd() < 0.10) return this._foulEvent();
+    if (rnd() < 0.028) return this._injuryEvent();
+
+    // Relato ambiente
+    if (rnd() < 0.35) this.log("plain", pick([
+      "El partido se juega en el mediocampo.",
+      "La hinchada alienta sin parar.",
+      `${this.oppTeam.name} mueve la pelota con paciencia.`,
+      "Tu equipo presiona la salida rival.",
+      "Pelota dividida, nadie cede.",
+    ]));
+    return false;
+  }
+
+  // ---------- Delegación a los módulos de jugadas ----------
+
+  _myChance(opp) { return Chances.myChance(this, opp); }
+  _oppChance(mine) { return Chances.oppChance(this, mine); }
+  resolveChance(key) { return Chances.resolveChance(this, key); }
+  resolvePenaltyMine(name) { return Chances.resolvePenaltyMine(this, name); }
+  resolvePenaltyOpp(key) { return Chances.resolvePenaltyOpp(this, key); }
+  _foulEvent() { return Incidents.foulEvent(this); }
+  _injuryEvent() { return Incidents.injuryEvent(this); }
+  startShootout() { return Shootout.startShootout(this); }
+  shootoutStatus() { return Shootout.shootoutStatus(this); }
+  shootMyPen(takerName, dir) { return Shootout.shootMyPen(this, takerName, dir); }
+  shootOppPen(guess) { return Shootout.shootOppPen(this, guess); }
+
+  // ---------- Cambios ----------
+
+  /**
+   * Sustitución (out: jugador en cancha, inName: nombre del banco).
+   * Reglas: máx. 3 cambios; el sustituido NO reingresa; un POR suplente solo entra por el POR.
+   * `force` salta la última regla (se usa al reemplazar de urgencia a un arquero expulsado).
+   */
+  makeSub(outPlayer, inName, force = false) {
+    const inP = this.my.bench.find(b => b.name === inName);
+    if (!inP || this.subsLeft <= 0) return false;
+    if (inP.usado || inP.sustituido) return false;
+    if (!force && inP.pos === "POR" && outPlayer.pos !== "POR") return false;
+    const idx = this.my.lineup.indexOf(outPlayer);
+    if (idx === -1) return false;
+    inP.usado = true;
+    this.my.lineup[idx] = inP;
+    this.my.bench = this.my.bench.filter(b => b !== inP);
+    outPlayer.sustituido = true;
+    if (!outPlayer.lesionado) this.my.bench.push(outPlayer); // queda visible en banca, en gris
+    outPlayer.enCancha = false;
+    this.subsLeft--;
+    this.log("info", `min ${this.min}' — 🔄 Cambio: entra #${inP.num || "?"} ${inP.name} por #${outPlayer.num || "?"} ${outPlayer.name}.`);
+    return true;
+  }
+
+  // ---------- Cierre del partido ----------
+
+  /** Al llegar al minuto final: en eliminatorias un empate deriva en prórroga y luego penales. */
+  _finishRegular() {
+    if (this.phase === "regular" && this.knockout && this.gMy === this.gOpp) {
+      this.phase = "extra";
+      this.log("info", "🕐 Empate. ¡Vamos a la PRÓRROGA! 30 minutos más.");
+      return "halftime";
+    }
+    if (this.phase === "extra" && this.gMy === this.gOpp) {
+      this.phase = "pens";
+      this.log("info", "🎯 No lograron sacarse diferencia en 120 minutos. Nos vamos a los... ¡PENALES!");
+      return "pens";
+    }
+    this.finished = true;
+    this.phase = "done";
+    return "end";
+  }
+
+  /** Elección aleatoria ponderada (protagonistas de ocasiones: DEL pesa más que MED, etc.). */
+  _weightedPick(arr, weights) {
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = rnd() * total;
+    for (let i = 0; i < arr.length; i++) { r -= weights[i]; if (r <= 0) return arr[i]; }
+    return arr[arr.length - 1];
+  }
+
+  /** Resultado final: marcador, ganador ("my"/"opp"/null=empate) y detalle de penales si hubo. */
+  result() {
+    let winner = null;
+    if (this.gMy > this.gOpp) winner = "my";
+    else if (this.gOpp > this.gMy) winner = "opp";
+    else if (this.pens && this.pens.winner) winner = this.pens.winner;
+    return { gMy: this.gMy, gOpp: this.gOpp, winner, pens: this.pens ? this.shootoutStatus() : null };
+  }
+}

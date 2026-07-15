@@ -1,0 +1,148 @@
+/* ============================================================
+   Smoke test: simula runs COMPLETAS sin UI, con decisiones al
+   azar, y verifica invariantes del motor en cada una. Es el
+   árbitro de la migración y del balance: si el % de campeón se
+   mueve fuera del ruido tras tocar código, algo se rompió.
+
+   Desde F7 usa el flujo REAL del motor (autoLineup,
+   nextOpponentId, closeMatch, advanceStage): cero reglas
+   duplicadas.
+
+   Uso:
+     node tests/smoke.js                  → 300 runs, equipo al azar
+     node tests/smoke.js --runs=1500 --team=BRA
+     node tests/smoke.js --all [--runs=100]   → tabla por selección
+   ============================================================ */
+import { loadEngine } from "./load-engine.js";
+
+const { Engine: E, WC_DATA } = await loadEngine();
+
+// ---------- argumentos ----------
+const args = Object.fromEntries(process.argv.slice(2).map(a => {
+  const m = a.match(/^--([^=]+)(?:=(.*))?$/);
+  return m ? [m[1], m[2] ?? true] : [a, true];
+}));
+const ALL = !!args.all;
+const RUNS = +args.runs || (ALL ? 100 : 300);
+const TEAM = args.team || null;
+
+let fails = 0;
+const assert = (cond, msg, ctx) => { if (!cond) { fails++; console.error("FAIL:", msg, ctx || ""); } };
+
+// ---------- un partido interactivo con decisiones al azar ----------
+function playMatch(run, oppId) {
+  const me = E.getTeam(run.teamId);
+  const opp = E.getTeam(oppId);
+  const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
+  for (const p of available) assert(!p.suspendido, "jugador suspendido en available");
+  const lineup = E.autoLineup(available);
+  assert(E.validateLineup(available, lineup).ok, "autoLineup debe producir alineación válida");
+  const bench = available.filter(p => !lineup.includes(p));
+  const ctx = { team: me, lineup, bench, mentalidad: "normal", buffs: { ...run.buffs } };
+  const match = new E.Match(ctx, opp, run.stage !== "groups");
+  let guard = 0;
+  while (!match.finished && guard++ < 500) {
+    const r = match.tick();
+    if (match.decision) {
+      const d = match.decision;
+      const opt = d.options[Math.floor(Math.random() * d.options.length)];
+      if (d.id === "chance") match.resolveChance(opt.key);
+      else if (d.id === "penalty_mine") match.resolvePenaltyMine(opt.key);
+      else if (d.id === "penalty_opp") match.resolvePenaltyOpp(opt.key);
+      else if (d.id === "forced_sub") { match.decision = null; match.makeSub(d.out, opt.key); }
+      else if (d.id === "gk_red") { match.decision = null; match.makeSub(match.my.lineup.find(p => p.name === opt.key), d.gkIn, true); }
+      else match.decision = null; // protect: lo deja en cancha
+    } else if (r === "pens") {
+      match.startShootout();
+      let pGuard = 0;
+      while (!match.shootoutStatus().done && pGuard++ < 60) {
+        const s = match.shootoutStatus();
+        if (s.my.length <= s.opp.length) {
+          const onField = ctx.lineup.filter(p => !p.expulsado && !p.lesionado);
+          match.shootMyPen(onField[Math.floor(Math.random() * onField.length)].name, E.pick(["izq", "centro", "der"]));
+        } else match.shootOppPen(E.pick(["izq", "centro", "der"]));
+      }
+      assert(pGuard < 60, "tanda de penales no terminó");
+    }
+  }
+  assert(guard < 500, "partido no terminó (loop guard)");
+  return match;
+}
+
+// ---------- una run completa (flujo real del motor) ----------
+function playRun(teamId) {
+  const run = E.newRun(teamId);
+  assert(run.journal.length === 1, "el diario debe abrir con el sorteo");
+  let alive = true, champion = false, guard = 0;
+
+  while (alive && guard++ < 60) {
+    let dayGuard = 0;
+    while (run.day < run.nextMatchDay && dayGuard++ < 10) {
+      const ev = E.advanceDay(run);
+      if (ev && ev.type === "conflicto") {
+        const opt = ev.options[Math.floor(Math.random() * ev.options.length)];
+        const res = opt.effect(run);
+        E.addJournal(run, { icon: ev.icon, tone: "neutral", title: ev.title, desc: `Elegiste "${opt.label}". ${res}` });
+      }
+    }
+    const oppId = E.nextOpponentId(run);
+    const match = playMatch(run, oppId);
+
+    // foto previa para validar la acumulación de amarillas del cierre
+    const before = run.squad.map(p => ({ p, am: p.amarillas || 0, amP: p.amarillaPartido || 0, exp: p.expulsado, susp: p.suspendido }));
+    const journalBefore = run.journal.length;
+
+    const out = E.closeMatch(run, match);
+
+    for (const b of before) {
+      const p = b.p;
+      if (b.exp) assert(p.suspendido === true, "roja debe suspender", p.name);
+      else if (b.susp) assert(p.suspendido === false, "suspensión cumplida debe limpiarse", p.name);
+      else if (b.amP === 1) {
+        if (b.am >= 1) assert(p.suspendido === true && p.amarillas === 0, "2ª amarilla acumulada debe suspender y resetear", p.name);
+        else assert(p.amarillas === 1 && !p.suspendido, "1ª amarilla deja apercibido", p.name);
+      } else if (b.amP === 0) assert((p.amarillas || 0) === b.am, "sin amarilla el contador no cambia", p.name);
+      assert(p.energia >= 5 && p.energia <= 100, "energía fuera de rango", `${p.name}=${p.energia}`);
+    }
+    assert(run.journal.length >= journalBefore + 1, "el diario debe crecer con el partido");
+
+    const adv = E.advanceStage(run, out.advanced);
+    if (adv.type === "eliminated") { alive = false; }
+    else if (adv.type === "champion") { champion = true; alive = false; }
+    else if (adv.type === "qualified") {
+      assert(run.squad.every(p => (p.amarillas || 0) === 0), "amarillas en 0 al cerrar grupos");
+      assert(run.stage === "r32" && run.koMatches.length === 16, "bracket de 16avos armado");
+    } else if (adv.type === "next-round" && adv.stage === "sf") {
+      assert(run.squad.every(p => (p.amarillas || 0) === 0), "amarillas en 0 tras 4tos");
+    }
+  }
+  assert(guard < 60, "la run no terminó (loop guard)");
+  for (let k = 1; k < run.journal.length; k++) {
+    assert(run.journal[k].day >= run.journal[k - 1].day, "diario fuera de orden cronológico");
+  }
+  return { champion, journal: run.journal.length };
+}
+
+// ---------- ejecución ----------
+const playables = WC_DATA.teams.filter(t => t.playable).map(t => t.id);
+const teamsToRun = ALL ? playables : [TEAM];
+const t0 = Date.now();
+const results = [];
+
+for (const teamId of teamsToRun) {
+  let champs = 0, journalSum = 0;
+  for (let i = 0; i < RUNS; i++) {
+    const id = teamId || playables[Math.floor(Math.random() * playables.length)];
+    const r = playRun(id);
+    if (r.champion) champs++;
+    journalSum += r.journal;
+  }
+  results.push({ team: teamId || "(azar)", champs, journal: journalSum / RUNS });
+}
+
+console.log(`\nsmoke: ${teamsToRun.length * RUNS} runs en ${((Date.now() - t0) / 1000).toFixed(1)}s · fallos: ${fails}`);
+for (const r of results) {
+  console.log(`  ${r.team.padEnd(7)} campeón ${(100 * r.champs / RUNS).toFixed(1).padStart(5)}%  · diario ~${r.journal.toFixed(0)} entradas`);
+}
+console.log(fails ? "❌ smoke con fallos" : "✅ smoke OK");
+process.exit(fails ? 1 : 0);

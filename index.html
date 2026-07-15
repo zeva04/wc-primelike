@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rumbo al Mundial 2026 — Roguelike</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      /* Paleta oficial WC26: emblema negro/blanco/dorado + tricolor de anfitriones */
+      --wc-gold: #D4AF37;
+      --wc-gold-light: #F0D97D;
+      --wc-gold-dark: #8B6914;
+      --wc-red: #EA002A;    /* Canadá */
+      --wc-green: #007A33;  /* México */
+      --wc-blue: #0057B8;   /* EE.UU. */
+      --wc-black: #0B0B0E;
+      /* Colores del equipo elegido (los setea JS al iniciar una run) */
+      --team-primary: #D4AF37;
+      --team-secondary: #8B6914;
+      --team-text: #0f172a;
+    }
+    body {
+      background:
+        radial-gradient(ellipse 60% 40% at 15% 0%, rgba(0, 87, 184, 0.14), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 85% 0%, rgba(234, 0, 42, 0.12), transparent 60%),
+        radial-gradient(ellipse 70% 50% at 50% 100%, rgba(0, 122, 51, 0.10), transparent 65%),
+        linear-gradient(180deg, #131318 0%, var(--wc-black) 60%, #060608 100%);
+      min-height: 100vh;
+    }
+    .btn-primary {
+      padding: 0.65rem 1.5rem;
+      border-radius: 0.75rem;
+      font-weight: 800;
+      color: #0f172a;
+      background: linear-gradient(135deg, var(--wc-gold-light), var(--wc-gold));
+      box-shadow: 0 4px 20px rgba(212, 175, 55, 0.35);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 25px rgba(212, 175, 55, 0.5); }
+    .btn-primary:disabled { cursor: not-allowed; }
+    /* Utilidades con los colores del equipo elegido */
+    .tp-border { border-color: var(--team-primary) !important; }
+    .tp-text { color: var(--team-primary) !important; }
+    .tp-bg-soft { background: color-mix(in srgb, var(--team-primary) 14%, transparent) !important; }
+    .tp-gradient { background: linear-gradient(135deg, var(--team-primary), var(--team-secondary)); color: var(--team-text); }
+    .tp-ring { box-shadow: 0 0 0 2px color-mix(in srgb, var(--team-primary) 55%, transparent); }
+    .tp-topbar { border-top: 4px solid var(--team-primary); }
+    /* Barra tricolor de los anfitriones */
+    .tricolor-bar {
+      height: 4px; border-radius: 2px;
+      background: linear-gradient(90deg, var(--wc-red) 0%, var(--wc-red) 32%, var(--wc-green) 34%, var(--wc-green) 65%, var(--wc-blue) 67%, var(--wc-blue) 100%);
+    }
+    .gold-text {
+      background: linear-gradient(180deg, var(--wc-gold-light), var(--wc-gold) 55%, var(--wc-gold-dark));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .flag-img { object-fit: cover; border-radius: 3px; box-shadow: 0 1px 4px rgba(0,0,0,.5); outline: 1px solid rgba(255,255,255,.18); display: inline-block; vertical-align: middle; }
+    @keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .animate-fadein { animation: fadein 0.3s ease; }
+    @keyframes pop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+    .animate-pop { animation: pop 0.2s ease; }
+    @keyframes floaty { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
+    .animate-floaty { animation: floaty 5s ease-in-out infinite; }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #16161c; }
+    ::-webkit-scrollbar-thumb { background: #3f3f4a; border-radius: 4px; }
+  </style>
+</head>
+<body class="text-slate-100 antialiased">
+  <div id="app"></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

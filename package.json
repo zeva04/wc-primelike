@@ -1,0 +1,7 @@
+{
+  "name": "wc26-game",
+  "private": true,
+  "version": "0.9.0",
+  "description": "Roguelike de navegador del Mundial 2026 — sin dependencias, sin build",
+  "type": "module"
+}
