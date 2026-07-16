@@ -1,0 +1,241 @@
+/* ============================================================
+   Test determinista de las reglas de alineación: formaciones,
+   asignación de puestos y castigo por jugar fuera de puesto
+   (docs/CORE.md §2b). Sin azar: los estados se fabrican a mano.
+
+   Cubre el riesgo real de esta regla: que un castigo mal aplicado
+   entre al motor como NaN y envenene el partido en silencio.
+
+   Uso: node tests/lineup.test.js
+   ============================================================ */
+import { loadEngine } from "./load-engine.js";
+
+const { Engine: E } = await loadEngine();
+
+let fails = 0, checks = 0;
+function t(cond, msg) {
+  checks++;
+  if (!cond) { fails++; console.error("  ❌", msg); }
+}
+
+const bra = E.getTeam("BRA");
+const vini = bra.players.find(p => p.name === "Vinícius Júnior");   // DEL 88
+const alisson = bra.players.find(p => p.name === "Alisson");        // POR
+const clon = p => ({ ...p, stats: { ...p.stats }, posJugada: null });
+
+// ---------- 1. Distancia entre posiciones ----------
+{
+  t(E.posDistance("DEF", "MED") === 1, "DEF→MED es 1 paso");
+  t(E.posDistance("MED", "DEL") === 1, "MED→DEL es 1 paso");
+  t(E.posDistance("DEF", "DEL") === 2, "DEF→DEL son 2 pasos");
+  t(E.posDistance("POR", "DEL") === 3, "POR→DEL son 3 pasos (el máximo)");
+  t(E.posDistance("DEL", "DEL") === 0, "misma posición, 0 pasos");
+  t(E.posDistance("DEF", "DEL") === E.posDistance("DEL", "DEF"), "la distancia es simétrica");
+}
+
+// ---------- 2. El castigo crece con la distancia ----------
+{
+  const p = clon(vini);
+  t(E.outOfPosPenalty(p) === 0, "en su puesto no hay castigo");
+  p.posJugada = "MED";
+  t(E.outOfPosPenalty(p) === E.OUT_OF_POS_STEP, "a 1 paso, castigo de 1 escalón");
+  p.posJugada = "DEF";
+  t(E.outOfPosPenalty(p) === E.OUT_OF_POS_STEP * 2, "a 2 pasos, castigo doble — más lejos, más duele");
+  t(E.outOfPosPenalty(clon(vini)) < E.outOfPosPenalty(p), "el de más lejos siempre recibe más castigo");
+}
+
+// ---------- 3. Qué stats baja el castigo (y cuáles no) ----------
+{
+  const p = clon(vini);
+  p.posJugada = "DEF";
+  t(E.effectiveStat(p, "defensa") === vini.stats.defensa - 12, "las stats técnicas bajan 6 por paso");
+  t(E.effectiveStat(p, "aura") === vini.stats.aura, "el aura NO se castiga: no depende del puesto");
+  t(E.effectiveStat(clon(vini), "defensa") === vini.stats.defensa, "en su puesto la stat queda intacta");
+  const pen = E.statPenalties(p);
+  t(pen.length === 4, "statPenalties lista las 4 stats técnicas afectadas");
+  t(pen.every(s => s.delta === -12), "cada delta refleja el castigo");
+  t(!pen.some(s => s.key === "aura"), "statPenalties no incluye el aura");
+  t(E.statPenalties(clon(vini)).length === 0, "en su puesto no hay nada que mostrar");
+  // Piso: una stat castigada nunca cae bajo 1 ni se vuelve negativa
+  const flojo = clon(vini);
+  flojo.stats.defensa = 3; flojo.posJugada = "DEF";
+  t(E.effectiveStat(flojo, "defensa") >= 1, "la stat castigada nunca baja de 1");
+}
+
+// ---------- 4. La nota cae por partida doble (pesos + castigo) ----------
+{
+  const enSuPuesto = E.playerOverall(clon(vini));
+  const deMed = clon(vini); deMed.posJugada = "MED";
+  const deDef = clon(vini); deDef.posJugada = "DEF";
+  t(enSuPuesto === 88, `Vinícius es 88 de DEL (fue ${enSuPuesto})`);
+  t(E.playerOverall(deDef) < E.playerOverall(deMed), "cuanto más lejos del puesto, peor nota");
+  t(E.playerOverall(deMed) < enSuPuesto, "fuera de puesto siempre baja");
+  t(E.playerOverall(deDef) === 47, `Vinícius de DEF queda en 47 (fue ${E.playerOverall(deDef)}) — el número que se le prometió al PO`);
+  t(Number.isFinite(E.playerOverall(deDef)), "la nota fuera de puesto es un número, no NaN");
+}
+
+// ---------- 5. El arco es exclusivo de los arqueros (stats disjuntas) ----------
+{
+  t(E.canPlayAt(vini, "DEF"), "un delantero puede jugar de defensa");
+  t(E.canPlayAt(vini, "MED"), "un delantero puede jugar de mediocampista");
+  t(!E.canPlayAt(vini, "POR"), "un jugador de campo NO puede ir al arco: no tiene atajadas");
+  t(E.canPlayAt(alisson, "POR"), "el arquero puede jugar de arquero");
+  t(!E.canPlayAt(alisson, "DEF"), "el arquero NO sale del arco: no tiene defensa");
+}
+
+// ---------- 6. Asignación de puestos según la formación ----------
+{
+  t(E.formationSlots("2-1-2").join() === "POR,DEF,DEF,MED,DEL,DEL", "los slots salen en orden POR→DEF→MED→DEL");
+  t(E.formationSlots("3-1-1").join() === "POR,DEF,DEF,DEF,MED,DEL", "3-1-1 pide 3 defensas");
+  t(E.formationSlots("no-existe").length === 0, "una formación inexistente no tiene slots");
+
+  const run = E.newRun("BRA");
+  const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
+  const once = E.autoLineup(available, "2-1-2");
+  E.assignPositions(run.squad, once, "2-1-2");
+  t(once.every(p => p.posJugada === p.pos), "el once automático deja a todos en su puesto natural");
+  t(run.squad.filter(p => !once.includes(p)).every(p => !p.posJugada), "a los suplentes se les borra el puesto");
+
+  // El DT mete un delantero de defensa: intercambia los índices 1 (DEF) y 4 (DEL)
+  const manual = once.slice();
+  [manual[1], manual[4]] = [manual[4], manual[1]];
+  E.assignPositions(run.squad, manual, "2-1-2");
+  t(manual[1].posJugada === "DEF" && manual[1].pos === "DEL", "el delantero movido al slot de DEF juega de DEF");
+  t(manual[4].posJugada === "DEL" && manual[4].pos === "DEF", "y el defensa queda de DEL");
+  t(E.outOfPosPenalty(manual[1]) > 0, "el delantero improvisado de defensa está castigado");
+
+  // Reasignar limpia lo anterior: el estado no se acumula entre formaciones
+  E.assignPositions(run.squad, once, "2-1-2");
+  t(once.every(p => E.outOfPosPenalty(p) === 0), "volver al once natural borra todos los castigos");
+}
+
+// ---------- 6b. currentLineup: la puerta real que usan las pantallas ----------
+// REGRESIÓN (bug del PO): el once automático salía POR,DEF,MED,DEL,+extras y los slots
+// del 2-1-2 son POR,DEF,DEF,MED,DEL,DEL — al asignar por índice, media Brasil quedaba
+// castigada jugando en su propia posición. Nadie debe estar fuera de puesto sin que el
+// DT lo haya movido a mano.
+{
+  for (const id of E.allTeams().filter(t => t.players).map(t => t.id)) {
+    const run = E.newRun(id);
+    const { lineup, formationId } = E.currentLineup(run.squad, [], null);
+    const castigados = lineup.filter(p => E.outOfPosPenalty(p) > 0);
+    t(castigados.length === 0,
+      `${id}: el once automático no castiga a nadie (castigados: ${castigados.map(p => `${p.name} ${p.pos}→${p.posJugada}`).join(", ")})`);
+    if (E.getFormation(formationId)) {
+      const slots = E.formationSlots(formationId);
+      t(lineup.every((p, i) => p.pos === slots[i]), `${id}: cada titular cae en un slot de su posición natural`);
+    }
+    t(lineup.every(p => E.playerOverall(p) === E.playerOverall({ ...p, posJugada: null })),
+      `${id}: la media del once automático es la real de cada jugador`);
+  }
+  // Idempotencia: volver a pasar por currentLineup no mueve ni castiga a nadie
+  const run = E.newRun("BRA");
+  const a = E.currentLineup(run.squad, [], null);
+  const b = E.currentLineup(run.squad, a.lineup, a.formationId);
+  t(b.lineup.every((p, i) => p === a.lineup[i]), "currentLineup es idempotente: no reordena un once vigente");
+  t(b.lineup.every(p => E.outOfPosPenalty(p) === 0), "y no aparecen castigos al repintar");
+  t(b.formationId === a.formationId, "la formación no cambia sola entre renders");
+
+  // El movimiento manual del DT SÍ se respeta y sobrevive al siguiente render
+  const manual = a.lineup.slice();
+  [manual[1], manual[4]] = [manual[4], manual[1]];
+  const c = E.currentLineup(run.squad, manual, a.formationId);
+  t(E.outOfPosPenalty(c.lineup[1]) > 0, "si el DT mueve a alguien fuera de puesto, el castigo se mantiene");
+}
+
+// ---------- 6c. El ranking del plantel usa el TALENTO, no la circunstancia ----------
+// REGRESIÓN: playerOverall depende de dónde está parado el jugador. Si autoLineup ordena
+// con esa nota, al crack que venías usando fuera de puesto lo compara castigado contra
+// suplentes intactos y lo manda al banco. Debe ordenar por naturalOverall.
+{
+  const p = clon(vini);
+  t(E.naturalOverall(p) === 88, "naturalOverall es su nota en su puesto");
+  p.posJugada = "DEF";
+  t(E.naturalOverall(p) === 88, "naturalOverall ignora dónde lo pararon hoy");
+  t(E.playerOverall(p) === 47, "playerOverall sí refleja dónde está parado");
+  t(E.overallAt(p, "DEL") === 88 && E.overallAt(p, "DEF") === 47, "overallAt calcula la nota en cualquier puesto");
+
+  const run = E.newRun("BRA");
+  const a = E.currentLineup(run.squad, [], null);
+  // El DT deja a Vinícius de defensa (queda en 47) y luego pide once automático
+  const manual = a.lineup.slice();
+  const iVini = manual.findIndex(x => x.name === "Vinícius Júnior");
+  const iDef = E.formationSlots(a.formationId).indexOf("DEF");
+  [manual[iVini], manual[iDef]] = [manual[iDef], manual[iVini]];
+  E.assignPositions(run.squad, manual, a.formationId);
+  t(E.playerOverall(run.squad.find(x => x.name === "Vinícius Júnior")) < 60, "montado el escenario: Vinícius está castigado");
+
+  const auto = E.autoLineup(run.squad.filter(x => !x.suspendido && x.lesionadoPartidos === 0), a.formationId);
+  t(auto.some(x => x.name === "Vinícius Júnior"), "el once automático NO manda al banco al crack por estar castigado");
+}
+
+// ---------- 6d. El puesto asignado no sobrevive al partido siguiente ----------
+// REGRESIÓN: `posJugada` es estado que vive en run.squad. Si un cambio del partido se lo
+// deja pegado a un suplente, ese jugador arrastraría el castigo por el resto de la run.
+{
+  const run = E.newRun("BRA");
+  const suplente = run.squad[7];
+  suplente.posJugada = "POR";                       // basura de un partido anterior
+  const { lineup } = E.currentLineup(run.squad, null, null);
+  t(run.squad.every(p => lineup.includes(p) || !p.posJugada), "currentLineup limpia el puesto de todo el que no es titular");
+  t(lineup.every(p => E.outOfPosPenalty(p) === 0), "y nadie arrastra castigo al armar el once nuevo");
+}
+
+// ---------- 7. El castigo llega al PARTIDO, no solo a la ficha ----------
+{
+  const run = E.newRun("BRA");
+  const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
+  const once = E.autoLineup(available, "2-1-2");
+
+  E.assignPositions(run.squad, once, "2-1-2");
+  const sano = E.teamPowers(once, "normal", {});
+
+  const roto = once.slice();
+  [roto[1], roto[4]] = [roto[4], roto[1]];   // delantero al fondo, defensa arriba
+  E.assignPositions(run.squad, roto, "2-1-2");
+  const improvisado = E.teamPowers(roto, "normal", {});
+
+  t(improvisado.def < sano.def, "parar a un delantero de defensa baja el poder defensivo REAL del partido");
+  t(Number.isFinite(improvisado.def) && Number.isFinite(improvisado.atk), "los poderes siguen siendo números (nada de NaN)");
+  t(improvisado.por === sano.por, "el arquero sigue siendo el arquero");
+  E.assignPositions(run.squad, once, "2-1-2");
+}
+
+// ---------- 8. Los cambios del partido heredan el puesto ----------
+{
+  const run = E.newRun("BRA");
+  const me = E.getTeam("BRA");
+  const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
+  const once = E.autoLineup(available, "2-1-2");
+  // El DT para a un delantero de defensa (slot 1)
+  const manual = once.slice();
+  [manual[1], manual[4]] = [manual[4], manual[1]];
+  E.assignPositions(run.squad, manual, "2-1-2");
+
+  const bench = run.squad.filter(p => !manual.includes(p) && !p.suspendido && p.lesionadoPartidos === 0);
+  const m = new E.Match({ team: me, lineup: manual.slice(), bench, mentalidad: "normal", buffs: {} }, E.getTeam("IRN"), false);
+
+  const sale = manual[1];                                    // el delantero parado de DEF
+  const entra = m.availableBench().find(b => b.pos !== "POR");
+  t(!!entra, "hay un suplente de campo para el cambio");
+  m.makeSub(sale, entra.name);
+  t(entra.posJugada === "DEF", "el que entra ocupa el puesto del que sale, no el suyo natural");
+  t(Number.isFinite(E.teamPowers(m.my.lineup, "normal", {}).def), "el partido sigue calculando tras el cambio");
+
+  // Roja al arquero: el POR suplente entra por un jugador de campo y va AL ARCO
+  const once2 = E.autoLineup(available, "2-1-2");
+  const m2 = new E.Match({ team: me, lineup: once2.slice(), bench: run.squad.filter(p => !once2.includes(p)), mentalidad: "normal", buffs: {} }, E.getTeam("IRN"), false);
+  E.assignPositions(run.squad, m2.my.lineup, "2-1-2");
+  const gk = m2.availableBench().find(b => b.pos === "POR");
+  const campo = m2.my.lineup.find(p => p.pos === "DEF");
+  t(!!gk && !!campo, "hay arquero suplente y jugador de campo en cancha");
+  m2.my.lineup.find(p => p.pos === "POR").expulsado = true;   // la roja que dispara el reemplazo
+  m2.makeSub(campo, gk.name, true);
+  t(gk.posJugada === "POR", "el arquero que entra por la roja va al ARCO, no al puesto del que salió");
+  t(Number.isFinite(E.playerOverall(gk)), "la nota del arquero que entró no es NaN");
+  t(E.teamPowers(m2.my.lineup, "normal", {}).por === gk, "el motor lo reconoce como su arquero");
+}
+
+console.log(`lineup.test: ${checks} checks`);
+console.log(fails ? `❌ ${fails} fallo(s)` : "✅ alineación y fuera de puesto OK");
+process.exit(fails ? 1 : 0);

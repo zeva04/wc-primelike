@@ -26,6 +26,7 @@
    ============================================================ */
 import { rnd, pick } from "../../core/rng.js";
 import { genOpponentLineup } from "../opponents.js";
+import { canPlayAt } from "../lineup.js";
 import { teamPowers } from "./powers.js";
 import * as Chances from "./chances.js";
 import * as Incidents from "./incidents.js";
@@ -149,6 +150,12 @@ export class Match {
     const idx = this.my.lineup.indexOf(outPlayer);
     if (idx === -1) return false;
     inP.usado = true;
+    // El que entra ocupa el puesto del que sale, no el suyo natural: si salía un delantero
+    // improvisado de defensa, el recambio también juega ahí (y se lo castiga). Excepción
+    // obligatoria: el arquero que entra por la roja al arquero sale por un jugador de campo
+    // (`force`), y va al arco — no al puesto del que salió.
+    const puesto = outPlayer.posJugada || outPlayer.pos;
+    inP.posJugada = canPlayAt(inP, puesto) ? puesto : inP.pos;
     this.my.lineup[idx] = inP;
     this.my.bench = this.my.bench.filter(b => b !== inP);
     outPlayer.sustituido = true;

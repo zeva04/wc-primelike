@@ -60,6 +60,50 @@ Pesos por posición (`OVR_WEIGHTS`):
 
 ---
 
+## 2b. Jugar fuera de puesto (`outOfPosPenalty`)
+
+El DT puede parar a cualquiera en cualquier puesto de campo. Si no es el suyo, **duele dos
+veces** — y esa doble caída es intencional:
+
+1. **Se lo mide con los pesos del puesto nuevo** (§2). A Vinícius de defensa le pesa la
+   defensa (0.50), que es justo su peor stat: cae de 88 a 57 sin ninguna regla extra.
+2. **Encima se le castigan las stats**, proporcional a la distancia del puesto.
+
+**La línea del fútbol** — la distancia es el número de pasos entre dos puestos:
+
+```
+POR ── DEF ── MED ── DEL
+        └─ DEF→MED = 1 · MED→DEL = 1 · DEF→DEL = 2
+```
+
+```
+castigo_por_stat = 6 × distancia        // escala 1–99, piso en 1
+```
+
+- **6 por paso** (`OUT_OF_POS_STEP`) = castigo "suave", decisión del PO (15-jul-2026):
+  improvisar se nota pero un crack fuera de puesto sigue siendo una opción defendible.
+- **El aura NO se castiga**: es carisma y sangre fría, no depende de dónde lo paren.
+- El castigo entra al partido por `effectiveStat`, del que parte `effStat` (§4) — la ficha
+  del DT y la cancha leen exactamente el mismo número.
+
+| Vinícius (DEL 88) juega de… | Distancia | Castigo | Nota |
+|---|---|---|---|
+| DEL (su puesto) | 0 | — | **88** |
+| MED | 1 | −6 | **77** |
+| DEF | 2 | −12 | **47** |
+
+> **El arco es exclusivo de los arqueros** (y ellos no salen de él). No es una regla de
+> balance sino del modelo de datos: los dos juegos de stats son **disjuntos** (§1). Un
+> delantero no tiene `atajadas` ni un arquero tiene `defensa`, así que cruzarlos no sería
+> un castigo sino una división por la nada. Lo impone `lineup.canPlayAt`.
+
+> **Ojo al ordenar el plantel**: `playerOverall` es la nota de HOY (donde esté parado), y
+> `naturalOverall` la de su puesto. `autoLineup` debe usar la segunda: con la primera, al
+> crack que venías usando fuera de puesto lo compara castigado contra suplentes intactos
+> y lo manda al banco.
+
+---
+
 ## 3. Estrellas (`starsFromRating`)
 
 Las estrellas son **solo visuales**. Se derivan del rating con una curva "futbolera"

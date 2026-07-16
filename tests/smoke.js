@@ -35,8 +35,12 @@ function playMatch(run, oppId) {
   const opp = E.getTeam(oppId);
   const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
   for (const p of available) assert(!p.suspendido, "jugador suspendido en available");
-  const lineup = E.autoLineup(available);
+  // Misma puerta que usan las pantallas: arma el once, lo ordena por slots y asigna los
+  // puestos (limpiando los que quedaron del partido anterior). Llamar a autoLineup pelado
+  // dejaría `posJugada` pegado de un cambio previo y castigaría a ese jugador para siempre.
+  const { lineup } = E.currentLineup(run.squad, null, null);
   assert(E.validateLineup(available, lineup).ok, "autoLineup debe producir alineación válida");
+  assert(lineup.every(p => E.outOfPosPenalty(p) === 0), "el once automático no debe castigar a nadie");
   const bench = available.filter(p => !lineup.includes(p));
   const ctx = { team: me, lineup, bench, mentalidad: "normal", buffs: { ...run.buffs } };
   const match = new E.Match(ctx, opp, run.stage !== "groups");
@@ -54,15 +58,18 @@ function playMatch(run, oppId) {
       else match.decision = null; // protect: lo deja en cancha
     } else if (r === "pens") {
       match.startShootout();
+      // Guard anti-loop-infinito, NO una afirmación sobre cuánto dura una tanda: con 60
+      // (25 rondas de muerte súbita empatadas) fallaba ~1 de cada 100.000 tandas por una
+      // tanda larga perfectamente legal. Medido: promedio 10,6 patadas, 0,03% pasa de 40.
       let pGuard = 0;
-      while (!match.shootoutStatus().done && pGuard++ < 60) {
+      while (!match.shootoutStatus().done && pGuard++ < 200) {
         const s = match.shootoutStatus();
         if (s.my.length <= s.opp.length) {
           const onField = ctx.lineup.filter(p => !p.expulsado && !p.lesionado);
           match.shootMyPen(onField[Math.floor(Math.random() * onField.length)].name, E.pick(["izq", "centro", "der"]));
         } else match.shootOppPen(E.pick(["izq", "centro", "der"]));
       }
-      assert(pGuard < 60, "tanda de penales no terminó");
+      assert(pGuard < 200, "tanda de penales no terminó");
     }
   }
   assert(guard < 500, "partido no terminó (loop guard)");

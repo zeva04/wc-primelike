@@ -5,8 +5,8 @@
    También muestra los modales de evento/conflicto del día.
    ============================================================ */
 import { getTeam } from "../../data/teams-repo.js";
-import { teamRating, teamStars, playerOverall } from "../../game/ratings.js";
-import { autoLineup, validateLineup, formationLabel } from "../../game/lineup.js";
+import { teamRating, teamStars, playerOverall, outOfPosPenalty } from "../../game/ratings.js";
+import { currentLineup, validateLineup, getFormation } from "../../game/lineup.js";
 import { dayLabel, advanceDay } from "../../game/calendar.js";
 import { addJournal } from "../../game/journal.js";
 import { nextOpponentId, STAGE_LABEL } from "../../game/tournament/knockout.js";
@@ -121,11 +121,10 @@ function renderHub() {
     : STAGE_LABEL[run.stage]) + ` · ${dayLabel(run.day)}`;
 
   const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
-  if (!S.selectedLineup.length || !S.selectedLineup.every(p => available.includes(p))) {
-    S.selectedLineup = autoLineup(available);
-  }
+  ({ lineup: S.selectedLineup, formationId: S.formation } = currentLineup(run.squad, S.selectedLineup, S.formation));
   const v = validateLineup(available, S.selectedLineup);
   const discipline = { susp: run.squad.filter(p => p.suspendido), aperc: run.squad.filter(p => p.amarillas > 0 && !p.suspendido) };
+  const fueraDePuesto = S.selectedLineup.filter(p => outOfPosPenalty(p) > 0);
 
   screenShell(`
     <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
@@ -176,7 +175,8 @@ function renderHub() {
             <span class="text-amber-300 font-black text-2xl">${teamRating(me)}</span>
           </div>
           <div class="mt-1">${starsHtml(teamStars(me))}</div>
-          <div class="text-xs mt-2 ${v.ok ? "text-slate-400" : "text-amber-400"}">${v.ok ? `Formación ${formationLabel(S.selectedLineup)} · alineación lista` : `⚠️ ${v.msg}`}</div>
+          <div class="text-xs mt-2 ${v.ok ? "text-slate-400" : "text-amber-400"}">${v.ok ? `Formación ${getFormation(S.formation) ? S.formation : "improvisada"} · alineación lista` : `⚠️ ${v.msg}`}</div>
+          ${fueraDePuesto.length ? `<div class="text-xs text-orange-400 mt-1.5" title="Sus stats bajan mientras jueguen ahí">❗ Fuera de puesto: ${fueraDePuesto.map(p => `${p.name} (de ${p.posJugada})`).join(", ")}</div>` : ""}
           ${discipline.susp.length ? `<div class="text-xs text-red-400 mt-1.5">🟥 Suspendido${discipline.susp.length > 1 ? "s" : ""}: ${discipline.susp.map(p => p.name).join(", ")}</div>` : ""}
           ${discipline.aperc.length ? `<div class="text-xs text-yellow-400 mt-1.5" title="Con otra amarilla quedan suspendidos un partido">🟨 Apercibido${discipline.aperc.length > 1 ? "s" : ""}: ${discipline.aperc.map(p => p.name).join(", ")}</div>` : ""}
           <p class="text-xs tp-text font-semibold mt-2">Gestión de Plantilla →</p>

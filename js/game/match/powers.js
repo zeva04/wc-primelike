@@ -3,13 +3,18 @@
    (docs/CORE.md §4-5). Sin estado, sin azar.
    ============================================================ */
 import { clamp } from "../../core/math.js";
+import { effectiveStat, playedPos } from "../ratings.js";
 
 // Modificadores de la mentalidad táctica (en escala normalizada ~0-5)
 export const MENT_MOD = { defensiva: { atk: -0.5, def: +0.6 }, normal: { atk: 0, def: 0 }, ofensiva: { atk: +0.6, def: -0.5 } };
 
-/** Stat efectiva normalizada a ~0-5 (stat 1-99 ÷ 20), con buffs (escala 1-99) y castigo por energía. */
+/**
+ * Stat efectiva normalizada a ~0-5 (stat 1-99 ÷ 20), con buffs (escala 1-99) y castigo por energía.
+ * Parte de `effectiveStat`, así que el castigo por jugar fuera de puesto entra al partido
+ * por el mismo caño que ve el DT en la ficha (docs/CORE.md §2b).
+ */
 export function effStat(p, key, buffs = {}) {
-  let v = p.stats[key];
+  let v = effectiveStat(p, key);
   if (buffs[key]) v += buffs[key];
   const en = p.energia !== undefined ? p.energia : 100;
   return clamp(v / 20, 0.05, 5.5) * (0.65 + 0.35 * (en / 100));
@@ -23,13 +28,15 @@ export function gkQuality(por, buffs) {
 
 /** Poder ofensivo y defensivo (~0-5) de una alineación, con mentalidad y castigo por expulsados. */
 export function teamPowers(lineup, mentalidad, buffs) {
+  // Reparto por el puesto que JUEGA cada uno (no el natural): si el DT paró a un
+  // delantero de defensa, ese delantero alimenta el poder defensivo — castigado.
   const act = lineup.filter(p => !p.expulsado && !p.lesionado);
-  const por = act.find(p => p.pos === "POR");
-  const atkP = act.filter(p => p.pos === "DEL" || p.pos === "MED");
-  const defP = act.filter(p => p.pos === "DEF");
+  const por = act.find(p => playedPos(p) === "POR");
+  const atkP = act.filter(p => playedPos(p) === "DEL" || playedPos(p) === "MED");
+  const defP = act.filter(p => playedPos(p) === "DEF");
   const avg = (ps, k) => ps.length ? ps.reduce((s, p) => s + effStat(p, k, buffs), 0) / ps.length : 1;
   const auraAll = avg(act, "aura");
-  let atk = avg(atkP, "tiro") * 0.4 + avg(act.filter(p => p.pos === "MED"), "pase") * 0.3 + avg(atkP, "cabezazo") * 0.12 + auraAll * 0.18;
+  let atk = avg(atkP, "tiro") * 0.4 + avg(act.filter(p => playedPos(p) === "MED"), "pase") * 0.3 + avg(atkP, "cabezazo") * 0.12 + auraAll * 0.18;
   let def = avg(defP, "defensa") * 0.52 + gkQuality(por, buffs) * 0.32 + auraAll * 0.16;
   const m = MENT_MOD[mentalidad] || MENT_MOD.normal;
   atk += m.atk; def += m.def;

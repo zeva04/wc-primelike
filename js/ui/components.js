@@ -72,6 +72,6 @@ export function modal(html) {
 export function closeModal() { const m = document.getElementById("modal"); if (m) m.remove(); }
 
 /** Reemplaza la pantalla completa con el contenido dado (contenedor centrado). */
-export function screenShell(inner) {
-  app().innerHTML = `<div class="max-w-5xl mx-auto px-4 py-6">${inner}</div>`;
+export function screenShell(inner, maxW = "max-w-5xl") {
+  app().innerHTML = `<div class="${maxW} mx-auto px-4 py-6">${inner}</div>`;
 }
