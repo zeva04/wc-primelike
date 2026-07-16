@@ -26,6 +26,8 @@
    ============================================================ */
 import { rnd, pick } from "../../core/rng.js";
 import { genOpponentLineup } from "../opponents.js";
+import { canPlayAt } from "../lineup.js";
+import { playedPos } from "../ratings.js";
 import { teamPowers } from "./powers.js";
 import * as Chances from "./chances.js";
 import * as Incidents from "./incidents.js";
@@ -68,9 +70,14 @@ export class Match {
     return this.my.bench.filter(b => !b.usado && !b.sustituido && !b.suspendido && !(b.lesionadoPartidos > 0));
   }
 
-  /** Suplentes elegibles para reemplazar a `outPlayer`. Regla: un POR suplente SOLO entra por el POR. */
+  /**
+   * Suplentes elegibles para reemplazar a `outPlayer`. Regla simétrica: el arco solo lo
+   * cubre un arquero, y un arquero no sale a la cancha (lineup.canPlayAt) — sus stats son
+   * otro juego. Antes solo se vigilaba una dirección y se podía mandar a un jugador de
+   * campo al arco: el equipo quedaba sin arquero y con 6 de campo (bug reportado por el PO).
+   */
   eligibleFor(outPlayer) {
-    return this.availableBench().filter(b => b.pos !== "POR" || outPlayer.pos === "POR");
+    return this.availableBench().filter(b => canPlayAt(b, playedPos(outPlayer)));
   }
 
   /** Poderes actuales de ambos equipos (se recalculan en cada tick: cambios y tarjetas afectan). */
@@ -145,10 +152,20 @@ export class Match {
     const inP = this.my.bench.find(b => b.name === inName);
     if (!inP || this.subsLeft <= 0) return false;
     if (inP.usado || inP.sustituido) return false;
-    if (!force && inP.pos === "POR" && outPlayer.pos !== "POR") return false;
+    // El que entra tiene que poder ocupar el puesto del que sale. `force` es la excepción
+    // de la roja al arquero: ahí el POR suplente entra por un jugador de campo y se va al
+    // arco igual (lo resuelve `posJugada`, abajo). No hay excepción a la inversa: al arco
+    // no entra un jugador de campo — no tiene atajadas.
+    if (!force && !canPlayAt(inP, outPlayer.posJugada || outPlayer.pos)) return false;
     const idx = this.my.lineup.indexOf(outPlayer);
     if (idx === -1) return false;
     inP.usado = true;
+    // El que entra ocupa el puesto del que sale, no el suyo natural: si salía un delantero
+    // improvisado de defensa, el recambio también juega ahí (y se lo castiga). Excepción
+    // obligatoria: el arquero que entra por la roja al arquero sale por un jugador de campo
+    // (`force`), y va al arco — no al puesto del que salió.
+    const puesto = outPlayer.posJugada || outPlayer.pos;
+    inP.posJugada = canPlayAt(inP, puesto) ? puesto : inP.pos;
     this.my.lineup[idx] = inP;
     this.my.bench = this.my.bench.filter(b => b !== inP);
     outPlayer.sustituido = true;

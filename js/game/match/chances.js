@@ -6,14 +6,16 @@
    ============================================================ */
 import { rnd, pick } from "../../core/rng.js";
 import { clamp } from "../../core/math.js";
-import { teamRating, currentAura } from "../ratings.js";
+import { teamRating, currentAura, playedPos } from "../ratings.js";
 import { effStat } from "./powers.js";
 
 /** Ocasión de mi equipo: puede ser penal, decisión interactiva (55%) o remate automático. */
 export function myChance(m, opp) {
   m.stats.misTiros++;
+  // Protagonista según dónde está PARADO: el que juega de 9 pisa el área más seguido,
+  // sea o no su puesto natural.
   const cands = m.activeMine().filter(p => p.pos !== "POR");
-  const weights = cands.map(p => p.pos === "DEL" ? 3 : p.pos === "MED" ? 2 : 1);
+  const weights = cands.map(p => playedPos(p) === "DEL" ? 3 : playedPos(p) === "MED" ? 2 : 1);
   const prot = m._weightedPick(cands, weights);
   // Penal a favor (poco frecuente)
   if (rnd() < 0.07) return myPenalty(m);
@@ -21,7 +23,7 @@ export function myChance(m, opp) {
   if (m._interactiveChanceCooldown === 0 && rnd() < 0.55) {
     m._interactiveChanceCooldown = 2;
     const mates = cands.filter(p => p !== prot);
-    const mate = mates.length ? m._weightedPick(mates, mates.map(p => p.pos === "DEL" ? 3 : 1)) : prot;
+    const mate = mates.length ? m._weightedPick(mates, mates.map(p => playedPos(p) === "DEL" ? 3 : 1)) : prot;
     m.decision = {
       id: "chance", prot, mate,
       title: `⚡ min ${m.min}' — ¡${prot.name} queda en posición de ataque!`,

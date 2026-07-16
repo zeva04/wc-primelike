@@ -31,6 +31,7 @@ export async function loadEngine() {
     import("../js/game/tournament/groups.js"),
     import("../js/game/tournament/knockout.js"),
     import("../js/game/match/Match.js"),
+    import("../js/game/match/powers.js"),
     import("../js/content/themes.js"),
     import("../js/content/prep-events.js"),
     import("../js/content/conflicts.js"),
