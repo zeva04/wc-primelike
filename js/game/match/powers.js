@@ -40,6 +40,9 @@ export function teamPowers(lineup, mentalidad, buffs) {
   let def = avg(defP, "defensa") * 0.52 + gkQuality(por, buffs) * 0.32 + auraAll * 0.16;
   const m = MENT_MOD[mentalidad] || MENT_MOD.normal;
   atk += m.atk; def += m.def;
+  // Sesión táctica (content/day-actions): bonus parejo de equipo, ya en escala ~0-5.
+  // Solo llega por los buffs propios — el rival calcula sus poderes con buffs = {}.
+  if (buffs.tactica) { atk += buffs.tactica; def += buffs.tactica; }
   // jugar con menos hombres castiga (formato 6v6)
   const missing = 6 - act.length;
   if (missing > 0) { atk *= (1 - 0.18 * missing); def *= (1 - 0.15 * missing); }

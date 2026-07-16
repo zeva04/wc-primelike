@@ -24,6 +24,7 @@ export async function loadEngine() {
     import("../js/game/run.js"),
     import("../js/game/flow.js"),
     import("../js/game/calendar.js"),
+    import("../js/game/day-action.js"),
     import("../js/game/discipline.js"),
     import("../js/game/medical.js"),
     import("../js/game/journal.js"),
@@ -33,7 +34,9 @@ export async function loadEngine() {
     import("../js/game/match/Match.js"),
     import("../js/game/match/powers.js"),
     import("../js/content/themes.js"),
+    import("../js/content/rarities.js"),
     import("../js/content/prep-events.js"),
+    import("../js/content/day-actions.js"),
     import("../js/content/conflicts.js"),
     import("../js/content/injuries.js"),
   ]);

@@ -72,8 +72,8 @@ agregan todos los módulos en `tests/load-engine.js` solo por comodidad. Mapa de
 | `js/game/tournament/knockout.js` | §7 Eliminatorias |
 | `js/game/match/powers.js` | §8 Funciones de poder |
 | `js/game/match/Match.js` (+ `chances.js`, `incidents.js`, `shootout.js`) | §8 Clase `Match` (máquina de estados + módulos de jugadas) |
-| `js/game/calendar.js` · `flow.js` · `discipline.js` · `medical.js` · `journal.js` | §9 Entre partidos |
-| `js/content/` (themes, prep-events, conflicts, injuries) | Tablas de contenido editable |
+| `js/game/calendar.js` · `day-action.js` · `flow.js` · `discipline.js` · `medical.js` · `journal.js` | §9 Entre partidos |
+| `js/content/` (themes, prep-events, day-actions, conflicts, injuries) | Tablas de contenido editable |
 
 Las secciones siguientes documentan las mismas funciones, ahora indicando su módulo.
 
@@ -142,8 +142,10 @@ resueltos hacia el ataque. Si se toca, recalcular la línea base de CORE.md §10
 
 El objeto `run` guarda: `teamId`, `squad`, `groups`, `stage` (`groups→r32→r16→qf→sf→final`),
 `matchday`, `koMatches`, `buffs`, `stats` acumuladas, y el calendario: `day` (día actual,
-1 = 11-jun-2026), `nextMatchDay` (día del próximo partido) y `dayPlan` (evento pre-sorteado
-de cada día intermedio: `{kind, id, tema}`).
+1 = 11-jun-2026), `nextMatchDay` (día del próximo partido), `dayPlan` (evento pre-sorteado
+de cada día intermedio: `{kind, id, tema}`), `actionPending` (Acción del Día por elegir),
+`lastAction` (`{day, icon, title}` de la última acción aplicada) y `dayMod` (modificador
+de las acciones de HOY: `{icon, title, desc, mods}`, dura exactamente un día).
 
 ### 5. Simulación IA — `js/game/tournament/sim.js`
 | Función | Qué hace |
@@ -170,7 +172,7 @@ de cada día intermedio: `{kind, id, tema}`).
 |---|---|
 | `effStat(p,key,buffs)` | Stat efectiva ~0–5 (stat÷20) con buffs y castigo por energía. |
 | `gkQuality(por,buffs)` | Calidad global del arquero (atajadas 60% · reflejos 25% · salidas 15%). |
-| `teamPowers(lineup,ment,buffs)` | Ataque y defensa (~0–5) de una alineación, con mentalidad e inferioridad numérica. |
+| `teamPowers(lineup,ment,buffs)` | Ataque y defensa (~0–5) de una alineación, con mentalidad, inferioridad numérica y el bonus parejo de `buffs.tactica` (Sesión táctica; solo llega por los buffs propios). |
 
 ### 8. Partido interactivo — clase `Match` (`js/game/match/Match.js` + `chances.js` / `incidents.js` / `shootout.js`)
 La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y llama al
@@ -218,12 +220,15 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | `_checkShootoutEnd()` | Cierra la tanda por definición matemática o muerte súbita. |
 | `result()` | Resultado final: marcador, ganador y detalle de penales. |
 
-### 9. Entre partidos — `js/game/calendar.js`, `flow.js`, `discipline.js`, `journal.js` y `js/content/`
+### 9. Entre partidos — `js/game/calendar.js`, `day-action.js`, `flow.js`, `discipline.js`, `journal.js` y `js/content/`
 | Función | Qué hace |
 |---|---|
 | `dayLabel(day)` | Fecha real del día de la run ("Jue 11 jun"; día 1 = 11-jun-2026). |
-| `scheduleNextMatch(run)` | Agenda el próximo partido a 5-6 días y pre-sortea el evento de cada día intermedio (75% evento / 25% conflicto, sin repetir dentro de la ventana). Llena `run.nextMatchDay` y `run.dayPlan`. |
-| `advanceDay(run)` | Pasa al día siguiente y resuelve lo que trae: `{type:"match"}` (llegó el partido), `{type:"evento",…}` (inevitable, ya aplicado) o `{type:"conflicto",…}` (dilema: la UI aplica la opción elegida). |
+| `scheduleNextMatch(run)` | Agenda el próximo partido a 5-6 días y pre-sortea el evento de cada día intermedio (75% evento — nivel de rareza ponderado por `RARITIES.weight` y luego un evento del nivel — / 25% conflicto, sin repetir dentro de la ventana). Llena `run.nextMatchDay` y `run.dayPlan`. |
+| `advanceDay(run)` | Pasa al día siguiente y resuelve lo que trae: `{type:"match"}` (llegó el partido), `{type:"evento",…, rareza}` (inevitable, ya aplicado; `effect` puede devolver un desc con protagonista) o `{type:"conflicto",…}` (dilema: la UI aplica la opción elegida). Todo día sin partido levanta además `run.actionPending`; si el evento trae `mod`, lo deja en `run.dayMod` (se limpia al empezar cada día). Las legendarias van al diario con tono dorado. |
+| `applyDayAction(run,actionId)` | **day-action**: aplica la Acción del Día elegida (`DAY_ACTIONS`) escalada por el modificador del día, baja `actionPending`, escribe `lastAction` y anota el diario. Devuelve `{...accion, mult}` o `null` si no había acción pendiente, el id no existe o la acción está bloqueada hoy. |
+| `actionMult(run,action)` | **day-action**: multiplicador de una acción HOY según `run.dayMod` (1 sin modificador; 0 = bloqueada). |
+| `multLabel(mult)` | **day-action**: etiqueta corta para la UI ("×2", "×½"); `""` si es 1 o bloqueo. |
 | `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced}`. |
 | `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario por jugador (delega en `applyMedicalPostMatch` y `applyDisciplinePostMatch`), limpia buffs y **re-agenda**. |
 | `advanceStage(run,advanced)` | **flow**: avanza el torneo y devuelve `{type: "next-matchday"\|"qualified"\|"eliminated"\|"next-round"\|"champion"}`; dispara `clearAmarillas` al cerrar grupos y tras 4tos. La UI solo rutea. |
@@ -233,8 +238,16 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | `clearAmarillas(run,motivo)` | Borra las amarillas acumuladas de todo el plantel y lo anota en el diario. Se llama al cerrar la fase de grupos y tras los cuartos. Las suspensiones pendientes NO se perdonan. |
 
 Constantes de datos: `EVENT_THEMES` (4 temáticas con icono/color fijos: entrenamiento,
-físico, vestuario, entorno), `PREP_EVENTS` (10 eventos inevitables ±5), `RANDOM_EVENTS`
-(6 conflictos con decisión, también con `tema`).
+físico, vestuario, entorno), `RARITIES` (4 niveles con peso de sorteo y colores:
+común 55 · infrecuente 27 · rara 13 · legendaria 5), `PREP_EVENTS` (30 eventos
+inevitables con `rareza` — 10/8/7/5 por nivel, magnitud creciente — y `mod` opcional
+que modifica las Acciones del Día vía `run.dayMod`), `RANDOM_EVENTS` (6 conflictos con
+decisión, también con `tema`) y `DAY_ACTIONS` (5 Acciones del Día en
+`content/day-actions.js`: 3 focos de entrenamiento con `group:"entrenar"`, recuperación
+y sesión táctica; los `effect(run, mult)` escalan su recompensa — no el costo — por el
+modificador; exporta también `TRAIN_BUFF`, `TRAIN_FATIGUE` y `TACTICS_BONUS`).
+El esquema de todo este contenido es LEY en `tests/events.validate.js`, que además
+aplica cada efecto contra una run fresca (energías en rango, buffs finitos).
 
 ### 10. API pública
 No existe fachada (F7): la superficie pública del motor es la suma de los exports de sus
@@ -336,11 +349,12 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 | Función | Qué hace |
 |---|---|
 | `nextOpponentId()` | Id del próximo rival (grupo o cruce). |
-| `renderHub()` | Pantalla central: rival, calendario, alineación; el botón principal pasa el día o juega el partido según toque. |
+| `renderHub()` | Pantalla central: rival, calendario, alineación; el botón principal pasa el día o juega el partido según toque. "Pasar al día" queda bloqueado mientras `run.actionPending` — primero se elige la Acción del Día. |
+| `actionCard()` | Panel de la **Acción del Día** (Bible §4.7): los focos de Entrenar agrupados en una fila + una tarjeta-botón por acción suelta; elegida la acción, lo reemplaza una línea de confirmación. Aplica vía `game/day-action`. Si hay `run.dayMod` muestra su banner y bloquea (`disabled` + gris) o etiqueta ("×2 hoy") las acciones afectadas. |
 | `renderCalendarCard(opp)` | Franja de días hasta el próximo partido: hoy resaltado, temática por día, rival en el día de partido. |
-| `buffChips()` | Chips con los efectos acumulados para el próximo partido. |
+| `buffChips()` | Chips con los efectos acumulados para el próximo partido (incluye el de `tactica` con su multiplicador de sesiones). |
 | `themeHeader(tema)` | Cabecera de temática (icono/color fijos) de los modales de evento/conflicto. |
-| `showDayEvent(ev)` | Modal del evento inevitable del día (ya aplicado por el motor). |
+| `showDayEvent(ev)` | Modal del evento inevitable del día (ya aplicado por el motor), con su badge de rareza coloreado (`RARITIES`). |
 | `renderJournal(back)` | Pantalla del **Diario de Campaña**: entradas agrupadas por día, coloreadas por `tone`; `back` define a dónde vuelve (hub o desenlace). |
 | `renderGroupTableCard()` / `renderKoInfoCard()` | Tarjetas de tabla / info de eliminatoria. |
 | `renderSquadScreen()` | **Gestión de Plantilla**: cancha con el once, selector de formación, ficha del jugador y los 4 suplentes. Las reglas son de `game/lineup`; aquí solo viven las coordenadas (`ROW_Y`, `spreadX`), que son presentación. |

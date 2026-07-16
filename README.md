@@ -31,11 +31,11 @@ js/core/              → rng.js (ÚNICO punto de azar) · math.js
 js/data/teams-repo.js → consultas a la base de selecciones
 js/game/              → sistemas de campaña: run, flow (orquestador: closeMatch,
                         postMatchUpdate, advanceStage), ratings, lineup, opponents,
-                        calendar, discipline, medical, journal
+                        calendar, day-action, discipline, medical, journal
 js/game/tournament/   → groups, knockout, sim (IA por Poisson)
 js/game/match/        → Match (máquina de estados) + powers, chances, incidents, shootout
 js/content/           → tablas que se editan para agregar contenido:
-                        prep-events, conflicts, injuries, themes
+                        prep-events, day-actions, conflicts, injuries, themes, rarities
 js/ui/                → interfaz: nav (registro de pantallas), session (estado),
                         components, sprites, theme
 js/ui/screens/        → una pantalla = un archivo: menu, history, draw, hub, squad,
@@ -43,7 +43,8 @@ js/ui/screens/        → una pantalla = un archivo: menu, history, draw, hub, s
 js/storage/history.js → persistencia del historial (único módulo que toca localStorage)
 data/teams.js         → base de datos de 52 selecciones (módulo ES)
 data/flags/           → banderas PNG locales (una por selección)
-tests/                → run-all, smoke (árbitro de balance), teams.validate, discipline
+tests/                → run-all, smoke (árbitro de balance), teams.validate,
+                        events.validate (esquema y efectos del contenido), discipline
 docs/                 → CORE.md (matemáticas) · FUNCIONES.md (referencia) · ARQUITECTURA.md
 ```
 
@@ -52,7 +53,8 @@ docs/                 → CORE.md (matemáticas) · FUNCIONES.md (referencia) ·
 - **Formato Mundial 2026 real**: 12 grupos de 4, clasifican los 2 primeros + los 8 mejores terceros → 16avos → octavos → cuartos → semis → final.
 - **Selecciones jugables (16)**: Brasil, Noruega, Francia, Argentina, Inglaterra, Colombia, Marruecos, Corea del Sur, Senegal, Japón, Estados Unidos, México, Canadá, Australia, Nueva Zelanda y Cabo Verde — cada una con sus 10 figuras reales, stats individuales, colores de camiseta que tiñen la UI y dificultad temática (Favorito / Aspirante / Caballo negro / Campaña legendaria). El menú es un carrusel estilo FIFA: eliges continente y navegas con flechas entre sus selecciones, con panel de detalle del plantel completo (dorsales reales 1-26 incluidos) y sus **sprites pixelados** generados por código — busto con piel/pelo/barba del jugador real y la equipación del equipo; el arquero usa su equipación propia). Los rivales también tienen sprites: camiseta titular real (`kit` en los datos) y apariencia procedural determinista generada por hash del nombre — visibles en el hub (figuras) y en el panel "Rival en cancha" del partido. Los rivales son los **48 clasificados reales** al Mundial 2026 (verificados post-repechajes de marzo 2026: entraron Bosnia, Suecia, Chequia e Irak). La base de datos también guarda selecciones NO clasificadas (Italia, Dinamarca, Polonia, Bolivia) con `qualified: false` — no salen en el sorteo, quedan para features futuras.
 - **Equipo**: formato **6v6** (Game Vision) — 6 titulares (POR + DEF + MED + DEL + 2 extras flexibles que definen la formación) y 4 suplentes, gestionados desde la pantalla de Gestión de Plantilla. Antes de cada partido ocurre un **Evento del día** inevitable (1 de 10) que buffea o nerfea al equipo. Stats en escala **1–99** (basadas en EA FC 26 para los planteles jugables). Jugadores de campo: tiro, defensa, cabezazo, pase y aura. Arqueros: **atajadas, reflejos, salidas, pase y aura** (atajadas = calidad base ante remates; reflejos = penales y mano a mano; salidas = dominio del área). La nota de cada jugador se pondera por posición; las estrellas son solo visualización (nota ÷ 20). El rating de un equipo jugable es el promedio de sus 5 mejores notas.
-- **Calendario por días**: la run avanza día a día sobre las fechas reales del Mundial (11 jun – 19 jul 2026). Los partidos se juegan cada 5-6 días (aleatorio); cada día sin partido trae un **evento inevitable** (buff/debuff, ±5) o un **conflicto con decisión** (sponsors, peleas, virus, localía…). El calendario del hub anticipa solo la **temática** de cada día (🏋️ Entrenamiento · 🧑‍⚕️ Estado físico · 🎭 Vestuario · 📣 Entorno) — el detalle se descubre al vivirlo. Los efectos se acumulan hasta el próximo partido; en los días de partido no hay eventos.
+- **Calendario por días**: la run avanza día a día sobre las fechas reales del Mundial (11 jun – 19 jul 2026). Los partidos se juegan cada 5-6 días (aleatorio); cada día sin partido trae un **evento inevitable** o un **conflicto con decisión** (sponsors, peleas, virus, localía…). Los 30 eventos se sortean por **rareza** (Común 55% · Infrecuente 27% · Rara 13% · Legendaria 5%): a mayor rareza, mayor impacto — desde ±5 de una stat hasta mejoras permanentes de un jugador o un brote de gripe (~1 legendaria por run). Algunos eventos son **modificadores del día**: bloquean, reducen o duplican las acciones de hoy (cancha anegada → no se entrena; spa → recuperar ×2). El calendario del hub anticipa solo la **temática** de cada día (🏋️ Entrenamiento · 🧑‍⚕️ Estado físico · 🎭 Vestuario · 📣 Entorno) — el detalle y la rareza se descubren al vivirlo. Los efectos se acumulan hasta el próximo partido; en los días de partido no hay eventos.
+- **Acción Principal del Día**: en cada día sin partido, después del evento, el DT elige **una** inversión (no se puede pasar el día sin elegir): 🏋️ Entrenar (foco ataque/defensa/pases: +4 a esa stat, pero −5 de energía al plantel), 🧘 Recuperar (+15 de energía) o 📋 Sesión táctica (el equipo llega mejor plantado al próximo partido). Elegir es renunciar: cada opción sacrifica las otras.
 - **Durante el partido**: relato en vivo con decisiones (ocasiones de gol, penales interactivos, cambios, mentalidad táctica, amonestados, lesiones, VAR). Reglas de cambio reales: 3 por partido, el sustituido no puede reingresar (queda en gris en la banca) y el arquero suplente solo puede entrar por el arquero.
 - **Fin de la run**: pantalla de estadísticas; el historial se guarda en localStorage.
 

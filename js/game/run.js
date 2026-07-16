@@ -62,6 +62,9 @@ export function newRun(myTeamId) {
     day: 1,                    // día 1 = 11 de junio de 2026           (escribe game/calendar)
     nextMatchDay: null,        // día del próximo partido               (escribe game/calendar)
     dayPlan: {},               // {día: {kind, id, tema}} pre-sorteados (escribe game/calendar)
+    actionPending: true,       // Acción del Día por elegir (levanta calendar, baja day-action)
+    lastAction: null,          // {day, icon, title} de la última acción (escribe day-action)
+    dayMod: null,              // modificador de las acciones de HOY: {icon,title,desc,mods} (escribe calendar)
     stats: { pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, tarjetas: 0, eventos: 0, penalesAtajados: 0 },
     champion: false,
     journal: [],               // Diario de Campaña: la memoria narrativa de la run

@@ -257,15 +257,73 @@ de 2026, arranque real del Mundial; las fechas son ambientación). Los partidos 
 cada **5-6 días** (`ri(5,6)` en `scheduleNextMatch`) y cada día intermedio trae
 exactamente un suceso, pre-sorteado al agendar el partido:
 
-- **75% evento inevitable** (`PREP_EVENTS`, 10): buff o debuff que se aplica solo.
+- **75% evento inevitable** (`PREP_EVENTS`, 30, sorteado por **rareza**): buff o debuff
+  que se aplica solo, o un **modificador del día** (ver más abajo).
 - **25% conflicto con decisión** (`RANDOM_EVENTS`, 6): dilema con dos opciones y
   trade-offs (sponsors, peleas, virus, localía, prensa, médicos).
+
+### Rareza de los eventos (`RARITIES`)
+
+El evento del día se sortea en dos pasos: primero el **nivel de rareza** (ponderado,
+renormalizando entre los niveles con eventos sin usar en la ventana) y después un
+evento de ese nivel. A mayor rareza, menor probabilidad y **mayor impacto**:
+
+| Rareza | Peso | Pool | Magnitud típica |
+|---|---|---|---|
+| Común | 55% | 10 | ±5 de stat, ±10/20 de energía (los originales) |
+| Infrecuente | 27% | 8 | ±8 de stat, ±12 de energía, o un modificador del día |
+| Rara | 13% | 7 | ±10-12, combos de dos stats, lesión en la práctica, +25 energía |
+| Legendaria | 5% | 5 | Campaña-defining: +5 a TODAS las stats, +3 PERMANENTE al mejor delantero, brote de gripe (−25), todas las acciones ×2 |
+
+Con ~19 eventos por run completa, una legendaria aparece ~1 vez por run: es un
+momento, no una rutina. El diario marca las legendarias con tono dorado.
+
+### Eventos como modificadores del día (`run.dayMod`)
+
+Algunos eventos no tocan números: **cambian el problema de hoy** (Bible §4.5). Su campo
+`mod` queda en `run.dayMod` (dura exactamente un día) y multiplica el rendimiento de las
+Acciones del Día: `entrenar ×2` (doble turno), `entrenar 0` (cancha anegada: bloqueada),
+`recuperar ×2` (spa), `recuperar ×0.5` (ola de calor), `tactica 0` (alineación filtrada),
+todas ×2 (legendaria "El día que todo sale"). El multiplicador escala la **recompensa**;
+el costo de energía de entrenar no se escala. La UI muestra el modificador como banner
+en el panel de acción y bloquea/etiqueta los botones afectados.
+
+> **Asimetría deliberada**: los modificadores-premio solo pagan si ELIGES la acción
+> potenciada (habilidad de lectura); los castigos aplican solos. Con decisiones al azar
+> el smoke pierde ~1-3 pp de campeón respecto a la versión sin rarezas — un DT humano
+> que aprovecha los ×2 recupera esa diferencia. Es la "ventaja del DT humano" (§6).
 
 Dentro de una ventana no se repite el mismo suceso (se sortea sin reposición).
 El calendario del hub muestra de antemano **solo la temática** de cada día
 (Entrenamiento · Estado físico · Vestuario · Entorno, siempre con el mismo icono y
 color): sabes *de qué* vendrá el golpe o el regalo, no *cuál* es — información
 aproximada, como pide el Game Vision.
+
+### La Acción Principal del Día (`DAY_ACTIONS`, `applyDayAction`)
+
+Además del suceso que le toca, **cada día sin partido el DT elige exactamente UNA
+acción** (Core Gameplay Bible §4.7: un día = una inversión, con opportunity cost).
+El orden dentro del día es el del Bible: primero el evento cambia el contexto,
+después el DT decide. No se puede pasar el día sin elegir. Las 5 acciones
+(`content/day-actions.js`):
+
+| Acción | Efecto | Trade-off |
+|---|---|---|
+| 🎯/🛡️/🎩 **Entrenar** (foco ataque, defensa o pases) | +4 al buff de la stat elegida | **−5 de energía** a todo el plantel |
+| 🧘 **Recuperar** | +15 de energía a todo el plantel | No mejora ninguna stat |
+| 📋 **Sesión táctica** | +0.1 a **atk y def** (escala de poder §5) para el próximo partido, vía `buffs.tactica` | No recupera ni sube stats individuales |
+
+Calibración: +4 de una stat entrenada equivale a +0.06–0.14 de poder según la stat
+(§5), así que la sesión táctica (+0.1 repartido en ambas fases, sin costo de energía)
+compite de igual a igual con entrenar — ninguna acción domina, como pide el Bible.
+El bonus táctico solo alcanza al equipo del usuario (el rival calcula sus poderes con
+`buffs = {}`) y se limpia con el resto de los buffs al terminar el partido. La sesión
+táctica es además el gancho donde se enchufará la **Filosofía**.
+
+Medido tras introducirla (1500 runs, decisiones al azar): BRA 34.9%→35.8%, CAN
+37.6%→37.0%, CPV 9.9%→10.1% de campeón — dentro del ruido; el diario crece de ~40 a
+~70 entradas por run (una por acción). Tras sumar rarezas y modificadores (16-jul-2026):
+BRA 32.1%, CAN 35.8%, CPV 8.9% — la baja leve es la asimetría deliberada descrita arriba.
 
 Las palancas de la economía:
 

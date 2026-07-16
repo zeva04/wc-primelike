@@ -85,6 +85,17 @@ function playRun(teamId) {
   while (alive && guard++ < 60) {
     let dayGuard = 0;
     while (run.day < run.nextMatchDay && dayGuard++ < 10) {
+      // Acción del Día del día actual (mismo orden que la UI: evento → acción → avanzar).
+      // Solo entre las acciones disponibles: los modificadores del día pueden bloquear.
+      if (run.actionPending) {
+        const opts = E.DAY_ACTIONS.filter(a => E.actionMult(run, a) > 0);
+        assert(opts.length > 0, "ningún modificador puede bloquear TODAS las acciones");
+        const blocked = E.DAY_ACTIONS.find(a => E.actionMult(run, a) === 0);
+        if (blocked) assert(E.applyDayAction(run, blocked.id) === null, "una acción bloqueada no debe aplicarse", blocked.id);
+        const a = opts[Math.floor(Math.random() * opts.length)];
+        assert(E.applyDayAction(run, a.id), "la acción del día debe aplicarse", a.id);
+        assert(!run.actionPending, "aplicar la acción consume el turno del día");
+      }
       const ev = E.advanceDay(run);
       if (ev && ev.type === "conflicto") {
         const opt = ev.options[Math.floor(Math.random() * ev.options.length)];
@@ -92,6 +103,7 @@ function playRun(teamId) {
         E.addJournal(run, { icon: ev.icon, tone: "neutral", title: ev.title, desc: `Elegiste "${opt.label}". ${res}` });
       }
     }
+    assert(!run.actionPending, "el día de partido no debe tener acción pendiente");
     const oppId = E.nextOpponentId(run);
     const match = playMatch(run, oppId);
 

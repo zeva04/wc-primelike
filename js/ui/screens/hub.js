@@ -8,6 +8,9 @@ import { getTeam } from "../../data/teams-repo.js";
 import { teamRating, teamStars, playerOverall, outOfPosPenalty } from "../../game/ratings.js";
 import { currentLineup, validateLineup, getFormation } from "../../game/lineup.js";
 import { dayLabel, advanceDay } from "../../game/calendar.js";
+import { applyDayAction, actionMult, multLabel } from "../../game/day-action.js";
+import { DAY_ACTIONS, TACTICS_BONUS, TRAIN_BUFF, TRAIN_FATIGUE } from "../../content/day-actions.js";
+import { RARITIES } from "../../content/rarities.js";
 import { addJournal } from "../../game/journal.js";
 import { nextOpponentId, STAGE_LABEL } from "../../game/tournament/knockout.js";
 import { EVENT_THEMES } from "../../content/themes.js";
@@ -80,6 +83,12 @@ function buffChips() {
   for (const [k, v] of Object.entries(S.run.buffs)) {
     if (k === "antiLesion") { if (v) chips.push(`<span class="px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/10 text-emerald-400">🧑‍⚕️ Sin lesiones</span>`); continue; }
     if (k === "penales") { if (v) chips.push(`<span class="px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/10 text-emerald-400">🥅 Penales +</span>`); continue; }
+    if (k === "tactica") {
+      if (!v) continue;
+      const n = Math.round(v / TACTICS_BONUS);
+      chips.push(`<span class="px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/10 text-emerald-400">📋 Preparación táctica${n > 1 ? ` ×${n}` : ""}</span>`);
+      continue;
+    }
     if (!v || !LABELS[k]) continue;
     const pos = v > 0;
     chips.push(`<span class="px-2 py-0.5 rounded-full border ${pos ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" : "border-red-500/50 bg-red-500/10 text-red-400"}">${LABELS[k]} ${pos ? "+" : ""}${v}</span>`);
@@ -106,9 +115,62 @@ function effectsCard() {
 }
 
 /**
+ * Panel de la Acción del Día (Bible §4.7): un día sin partido = una inversión.
+ * Entrenar agrupa sus focos en una fila de botones; las demás acciones son una
+ * tarjeta-botón cada una. Cuando la acción ya se eligió, una línea de
+ * confirmación reemplaza al panel y se desbloquea "Pasar al día siguiente".
+ */
+function actionCard() {
+  const run = S.run;
+  if (!run.actionPending) {
+    const done = run.lastAction && run.lastAction.day === run.day;
+    return done
+      ? `<div class="border border-slate-700/70 bg-slate-800/40 rounded-2xl px-4 py-2.5 text-xs text-slate-400">
+          Acción de hoy: <b class="text-slate-200">${run.lastAction.icon} ${run.lastAction.title}</b> ✓
+        </div>`
+      : "";
+  }
+  const training = DAY_ACTIONS.filter(a => a.group === "entrenar");
+  const rest = DAY_ACTIONS.filter(a => !a.group);
+  // Badge del modificador del día sobre una acción: bloqueada / ×2 / ×½
+  const modBadge = m => m === 0
+    ? `<span class="text-[9px] font-black text-red-400 uppercase">no disponible hoy</span>`
+    : m !== 1
+      ? `<span class="text-[9px] font-black ${m > 1 ? "text-emerald-400" : "text-orange-400"}">${multLabel(m)} hoy</span>`
+      : "";
+  const tMult = actionMult(run, training[0]);
+  return `<div class="bg-slate-800/60 border tp-border rounded-2xl p-4">
+    <h3 class="font-bold">🧭 Acción del día</h3>
+    <p class="text-[10px] text-slate-500 mt-0.5 mb-3">Un día, una inversión: lo que elijas hoy es lo que NO harás. Revisa plantilla y rival antes de decidir.</p>
+    ${run.dayMod ? `<div class="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-300 mb-3">${run.dayMod.icon} ${run.dayMod.title}: ${run.dayMod.desc}.</div>` : ""}
+    <div class="rounded-xl border border-slate-700 bg-slate-900/50 p-3 mb-2 ${tMult === 0 ? "opacity-50" : ""}">
+      <div class="flex items-center justify-between">
+        <span class="font-semibold text-sm">🏋️ Entrenar</span>
+        ${modBadge(tMult) || `<span class="text-[10px] font-bold text-red-400/90">cansa al plantel</span>`}
+      </div>
+      <p class="text-[10px] text-slate-500 mt-0.5 mb-2">+${TRAIN_BUFF} a la stat del foco elegido hasta el próximo partido · −${TRAIN_FATIGUE} de energía al plantel.</p>
+      <div class="grid grid-cols-3 gap-2">
+        ${training.map(a => `<button data-action="${a.id}" ${tMult === 0 ? "disabled" : ""} class="da-opt px-2 py-2 rounded-lg border border-slate-600 bg-slate-700/60 text-xs font-semibold transition-all ${tMult === 0 ? "cursor-not-allowed text-slate-500" : "hover:border-amber-400 hover:bg-slate-700 cursor-pointer"}" title="${a.desc}">${a.icon} ${a.label}</button>`).join("")}
+      </div>
+    </div>
+    ${rest.map(a => {
+      const m = actionMult(run, a);
+      return `<button data-action="${a.id}" ${m === 0 ? "disabled" : ""} class="da-opt w-full text-left rounded-xl border border-slate-700 bg-slate-900/50 p-3 mb-2 transition-all ${m === 0 ? "opacity-50 cursor-not-allowed" : "hover:border-amber-400 hover:bg-slate-800 cursor-pointer"}">
+        <div class="flex items-center justify-between">
+          <span class="font-semibold text-sm">${a.icon} ${a.title}</span>
+          ${modBadge(m)}
+        </div>
+        <div class="text-[10px] text-slate-500 mt-0.5">${a.desc}.</div>
+      </button>`;
+    }).join("")}
+  </div>`;
+}
+
+/**
  * Concentración Mundialista: pantalla central entre partidos.
  * Layout balanceado en 2 columnas: IZQUIERDA posición + efectos;
- * DERECHA plantilla + diario + el botón del día (pasar día o jugar).
+ * DERECHA plantilla + diario + la Acción del Día + el botón del día
+ * (pasar día — bloqueado hasta elegir acción — o jugar).
  */
 function renderHub() {
   const run = S.run;
@@ -189,9 +251,12 @@ function renderHub() {
           <p class="text-xs text-slate-400 mt-1 truncate">Último: ${run.journal.length ? run.journal[run.journal.length - 1].title : "la historia recién comienza."}</p>
           <p class="text-xs tp-text font-semibold mt-2">Revivir la campaña →</p>
         </button>
+        ${isMatchDay ? "" : actionCard()}
         ${isMatchDay
           ? `<button id="btn-play" class="tp-gradient w-full text-lg font-black py-3 rounded-xl shadow-lg cursor-pointer transition-all hover:scale-[1.01] hover:brightness-110">⚽ JUGAR PARTIDO</button>`
-          : `<button id="btn-nextday" class="w-full text-lg font-black py-3 rounded-xl border border-slate-500 bg-slate-700/70 hover:bg-slate-600 shadow-lg cursor-pointer transition-all hover:scale-[1.01]">🌙 Pasar al día siguiente →</button>`}
+          : run.actionPending
+            ? `<button id="btn-nextday" disabled class="w-full text-lg font-black py-3 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-500 shadow-lg cursor-not-allowed" title="Primero elige la Acción del día">🌙 Pasar al día siguiente →</button>`
+            : `<button id="btn-nextday" class="w-full text-lg font-black py-3 rounded-xl border border-slate-500 bg-slate-700/70 hover:bg-slate-600 shadow-lg cursor-pointer transition-all hover:scale-[1.01]">🌙 Pasar al día siguiente →</button>`}
       </div>
     </div>
   `);
@@ -207,7 +272,13 @@ function renderHub() {
     play.classList.toggle("cursor-not-allowed", !v.ok);
     play.onclick = () => { if (validateLineup(available, S.selectedLineup).ok) go("start-match", oppId); };
   } else {
-    $("#btn-nextday").onclick = () => {
+    document.querySelectorAll(".da-opt").forEach(b => b.onclick = () => {
+      const a = applyDayAction(S.run, b.dataset.action);
+      if (!a) return;
+      toast(`${a.icon} ${a.title}${a.mult !== 1 ? ` (${multLabel(a.mult)} hoy)` : ""}: ${a.desc}.`);
+      renderHub();
+    });
+    if (!S.run.actionPending) $("#btn-nextday").onclick = () => {
       const res = advanceDay(S.run);
       if (!res) { renderHub(); return; }
       if (res.type === "match") { renderHub(); toast(`⚽ ${dayLabel(S.run.day)} — ¡Día de partido!`); }
@@ -227,10 +298,12 @@ function themeHeader(tema) {
 /** Muestra el evento inevitable del día (ya aplicado por el motor) y vuelve al hub. */
 function showDayEvent(ev) {
   S.run.stats.eventos++;
+  const rar = RARITIES[ev.rareza];
   const m = modal(`
     <div class="text-center">
       ${themeHeader(ev.tema)}
       <div class="text-5xl mb-2">${ev.icon}</div>
+      ${rar ? `<div class="inline-block px-2.5 py-0.5 rounded-full border ${rar.border} ${rar.color} text-[10px] font-black uppercase tracking-widest mb-2">${rar.label}</div>` : ""}
       <h2 class="text-xl font-black mb-2">${ev.title}</h2>
       <p class="text-sm mb-2 ${ev.tipo === "buff" ? "text-emerald-400" : "text-red-400"}">${ev.desc}</p>
       <p class="text-[10px] text-slate-500 mb-5">Los eventos son inevitables: el mundo del Mundial no espera a nadie.</p>
