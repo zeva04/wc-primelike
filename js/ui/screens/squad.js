@@ -1,16 +1,15 @@
 /* ============================================================
-   ui/screens/squad — Gestión de Plantilla: el once sobre la
-   cancha, la formación y la ficha del jugador.
+   ui/screens/squad — Gestión de Plantilla: formación, ficha del
+   jugador y el once sobre la cancha.
 
-   Las reglas de alineación viven en game/lineup.js y el castigo
-   por jugar fuera de puesto en game/ratings.js: esta pantalla
-   solo pinta y captura clics/arrastres. Las coordenadas de la
-   cancha SÍ son suyas: son presentación, no regla.
+   La cancha y su arrastre viven en ui/pitch.js (la comparte con
+   el partido); las reglas, en game/lineup.js y game/ratings.js.
+   Esta pantalla decide QUÉ intercambio es válido y qué significa.
 
    MODELO: S.selectedLineup va ORDENADO por los slots de
    S.formation — el titular del índice i juega formationSlots(i).
-   Mover a alguien = mover su índice. game/lineup.assignPositions
-   deriva de ahí el puesto de cada uno (y con él, el castigo).
+   Mover a alguien = mover su índice; assignPositions rederiva de
+   ahí el puesto de cada uno (y con él, el castigo).
    ============================================================ */
 import { getTeam } from "../../data/teams-repo.js";
 import {
@@ -24,19 +23,15 @@ import {
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, toast, modal, closeModal } from "../components.js";
+import { mountPitch, POS_NAME } from "../pitch.js";
 import { spriteSvg } from "../sprites.js";
 
-const POS_NAME = { POR: "Arquero", DEF: "Defensa", MED: "Mediocampista", DEL: "Delantero" };
 const STAT_NAME = {
   tiro: "Tiro", defensa: "Defensa", cabezazo: "Cabezazo", pase: "Pase", aura: "Aura",
   atajadas: "Atajadas", reflejos: "Reflejos", salidas: "Salidas",
 };
-// Filas de la cancha (% desde arriba): el arquero abajo, los delanteros arriba.
-// Equiespaciadas a 23%: menos que eso y las fichas se pisan en pantallas chicas.
-const ROW_Y = { DEL: 20, MED: 43, DEF: 66, POR: 89 };
 
 let selName = null; // jugador con la ficha abierta (solo estado visual de esta pantalla)
-let dragging = null; // origen del arrastre en curso: {kind:"pitch",idx} | {kind:"bench",name}
 
 /**
  * Gestión de Plantilla: cancha con los 6 titulares, selector de formación,
@@ -96,6 +91,7 @@ function renderSquadScreen() {
 }
 
 const availables = () => S.run.squad.filter(isAvailable);
+const isAvailable = p => !p.suspendido && p.lesionadoPartidos === 0;
 
 /** Trae el once vigente del motor (lo rearma si hay bajas nuevas) y deja los puestos asignados. */
 function refreshLineup() {
@@ -112,9 +108,20 @@ function setLineup(lineup) {
 function renderAll() {
   const available = availables();
   renderFormationPicker(available);
-  renderPitch();
+  mountPitch({
+    pitchEl: $("#pitch"), benchEl: $("#bench"),
+    team: getTeam(S.run.teamId),
+    lineup: S.selectedLineup,
+    bench: S.run.squad.filter(p => !S.selectedLineup.includes(p)),
+    selected: selName,
+    badge: p => (p.amarillas > 0 ? " 🟨" : "") + (p.suspendido ? "🟥" : p.lesionadoPartidos > 0 ? "🚑" : ""),
+    muted: p => !isAvailable(p),
+    draggable: isAvailable,
+    canSwap: (a, b) => swapCandidates(a).includes(b) ? { tone: "sky" } : null,
+    onSwap: (a, b) => { swapPlayers(a, b); renderAll(); },
+    onSelect: p => { selName = p.name; renderAll(); },
+  });
   renderPlayerCard();
-  renderBench();
   renderStatus(available);
 }
 
@@ -124,8 +131,7 @@ function renderAll() {
 function renderFormationPicker(available) {
   const el = $("#formation-picker");
   if (!el) return;
-  const cur = S.formation;
-  const curF = getFormation(cur);
+  const curF = getFormation(S.formation);
 
   el.innerHTML = `
     <button id="btn-formation" class="flex items-center gap-2.5 bg-slate-900/80 border-2 tp-border rounded-lg pl-3 pr-2 py-1.5 cursor-pointer hover:brightness-125 transition-all">
@@ -136,7 +142,7 @@ function renderFormationPicker(available) {
     <div id="formation-list" class="hidden absolute left-0 top-full mt-1.5 z-30 w-60 bg-slate-900 border-2 border-slate-600 rounded-lg shadow-2xl overflow-hidden animate-pop">
       ${FORMATIONS.map(f => {
         const usable = canUseFormation(available, f.id);
-        const isCur = f.id === cur;
+        const isCur = f.id === S.formation;
         return `<button data-formation="${f.id}" ${usable ? "" : "disabled"}
           class="w-full flex items-center gap-2.5 px-3 py-2 text-left border-b border-slate-800 last:border-0 ${
             !usable ? "opacity-35 cursor-not-allowed"
@@ -177,68 +183,6 @@ function formationDots(f) {
   return `<span class="inline-flex items-center gap-[5px] h-4 align-middle">${col(f.def)}${col(f.med)}${col(f.del)}</span>`;
 }
 
-/* ---------- Cancha ---------- */
-
-/** Reparte n fichas a lo ancho (%): 1 al centro, 2 abiertos, 3 en línea. */
-function spreadX(n) {
-  if (n <= 1) return [50];
-  const gap = n === 2 ? 36 : n === 3 ? 30 : 24;
-  return Array.from({ length: n }, (_, i) => 50 + (i - (n - 1) / 2) * gap);
-}
-
-/** Puesto que juega el slot i (el del jugador si el once es improvisado y no hay formación). */
-const slotPos = (i) => formationSlots(S.formation)[i] || S.selectedLineup[i].pos;
-
-/** Pinta el once sobre el césped, cada uno en la fila del PUESTO QUE JUEGA (no el natural). */
-function renderPitch() {
-  const el = $("#pitch");
-  if (!el) return;
-  const me = getTeam(S.run.teamId);
-  const rows = { POR: [], DEF: [], MED: [], DEL: [] };
-  S.selectedLineup.forEach((p, i) => rows[slotPos(i)].push(i));
-  const tokens = [];
-  for (const pos of ["DEL", "MED", "DEF", "POR"]) {
-    const xs = spreadX(rows[pos].length);
-    rows[pos].forEach((idx, k) => tokens.push(pitchToken(S.selectedLineup[idx], idx, me, xs[k], ROW_Y[pos])));
-  }
-  el.innerHTML = pitchLines() + tokens.join("");
-  bindTokens(el);
-}
-
-/** Líneas de la cancha: borde, medio campo, círculo central y las dos áreas. */
-function pitchLines() {
-  return `
-    <div class="pitch-line inset-2 border-2"></div>
-    <div class="pitch-line left-2 right-2 top-1/2 border-t-2"></div>
-    <div class="pitch-line left-1/2 top-1/2 w-20 h-20 -translate-x-1/2 -translate-y-1/2 border-2 rounded-full"></div>
-    <div class="pitch-line left-1/2 -translate-x-1/2 top-2 w-2/5 h-[13%] border-2 border-t-0"></div>
-    <div class="pitch-line left-1/2 -translate-x-1/2 bottom-2 w-2/5 h-[13%] border-2 border-b-0"></div>`;
-}
-
-/** Ficha de un titular: sprite + dorsal + placa con nombre y nota. Arrastrable. */
-function pitchToken(p, idx, team, x, y) {
-  const sel = p.name === selName;
-  const fuera = outOfPosPenalty(p) > 0;
-  return `<button data-idx="${idx}" data-name="${p.name}" draggable="true"
-    title="${p.name}${fuera ? ` — ¡de ${POS_NAME[playedPos(p)].toLowerCase()}! No es su puesto` : ""}"
-    class="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center cursor-grab active:cursor-grabbing group z-10"
-    style="left:${x}%;top:${y}%">
-    <div class="relative pointer-events-none">
-      <div class="absolute left-1/2 -translate-x-1/2 bottom-0 w-8 h-1.5 bg-black/40 rounded-[50%]"></div>
-      <div class="relative rounded border-2 px-0.5 transition-all group-hover:brightness-125 ${
-        sel ? "tp-border tp-bg-soft tp-ring" : fuera ? "border-orange-400/70" : "border-transparent"}">
-        ${spriteSvg(p, team, "w-10 h-12 sm:w-12 sm:h-14")}
-      </div>
-      <span class="absolute -top-1.5 -left-2.5 text-[9px] font-black text-slate-200 bg-slate-900/90 border border-slate-600 rounded px-1">${p.num || "–"}</span>
-      ${fuera ? `<span class="absolute -top-2 -right-2 text-[11px] font-black text-slate-900 bg-orange-400 border border-orange-200 rounded-full w-4 h-4 flex items-center justify-center leading-none">!</span>` : ""}
-    </div>
-    <span class="mt-0.5 px-1.5 py-0.5 rounded bg-slate-900/85 border text-center leading-tight pointer-events-none ${sel ? "tp-border" : fuera ? "border-orange-400/70" : "border-slate-700"}">
-      <span class="block text-[10px] font-bold text-slate-100 truncate max-w-[4.5rem] sm:max-w-[6.5rem]">${p.name}${p.amarillas > 0 ? " 🟨" : ""}</span>
-      <b class="block text-[11px] ${fuera ? "text-orange-400" : "text-amber-300"}">${playerOverall(p)}</b>
-    </span>
-  </button>`;
-}
-
 /* ---------- Ficha del jugador ---------- */
 
 /** Ficha completa del jugador seleccionado: sprite, nota, stats reales del motor e info de la run. */
@@ -252,7 +196,6 @@ function renderPlayerCard() {
   const st = stateOf(p);
   const fuera = outOfPosPenalty(p) > 0;
   const bajas = statPenalties(p);
-  const notaReal = naturalOverall(p); // la que tendría en su puesto
 
   el.innerHTML = `
     <div class="flex items-center gap-3 mb-3">
@@ -265,19 +208,13 @@ function renderPlayerCard() {
         <div class="text-xs text-slate-400 mb-1">${posBadge(p.pos)} <span class="ml-1">${POS_NAME[p.pos]}</span></div>
         <div class="flex items-baseline gap-1.5">
           <span class="text-3xl font-black leading-none ${fuera ? "text-orange-400" : "text-amber-300"}">${playerOverall(p)}</span>
-          ${fuera ? `<span class="text-xs text-slate-500 line-through">${notaReal}</span>` : ""}
+          ${fuera ? `<span class="text-xs text-slate-500 line-through">${naturalOverall(p)}</span>` : ""}
           <span class="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Media</span>
         </div>
         ${starsHtml(playerStars(p), "text-xs")}
       </div>
     </div>
-
-    ${fuera ? `<div class="mb-3 p-2 rounded-lg border border-orange-400/60 bg-orange-400/10">
-      <div class="text-[11px] font-black text-orange-300 mb-1">❗ Jugando de ${POS_NAME[playedPos(p)].toLowerCase()}</div>
-      <p class="text-[10px] text-slate-300 leading-snug">No es su puesto: ${POS_NAME[p.pos].toLowerCase()} está a ${bajas[0] ? Math.abs(bajas[0].delta) / 6 : 0} ${(bajas[0] && Math.abs(bajas[0].delta) / 6) === 1 ? "línea" : "líneas"} de distancia.
-      Pierde <b class="text-orange-300">${Math.abs(bajas[0] ? bajas[0].delta : 0)}</b> en cada stat técnica y su media cae de
-      <b>${notaReal}</b> a <b class="text-orange-300">${playerOverall(p)}</b> mientras siga ahí.</p>
-    </div>` : ""}
+    ${fuera ? outOfPosNote(p, bajas) : ""}
 
     <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">Estadísticas</div>
     <div class="space-y-1 mb-3">${keys.map(k => statRow(p, k, bajas.find(b => b.key === k))).join("")}</div>
@@ -302,6 +239,17 @@ function renderPlayerCard() {
   if (btn) btn.onclick = () => openSwapModal(p);
 }
 
+/** Explica el castigo por jugar fuera de puesto: cuánto pierde y por qué. */
+function outOfPosNote(p, bajas) {
+  const pasos = bajas[0] ? Math.abs(bajas[0].delta) / 6 : 0;
+  return `<div class="mb-3 p-2 rounded-lg border border-orange-400/60 bg-orange-400/10">
+    <div class="text-[11px] font-black text-orange-300 mb-1">❗ Jugando de ${POS_NAME[playedPos(p)].toLowerCase()}</div>
+    <p class="text-[10px] text-slate-300 leading-snug">No es su puesto: ${POS_NAME[p.pos].toLowerCase()} está a ${pasos} ${pasos === 1 ? "línea" : "líneas"} de distancia.
+    Pierde <b class="text-orange-300">${Math.abs(bajas[0] ? bajas[0].delta : 0)}</b> en cada stat técnica y su media cae de
+    <b>${naturalOverall(p)}</b> a <b class="text-orange-300">${playerOverall(p)}</b> mientras siga ahí.</p>
+  </div>`;
+}
+
 /** Fila de una stat: si el jugador está fuera de puesto, muestra base → castigada. */
 function statRow(p, key, baja) {
   const v = baja ? baja.real : p.stats[key];
@@ -314,32 +262,6 @@ function statRow(p, key, baja) {
               <b class="w-6 text-right text-orange-400">${v}</b>`
             : `<b class="w-6 text-right ${txt}">${v}</b><span class="w-5"></span>`}
   </div>`;
-}
-
-/* ---------- Suplentes ---------- */
-
-/** Los 4 del banco: todo el que no es titular (lesionados y suspendidos incluidos, en gris). */
-function renderBench() {
-  const el = $("#bench");
-  if (!el) return;
-  const me = getTeam(S.run.teamId);
-  const bench = S.run.squad.filter(p => !S.selectedLineup.includes(p));
-  el.innerHTML = bench.map(p => {
-    const sel = p.name === selName;
-    const out = !isAvailable(p);
-    const st = stateOf(p);
-    return `<button data-name="${p.name}" ${out ? "" : 'draggable="true"'} title="${p.name}${out ? ` · ${st.txt}` : ""}"
-      class="relative flex flex-col items-center gap-0.5 p-1 pt-2 rounded-lg border-2 transition-all ${out ? "opacity-40 cursor-not-allowed" : "cursor-grab active:cursor-grabbing"} ${
-        sel ? "tp-border tp-bg-soft" : "border-slate-700 bg-slate-900/50 hover:border-slate-500"}">
-      <span class="absolute top-0.5 left-0.5 text-[8px] font-black text-slate-300 bg-slate-800/90 rounded px-0.5 pointer-events-none">${p.num || "–"}</span>
-      ${out ? `<span class="absolute top-0.5 right-0.5 text-[9px] pointer-events-none">${st.icon}</span>` : ""}
-      <span class="relative pointer-events-none">${spriteSvg(p, me, "w-9 h-11")}</span>
-      <span class="scale-[0.82] origin-center -my-0.5 pointer-events-none">${posBadge(p.pos)}</span>
-      <span class="text-[9px] font-medium text-slate-300 truncate max-w-full leading-tight pointer-events-none">${p.name}</span>
-      <b class="text-[11px] text-amber-300 leading-none pointer-events-none">${playerOverall(p)}</b>
-    </button>`;
-  }).join("");
-  bindTokens(el);
 }
 
 /* ---------- Estado ---------- */
@@ -364,8 +286,6 @@ function renderStatus(available) {
       : `<span class="text-slate-500"> · Arrastra una ficha sobre otra para intercambiarlas.</span>`}`;
 }
 
-const isAvailable = p => !p.suspendido && p.lesionadoPartidos === 0;
-
 /** Estado del jugador para este partido (mismo criterio que usa el motor para dejarlo fuera). */
 function stateOf(p) {
   if (p.suspendido) return { icon: "🟥", txt: "🟥 Suspendido", cls: "text-red-400" };
@@ -374,10 +294,12 @@ function stateOf(p) {
   return { icon: "", txt: "✅ Disponible", cls: "text-emerald-400" };
 }
 
-/* ---------- Mover jugadores: arrastre y permuta ---------- */
+/* ---------- Mover jugadores ---------- */
 
 /** Índice del jugador en el once, o -1 si está en el banco. */
 const idxOf = (p) => S.selectedLineup.indexOf(p);
+/** Puesto que juega el slot i (el del jugador si el once es improvisado y no hay formación). */
+const slotPos = (i) => formationSlots(S.formation)[i] || S.selectedLineup[i].pos;
 
 /**
  * Con quién puede intercambiarse este jugador. Cualquier puesto vale (el castigo por
@@ -388,7 +310,6 @@ function swapCandidates(p) {
   if (!isAvailable(p)) return [];
   const i = idxOf(p);
   if (i >= 0) {
-    // Titular: puede permutar con otro titular o con cualquier suplente disponible.
     return S.run.squad.filter(q => {
       if (q === p || !isAvailable(q)) return false;
       const j = idxOf(q);
@@ -396,21 +317,7 @@ function swapCandidates(p) {
                     : canPlayAt(q, slotPos(i));
     });
   }
-  // Suplente: puede entrar por cualquier titular cuyo puesto sepa ocupar.
   return S.selectedLineup.filter(q => canPlayAt(p, slotPos(idxOf(q))));
-}
-
-/** ¿Este destino acepta la ficha que se está arrastrando ahora? (pinta el resalte azul). */
-function isDropTarget(dest) {
-  if (!dragging) return false;
-  const from = entityPlayer(dragging), to = entityPlayer(dest);
-  if (!from || !to || from === to) return false;
-  return swapCandidates(from).includes(to);
-}
-
-/** El jugador detrás de un origen/destino de arrastre. */
-function entityPlayer(e) {
-  return e.kind === "pitch" ? S.selectedLineup[e.idx] : S.run.squad.find(p => p.name === e.name);
 }
 
 /**
@@ -424,60 +331,10 @@ function swapPlayers(a, b) {
   else if (j >= 0) S.selectedLineup[j] = a;
   else return;
   assignPositions(S.run.squad, S.selectedLineup, S.formation);
-  selName = (idxOf(a) >= 0 ? a : b).name;
   const movido = idxOf(a) >= 0 ? a : b;
+  selName = movido.name;
   const aviso = outOfPosPenalty(movido) > 0 ? ` — ❗ ${movido.name} juega de ${POS_NAME[playedPos(movido)].toLowerCase()}` : "";
   toast(`${a.name} ⇄ ${b.name}${aviso}`);
-}
-
-/** El origen/destino de arrastre que representa un nodo de ficha. */
-const destOf = (node) => node.dataset.idx !== undefined
-  ? { kind: "pitch", idx: +node.dataset.idx }
-  : { kind: "bench", name: node.dataset.name };
-
-/**
- * Enciende (o apaga) el resalte de los destinos válidos SIN repintar: durante un arrastre
- * no se puede tocar el innerHTML, porque destruir el nodo que el mouse está arrastrando
- * cancela el drag. Por eso el resalte va por clases sobre los nodos que ya existen.
- */
-function markDropTargets(on) {
-  document.querySelectorAll("#pitch [data-name], #bench [data-name]").forEach(n => {
-    const ok = on && isDropTarget(destOf(n));
-    n.classList.toggle("ring-2", ok);
-    n.classList.toggle("ring-sky-400", ok);
-    n.classList.toggle("ring-offset-1", ok);
-    n.classList.toggle("ring-offset-slate-900", ok);
-  });
-}
-
-/** Engancha clic (ver ficha) y arrastre (mover/permutar) en las fichas de un contenedor. */
-function bindTokens(el) {
-  el.querySelectorAll("[data-name]").forEach(node => {
-    const dest = destOf(node);
-
-    node.onclick = () => { selName = node.dataset.name; renderAll(); };
-
-    node.addEventListener("dragstart", (e) => {
-      const p = entityPlayer(dest);
-      if (!isAvailable(p)) return e.preventDefault();   // lesionado/suspendido no se arrastra
-      dragging = dest;
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", p.name);     // Firefox exige carga útil
-      // Tras el tick en que el navegador captura la imagen del arrastre.
-      setTimeout(() => markDropTargets(true), 0);
-    });
-    node.addEventListener("dragend", () => { dragging = null; markDropTargets(false); });
-    node.addEventListener("dragover", (e) => { if (isDropTarget(dest)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } });
-    node.addEventListener("drop", (e) => {
-      e.preventDefault();
-      if (!isDropTarget(dest)) return;
-      const from = entityPlayer(dragging), to = entityPlayer(dest);
-      dragging = null;
-      markDropTargets(false);
-      swapPlayers(from, to);
-      renderAll();
-    });
-  });
 }
 
 /**
@@ -495,8 +352,6 @@ function openSwapModal(p) {
     <div class="space-y-1.5">
       ${cands.map(q => {
         const puesto = dest(q);
-        const notaAhi = overallAt(q, puesto);
-        const notaSuya = naturalOverall(q);
         const fuera = puesto !== q.pos;
         return `<button data-swap="${q.name}" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl border ${fuera ? "border-orange-400/50" : "border-slate-600"} hover:border-[var(--team-primary)] hover:bg-slate-700/40 cursor-pointer text-left transition-all">
           ${spriteSvg(q, me, "w-7 h-9")}
@@ -506,8 +361,8 @@ function openSwapModal(p) {
             <span class="text-[10px] ${fuera ? "text-orange-400" : "text-slate-500"}">${idxOf(q) >= 0 ? "En cancha" : "Suplente"} · ${fuera ? `❗ jugaría de ${POS_NAME[puesto].toLowerCase()}` : "en su puesto"}</span>
           </span>
           <span class="text-right">
-            <b class="${fuera ? "text-orange-400" : "text-amber-300"} text-sm block">${notaAhi}</b>
-            ${fuera ? `<span class="text-[9px] text-slate-500 line-through">${notaSuya}</span>` : ""}
+            <b class="${fuera ? "text-orange-400" : "text-amber-300"} text-sm block">${overallAt(q, puesto)}</b>
+            ${fuera ? `<span class="text-[9px] text-slate-500 line-through">${naturalOverall(q)}</span>` : ""}
           </span>
         </button>`;
       }).join("")}
