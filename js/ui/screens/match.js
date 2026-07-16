@@ -6,12 +6,14 @@
    decisión nueva exige su entrada de ruteo en handleDecision().
    ============================================================ */
 import { getTeam } from "../../data/teams-repo.js";
-import { statLine } from "../../game/ratings.js";
+import { statLine, playedPos, outOfPosPenalty } from "../../game/ratings.js";
+import { swapAssignments, canPlayAt } from "../../game/lineup.js";
 import { STAGE_LABEL } from "../../game/tournament/knockout.js";
 import { Match } from "../../game/match/Match.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, modal, closeModal, toast, numTag, posBadge, energyBar } from "../components.js";
+import { mountPitch, POS_NAME } from "../pitch.js";
 import { spriteSvg } from "../sprites.js";
 
 /** Crea la instancia Match con el once elegido y arranca el reloj del relato. */
@@ -47,7 +49,7 @@ function renderMatchScreen() {
           ${["defensiva", "normal", "ofensiva"].map(mm => `<button data-ment="${mm}" class="ment-btn px-3 py-1.5 font-semibold cursor-pointer transition-colors ${mm === "normal" ? "bg-amber-500 text-slate-900" : "bg-slate-700 hover:bg-slate-600"}">${mm === "defensiva" ? "🛡️" : mm === "ofensiva" ? "⚔️" : "⚖️"} ${mm[0].toUpperCase() + mm.slice(1)}</button>`).join("")}
         </div>
         <button id="btn-pause" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">⏸️ Pausa</button>
-        <button id="btn-subs" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">🔄 Cambios (<span id="subs-left">3</span>)</button>
+        <button id="btn-subs" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">🔄 Plantilla (<span id="subs-left">3</span>)</button>
         <button id="btn-speed" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">⏩ x1</button>
       </div>
     </div>
@@ -72,7 +74,7 @@ function renderMatchScreen() {
     updateMatchUI();
   });
   $("#btn-pause").onclick = togglePause;
-  $("#btn-subs").onclick = openSubsModal;
+  $("#btn-subs").onclick = openSquadModal;
   $("#btn-speed").onclick = () => {
     S.speed = S.speed === 1 ? 2 : 1;
     $("#btn-speed").textContent = `⏩ x${S.speed}`;
@@ -130,16 +132,19 @@ export function updateMatchUI() {
     feed.appendChild(div);
   }
   feed.scrollTop = feed.scrollHeight;
-  // Alineaciones en cancha, siempre en orden POR → DEF → MED → DEL (incluso tras cambios)
+  // Alineaciones en cancha, siempre en orden POR → DEF → MED → DEL (incluso tras cambios).
+  // Los míos se ordenan y etiquetan por el puesto que JUEGAN: tras una reubicación, un
+  // delantero puesto de defensa aparece en la línea de atrás, con ❗ y su nota castigada.
   const POS_RANK = { POR: 0, DEF: 1, MED: 2, DEL: 3 };
   const byPos = (a, b) => POS_RANK[a.pos] - POS_RANK[b.pos];
+  const byPlayed = (a, b) => POS_RANK[playedPos(a)] - POS_RANK[playedPos(b)];
   const oc = $("#oncourt");
-  if (oc) oc.innerHTML = matchCtx.lineup.slice().sort(byPos).map(p => `
+  if (oc) oc.innerHTML = matchCtx.lineup.slice().sort(byPlayed).map(p => `
     <div class="flex items-center gap-2 text-xs px-2 py-1 rounded-lg ${p.expulsado ? "opacity-30 line-through" : p.lesionado ? "opacity-30" : "bg-slate-800/60"}">
       ${spriteSvg(p, matchCtx.team, "w-5 h-6")}
       ${numTag(p)}
-      ${posBadge(p.pos)}
-      <span class="flex-1 truncate">${p.name} ${p.usado ? "🔄" : ""}${p.amarillaPartido ? "🟨" : ""}${p.expulsado ? "🟥" : ""}${p.lesionado ? "🚑" : ""}</span>
+      ${posBadge(playedPos(p))}
+      <span class="flex-1 truncate">${p.name} ${outOfPosPenalty(p) > 0 ? `<span class="text-orange-400 font-black" title="Fuera de puesto: es ${p.pos}">!</span>` : ""}${p.usado ? "🔄" : ""}${p.amarillaPartido ? "🟨" : ""}${p.expulsado ? "🟥" : ""}${p.lesionado ? "🚑" : ""}</span>
       <span class="w-12">${energyBar(p.energia)}</span>
     </div>`).join("");
   const opc = $("#oppcourt");
@@ -210,61 +215,160 @@ function showHalftime() {
   $("#btn-resume").onclick = () => { footer.innerHTML = ""; startTimer(); };
 }
 
-/** Modal de cambios manual: elige quién sale y la columna "Entra" se recalcula según las reglas. */
-function openSubsModal() {
+/* ---------- Gestión de plantilla en partido ---------- */
+
+/**
+ * Gestión de plantilla en vivo: la misma cancha del hub, con el partido en pausa.
+ * Arrastrar titular sobre titular reubica (gratis); traer a alguien del banco es un cambio.
+ *
+ * NADA toca el partido hasta Confirmar: los cambios se arman como un plan y se aplican
+ * juntos. Las reubicaciones sí mutan `posJugada` en el momento — es lo que la cancha lee
+ * para previsualizar — y por eso se guarda el estado previo y se restaura al salir.
+ */
+function openSquadModal() {
   const match = S.match;
   if (match.finished) return;
-  if (match.subsLeft <= 0) return toast("Ya no te quedan cambios.");
-  const wasPaused = S.paused; S.paused = true;
-  const onField = S.matchCtx.lineup.filter(p => !p.expulsado && !p.lesionado);
-  if (!match.availableBench().length) { S.paused = wasPaused; return toast("No hay suplentes disponibles."); }
-  let outSel = null;
-  const m = modal(`
-    <h2 class="text-lg font-black mb-3">🔄 Realizar cambio <span class="text-xs text-slate-400">(${match.subsLeft} restantes)</span></h2>
-    <div class="grid grid-cols-2 gap-3 text-sm">
-      <div><div class="text-xs uppercase text-slate-400 font-bold mb-1">Sale</div><div id="sub-out" class="space-y-1">
-        ${onField.map(p => `<button data-name="${p.name}" class="sub-out w-full text-left px-2 py-1.5 rounded-lg border border-slate-600 hover:border-red-400 cursor-pointer">${numTag(p)} ${posBadge(p.pos)} ${p.name} <span class="text-[10px] text-slate-400">E:${p.energia}</span></button>`).join("")}
-      </div></div>
-      <div><div class="text-xs uppercase text-slate-400 font-bold mb-1">Entra</div><div id="sub-in" class="space-y-1"></div></div>
-    </div>
-    <button id="sub-cancel" class="mt-4 text-sm text-slate-400 hover:text-white cursor-pointer">Cancelar</button>
-  `);
+  const wasPaused = S.paused;
+  S.paused = true;
 
-  // La columna "Entra" se recalcula según quién sale: sustituidos en gris,
-  // y el arquero suplente bloqueado salvo que salga el arquero.
-  const renderIn = () => {
-    const box = m.querySelector("#sub-in");
-    box.innerHTML = match.my.bench.map(b => {
-      if (b.sustituido) {
-        return `<div class="w-full text-left px-2 py-1.5 rounded-lg border border-slate-800 bg-slate-800/30 opacity-45 grayscale">${numTag(b)} ${posBadge(b.pos)} <span class="line-through text-slate-400">${b.name}</span> <span class="text-[9px] uppercase font-bold text-slate-500 ml-1">Sustituido</span></div>`;
-      }
-      if (!outSel) {
-        return `<div class="w-full text-left px-2 py-1.5 rounded-lg border border-slate-700 opacity-50">${numTag(b)} ${posBadge(b.pos)} ${b.name} <span class="text-[10px] text-slate-500">elige quién sale</span></div>`;
-      }
-      const eligible = match.eligibleFor(outSel).includes(b);
-      if (!eligible) {
-        const motivo = b.pos === "POR" && outSel.pos !== "POR" ? "solo puede entrar por el arquero" : "no disponible";
-        return `<div class="w-full text-left px-2 py-1.5 rounded-lg border border-slate-800 opacity-40">${numTag(b)} ${posBadge(b.pos)} ${b.name} <span class="text-[9px] text-amber-500">${motivo}</span></div>`;
-      }
-      return `<button data-name="${b.name}" class="sub-in w-full text-left px-2 py-1.5 rounded-lg border border-slate-600 hover:border-emerald-400 cursor-pointer">${numTag(b)} ${posBadge(b.pos)} ${b.name} <span class="text-[10px] text-slate-400">${statLine(b)}</span></button>`;
-    }).join("");
-    box.querySelectorAll(".sub-in").forEach(b => b.onclick = () => {
-      if (!outSel) return;
-      match.makeSub(outSel, b.dataset.name);
-      closeModal();
-      S.paused = wasPaused;
-      updateMatchUI();
-    });
+  const previo = new Map(S.run.squad.map(p => [p, p.posJugada || null]));
+  const once = S.matchCtx.lineup.slice();   // once previsualizado
+  let banco = match.my.bench.slice();
+  const pendientes = [];                    // [{ sale, entra }] cambios por confirmar
+
+  const enOnce = p => once.includes(p);
+  /** En el once previsualizado y en condiciones de jugar: un expulsado o lesionado no se mueve. */
+  const activo = p => enOnce(p) && !p.expulsado && !p.lesionado;
+  const restantes = () => match.subsLeft - pendientes.length;
+  const hayPlan = () => pendientes.length > 0 || once.some(p => (p.posJugada || null) !== previo.get(p));
+
+  /**
+   * Qué significa arrastrar `a` sobre `b`, o null si no se puede:
+   *  - dos titulares activos → REUBICAR: intercambian el puesto, gratis (azul).
+   *  - banco → titular → CAMBIO: se suma al plan y gastará 1 de 3 (verde).
+   * Las reglas del cambio las manda el motor (`eligibleFor`): el arco solo lo cubre un
+   * arquero, un arquero no sale a la cancha, y el sustituido no reingresa.
+   */
+  const tipo = (a, b) => {
+    if (match.finished) return null;
+    if (activo(a) && activo(b)) {
+      // El arco no se permuta: solo un arquero puede ocuparlo (game/lineup.canPlayAt).
+      return canPlayAt(a, playedPos(b)) && canPlayAt(b, playedPos(a)) ? { tone: "sky", kind: "mover" } : null;
+    }
+    const sale = activo(a) ? a : activo(b) ? b : null;
+    const entra = sale === a ? b : a;
+    if (!sale || enOnce(entra) || restantes() <= 0) return null;
+    // El que sale tiene que ser titular de verdad: no se encadenan cambios sobre un
+    // jugador que recién metiste en el plan.
+    if (!S.matchCtx.lineup.includes(sale)) return null;
+    if (!match.availableBench().includes(entra) || !match.eligibleFor(sale).includes(entra)) return null;
+    return { tone: "emerald", kind: "cambio", sale, entra };
   };
-  renderIn();
 
-  m.querySelectorAll(".sub-out").forEach(b => b.onclick = () => {
-    outSel = onField.find(p => p.name === b.dataset.name);
-    m.querySelectorAll(".sub-out").forEach(x => x.classList.remove("border-red-400", "bg-red-400/10"));
-    b.classList.add("border-red-400", "bg-red-400/10");
-    renderIn();
-  });
-  m.querySelector("#sub-cancel").onclick = () => { closeModal(); S.paused = wasPaused; };
+  const wrap = modal(`
+    <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+      <h2 class="text-lg font-black">🔄 Gestión de plantilla</h2>
+      <span class="text-xs text-slate-400">Cambios restantes: <b id="modal-subs" class="text-amber-300">${match.subsLeft}</b> de 3</span>
+    </div>
+    <div class="grid sm:grid-cols-[minmax(0,1fr)_11rem] gap-3 items-start">
+      <div id="match-pitch" class="pitch relative w-full h-[22rem] rounded-xl overflow-hidden border-2 border-slate-900"></div>
+      <div>
+        <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1.5">Banco</div>
+        <div id="match-bench" class="grid grid-cols-2 gap-1.5"></div>
+      </div>
+    </div>
+    <div class="flex items-center gap-4 mt-3 text-[10px] text-slate-400 flex-wrap">
+      <span class="flex items-center gap-1.5"><i class="w-3 h-3 rounded ring-2 ring-sky-400 inline-block"></i> Reubicar — gratis</span>
+      <span class="flex items-center gap-1.5"><i class="w-3 h-3 rounded ring-2 ring-emerald-400 inline-block"></i> Cambio — gasta 1 de 3</span>
+      <span class="flex items-center gap-1.5"><i class="text-orange-400 font-black">!</i> Fuera de puesto</span>
+    </div>
+    <div id="plan-resumen" class="mt-3"></div>
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <button id="squad-cancel" class="text-sm font-bold py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 cursor-pointer"></button>
+      <button id="squad-ok" class="text-sm font-black py-2.5 rounded-lg tp-gradient cursor-pointer hover:brightness-110 transition-all"></button>
+    </div>
+  `, "max-w-3xl");
+
+  const paint = () => {
+    mountPitch({
+      pitchEl: wrap.querySelector("#match-pitch"),
+      benchEl: wrap.querySelector("#match-bench"),
+      team: S.matchCtx.team,
+      lineup: once,
+      bench: banco,
+      sizes: { sprite: "w-9 h-11", bench: "w-8 h-10" },
+      badge: p => `${p.usado ? "🔄" : ""}${p.amarillaPartido ? "🟨" : ""}${p.expulsado ? "🟥" : ""}${p.lesionado ? "🚑" : ""}${p.sustituido ? "↩" : ""}`,
+      extra: p => `<span class="block w-10 mx-auto mt-0.5">${energyBar(p.energia)}</span>`,
+      muted: p => p.expulsado || p.lesionado || p.sustituido,
+      draggable: p => activo(p) || (!enOnce(p) && match.availableBench().includes(p)),
+      canSwap: tipo,
+      onSwap: (a, b) => {
+        const s = tipo(a, b);
+        if (!s) return;
+        if (s.kind === "mover") {
+          if (!swapAssignments(a, b)) return toast("No pueden intercambiar ese puesto.");
+        } else {
+          once[once.indexOf(s.sale)] = s.entra;
+          banco = banco.filter(x => x !== s.entra).concat(s.sale);
+          // Previsualiza el puesto que ocupará: el mismo que le pondrá makeSub al confirmar.
+          const puesto = s.sale.posJugada || s.sale.pos;
+          s.entra.posJugada = canPlayAt(s.entra, puesto) ? puesto : s.entra.pos;
+          pendientes.push({ sale: s.sale, entra: s.entra });
+        }
+        paint();
+      },
+    });
+    wrap.querySelector("#modal-subs").textContent = restantes();
+    renderPlan();
+  };
+
+  /** Resumen de lo que está por aplicarse: nada de esto pasó todavía. */
+  const renderPlan = () => {
+    const reubicados = once.filter(p => (p.posJugada || null) !== previo.get(p) && !pendientes.some(c => c.entra === p));
+    wrap.querySelector("#plan-resumen").innerHTML = !hayPlan()
+      ? `<p class="text-[11px] text-slate-500 text-center">Arrastra las fichas para armar los cambios. Nada se aplica hasta que confirmes.</p>`
+      : `<div class="p-2 rounded-lg border border-amber-400/50 bg-amber-400/10 space-y-0.5">
+          <div class="text-[10px] uppercase tracking-wider text-amber-300 font-black mb-1">Sin aplicar</div>
+          ${pendientes.map(c => `<div class="text-[11px] text-slate-200">🔄 Entra <b>${c.entra.name}</b> por <b>${c.sale.name}</b>${
+            outOfPosPenalty(c.entra) > 0 ? ` <span class="text-orange-400">— ❗ jugaría de ${POS_NAME[playedPos(c.entra)].toLowerCase()}</span>` : ""}</div>`).join("")}
+          ${reubicados.map(p => `<div class="text-[11px] text-slate-200">📢 <b>${p.name}</b> pasa a ${POS_NAME[playedPos(p)].toLowerCase()}${
+            outOfPosPenalty(p) > 0 ? ` <span class="text-orange-400">— ❗ no es su puesto</span>` : ""}</div>`).join("")}
+        </div>`;
+    const ok = wrap.querySelector("#squad-ok");
+    const cancel = wrap.querySelector("#squad-cancel");
+    ok.textContent = pendientes.length ? `✔ Confirmar (${pendientes.length} cambio${pendientes.length > 1 ? "s" : ""})` : "✔ Confirmar";
+    ok.disabled = !hayPlan();
+    ok.classList.toggle("opacity-40", !hayPlan());
+    ok.classList.toggle("cursor-not-allowed", !hayPlan());
+    cancel.textContent = hayPlan() ? "✕ Salir sin guardar" : "Volver al partido";
+  };
+
+  /** Aplica el plan al partido: primero los cambios, después las posiciones finales. */
+  const confirmar = () => {
+    // El plan manda: si el DT reubicó a alguien DESPUÉS de meterlo, makeSub le pondría el
+    // puesto del que salió — por eso las posiciones finales se escriben al final.
+    const posFinal = once.map(p => [p, p.posJugada || null]);
+    const movidos = once.filter(p => (p.posJugada || null) !== previo.get(p) && !pendientes.some(c => c.entra === p));
+    let fallidos = 0;
+    for (const c of pendientes) if (!match.makeSub(c.sale, c.entra.name)) fallidos++;
+    for (const [p, pos] of posFinal) p.posJugada = pos;
+    for (const p of movidos) match.log("info", `📢 min ${match.min}' — ${p.name} pasa a ${POS_NAME[playedPos(p)].toLowerCase()}.`);
+    closeModal();
+    S.paused = wasPaused;
+    updateMatchUI();
+    if (fallidos) toast(`${fallidos} cambio(s) no se pudieron aplicar.`);
+  };
+
+  /** Sale sin tocar el partido: deshace las reubicaciones y tira el plan. */
+  const cancelar = () => {
+    for (const [p, pos] of previo) p.posJugada = pos;
+    closeModal();
+    S.paused = wasPaused;
+  };
+
+  paint();
+  wrap.querySelector("#squad-ok").onclick = () => { if (hayPlan()) confirmar(); };
+  wrap.querySelector("#squad-cancel").onclick = cancelar;
 }
 
 register("start-match", startMatch);

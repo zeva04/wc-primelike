@@ -181,6 +181,26 @@ const clon = p => ({ ...p, stats: { ...p.stats }, posJugada: null });
   t(lineup.every(p => E.outOfPosPenalty(p) === 0), "y nadie arrastra castigo al armar el once nuevo");
 }
 
+// ---------- 6e. Reubicación táctica (swapAssignments) ----------
+// En el partido no hay formación de la que rederivar: posJugada es la única verdad.
+{
+  const run = E.newRun("BRA");
+  const { lineup, formationId } = E.currentLineup(run.squad, [], null);
+  const def = lineup.find(p => E.playedPos(p) === "DEF");
+  const del = lineup.find(p => E.playedPos(p) === "DEL");
+  const por = lineup.find(p => p.pos === "POR");
+
+  t(E.swapAssignments(def, del), "dos jugadores de campo pueden intercambiar el puesto");
+  t(E.playedPos(def) === "DEL" && E.playedPos(del) === "DEF", "quedaron cruzados");
+  t(E.outOfPosPenalty(def) > 0 && E.outOfPosPenalty(del) > 0, "y ambos pagan el castigo");
+  t(E.swapAssignments(def, del) && E.playedPos(def) === "DEF", "volver a intercambiarlos los deja como estaban");
+  t(E.outOfPosPenalty(def) === 0, "sin castigo al volver a su puesto");
+
+  t(!E.swapAssignments(por, del), "el arquero NO puede intercambiarse con uno de campo");
+  t(E.playedPos(por) === "POR" && E.playedPos(del) === "DEL", "y el rechazo no dejó a nadie movido");
+  t(Number.isFinite(E.teamPowers(lineup, "normal", {}).def), "el equipo sigue calculando tras las reubicaciones");
+}
+
 // ---------- 7. El castigo llega al PARTIDO, no solo a la ficha ----------
 {
   const run = E.newRun("BRA");
@@ -234,6 +254,40 @@ const clon = p => ({ ...p, stats: { ...p.stats }, posJugada: null });
   t(gk.posJugada === "POR", "el arquero que entra por la roja va al ARCO, no al puesto del que salió");
   t(Number.isFinite(E.playerOverall(gk)), "la nota del arquero que entró no es NaN");
   t(E.teamPowers(m2.my.lineup, "normal", {}).por === gk, "el motor lo reconoce como su arquero");
+}
+
+// ---------- 9. El arco nunca queda vacío por un cambio ----------
+// REGRESIÓN (bug del PO): `eligibleFor` solo vigilaba que un arquero suplente no entrara
+// por un jugador de campo, pero no la dirección contraria — se podía mandar a un mediocampista
+// al arco y el equipo quedaba SIN ARQUERO y con 6 de campo.
+{
+  const run = E.newRun("BRA");
+  const me = E.getTeam("BRA");
+  const { lineup } = E.currentLineup(run.squad, null, null);
+  const bench = run.squad.filter(p => !lineup.includes(p));
+  const m = new E.Match({ team: me, lineup: lineup.slice(), bench, mentalidad: "normal", buffs: {} }, E.getTeam("IRN"), false);
+
+  const arquero = m.my.lineup.find(p => p.pos === "POR");
+  const campoBanco = m.availableBench().filter(b => b.pos !== "POR");
+  const gkBanco = m.availableBench().find(b => b.pos === "POR");
+
+  t(campoBanco.length > 0 && !!gkBanco, "montado: hay suplentes de campo y un arquero suplente");
+  t(m.eligibleFor(arquero).every(b => b.pos === "POR"), "por el arquero SOLO pueden entrar arqueros");
+  t(m.eligibleFor(arquero).includes(gkBanco), "y el arquero suplente sí está entre ellos");
+
+  const campo = m.my.lineup.find(p => p.pos === "DEF");
+  t(m.eligibleFor(campo).every(b => b.pos !== "POR"), "por un jugador de campo NO puede entrar el arquero suplente");
+
+  // El intento directo tiene que rebotar
+  t(m.makeSub(arquero, campoBanco[0].name) === false, "makeSub rechaza mandar a un jugador de campo al arco");
+  t(m.subsLeft === 3, "y el intento rechazado no gasta un cambio");
+  t(m.my.lineup.includes(arquero), "el arquero sigue en cancha");
+  t(!!E.teamPowers(m.my.lineup, "normal", {}).por, "el equipo NUNCA se queda sin arquero por un cambio");
+  t(m.my.lineup.filter(p => E.playedPos(p) === "POR").length === 1, "hay exactamente 1 arquero, no 6 de campo");
+
+  // El cambio legítimo de arquero sigue funcionando
+  t(m.makeSub(arquero, gkBanco.name), "arquero por arquero sí se puede");
+  t(E.playedPos(gkBanco) === "POR" && E.teamPowers(m.my.lineup, "normal", {}).por === gkBanco, "y el suplente queda como arquero");
 }
 
 console.log(`lineup.test: ${checks} checks`);

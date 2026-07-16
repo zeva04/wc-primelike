@@ -116,6 +116,7 @@ Las secciones siguientes documentan las mismas funciones, ahora indicando su mó
 | `formationSlots(id)` | Los 6 puestos en orden POR→DEF→MED→DEL. **El once se guarda en ese orden**: el titular del índice i juega `slots[i]`. Mover a alguien = mover su índice. |
 | `canPlayAt(player, slotPos)` | ¿Puede pararse ahí? Todo vale entre DEF/MED/DEL; el arco es solo para arqueros y ellos no salen de él (stats disjuntas, CORE.md §2b). |
 | `assignPositions(squad, lineup, id)` | **Única pluma de `posJugada`**: se lo fija a los 6 titulares según los slots y se lo borra al resto. De aquí sale el castigo. Llamarla en CADA cambio del once. |
+| `swapAssignments(a, b)` | Reubicación táctica: dos titulares intercambian el puesto. No gasta cambio; `false` si alguno no puede ocupar el del otro (el arco). La usa el PARTIDO, donde no hay formación de la que rederivar y `posJugada` es la única verdad (en Gestión de Plantilla se mueve el índice y `assignPositions` rederiva). |
 | `currentLineup(squad, prev, id)` | **Puerta de entrada de las pantallas** (hub y squad): devuelve `{lineup, formationId}` ya ordenado por slots y con los puestos asignados; rearma el once si una baja lo invalidó. El smoke la usa también. |
 | `fillFormation(available, id, keep)` | Mejor once para esa formación, o `null` si el plantel no la cubre. `keep` manda sobre la nota: cambiar de formación no borra las elecciones del DT. |
 | `canUseFormation(available, id)` | ¿El plantel alcanza para esa formación? (Brasil no puede `3-1-1`: tiene 2 DEF.) |
@@ -182,7 +183,7 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | `log(kind,text)` | Agrega una línea al relato (kind define el estilo visual). |
 | `activeMine()` | Mis jugadores en cancha (sin expulsados ni lesionados). |
 | `availableBench()` | Suplentes que aún pueden entrar. |
-| `eligibleFor(out)` | Suplentes elegibles para reemplazar a `out` (POR solo entra por POR). |
+| `eligibleFor(out)` | Suplentes elegibles para reemplazar a `out`. Regla **simétrica** vía `lineup.canPlayAt`: el arco solo lo cubre un arquero **y** un arquero no sale a la cancha. Antes solo se vigilaba una dirección y se podía mandar a un jugador de campo al arco: el equipo quedaba sin arquero y con 6 de campo. |
 | `powers()` | Poderes actuales de ambos equipos (se recalculan cada tick). |
 
 **Simulación por tick**
@@ -204,7 +205,7 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 |---|---|
 | `_foulEvent()` | Falta → amarilla/roja o decisión de proteger a un amonestado. |
 | `_injuryEvent()` | Lesión → golpe leve o cambio forzado. |
-| `makeSub(out,inName)` | Sustitución. Reglas: máx 3, el sustituido no reingresa, POR solo por POR. |
+| `makeSub(out,inName,force)` | Sustitución. Reglas: máx 3, el sustituido no reingresa, y el que entra debe poder ocupar el puesto del que sale (`canPlayAt`). El que entra hereda `posJugada` del que sale — si salía un improvisado de defensa, el recambio también juega ahí. `force` es la excepción de la roja al arquero: el POR suplente entra por un jugador de campo y se va **al arco**, no a su puesto. No hay excepción a la inversa. |
 
 **Goles, cierre y penales**
 | Método | Qué hace |
@@ -255,6 +256,7 @@ entre pantallas es `go("nombre", ...args)` — así no hay imports circulares (�
 | `ui/nav.js` | registro de pantallas: `register(name, fn)` / `go(name, ...args)` |
 | `ui/session.js` | `S`: run, match, matchCtx, selectedLineup, timer, paused, speed, feedRendered |
 | `ui/components.js` | §2-3: stars, energía, banderas, dorsales, toast, modal, screenShell, `$`, `app` |
+| `ui/pitch.js` | La cancha 8-bit reutilizable (§6b): césped, fichas del once, banco y arrastre. La comparten Gestión de Plantilla y el partido |
 | `ui/sprites.js` | §2: spriteSvg, rivalLook, nameHash |
 | `ui/theme.js` | §2: applyTeamColors, trofeo y balón SVG |
 | `ui/screens/menu.js` | §4: carrusel (la regla de dificultad vive en `game/ratings`) |
@@ -320,6 +322,16 @@ equipo y posiciona el carrusel sin iniciar la partida.
 | `startRun(teamId)` | Crea la run, aplica colores y muestra el sorteo. |
 | `renderDraw()` | Pantalla de sorteo con los 12 grupos. |
 
+### 6b. La cancha reutilizable — `ui/pitch.js`
+| Función | Qué hace |
+|---|---|
+| `mountPitch(cfg)` | Pinta (o repinta) el césped, el once y el banco, y engancha el arrastre. **No conoce reglas**: quien la monta pasa `canSwap(a,b)` → `null` \| `{tone}` y `onSwap(a,b)`. En Gestión de Plantilla un arrastre mueve jugadores; en el partido es una reubicación (azul, gratis) o un cambio (verde, gasta 1 de 3). |
+| `POS_NAME` | `POR→Arquero`, `DEF→Defensa`, `MED→Mediocampista`, `DEL→Delantero`. |
+
+Dos detalles que NO son estéticos y no conviene "arreglar":
+- Las filas salen de **`playedPos(p)`, no del índice del slot**: así cae bien el arquero que entra por una roja, que ocupa el índice del jugador de campo que salió pero juega en el arco.
+- El resalte de destinos válidos va **por clases, sin repintar**: repintar en `dragstart` destruye el nodo que el mouse arrastra y cancela el drag.
+
 ### 7. Hub y sus pantallas satélite — `ui/screens/hub.js` · `squad.js` · `worldcup.js` · `journal.js`
 | Función | Qué hace |
 |---|---|
@@ -341,6 +353,7 @@ equipo y posiciona el carrusel sin iniciar la partida.
 ### 8. Partido en vivo — `ui/screens/match.js`
 | Función | Qué hace |
 |---|---|
+| `openSquadModal()` | **Gestión de plantilla en vivo**: la cancha de `ui/pitch.js` con el partido en pausa. Arrastrar titular sobre titular reubica (azul, gratis); traer a alguien del banco es un cambio (verde, gasta 1 de 3). **Nada toca el partido hasta Confirmar**: los cambios se arman como plan y se aplican juntos; "Salir sin guardar" lo descarta. Las reubicaciones sí mutan `posJugada` en el momento (es lo que la cancha lee para previsualizar), por eso se guarda el estado previo y se restaura al cancelar. Al confirmar se aplican **primero los cambios y después las posiciones finales**: si el DT reubicó a alguien DESPUÉS de meterlo, `makeSub` le pondría el puesto del que salió y el plan quedaría pisado. |
 | `startMatch(oppId)` | Crea el `Match` y arranca el reloj. |
 | `renderMatchScreen()` | Estructura fija: marcador, controles, relato, alineaciones. |
 | `startTimer()` / `stopTimer()` / `togglePause()` | Control del reloj de ticks. |

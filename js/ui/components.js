@@ -57,13 +57,16 @@ export function toast(msg) {
   setTimeout(() => t.remove(), 4200);
 }
 
-/** Abre un modal centrado (cierra el anterior si había). Devuelve el nodo para enganchar handlers. */
-export function modal(html) {
+/**
+ * Abre un modal centrado (cierra el anterior si había). Devuelve el nodo para enganchar handlers.
+ * `maxW` por defecto `max-w-lg`; la gestión de plantilla en partido usa uno ancho para la cancha.
+ */
+export function modal(html, maxW = "max-w-lg") {
   closeModal();
   const wrap = document.createElement("div");
   wrap.id = "modal";
   wrap.className = "fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4";
-  wrap.innerHTML = `<div class="bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-pop max-h-[85vh] overflow-y-auto">${html}</div>`;
+  wrap.innerHTML = `<div class="bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl ${maxW} w-full p-6 animate-pop max-h-[85vh] overflow-y-auto">${html}</div>`;
   document.body.appendChild(wrap);
   return wrap;
 }

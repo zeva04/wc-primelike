@@ -46,6 +46,24 @@ export function canPlayAt(player, slotPos) {
 }
 
 /**
+ * Reubicación táctica: dos titulares intercambian el puesto que juegan. No gasta cambio
+ * (decisión del PO 15-jul) y se auto-limita sola — el castigo por jugar fuera de puesto
+ * ya la hace cara. Devuelve false si alguno no puede ocupar el puesto del otro (el arco).
+ *
+ * La usa el PARTIDO, donde no hay formación de la que rederivar: ahí `posJugada` es la
+ * única verdad. En Gestión de Plantilla, en cambio, el once se reordena por índice y
+ * `assignPositions` rederiva los puestos desde los slots (si no, el próximo repintado
+ * desharía el movimiento).
+ */
+export function swapAssignments(a, b) {
+  const pa = a.posJugada || a.pos, pb = b.posJugada || b.pos;
+  if (!canPlayAt(a, pb) || !canPlayAt(b, pa)) return false;
+  a.posJugada = pb;
+  b.posJugada = pa;
+  return true;
+}
+
+/**
  * Fija en qué puesto juega cada titular (`posJugada`) según la formación y se lo borra
  * al resto del plantel. Es la única pluma de ese campo (ARQUITECTURA §3.1) y hay que
  * llamarla cada vez que el once cambia: de ahí salen el castigo por jugar fuera de
