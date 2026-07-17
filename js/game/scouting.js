@@ -1,0 +1,114 @@
+/* ============================================================
+   game/scouting — el Informe del Rival (Bible §4.6, sprint
+   "Preparación con dientes"): lo que el cuerpo técnico sabe del
+   próximo cruce, para que la Acción del Día se decida mirando
+   al rival y no en el vacío.
+
+   Reglas de diseño:
+   - CUALITATIVO (UX Bible): niveles Alto/Medio/Bajo relativos a
+     TU equipo, nunca porcentajes. Los niveles comparan el cruce
+     real: su ataque contra tu defensa, su defensa contra tu
+     ataque, su arquero contra el tuyo.
+   - Solo datos que el motor YA tiene: poderes esperados (stats
+     sin ruido, opponents.expectedOpponentLineup), resultados
+     jugados por el mundo vivo, bajas de run.rivalBans y la
+     figura del rival. Nada de "filosofía del rival" hasta que
+     exista Filosofía.
+   - PURO: no consume rng, no muta la run (mirar el informe es
+     gratis e ilimitado — la curiosidad no se castiga).
+   ============================================================ */
+import { getTeam } from "../data/teams-repo.js";
+import { playerOverall } from "./ratings.js";
+import { bestSix, expectedOpponentLineup } from "./opponents.js";
+import { teamPowers, gkQuality } from "./match/powers.js";
+
+// Umbral en escala de poder (~0-5): ±0.25 ≈ 5 puntos de rating de diferencia
+const THRESHOLD = 0.25;
+const nivel = diff => (diff >= THRESHOLD ? "Alto" : diff <= -THRESHOLD ? "Bajo" : "Medio");
+
+const DETALLE = {
+  ataque: {
+    Alto: "Su ofensiva supera a tu defensa: cada espacio que dejes lo van a castigar.",
+    Medio: "Su ataque y tu defensa están a la par: el duelo se define en los detalles.",
+    Bajo: "Tu defensa está por encima de su ataque: sin regalos, no deberían lastimarte.",
+  },
+  defensa: {
+    Alto: "Su bloque defensivo supera a tu ataque: va a haber que trabajar cada gol.",
+    Medio: "Su defensa y tu ataque están parejos: la efectividad va a mandar.",
+    Bajo: "Tu ataque está por encima de su defensa: hay espacios para lastimar.",
+  },
+  arquero: {
+    Alto: "Su arquero es superior al tuyo: el mano a mano no te conviene.",
+    Medio: "Los arqueros están a la par: nadie gana el partido bajo los palos.",
+    Bajo: "Tu arquero es superior: en un partido cerrado, esa ventaja pesa.",
+  },
+};
+
+const POR_QUE = {
+  DEL: "Su gol: el hombre que define los partidos.",
+  MED: "Maneja los hilos: todo el juego pasa por sus pies.",
+  DEF: "Ordena el fondo: la muralla que hay que mover.",
+  POR: "Achica todo: un arquero que gana puntos solo.",
+};
+
+/** Copia limpia para calcular poderes sin arrastrar estado de run (posJugada, energía del torneo). */
+const shadow = p => ({ name: p.name, pos: p.pos, stats: { ...p.stats }, energia: 100 });
+
+/** La figura del rival: con stats reales manda la nota; sin ellas, su figura curada (la primera). */
+function keyFigure(opp) {
+  if (opp.players) {
+    const star = [...opp.players].sort((a, b) => playerOverall(b) - playerOverall(a))[0];
+    return { name: star.name, pos: star.pos, nota: playerOverall(star), por_que: POR_QUE[star.pos] };
+  }
+  const star = opp.figures[0];
+  return { name: star.name, pos: star.pos, nota: null, por_que: POR_QUE[star.pos] };
+}
+
+/** Los partidos ya jugados por el rival en su grupo, del más reciente al más viejo (máx 3). */
+function recentForm(run, oppId) {
+  const g = run.groups.find(g => g.teamIds.includes(oppId));
+  if (!g) return [];
+  return g.results
+    .filter(r => r.a === oppId || r.b === oppId)
+    .map(r => {
+      const soyA = r.a === oppId;
+      const gf = soyA ? r.gA : r.gB, gc = soyA ? r.gB : r.gA;
+      return { rival: getTeam(soyA ? r.b : r.a).name, marcador: `${gf}-${gc}`, res: gf > gc ? "V" : gf < gc ? "D" : "E" };
+    })
+    .reverse()
+    .slice(0, 3);
+}
+
+/**
+ * El Informe del Rival completo:
+ *   { oppId, name, lineas: {ataque|defensa|arquero: {nivel, detalle}},
+ *     figura: {name, pos, nota|null, por_que}, forma: [{rival, marcador, res}],
+ *     bajas: [nombres], enEliminatorias: bool }
+ * Los niveles usan la alineación esperada del rival (sin ruido, con sus bajas
+ * descontadas) contra tu mejor seis DISPONIBLE hoy, ambos sin buffs: calidad
+ * base — los efectos del calendario ya se ven en su propia card del hub.
+ */
+export function buildOpponentReport(run, oppId) {
+  const opp = getTeam(oppId);
+  const bajas = run.rivalBans[oppId] || [];
+
+  const oppP = teamPowers(expectedOpponentLineup(opp, bajas).map(shadow), "normal", {});
+  // shadow ANTES de bestSix: sobre jugadores de la run, playerOverall castiga por la
+  // posJugada del momento (lección v13) y elegiría mal; la copia limpia mide su puesto natural
+  const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0).map(shadow);
+  const myP = teamPowers(bestSix(available), "normal", {});
+
+  return {
+    oppId,
+    name: opp.name,
+    lineas: {
+      ataque: { nivel: nivel(oppP.atk - myP.def), detalle: DETALLE.ataque[nivel(oppP.atk - myP.def)] },
+      defensa: { nivel: nivel(oppP.def - myP.atk), detalle: DETALLE.defensa[nivel(oppP.def - myP.atk)] },
+      arquero: { nivel: nivel(gkQuality(oppP.por, {}) - gkQuality(myP.por, {})), detalle: DETALLE.arquero[nivel(gkQuality(oppP.por, {}) - gkQuality(myP.por, {}))] },
+    },
+    figura: keyFigure(opp),
+    forma: recentForm(run, oppId),
+    bajas: [...bajas],
+    enEliminatorias: run.stage !== "groups",
+  };
+}

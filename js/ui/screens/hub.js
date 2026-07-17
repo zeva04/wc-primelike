@@ -14,6 +14,7 @@ import { DAY_ACTIONS, TACTICS_BONUS, TRAIN_BUFF, TRAIN_FATIGUE } from "../../con
 import { RARITIES } from "../../content/rarities.js";
 import { addJournal } from "../../game/journal.js";
 import { nextOpponentId, STAGE_LABEL } from "../../game/tournament/knockout.js";
+import { buildOpponentReport } from "../../game/scouting.js";
 import { EVENT_THEMES } from "../../content/themes.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
@@ -115,6 +116,63 @@ function effectsCard() {
   </div>`;
 }
 
+// Colores del nivel de amenaza del informe: Alto = peligro, Bajo = ventaja tuya
+const NIVEL_CHIP = {
+  Alto: "border-red-500/60 bg-red-500/10 text-red-400",
+  Medio: "border-slate-500/60 bg-slate-500/10 text-slate-300",
+  Bajo: "border-emerald-500/60 bg-emerald-500/10 text-emerald-400",
+};
+const RES_CHIP = { V: "text-emerald-400 border-emerald-500/50", E: "text-slate-300 border-slate-500/50", D: "text-red-400 border-red-500/50" };
+
+/**
+ * Modal del Informe del Rival (Bible §4.6): las tres líneas del cruce con su
+ * nivel cualitativo, la figura, la forma reciente y las bajas confirmadas.
+ * Gratis e ilimitado — mirar nunca gasta el día.
+ */
+function showScoutReport(oppId) {
+  const rep = buildOpponentReport(S.run, oppId);
+  const opp = getTeam(oppId);
+  const LINEA = { ataque: "⚔️ Su ataque", defensa: "🛡️ Su defensa", arquero: "🧤 Su arquero" };
+  const figuraObj = (opp.players || opp.figures).find(p => p.name === rep.figura.name);
+  modal(`
+    <div>
+      <div class="flex items-center gap-3 mb-1">
+        ${flagImg(opp, "w-10 h-7", true)}
+        <div>
+          <h2 class="text-xl font-black">📋 Informe del rival — ${rep.name}</h2>
+          <p class="text-[10px] text-slate-500">Cuerpo técnico · consultarlo es gratis: mirar no gasta el día</p>
+        </div>
+      </div>
+      <div class="space-y-2 mt-4">
+        ${Object.entries(rep.lineas).map(([k, l]) => `
+          <div class="rounded-xl border border-slate-700 bg-slate-900/50 p-3">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-sm">${LINEA[k]}</span>
+              <span class="px-2 py-0.5 rounded-full border ${NIVEL_CHIP[l.nivel]} text-[10px] font-black uppercase tracking-widest">${l.nivel}</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1">${l.detalle}</p>
+          </div>`).join("")}
+        <div class="rounded-xl border border-slate-700 bg-slate-900/50 p-3 flex items-center gap-3">
+          ${figuraObj ? spriteSvg(figuraObj, opp, "w-8 h-9") : ""}
+          <div class="flex-1">
+            <div class="font-semibold text-sm">⭐ ${rep.figura.name} <span class="text-[10px] text-slate-500">${rep.figura.pos}${rep.figura.nota ? ` · ${rep.figura.nota}` : ""}</span></div>
+            <p class="text-[11px] text-slate-400 mt-0.5">${rep.figura.por_que}</p>
+          </div>
+        </div>
+        <div class="rounded-xl border border-slate-700 bg-slate-900/50 p-3">
+          <span class="font-semibold text-sm">📈 Forma reciente</span>
+          ${rep.forma.length
+            ? `<div class="flex flex-wrap gap-1.5 mt-1.5">${rep.forma.map(f => `<span class="px-2 py-0.5 rounded-full border ${RES_CHIP[f.res]} bg-slate-800/60 text-[10px] font-bold">${f.res} ${f.marcador} vs ${f.rival}</span>`).join("")}</div>`
+            : `<p class="text-[11px] text-slate-500 mt-1">${rep.enEliminatorias ? "Sigue vivo en las eliminatorias: viene ganando cuando importa." : "Aún no jugó en el torneo."}</p>`}
+          ${rep.forma.length && rep.enEliminatorias ? `<p class="text-[10px] text-slate-500 mt-1.5">Además sigue vivo en las eliminatorias.</p>` : ""}
+        </div>
+        ${rep.bajas.length ? `<div class="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-[11px] text-red-300"><b>🟥 Bajas confirmadas:</b> ${rep.bajas.join(" y ")} no juega${rep.bajas.length > 1 ? "n" : ""} ante nosotros.</div>` : ""}
+      </div>
+      <button id="scout-close" class="btn-primary w-full mt-4">Cerrar informe</button>
+    </div>
+  `, "max-w-lg").querySelector("#scout-close").onclick = closeModal;
+}
+
 /**
  * Card de la Oportunidad del día (Bible §4.5): la oferta única que compite con
  * las acciones normales. Borde y badge de su rareza; el calendario nunca la
@@ -181,6 +239,8 @@ function showOppChooser(o) {
  */
 function actionCard() {
   const run = S.run;
+  const oppNextId = nextOpponentId(run);
+  const opp = oppNextId ? getTeam(oppNextId) : null;
   if (!run.actionPending) {
     const done = run.lastAction && run.lastAction.day === run.day;
     return done
@@ -215,12 +275,14 @@ function actionCard() {
     </div>
     ${rest.map(a => {
       const m = actionMult(run, a);
+      // La Sesión Táctica se prepara contra ALGUIEN: el informe del rival (card VS) es su insumo
+      const desc = a.id === "tactica" && opp ? `Preparar el partido vs ${opp.name}: el equipo llega mejor plantado (bonus de ataque y defensa)` : a.desc;
       return `<button data-action="${a.id}" ${m === 0 ? "disabled" : ""} class="da-opt w-full text-left rounded-xl border border-slate-700 bg-slate-900/50 p-3 mb-2 transition-all ${m === 0 ? "opacity-50 cursor-not-allowed" : "hover:border-amber-400 hover:bg-slate-800 cursor-pointer"}">
         <div class="flex items-center justify-between">
           <span class="font-semibold text-sm">${a.icon} ${a.title}</span>
           ${modBadge(m)}
         </div>
-        <div class="text-[10px] text-slate-500 mt-0.5">${a.desc}.</div>
+        <div class="text-[10px] text-slate-500 mt-0.5">${desc}.</div>
       </button>`;
     }).join("")}
   </div>`;
@@ -257,26 +319,29 @@ function renderHub() {
       <button id="btn-abandon" class="text-xs text-slate-500 hover:text-red-400 cursor-pointer">Abandonar torneo</button>
     </div>
 
-    <div class="bg-slate-800/80 border border-slate-600 tp-topbar rounded-2xl p-5 mb-5 flex items-center justify-between flex-wrap gap-4">
-      <div class="flex items-center gap-4">
-        ${flagImg(me, "w-16 h-11", true)}
-        <span class="text-xl font-black text-slate-400">VS</span>
-        ${flagImg(opp, "w-16 h-11", true)}
-        <div>
-          <div class="text-2xl font-bold">${opp.name}</div>
-          <div>${starsHtml(teamStars(opp))} <span class="text-amber-300 font-bold text-sm ml-1">Media ${teamRating(opp)}</span></div>
+    <div id="btn-scout" title="Ver el informe del cuerpo técnico" class="bg-slate-800/80 border border-slate-600 tp-topbar rounded-2xl p-5 mb-5 cursor-pointer transition-all hover:scale-[1.005] hover:border-[var(--team-primary)]">
+      <div class="flex items-center justify-between flex-wrap gap-4">
+        <div class="flex items-center gap-4">
+          ${flagImg(me, "w-16 h-11", true)}
+          <span class="text-xl font-black text-slate-400">VS</span>
+          ${flagImg(opp, "w-16 h-11", true)}
+          <div>
+            <div class="text-2xl font-bold">${opp.name}</div>
+            <div>${starsHtml(teamStars(opp))} <span class="text-amber-300 font-bold text-sm ml-1">Media ${teamRating(opp)}</span></div>
+          </div>
+        </div>
+        <div class="text-right">
+          <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Figuras</div>
+          <div class="flex gap-1.5 justify-end">
+            ${keyPlayers(opp).map(f => `
+              <div class="text-center w-14 shrink-0" title="${f.name}">
+                <div class="flex justify-center">${spriteSvg(f, opp, "w-7 h-8")}</div>
+                <div class="text-[9px] text-slate-400 truncate">${f.name}</div>
+              </div>`).join("")}
+          </div>
         </div>
       </div>
-      <div class="text-right">
-        <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Figuras</div>
-        <div class="flex gap-1.5 justify-end">
-          ${keyPlayers(opp).map(f => `
-            <div class="text-center w-14 shrink-0" title="${f.name}">
-              <div class="flex justify-center">${spriteSvg(f, opp, "w-7 h-8")}</div>
-              <div class="text-[9px] text-slate-400 truncate">${f.name}</div>
-            </div>`).join("")}
-        </div>
-      </div>
+      <p class="text-[10px] tp-text font-semibold text-right mt-2">📋 Informe del rival →</p>
     </div>
 
     <div class="mb-5">${renderCalendarCard(opp)}</div>
@@ -322,6 +387,7 @@ function renderHub() {
   `);
 
   $("#btn-abandon").onclick = () => { if (confirm("¿Abandonar el torneo? La partida terminará.")) go("end-run", false, true); };
+  $("#btn-scout").onclick = () => showScoutReport(oppId);
   $("#btn-standings").onclick = () => go("worldcup");
   $("#btn-journal").onclick = () => go("journal", "hub");
   $("#btn-squad").onclick = () => go("squad");

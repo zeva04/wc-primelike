@@ -29,6 +29,19 @@ import { nextOpponentId, STAGE_LABEL } from "./tournament/knockout.js";
 import { DAILY_FLAVOR } from "../content/daily-flavor.js";
 import { PREP_EVENTS } from "../content/prep-events.js";
 import { RANDOM_EVENTS } from "../content/conflicts.js";
+import { buildOpponentReport } from "./scouting.js";
+
+// H6 (sprint Preparación con dientes): el framing de la previa cita UN dato del
+// Informe del Rival — la debilidad si la hay (accionable), si no la amenaza.
+const LINEA_TXT = { ataque: "su ataque", defensa: "su defensa", arquero: "su arquero" };
+function scoutHint(run, oppId) {
+  const lineas = Object.entries(buildOpponentReport(run, oppId).lineas);
+  const debil = lineas.find(([, l]) => l.nivel === "Bajo");
+  if (debil) return ` El informe del cuerpo técnico marca su punto débil: ${LINEA_TXT[debil[0]]}.`;
+  const fuerte = lineas.find(([, l]) => l.nivel === "Alto");
+  if (fuerte) return ` El informe del cuerpo técnico advierte: ${LINEA_TXT[fuerte[0]]} es superior.`;
+  return " El informe del cuerpo técnico no encuentra grietas: partido de igual a igual.";
+}
 
 const ORD = ["", "1º", "2º", "3º", "4º"];
 
@@ -177,12 +190,10 @@ export function buildDaily(run) {
   if (opp && !isMatchDay && run.nextMatchDay - run.day <= 2) {
     const rMe = teamRating(me), rOpp = teamRating(opp);
     const diff = rOpp - rMe;
-    items.push({
-      icon: "🎯", tag: "RIVAL",
-      text: diff >= 5 ? `${opp.name} (media ${rOpp}) llega como favorito al cruce: nadie nos regala nada.`
-        : diff <= -5 ? `Los analistas dan a ${me.name} como favorito ante ${opp.name} (media ${rOpp}). Cuidado con el exceso de confianza.`
-        : `Duelo parejo a la vista: ${opp.name} (media ${rOpp}) promete un partido cerrado.`,
-    });
+    const framing = diff >= 5 ? `${opp.name} (media ${rOpp}) llega como favorito al cruce: nadie nos regala nada.`
+      : diff <= -5 ? `Los analistas dan a ${me.name} como favorito ante ${opp.name} (media ${rOpp}). Cuidado con el exceso de confianza.`
+      : `Duelo parejo a la vista: ${opp.name} (media ${rOpp}) promete un partido cerrado.`;
+    items.push({ icon: "🎯", tag: "RIVAL", text: framing + scoutHint(run, opp.id) });
   }
 
   // P3 — anoche en el resto del Mundial (hasta 2 titulares)

@@ -136,6 +136,9 @@ resueltos hacia el ataque. Si se toca, recalcular la línea base de CORE.md §10
 |---|---|
 | `genOpponentSquad(team)` | Plantel de 10 de un rival no jugable: sus 5 figuras (stats derivadas del `rating` con `POS_MODS`) + 5 genéricos "Jugador6..Jugador10" que cubren todas las líneas — incluido un POR suplente — con `GENERIC_MALUS` (−4: perder una figura por suspensión duele; con −6 el % de campeón derivaba arriba). |
 | `genOpponentLineup(team, banned)` | Alineación de 6 titulares del rival (formato 6v6), excluyendo a los suspendidos de `run.rivalBans`. Jugables usan sus mejores 6 disponibles; el resto arma su mejor seis del plantel de 10 (mejor POR + mejor por línea + relleno por nota). |
+| `expectedOpponentLineup(team, banned)` | La misma regla `bestSix` pero con stats SIN ruido (no consume rng): la alineación ESPERADA del rival, para el Informe (`game/scouting`). |
+| `bestSix(pool)` | (export) Mejor seis de un pool: mejor POR + mejor por línea + relleno por nota. Lo comparten el once rival y el "mi lado" del Informe. |
+| `buildOpponentReport(run, oppId)` | **scouting**: el Informe del Rival (Bible §4.6) — `{lineas: {ataque\|defensa\|arquero: {nivel, detalle}}, figura, forma, bajas, enEliminatorias}`. Niveles CUALITATIVOS (Alto/Medio/Bajo) comparando el cruce real (su ataque vs tu defensa, su defensa vs tu ataque, arquero vs arquero) con poderes esperados sin buffs; forma desde los resultados jugados por el mundo vivo (máx 3, reciente primero); bajas de `run.rivalBans`. PURO: no muta la run ni consume rng — mirar es gratis (los tests de pureza en `tests/scouting.test.js`). |
 
 ### 4. La run — `js/game/run.js`
 | Función | Qué hace |

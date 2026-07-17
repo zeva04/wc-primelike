@@ -21,6 +21,7 @@ export async function loadEngine() {
     import("../js/game/ratings.js"),
     import("../js/game/lineup.js"),
     import("../js/game/opponents.js"),
+    import("../js/game/scouting.js"),
     import("../js/game/run.js"),
     import("../js/game/flow.js"),
     import("../js/game/calendar.js"),
