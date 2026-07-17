@@ -68,7 +68,8 @@ export function newRun(myTeamId) {
     actionPending: true,       // Acción del Día por elegir (levanta calendar, baja day-action)
     lastAction: null,          // {day, icon, title} de la última acción (escribe day-action)
     dayMod: null,              // modificador de las acciones de HOY: {icon,title,desc,mods} (escribe calendar)
-    stats: { pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, tarjetas: 0, eventos: 0, penalesAtajados: 0 },
+    dayOpp: null,              // Oportunidad viva HOY: {id} o null (escribe calendar; day-action la consume)
+    stats: { pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, tarjetas: 0, eventos: 0, penalesAtajados: 0, oppOfrecidas: 0, oppAprovechadas: 0 },
     champion: false,
     journal: [],               // Diario de Campaña: la memoria narrativa de la run
   };

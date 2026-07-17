@@ -9,7 +9,7 @@ import { teamRating, teamStars, playerOverall, outOfPosPenalty } from "../../gam
 import { currentLineup, validateLineup, getFormation } from "../../game/lineup.js";
 import { dayLabel, advanceDay } from "../../game/calendar.js";
 import { buildDaily } from "../../game/daily.js";
-import { applyDayAction, actionMult, multLabel } from "../../game/day-action.js";
+import { applyDayAction, actionMult, multLabel, dayOpportunity } from "../../game/day-action.js";
 import { DAY_ACTIONS, TACTICS_BONUS, TRAIN_BUFF, TRAIN_FATIGUE } from "../../content/day-actions.js";
 import { RARITIES } from "../../content/rarities.js";
 import { addJournal } from "../../game/journal.js";
@@ -79,7 +79,7 @@ function renderCalendarCard(opp) {
 
 /** Chips con los efectos acumulados para el próximo partido; "" si no hay ninguno. */
 function buffChips() {
-  const LABELS = { tiro: "Tiro", defensa: "Defensa", atajadas: "Atajadas", pase: "Pase", aura: "Aura", cabezazo: "Cabezazo" };
+  const LABELS = { tiro: "Tiro", defensa: "Defensa", atajadas: "Atajadas", reflejos: "Reflejos", pase: "Pase", aura: "Aura", cabezazo: "Cabezazo" };
   const chips = [];
   for (const [k, v] of Object.entries(S.run.buffs)) {
     if (k === "antiLesion") { if (v) chips.push(`<span class="px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/10 text-emerald-400">🧑‍⚕️ Sin lesiones</span>`); continue; }
@@ -116,10 +116,68 @@ function effectsCard() {
 }
 
 /**
+ * Card de la Oportunidad del día (Bible §4.5): la oferta única que compite con
+ * las acciones normales. Borde y badge de su rareza; el calendario nunca la
+ * anticipó y mañana no va a estar — la card lo dice. "" si hoy no hay.
+ */
+function oppCard() {
+  const o = dayOpportunity(S.run);
+  if (!o) return "";
+  const rar = RARITIES[o.rareza];
+  return `<button id="da-opp" class="w-full text-left rounded-xl border-2 ${rar.border} bg-slate-900/60 p-3 mb-2 transition-all hover:scale-[1.01] hover:brightness-110 cursor-pointer">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <span class="font-semibold text-sm">${o.icon} ${o.title}</span>
+      <span class="px-2 py-0.5 rounded-full border ${rar.border} ${rar.color} text-[9px] font-black uppercase tracking-widest">Oportunidad · ${rar.label}</span>
+    </div>
+    <div class="text-[10px] text-slate-400 mt-0.5">${o.desc}</div>
+    <div class="text-[9px] ${rar.color} font-bold mt-1">⏳ Solo por hoy — ocupa tu Acción del Día${o.choose ? " · tú eliges al protagonista" : ""}</div>
+  </button>`;
+}
+
+/**
+ * Selector de protagonista de una oportunidad con `choose`: modal con los
+ * candidatos (sprite, nombre, puesto y nota). Elegir aplica y consume el día;
+ * "decidir más tarde" no toca nada — la oportunidad sigue viva hasta que el
+ * día pase.
+ */
+function showOppChooser(o) {
+  const me = getTeam(S.run.teamId);
+  const rar = RARITIES[o.rareza];
+  const m = modal(`
+    <div class="text-center">
+      <div class="text-5xl mb-2">${o.icon}</div>
+      <div class="inline-block px-2.5 py-0.5 rounded-full border ${rar.border} ${rar.color} text-[10px] font-black uppercase tracking-widest mb-2">Oportunidad · ${rar.label}</div>
+      <h2 class="text-xl font-black mb-1">${o.title}</h2>
+      <p class="text-slate-300 text-sm mb-4">${o.desc}</p>
+      <p class="text-xs font-bold tp-text mb-3">${o.choose.label}</p>
+      <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+        ${o.choose.candidates(S.run).map(p => `
+          <button data-name="${p.name}" class="opp-cand w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-slate-600 bg-slate-700/60 hover:border-amber-400 hover:bg-slate-700 transition-all cursor-pointer text-left">
+            ${spriteSvg(p, me, "w-7 h-8")}
+            <span class="flex-1 font-semibold text-sm">${p.name}</span>
+            <span class="text-[10px] text-slate-400">${p.pos}</span>
+            <span class="text-amber-300 font-black text-sm">${playerOverall(p)}</span>
+          </button>`).join("")}
+      </div>
+      <button id="opp-cancel" class="mt-4 text-xs text-slate-500 hover:text-slate-300 cursor-pointer">Todavía no — decidir más tarde</button>
+    </div>
+  `);
+  m.querySelectorAll(".opp-cand").forEach(b => b.onclick = () => {
+    const res = applyDayAction(S.run, o.id, b.dataset.name);
+    if (!res) return;
+    closeModal();
+    toast(`${res.icon} ${res.title}: ${res.desc}`);
+    renderHub();
+  });
+  m.querySelector("#opp-cancel").onclick = closeModal;
+}
+
+/**
  * Panel de la Acción del Día (Bible §4.7): un día sin partido = una inversión.
- * Entrenar agrupa sus focos en una fila de botones; las demás acciones son una
- * tarjeta-botón cada una. Cuando la acción ya se eligió, una línea de
- * confirmación reemplaza al panel y se desbloquea "Pasar al día siguiente".
+ * La Oportunidad del día (si hay) va arriba, tentando; Entrenar agrupa sus
+ * focos en una fila de botones; las demás acciones son una tarjeta-botón cada
+ * una. Cuando la acción ya se eligió, una línea de confirmación reemplaza al
+ * panel y se desbloquea "Pasar al día siguiente".
  */
 function actionCard() {
   const run = S.run;
@@ -144,6 +202,7 @@ function actionCard() {
     <h3 class="font-bold">🧭 Acción del día</h3>
     <p class="text-[10px] text-slate-500 mt-0.5 mb-3">Un día, una inversión: lo que elijas hoy es lo que NO harás. Revisa plantilla y rival antes de decidir.</p>
     ${run.dayMod ? `<div class="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-300 mb-3">${run.dayMod.icon} ${run.dayMod.title}: ${run.dayMod.desc}.</div>` : ""}
+    ${oppCard()}
     <div class="rounded-xl border border-slate-700 bg-slate-900/50 p-3 mb-2 ${tMult === 0 ? "opacity-50" : ""}">
       <div class="flex items-center justify-between">
         <span class="font-semibold text-sm">🏋️ Entrenar</span>
@@ -279,6 +338,16 @@ function renderHub() {
       toast(`${a.icon} ${a.title}${a.mult !== 1 ? ` (${multLabel(a.mult)} hoy)` : ""}: ${a.desc}.`);
       renderHub();
     });
+    const oppBtn = $("#da-opp");
+    if (oppBtn) oppBtn.onclick = () => {
+      const o = dayOpportunity(S.run);
+      if (!o) return;
+      if (o.choose) { showOppChooser(o); return; }
+      const res = applyDayAction(S.run, o.id);
+      if (!res) return;
+      toast(`${res.icon} ${res.title}: ${res.desc}`);
+      renderHub();
+    };
     if (!S.run.actionPending) $("#btn-nextday").onclick = () => {
       const res = advanceDay(S.run);
       if (!res) { renderHub(); return; }

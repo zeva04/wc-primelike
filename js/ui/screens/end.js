@@ -66,6 +66,7 @@ function renderEndScreen() {
           <div class="flex justify-between"><span>👑 Goleador</span><b>${topTxt}</b></div>
           <div class="flex justify-between"><span>🧤 Penales atajados</span><b>${run.stats.penalesAtajados}</b></div>
           <div class="flex justify-between"><span>🎲 Eventos enfrentados</span><b>${run.stats.eventos}</b></div>
+          <div class="flex justify-between"><span>🎁 Oportunidades únicas</span><b>${run.stats.oppOfrecidas ? `aprovechaste ${run.stats.oppAprovechadas} de ${run.stats.oppOfrecidas}` : "no apareció ninguna"}</b></div>
         </div>
       </div>
 

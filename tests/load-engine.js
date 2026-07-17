@@ -40,6 +40,7 @@ export async function loadEngine() {
     import("../js/content/prep-events.js"),
     import("../js/content/day-actions.js"),
     import("../js/content/daily-flavor.js"),
+    import("../js/content/opportunities.js"),
     import("../js/content/conflicts.js"),
     import("../js/content/injuries.js"),
   ]);

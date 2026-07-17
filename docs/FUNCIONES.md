@@ -73,7 +73,7 @@ agregan todos los módulos en `tests/load-engine.js` solo por comodidad. Mapa de
 | `js/game/match/powers.js` | §8 Funciones de poder |
 | `js/game/match/Match.js` (+ `chances.js`, `incidents.js`, `shootout.js`) | §8 Clase `Match` (máquina de estados + módulos de jugadas) |
 | `js/game/calendar.js` · `daily.js` · `day-action.js` · `flow.js` · `discipline.js` · `medical.js` · `journal.js` | §9 Entre partidos |
-| `js/content/` (themes, prep-events, day-actions, conflicts, injuries, daily-flavor) | Tablas de contenido editable |
+| `js/content/` (themes, prep-events, day-actions, opportunities, conflicts, injuries, daily-flavor) | Tablas de contenido editable |
 
 Las secciones siguientes documentan las mismas funciones, ahora indicando su módulo.
 
@@ -238,10 +238,11 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | Función | Qué hace |
 |---|---|
 | `dayLabel(day)` | Fecha real del día de la run ("Jue 11 jun"; día 1 = 11-jun-2026). |
-| `scheduleNextMatch(run)` | Agenda el próximo partido a 5-6 días y pre-sortea el evento de cada día intermedio (75% evento — nivel de rareza ponderado por `RARITIES.weight` y luego un evento del nivel — / 25% conflicto, sin repetir dentro de la ventana). Llena `run.nextMatchDay` y `run.dayPlan`. |
-| `advanceDay(run)` | Pasa al día siguiente y resuelve lo que trae: `{type:"match"}` (llegó el partido), `{type:"evento",…, rareza}` (inevitable, ya aplicado; `effect` puede devolver un desc con protagonista) o `{type:"conflicto",…}` (dilema: la UI aplica la opción elegida). Todo día sin partido levanta además `run.actionPending`; si el evento trae `mod`, lo deja en `run.dayMod` (se limpia al empezar cada día). Las legendarias van al diario con tono dorado. |
-| `applyDayAction(run,actionId)` | **day-action**: aplica la Acción del Día elegida (`DAY_ACTIONS`) escalada por el modificador del día, baja `actionPending`, escribe `lastAction` y anota el diario. Devuelve `{...accion, mult}` o `null` si no había acción pendiente, el id no existe o la acción está bloqueada hoy. |
+| `scheduleNextMatch(run)` | Agenda el próximo partido a 5-6 días y pre-sortea el evento de cada día intermedio (75% evento — nivel de rareza ponderado por `RARITIES.weight` y luego un evento del nivel — / 25% conflicto, sin repetir dentro de la ventana). Además, a lo sumo UN día libre esconde una Oportunidad (`dayPlan[d].opp`): cada día tira 20% y el primero que acierta corta. Llena `run.nextMatchDay` y `run.dayPlan`. |
+| `advanceDay(run)` | Pasa al día siguiente y resuelve lo que trae: `{type:"match"}` (llegó el partido), `{type:"evento",…, rareza}` (inevitable, ya aplicado; `effect` puede devolver un desc con protagonista) o `{type:"conflicto",…}` (dilema: la UI aplica la opción elegida). Todo día sin partido levanta además `run.actionPending`; si el evento trae `mod`, lo deja en `run.dayMod`; si el plan del día esconde una Oportunidad, la deja viva en `run.dayOpp` (ambos se limpian al empezar cada día: la oportunidad no tomada expira sin rastro). Las legendarias van al diario con tono dorado. |
+| `applyDayAction(run,actionId,targetName?)` | **day-action**: aplica la Acción del Día elegida (`DAY_ACTIONS` o la Oportunidad viva hoy) escalada por el modificador del día — la Oportunidad NO se escala (decisión PO: premio externo) —, baja `actionPending`, escribe `lastAction` y anota el diario (la oportunidad con tono por rareza). Si la oportunidad trae `choose`, exige `targetName` válido entre sus candidatos (por nombre, §3.1); sin él no aplica NI consume el turno. Devuelve `{...accion, mult, desc}` (`desc` puede traer protagonista) o `null` si no había acción pendiente, el id no existe, la acción está bloqueada hoy o faltó el objetivo. |
 | `actionMult(run,action)` | **day-action**: multiplicador de una acción HOY según `run.dayMod` (1 sin modificador; 0 = bloqueada). |
+| `dayOpportunity(run)` | **day-action**: la Oportunidad viva HOY (fila completa de `content/opportunities`) o `null`. |
 | `buildDaily(run)` | **daily**: arma la edición del World Cup Daily — `{day, isMatchDay, items}` con 1-5 titulares `{icon, tag, text}` ordenados por prioridad (PORTADA/PLANTEL/GRUPO/RIVAL/MUNDIAL/HOY/COLOR, ver CORE §9); el primero es la nota de tapa. GRUPO marca al próximo rival si jugó anoche; RIVAL avisa sus suspendidos (`rivalBans`) y da el framing por paridad solo en la previa (≤2 días); MUNDIAL puntúa `run.lastNight` (batacazos por tier, goleadas, festivales, grandes, rojas); HOY es el `teaser` del evento/conflicto que trae el día (anticipa sin revelar). Solo lectura (el flavor consume rng). |
 | `multLabel(mult)` | **day-action**: etiqueta corta para la UI ("×2", "×½"); `""` si es 1 o bloqueo. |
 | `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced}`. |
@@ -262,9 +263,15 @@ decisión, también con `tema`) y `DAY_ACTIONS` (5 Acciones del Día en
 y sesión táctica; los `effect(run, mult)` escalan su recompensa — no el costo — por el
 modificador; exporta también `TRAIN_BUFF`, `TRAIN_FATIGUE` y `TACTICS_BONUS`).
 También `DAILY_FLAVOR` (12 titulares de color `{icon, text}` para el World Cup Daily,
-máximo 1 por edición y solo en días tranquilos).
+máximo 1 por edición y solo en días tranquilos) y `OPPORTUNITIES`
+(`content/opportunities.js`: 19 Eventos de Oportunidad — Bible §4.5 — que compiten con
+la Acción del Día, distribución 5/7/5/2 por rareza elegida por el PO; con `rareza` pero
+SIN `tema` ni `teaser` porque ni el calendario ni el Daily las anticipan; máx 1 por
+ventana, el modificador del día no las toca, y la que no se toma expira sin rastro.
+Las de calidad permanente llevan `choose: {label, candidates(run)}`: el DT elige al
+jugador protagonista y `effect(run, jugador)` lo recibe).
 El esquema de todo este contenido es LEY en `tests/events.validate.js`, que además
-aplica cada efecto contra una run fresca (energías en rango, buffs finitos).
+aplica cada efecto contra una run fresca (energías en rango, buffs finitos, stats 1-99).
 
 ### 10. API pública
 No existe fachada (F7): la superficie pública del motor es la suma de los exports de sus
@@ -367,7 +374,9 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 |---|---|
 | `nextOpponentId()` | Id del próximo rival (grupo o cruce). |
 | `renderHub()` | Pantalla central: rival, calendario, alineación; el botón principal pasa el día o juega el partido según toque. "Pasar al día" queda bloqueado mientras `run.actionPending` — primero se elige la Acción del Día. |
-| `actionCard()` | Panel de la **Acción del Día** (Bible §4.7): los focos de Entrenar agrupados en una fila + una tarjeta-botón por acción suelta; elegida la acción, lo reemplaza una línea de confirmación. Aplica vía `game/day-action`. Si hay `run.dayMod` muestra su banner y bloquea (`disabled` + gris) o etiqueta ("×2 hoy") las acciones afectadas. |
+| `actionCard()` | Panel de la **Acción del Día** (Bible §4.7): la Oportunidad del día arriba (si hay), los focos de Entrenar agrupados en una fila + una tarjeta-botón por acción suelta; elegida la acción, lo reemplaza una línea de confirmación. Aplica vía `game/day-action`. Si hay `run.dayMod` muestra su banner y bloquea (`disabled` + gris) o etiqueta ("×2 hoy") las acciones afectadas. |
+| `oppCard()` | Card de la **Oportunidad del día** (Bible §4.5): borde y badge de su rareza + recordatorio "solo por hoy, ocupa tu Acción del Día". Click: aplica directo, o abre `showOppChooser` si trae `choose`. `""` si hoy no hay. |
+| `showOppChooser(o)` | Modal selector de protagonista de una oportunidad con `choose`: candidatos con sprite/nombre/puesto/nota; elegir aplica (`applyDayAction` con el nombre) y consume el día; "decidir más tarde" cierra sin tocar nada. |
 | `showDaily(daily,onClose)` | La **portada del Diario del Mundial** (papel crema, serifas, doble filete, nota de tapa grande + titulares secundarios con su sección en rojo). Se abre al llegar a un día nuevo, antes del evento; "Doblar el diario" dispara `onClose`, que encadena el modal de evento/conflicto o el toast de día de partido. |
 | `renderCalendarCard(opp)` | Franja de días hasta el próximo partido: hoy resaltado, temática por día, rival en el día de partido. |
 | `buffChips()` | Chips con los efectos acumulados para el próximo partido (incluye el de `tactica` con su multiplicador de sesiones). |

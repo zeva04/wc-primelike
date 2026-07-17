@@ -88,22 +88,41 @@ function playRun(teamId) {
   const run = E.newRun(teamId);
   assert(run.journal.length === 1, "el diario debe abrir con el sorteo");
   let alive = true, champion = false, guard = 0;
+  let oppSeen = 0, oppTaken = 0; // contabilidad paralela de oportunidades (audita run.stats)
 
   while (alive && guard++ < 60) {
-    let dayGuard = 0;
+    let dayGuard = 0, oppDays = 0;
     while (run.day < run.nextMatchDay && dayGuard++ < 10) {
       // Acción del Día del día actual (mismo orden que la UI: evento → acción → avanzar).
       // Solo entre las acciones disponibles: los modificadores del día pueden bloquear.
+      // La Oportunidad viva compite como una opción más (Bible §4.5).
       if (run.actionPending) {
+        const opp = E.dayOpportunity(run);
         const opts = E.DAY_ACTIONS.filter(a => E.actionMult(run, a) > 0);
         assert(opts.length > 0, "ningún modificador puede bloquear TODAS las acciones");
+        if (opp) opts.push(opp);
         const blocked = E.DAY_ACTIONS.find(a => E.actionMult(run, a) === 0);
         if (blocked) assert(E.applyDayAction(run, blocked.id) === null, "una acción bloqueada no debe aplicarse", blocked.id);
         const a = opts[Math.floor(Math.random() * opts.length)];
-        assert(E.applyDayAction(run, a.id), "la acción del día debe aplicarse", a.id);
+        let res;
+        if (opp && a.id === opp.id && opp.choose) {
+          // La oportunidad con elección exige objetivo: sin él no se aplica, y un
+          // candidato al azar (como haría un jugador) sí
+          assert(E.applyDayAction(run, a.id) === null, "con choose y sin objetivo no debe aplicarse", a.id);
+          const cands = opp.choose.candidates(run);
+          assert(cands.length > 0, "la oportunidad con elección siempre tiene candidatos", opp.id);
+          res = E.applyDayAction(run, a.id, cands[Math.floor(Math.random() * cands.length)].name);
+        } else res = E.applyDayAction(run, a.id);
+        assert(res, "la acción del día debe aplicarse", a.id);
+        if (opp && a.id === opp.id) { oppTaken++; assert(res.mult === 1, "el modificador del día no escala la oportunidad", a.id); }
         assert(!run.actionPending, "aplicar la acción consume el turno del día");
       }
       const ev = E.advanceDay(run);
+      if (run.dayOpp) {
+        oppDays++; oppSeen++;
+        assert(oppDays <= 1, "máx 1 oportunidad por ventana entre partidos");
+        assert(E.dayOpportunity(run), "la oportunidad viva debe existir en el pool", run.dayOpp.id);
+      }
       // El mundo jugó "anoche": las entradas de lastNight deben estar completas
       for (const n of run.lastNight) {
         assert(n.a && n.b && Number.isInteger(n.gA) && Number.isInteger(n.gB), "resultado de anoche completo", JSON.stringify(n));
@@ -120,6 +139,7 @@ function playRun(teamId) {
       }
     }
     assert(!run.actionPending, "el día de partido no debe tener acción pendiente");
+    assert(!run.dayOpp, "el día de partido no trae oportunidad (y la de ayer expiró sin rastro)");
     // Edición de día de partido: la tapa es el partido, nada compite con el clímax
     const matchDaily = E.buildDaily(run);
     assert(matchDaily.isMatchDay && matchDaily.items[0].tag === "PORTADA", "el Daily de día de partido abre con la tapa del partido");
@@ -162,6 +182,8 @@ function playRun(teamId) {
     }
   }
   assert(guard < 60, "la run no terminó (loop guard)");
+  assert(run.stats.oppOfrecidas === oppSeen, "oppOfrecidas cuadra con las oportunidades vistas", `stats=${run.stats.oppOfrecidas} vistas=${oppSeen}`);
+  assert(run.stats.oppAprovechadas === oppTaken, "oppAprovechadas cuadra con las tomadas", `stats=${run.stats.oppAprovechadas} tomadas=${oppTaken}`);
   for (let k = 1; k < run.journal.length; k++) {
     assert(run.journal[k].day >= run.journal[k - 1].day, "diario fuera de orden cronológico");
   }

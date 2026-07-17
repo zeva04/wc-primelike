@@ -5,6 +5,7 @@
 import { rnd, ri, shuffle } from "../core/rng.js";
 import { PREP_EVENTS } from "../content/prep-events.js";
 import { RANDOM_EVENTS } from "../content/conflicts.js";
+import { OPPORTUNITIES } from "../content/opportunities.js";
 import { RARITIES } from "../content/rarities.js";
 import { addJournal } from "./journal.js";
 import { playWorldDay } from "./tournament/world.js";
@@ -23,14 +24,18 @@ export function dayLabel(day) {
 
 // Probabilidad de que el evento de un día sea un conflicto con decisión (vs evento inevitable)
 const CONFLICT_CHANCE = 0.25;
+// Probabilidad de que un día libre traiga además una Oportunidad (Bible §4.5);
+// el tope de 1 por ventana lo aplica scheduleNextMatch cortando en el primer acierto.
+const OPPORTUNITY_CHANCE = 0.20;
 
 /**
- * Sortea un evento inevitable por RAREZA: primero el nivel (ponderado por
- * RARITIES.weight, renormalizado entre los niveles que aún tienen eventos sin
- * usar en la ventana) y después un evento de ese nivel. Los pools llegan ya
- * barajados, así que `pop()` es un evento al azar del nivel.
+ * Sortea del pool por RAREZA: primero el nivel (ponderado por RARITIES.weight,
+ * renormalizado entre los niveles que aún tienen entradas sin usar en la
+ * ventana) y después una entrada de ese nivel. Los pools llegan ya barajados,
+ * así que `pop()` es una entrada al azar del nivel. Lo usan los eventos
+ * inevitables y las oportunidades.
  */
-function drawPrepEvent(pools) {
+function drawByRarity(pools) {
   const tiers = Object.keys(RARITIES).filter(t => pools[t].length);
   let r = rnd() * tiers.reduce((s, t) => s + RARITIES[t].weight, 0);
   for (const t of tiers) { r -= RARITIES[t].weight; if (r <= 0) return pools[t].pop(); }
@@ -43,6 +48,9 @@ function drawPrepEvent(pools) {
  * repetir el mismo evento dentro de la ventana (3 "lluvias" seguidas aburren y castigan
  * de más). El plan guarda el evento completo pero el calendario solo muestra su
  * TEMÁTICA: el detalle (y su rareza) se descubre al vivir el día.
+ * Además, a lo sumo UN día libre de la ventana esconde una Oportunidad (`opp`):
+ * cada día tira OPPORTUNITY_CHANCE y el primero que acierta se la lleva. El
+ * calendario no la muestra — se descubre al llegar el día (decisión del PO).
  */
 export function scheduleNextMatch(run) {
   run.nextMatchDay = run.day + ri(5, 6);
@@ -52,8 +60,16 @@ export function scheduleNextMatch(run) {
   const conflictPool = shuffle(RANDOM_EVENTS);
   for (let d = run.day + 1; d < run.nextMatchDay; d++) {
     const kind = rnd() < CONFLICT_CHANCE && conflictPool.length ? "conflicto" : "evento";
-    const ev = kind === "conflicto" ? conflictPool.pop() : drawPrepEvent(eventPools);
+    const ev = kind === "conflicto" ? conflictPool.pop() : drawByRarity(eventPools);
     run.dayPlan[d] = { kind, id: ev.id, tema: ev.tema };
+  }
+  const oppPools = {};
+  for (const t of Object.keys(RARITIES)) oppPools[t] = shuffle(OPPORTUNITIES.filter(o => o.rareza === t));
+  for (let d = run.day + 1; d < run.nextMatchDay; d++) {
+    if (rnd() >= OPPORTUNITY_CHANCE) continue;
+    const opp = drawByRarity(oppPools);
+    if (opp) run.dayPlan[d].opp = opp.id;
+    break; // tope: 1 oportunidad por ventana
   }
 }
 
@@ -66,17 +82,21 @@ export function scheduleNextMatch(run) {
  * cambia el contexto, DESPUÉS el DT decide su inversión del día (game/day-action.js).
  * Si el evento trae `mod`, queda en `run.dayMod` y modifica las acciones SOLO hoy
  * (Bible §4.5: los eventos cambian el problema del día, no solo los números).
+ * Si el plan del día esconde una Oportunidad, queda viva en `run.dayOpp` — la de
+ * ayer expira SIN rastro (rechazo silencioso: el silencio es el costo).
  * Devuelve null si ya es día de partido (no se puede pasar el día sin jugarlo).
  */
 export function advanceDay(run) {
   if (run.day >= run.nextMatchDay) return null;
   run.day++;
   run.dayMod = null; // los modificadores duran exactamente un día
+  run.dayOpp = null; // la oportunidad no tomada ayer se perdió para siempre
   playWorldDay(run); // "anoche" el resto del Mundial jugó lo suyo (run.lastNight → Daily)
   if (run.day >= run.nextMatchDay) { run.actionPending = false; return { type: "match" }; }
   run.actionPending = true;
   const plan = run.dayPlan[run.day];
   if (!plan) { run.actionPending = false; return { type: "match" }; } // no debería ocurrir: todo día intermedio tiene plan
+  if (plan.opp) { run.dayOpp = { id: plan.opp }; run.stats.oppOfrecidas++; } // la cuenta final revela las que dejaste pasar
   if (plan.kind === "evento") {
     const ev = PREP_EVENTS.find(e => e.id === plan.id);
     const desc = ev.effect(run) || ev.desc; // el efecto puede devolver un desc con protagonista
