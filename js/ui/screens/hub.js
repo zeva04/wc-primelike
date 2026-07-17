@@ -8,6 +8,7 @@ import { getTeam } from "../../data/teams-repo.js";
 import { teamRating, teamStars, playerOverall, outOfPosPenalty } from "../../game/ratings.js";
 import { currentLineup, validateLineup, getFormation } from "../../game/lineup.js";
 import { dayLabel, advanceDay } from "../../game/calendar.js";
+import { buildDaily } from "../../game/daily.js";
 import { applyDayAction, actionMult, multLabel } from "../../game/day-action.js";
 import { DAY_ACTIONS, TACTICS_BONUS, TRAIN_BUFF, TRAIN_FATIGUE } from "../../content/day-actions.js";
 import { RARITIES } from "../../content/rarities.js";
@@ -237,7 +238,7 @@ function renderHub() {
             <span class="text-amber-300 font-black text-2xl">${teamRating(me)}</span>
           </div>
           <div class="mt-1">${starsHtml(teamStars(me))}</div>
-          <div class="text-xs mt-2 ${v.ok ? "text-slate-400" : "text-amber-400"}">${v.ok ? `Formación ${getFormation(S.formation) ? S.formation : "improvisada"} · alineación lista` : `⚠️ ${v.msg}`}</div>
+          <div class="text-xs mt-2 ${!v.ok ? "text-amber-400" : v.short ? "text-orange-400" : "text-slate-400"}">${!v.ok ? `⚠️ ${v.msg}` : v.short ? `🆘 Plantel diezmado: presentas ${S.selectedLineup.length} — jugarás en inferioridad numérica` : `Formación ${getFormation(S.formation) ? S.formation : "improvisada"} · alineación lista`}</div>
           ${fueraDePuesto.length ? `<div class="text-xs text-orange-400 mt-1.5" title="Sus stats bajan mientras jueguen ahí">❗ Fuera de puesto: ${fueraDePuesto.map(p => `${p.name} (de ${p.posJugada})`).join(", ")}</div>` : ""}
           ${discipline.susp.length ? `<div class="text-xs text-red-400 mt-1.5">🟥 Suspendido${discipline.susp.length > 1 ? "s" : ""}: ${discipline.susp.map(p => p.name).join(", ")}</div>` : ""}
           ${discipline.aperc.length ? `<div class="text-xs text-yellow-400 mt-1.5" title="Con otra amarilla quedan suspendidos un partido">🟨 Apercibido${discipline.aperc.length > 1 ? "s" : ""}: ${discipline.aperc.map(p => p.name).join(", ")}</div>` : ""}
@@ -281,11 +282,48 @@ function renderHub() {
     if (!S.run.actionPending) $("#btn-nextday").onclick = () => {
       const res = advanceDay(S.run);
       if (!res) { renderHub(); return; }
-      if (res.type === "match") { renderHub(); toast(`⚽ ${dayLabel(S.run.day)} — ¡Día de partido!`); }
-      else if (res.type === "evento") showDayEvent(res);
-      else showRandomEvent(res);
+      renderHub(); // el hub del día nuevo queda detrás de la portada
+      // Bible §4.4: el día arranca con el Daily (informa); el evento llega después (transforma)
+      showDaily(buildDaily(S.run), () => {
+        if (res.type === "match") { closeModal(); toast(`⚽ ${dayLabel(S.run.day)} — ¡Día de partido!`); }
+        else if (res.type === "evento") showDayEvent(res);
+        else showRandomEvent(res);
+      });
     };
   }
+}
+
+/**
+ * El World Cup Daily (Bible §4.4) como PORTADA de diario: papel crema, serifas,
+ * cabecera con doble filete y la nota de tapa en grande. Se abre al llegar a un
+ * día nuevo, ANTES del evento — primero informar, después transformar. `onClose`
+ * encadena lo que siga (modal de evento/conflicto o el toast de día de partido).
+ */
+function showDaily(daily, onClose) {
+  const [main, ...rest] = daily.items;
+  const tag = t => `<span class="text-[9px] font-sans font-black tracking-[0.25em] text-red-800 uppercase">${t}</span>`;
+  const m = modal(`
+    <div class="-m-6 bg-[#f3edda] text-slate-900 font-serif rounded-2xl overflow-hidden px-6 pt-5 pb-5">
+      <div class="text-center border-b-4 border-double border-slate-900 pb-2">
+        <div class="text-[9px] font-sans tracking-[0.35em] uppercase text-slate-500">Edición especial mundial 2026</div>
+        <h1 class="text-3xl font-black tracking-tight uppercase">El Pitazo Inicial</h1>
+      </div>
+      <div class="flex items-center justify-between text-[9px] font-sans uppercase tracking-widest text-slate-500 border-b border-slate-900/50 py-1.5">
+        <span>Edición Nº ${daily.day}</span><span>${dayLabel(daily.day)} 2026</span><span>$1,00</span>
+      </div>
+      <div class="py-3 border-b border-slate-900/25">
+        ${tag(main.tag)}
+        <div class="text-xl font-black leading-snug mt-1">${main.icon} ${main.text}</div>
+      </div>
+      ${rest.map(it => `
+        <div class="py-2.5 border-b border-slate-900/15 flex gap-2.5 items-start">
+          <span class="text-base leading-none mt-0.5">${it.icon}</span>
+          <div class="leading-snug"><span class="mr-1.5">${tag(it.tag)}</span><span class="text-sm">${it.text}</span></div>
+        </div>`).join("")}
+      <button id="daily-fold" class="mt-4 w-full bg-slate-900 text-[#f3edda] font-sans font-black uppercase tracking-widest text-xs py-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-all">Doblar el diario →</button>
+    </div>
+  `, "max-w-xl");
+  m.querySelector("#daily-fold").onclick = onClose;
 }
 
 /** Cabecera de temática de un evento/conflicto del calendario (misma caracterización siempre). */

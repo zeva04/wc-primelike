@@ -209,7 +209,11 @@ Este mapa es ley: si un módulo escribe un campo que no le pertenece, es un bug 
 | `squad[].amarillas/suspendido/expulsado` | `discipline` (post-partido) · `match/incidents` (en juego) | lineup, ui |
 | `squad[].lesionado*` | `match/incidents` · `medical` | lineup, ui |
 | `stage`, `matchday`, `koMatches`, `lastWinners` | `flow.js` (única pluma) | tournament, ui |
-| `day`, `nextMatchDay`, `dayPlan` | `calendar.js` | ui/hub |
+| `groups[].results` | `run.js` (nacen) · `tournament/world` (sim ajenos) · `flow` (mi resultado) | tournament/groups, ui |
+| `koPlayed`, `lastNight` | `tournament/world` (resetea `flow` por ronda) | daily, ui/worldcup |
+| `rivalBans` | `tournament/world` (limpia `flow` cuando cumplen ante mí) | daily, opponents, ui/match |
+| `day`, `nextMatchDay`, `dayPlan`, `actionPending`, `dayMod` | `calendar.js` (`actionPending` la baja day-action) | ui/hub, day-action |
+| `lastAction` | `day-action.js` | ui/hub |
 | `buffs` | efectos de `content/` (+), `flow` (reset) | match/powers, ui |
 | `journal` | `journal.js` (todos anotan vía addJournal) | ui/journal |
 | `stats`, `champion` | `flow.js` | ui/end |

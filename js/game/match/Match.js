@@ -35,14 +35,15 @@ import * as Shootout from "./shootout.js";
 
 export class Match {
   /**
-   * @param my      { team, lineup: [6 refs al plantel], bench: [refs], mentalidad, buffs }
-   * @param oppTeam equipo rival (jugable o no)
-   * @param knockout true = eliminatoria (empate → prórroga → penales)
+   * @param my        { team, lineup: [6 refs al plantel], bench: [refs], mentalidad, buffs }
+   * @param oppTeam   equipo rival (jugable o no)
+   * @param knockout  true = eliminatoria (empate → prórroga → penales)
+   * @param oppBanned nombres del rival suspendidos (rojas del mundo vivo: run.rivalBans)
    */
-  constructor(my, oppTeam, knockout) {
+  constructor(my, oppTeam, knockout, oppBanned = []) {
     this.my = my;
     this.oppTeam = oppTeam;
-    this.oppLineup = genOpponentLineup(oppTeam);
+    this.oppLineup = genOpponentLineup(oppTeam, oppBanned);
     this.knockout = knockout;
     this.min = 0;
     this.gMy = 0; this.gOpp = 0;

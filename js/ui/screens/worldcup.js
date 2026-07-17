@@ -21,11 +21,13 @@ function renderWorldCupStatus() {
     <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 mb-5">
       <h3 class="font-bold mb-2">🔥 ${STAGE_LABEL[run.stage]} — cruces</h3>
       <div class="grid sm:grid-cols-2 gap-x-6">
-        ${run.koMatches.map(([a, b]) => {
+        ${run.koMatches.map(([a, b], idx) => {
           const A = getTeam(a), B = getTeam(b);
           const mine = a === run.teamId || b === run.teamId;
+          // El mundo juega día a día: los cruces ajenos ya resueltos muestran su marcador
+          const r = run.koPlayed[idx];
           return `<div class="text-sm py-1 flex items-center gap-1.5 ${mine ? "tp-text font-bold" : "text-slate-300"}">
-            ${flagImg(A, "w-5 h-3.5")} ${A.name} <span class="text-slate-500">vs</span> ${B.name} ${flagImg(B, "w-5 h-3.5")}
+            ${flagImg(A, "w-5 h-3.5")} ${A.name} <span class="text-slate-500">${r ? `<b class="text-slate-300">${r.gA}-${r.gB}${r.pens ? " (p)" : ""}</b>` : "vs"}</span> ${B.name} ${flagImg(B, "w-5 h-3.5")}
           </div>`;
         }).join("")}
       </div>

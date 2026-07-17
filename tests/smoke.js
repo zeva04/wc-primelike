@@ -39,11 +39,18 @@ function playMatch(run, oppId) {
   // puestos (limpiando los que quedaron del partido anterior). Llamar a autoLineup pelado
   // dejaría `posJugada` pegado de un cambio previo y castigaría a ese jugador para siempre.
   const { lineup } = E.currentLineup(run.squad, null, null);
-  assert(E.validateLineup(available, lineup).ok, "autoLineup debe producir alineación válida");
+  const val = E.validateLineup(available, lineup);
+  assert(val.ok, "autoLineup debe producir alineación válida",
+    `[${val.msg}] once: ${lineup.map(p => `${p.pos}:${p.name}`).join(", ")} · fuera: ${run.squad.filter(p => p.suspendido || p.lesionadoPartidos > 0).map(p => `${p.name}(${p.pos}${p.suspendido ? " susp" : " les" + p.lesionadoPartidos})`).join(", ") || "nadie"}`);
   assert(lineup.every(p => E.outOfPosPenalty(p) === 0), "el once automático no debe castigar a nadie");
   const bench = available.filter(p => !lineup.includes(p));
   const ctx = { team: me, lineup, bench, mentalidad: "normal", buffs: { ...run.buffs } };
-  const match = new E.Match(ctx, opp, run.stage !== "groups");
+  const banned = run.rivalBans[oppId] || [];
+  const match = new E.Match(ctx, opp, run.stage !== "groups", banned);
+  // La suspensión por roja ajena es real: el suspendido no puede estar en el once rival
+  for (const name of banned) assert(!match.oppLineup.some(p => p.name === name), "suspendido fuera del once rival", name);
+  assert(match.oppLineup.length === 6, "el rival siempre forma 6 (los genéricos cubren al suspendido)");
+  assert(match.oppLineup.some(p => p.pos === "POR"), "el rival nunca se queda sin arquero");
   let guard = 0;
   while (!match.finished && guard++ < 500) {
     const r = match.tick();
@@ -97,6 +104,15 @@ function playRun(teamId) {
         assert(!run.actionPending, "aplicar la acción consume el turno del día");
       }
       const ev = E.advanceDay(run);
+      // El mundo jugó "anoche": las entradas de lastNight deben estar completas
+      for (const n of run.lastNight) {
+        assert(n.a && n.b && Number.isInteger(n.gA) && Number.isInteger(n.gB), "resultado de anoche completo", JSON.stringify(n));
+        if (run.stage !== "groups") assert(n.win === n.a || n.win === n.b, "cruce ajeno con ganador válido");
+      }
+      // El World Cup Daily se lee al llegar al día nuevo (mismo orden que la UI)
+      const daily = E.buildDaily(run);
+      assert(daily.items.length >= 1 && daily.items.length <= 5, "el Daily trae 1-5 titulares", daily.items.length);
+      for (const it of daily.items) assert(it.icon && it.text && it.tag, "titular completo (icon/text/tag)", JSON.stringify(it));
       if (ev && ev.type === "conflicto") {
         const opt = ev.options[Math.floor(Math.random() * ev.options.length)];
         const res = opt.effect(run);
@@ -104,6 +120,9 @@ function playRun(teamId) {
       }
     }
     assert(!run.actionPending, "el día de partido no debe tener acción pendiente");
+    // Edición de día de partido: la tapa es el partido, nada compite con el clímax
+    const matchDaily = E.buildDaily(run);
+    assert(matchDaily.isMatchDay && matchDaily.items[0].tag === "PORTADA", "el Daily de día de partido abre con la tapa del partido");
     const oppId = E.nextOpponentId(run);
     const match = playMatch(run, oppId);
 
@@ -131,6 +150,13 @@ function playRun(teamId) {
     else if (adv.type === "qualified") {
       assert(run.squad.every(p => (p.amarillas || 0) === 0), "amarillas en 0 al cerrar grupos");
       assert(run.stage === "r32" && run.koMatches.length === 16, "bracket de 16avos armado");
+      // El mundo repartido por días no debe duplicar ni saltarse partidos:
+      // cada grupo cierra con sus 6 resultados y sin pares repetidos
+      for (const g of run.groups) {
+        assert(g.results.length === 6, "grupo con 6 resultados al clasificar", `${g.name}=${g.results.length}`);
+        const keys = new Set(g.results.map(r => [r.a, r.b].sort().join("|")));
+        assert(keys.size === 6, "sin partidos duplicados en el grupo", g.name);
+      }
     } else if (adv.type === "next-round" && adv.stage === "sf") {
       assert(run.squad.every(p => (p.amarillas || 0) === 0), "amarillas en 0 tras 4tos");
     }

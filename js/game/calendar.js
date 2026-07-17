@@ -7,6 +7,7 @@ import { PREP_EVENTS } from "../content/prep-events.js";
 import { RANDOM_EVENTS } from "../content/conflicts.js";
 import { RARITIES } from "../content/rarities.js";
 import { addJournal } from "./journal.js";
+import { playWorldDay } from "./tournament/world.js";
 
 // Día 1 = 11 de junio de 2026, arranque real del Mundial. Las fechas son ambientación:
 // la run avanza por días propios y dura ~38 días, casi calzando con el torneo real.
@@ -71,6 +72,7 @@ export function advanceDay(run) {
   if (run.day >= run.nextMatchDay) return null;
   run.day++;
   run.dayMod = null; // los modificadores duran exactamente un día
+  playWorldDay(run); // "anoche" el resto del Mundial jugó lo suyo (run.lastNight → Daily)
   if (run.day >= run.nextMatchDay) { run.actionPending = false; return { type: "match" }; }
   run.actionPending = true;
   const plan = run.dayPlan[run.day];

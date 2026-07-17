@@ -1,5 +1,6 @@
 /* ============================================================
-   game/opponents — alineación efectiva de un equipo no jugable.
+   game/opponents — plantel y alineación efectiva de un equipo
+   no jugable.
    ============================================================ */
 import { rnd } from "../core/rng.js";
 import { clamp } from "../core/math.js";
@@ -13,40 +14,55 @@ export const POS_MODS = {
   DEL: { tiro: +10, defensa: -40, cabezazo: +10, pase: -10, aura: +10 },
 };
 
-/**
- * Alineación de 6 titulares del rival (Game Vision: formato 6v6).
- * Jugables usan sus mejores 6; el resto se deriva del rating de sus 5 figuras
- * más un "Jugador6" genérico que duplica los rasgos y stats de una de ellas.
- */
-export function genOpponentLineup(team) {
-  // Equipo jugable como rival (ej: Noruega cuando juegas con Brasil): usa sus mejores 6
-  if (team.players) {
-    const byStars = (a, b) => playerOverall(b) - playerOverall(a);
-    const por = team.players.filter(p => p.pos === "POR").sort(byStars)[0];
-    const field = team.players.filter(p => p.pos !== "POR").sort(byStars);
-    const lineup = por ? [por] : [];
-    for (const pos of ["DEF", "MED", "DEL"]) {
-      const best = field.find(p => p.pos === pos && !lineup.includes(p));
-      if (best) lineup.push(best);
-    }
-    for (const p of field) { if (lineup.length >= 6) break; if (!lineup.includes(p)) lineup.push(p); }
-    return lineup.map(p => ({ name: p.name, pos: p.pos, num: p.num, stats: { ...p.stats }, look: p.look, energia: 100, amarilla: false, expulsado: false, lesionado: false }));
+// Los 5 genéricos que completan el plantel rival hasta 10 (Jugador6..Jugador10).
+// Cubren todas las líneas — incluido un arquero suplente, porque el arco solo
+// puede ocuparlo un POR — y rinden por debajo de las figuras (GENERIC_MALUS):
+// perder una figura por suspensión tiene que doler.
+// Malus 4 y no 6: el sexto titular rival ES un genérico, así que el malus
+// también debilita su once por defecto — con 6 el % de campeón derivaba
+// arriba (BRA 32→36.5 en smoke); con 4 vuelve a la banda histórica.
+const GENERIC_SLOTS = [["Jugador6", "DEF"], ["Jugador7", "MED"], ["Jugador8", "DEL"], ["Jugador9", "POR"], ["Jugador10", "MED"]];
+const GENERIC_MALUS = 4;
+
+/** Stats 1-99 derivadas del rating del equipo con los desvíos del puesto y ruido. */
+function deriveStats(rating, pos) {
+  const stats = {};
+  for (const k of (pos === "POR" ? GK_STAT_KEYS : STAT_KEYS)) {
+    stats[k] = clamp(Math.round(rating + POS_MODS[pos][k] + (rnd() - 0.5) * 12), 1, 99);
   }
+  return stats;
+}
+
+/** Plantel de 10 de un rival no jugable: sus 5 figuras + los 5 genéricos. */
+export function genOpponentSquad(team) {
   const r = teamRating(team);
-  const players = team.figures.map(f => {
-    const stats = {};
-    const keys = f.pos === "POR" ? GK_STAT_KEYS : STAT_KEYS;
-    for (const k of keys) {
-      const mod = POS_MODS[f.pos][k];
-      stats[k] = clamp(Math.round(r + mod + (rnd() - 0.5) * 12), 1, 99);
-    }
-    return { name: f.name, pos: f.pos, stats, energia: 100, amarilla: false, expulsado: false, lesionado: false };
-  });
-  // Los rivales tienen 5 figuras: se agrega temporalmente un sexto genérico con
-  // los mismos rasgos y stats que su último jugador de campo.
-  if (players.length < 6) {
-    const base = [...players].reverse().find(p => p.pos !== "POR") || players[players.length - 1];
-    players.push({ ...base, name: "Jugador6", stats: { ...base.stats } });
+  return [
+    ...team.figures.map(f => ({ name: f.name, pos: f.pos, stats: deriveStats(r, f.pos) })),
+    ...GENERIC_SLOTS.map(([name, pos]) => ({ name, pos, stats: deriveStats(r - GENERIC_MALUS, pos) })),
+  ];
+}
+
+/** Mejor seis de un pool: el mejor POR + el mejor de cada línea + relleno por nota. */
+function bestSix(pool) {
+  const byOvr = (a, b) => playerOverall(b) - playerOverall(a);
+  const por = pool.filter(p => p.pos === "POR").sort(byOvr)[0];
+  const field = pool.filter(p => p.pos !== "POR").sort(byOvr);
+  const lineup = por ? [por] : [];
+  for (const pos of ["DEF", "MED", "DEL"]) {
+    const best = field.find(p => p.pos === pos && !lineup.includes(p));
+    if (best) lineup.push(best);
   }
-  return players;
+  for (const p of field) { if (lineup.length >= 6) break; if (!lineup.includes(p)) lineup.push(p); }
+  return lineup;
+}
+
+/**
+ * Alineación de 6 titulares del rival (Game Vision: formato 6v6), excluyendo a
+ * los suspendidos (`banned`: nombres en `run.rivalBans`, las rojas del mundo
+ * vivo). Jugables usan sus mejores 6 disponibles; el resto arma su mejor seis
+ * del plantel de 10 (figuras + genéricos).
+ */
+export function genOpponentLineup(team, banned = []) {
+  const pool = (team.players || genOpponentSquad(team)).filter(p => !banned.includes(p.name));
+  return bestSix(pool).map(p => ({ name: p.name, pos: p.pos, num: p.num, stats: { ...p.stats }, look: p.look, energia: 100, amarilla: false, expulsado: false, lesionado: false }));
 }

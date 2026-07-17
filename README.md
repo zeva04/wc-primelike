@@ -31,11 +31,14 @@ js/core/              → rng.js (ÚNICO punto de azar) · math.js
 js/data/teams-repo.js → consultas a la base de selecciones
 js/game/              → sistemas de campaña: run, flow (orquestador: closeMatch,
                         postMatchUpdate, advanceStage), ratings, lineup, opponents,
-                        calendar, day-action, discipline, medical, journal
-js/game/tournament/   → groups, knockout, sim (IA por Poisson)
+                        calendar, daily (portada del día), day-action, discipline,
+                        medical, journal
+js/game/tournament/   → groups, knockout, sim (IA por Poisson), world (los partidos
+                        ajenos repartidos día a día)
 js/game/match/        → Match (máquina de estados) + powers, chances, incidents, shootout
 js/content/           → tablas que se editan para agregar contenido:
-                        prep-events, day-actions, conflicts, injuries, themes, rarities
+                        prep-events, day-actions, conflicts, injuries, themes,
+                        rarities, daily-flavor
 js/ui/                → interfaz: nav (registro de pantallas), session (estado),
                         components, sprites, theme
 js/ui/screens/        → una pantalla = un archivo: menu, history, draw, hub, squad,
@@ -55,6 +58,9 @@ docs/                 → CORE.md (matemáticas) · FUNCIONES.md (referencia) ·
 - **Equipo**: formato **6v6** (Game Vision) — 6 titulares (POR + DEF + MED + DEL + 2 extras flexibles que definen la formación) y 4 suplentes, gestionados desde la pantalla de Gestión de Plantilla. Antes de cada partido ocurre un **Evento del día** inevitable (1 de 10) que buffea o nerfea al equipo. Stats en escala **1–99** (basadas en EA FC 26 para los planteles jugables). Jugadores de campo: tiro, defensa, cabezazo, pase y aura. Arqueros: **atajadas, reflejos, salidas, pase y aura** (atajadas = calidad base ante remates; reflejos = penales y mano a mano; salidas = dominio del área). La nota de cada jugador se pondera por posición; las estrellas son solo visualización (nota ÷ 20). El rating de un equipo jugable es el promedio de sus 5 mejores notas.
 - **Calendario por días**: la run avanza día a día sobre las fechas reales del Mundial (11 jun – 19 jul 2026). Los partidos se juegan cada 5-6 días (aleatorio); cada día sin partido trae un **evento inevitable** o un **conflicto con decisión** (sponsors, peleas, virus, localía…). Los 30 eventos se sortean por **rareza** (Común 55% · Infrecuente 27% · Rara 13% · Legendaria 5%): a mayor rareza, mayor impacto — desde ±5 de una stat hasta mejoras permanentes de un jugador o un brote de gripe (~1 legendaria por run). Algunos eventos son **modificadores del día**: bloquean, reducen o duplican las acciones de hoy (cancha anegada → no se entrena; spa → recuperar ×2). El calendario del hub anticipa solo la **temática** de cada día (🏋️ Entrenamiento · 🧑‍⚕️ Estado físico · 🎭 Vestuario · 📣 Entorno) — el detalle y la rareza se descubren al vivirlo. Los efectos se acumulan hasta el próximo partido; en los días de partido no hay eventos.
 - **Acción Principal del Día**: en cada día sin partido, después del evento, el DT elige **una** inversión (no se puede pasar el día sin elegir): 🏋️ Entrenar (foco ataque/defensa/pases: +4 a esa stat, pero −5 de energía al plantel), 🧘 Recuperar (+15 de energía) o 📋 Sesión táctica (el equipo llega mejor plantado al próximo partido). Elegir es renunciar: cada opción sacrifica las otras.
+- **El Diario del Mundial**: cada día nuevo arranca con la **portada de un diario** (papel crema, serifas, nota de tapa) que responde "¿qué cambió desde ayer?" antes de decidir: reacción de la prensa al último partido, parte médico y sanciones, racha del goleador, posición en el grupo, framing del próximo rival (solo en la previa), lo de anoche en tu grupo y en el resto del torneo, y — solo en días tranquilos — una nota de color. 1 a 5 titulares: los días con poco que contar son deliberados, para que los grandes se sientan grandes. La portada informa; el evento del día (que llega después) transforma.
+- **El mundo se mueve entre tus partidos**: los partidos de los otros grupos y cruces se juegan **repartidos por los días del calendario** (~5 por noche), no de golpe: cada mañana hay resultados frescos, las tablas de "Estado del Mundial" evolucionan a mitad de ventana y el diario prioriza a tus rivales directos (marcando a tu próximo rival si jugó anoche), los batacazos de verdad (una cenicienta venciendo a un Favorito), goleadas, festivales de goles, los resultados de los grandes y las expulsiones ajenas.
+- **El diario tiene dientes**: la portada además **anticipa el evento de hoy** con un titular ambiguo ("se esperan lluvias…") que el evento materializa después, y las **rojas ajenas suspenden de verdad** — si la figura expulsada te enfrenta en su próximo partido, no forma en su alineación y el diario te lo avisa. Para que la baja duela, los rivales tienen plantel de 10 (5 figuras + genéricos que cubren todas las líneas). Y si TU plantel queda diezmado (4+ bajas de campo), el partido se juega igual: presentas a los que estén en pie, con la pena de inferioridad numérica.
 - **Durante el partido**: relato en vivo con decisiones (ocasiones de gol, penales interactivos, cambios, mentalidad táctica, amonestados, lesiones, VAR). Reglas de cambio reales: 3 por partido, el sustituido no puede reingresar (queda en gris en la banca) y el arquero suplente solo puede entrar por el arquero.
 - **Fin de la run**: pantalla de estadísticas; el historial se guarda en localStorage.
 

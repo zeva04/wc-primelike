@@ -72,8 +72,8 @@ agregan todos los módulos en `tests/load-engine.js` solo por comodidad. Mapa de
 | `js/game/tournament/knockout.js` | §7 Eliminatorias |
 | `js/game/match/powers.js` | §8 Funciones de poder |
 | `js/game/match/Match.js` (+ `chances.js`, `incidents.js`, `shootout.js`) | §8 Clase `Match` (máquina de estados + módulos de jugadas) |
-| `js/game/calendar.js` · `day-action.js` · `flow.js` · `discipline.js` · `medical.js` · `journal.js` | §9 Entre partidos |
-| `js/content/` (themes, prep-events, day-actions, conflicts, injuries) | Tablas de contenido editable |
+| `js/game/calendar.js` · `daily.js` · `day-action.js` · `flow.js` · `discipline.js` · `medical.js` · `journal.js` | §9 Entre partidos |
+| `js/content/` (themes, prep-events, day-actions, conflicts, injuries, daily-flavor) | Tablas de contenido editable |
 
 Las secciones siguientes documentan las mismas funciones, ahora indicando su módulo.
 
@@ -121,7 +121,8 @@ Las secciones siguientes documentan las mismas funciones, ahora indicando su mó
 | `fillFormation(available, id, keep)` | Mejor once para esa formación, o `null` si el plantel no la cubre. `keep` manda sobre la nota: cambiar de formación no borra las elecciones del DT. |
 | `canUseFormation(available, id)` | ¿El plantel alcanza para esa formación? (Brasil no puede `3-1-1`: tiene 2 DEF.) |
 | `autoLineup(available, formationId?, keep?)` | Mejor once de 6. Con `formationId` respeta esa formación; sin él usa el algoritmo histórico — **ojo: es la línea base del balance**, ver nota abajo. |
-| `validateLineup(available, selected)` | Valida la alineación (6, 1 arquero, líneas cubiertas si hay jugadores). |
+| `validateLineup(available, selected)` | Valida la alineación (6, 1 arquero, líneas cubiertas si hay jugadores). **Regla de emergencia**: si el plantel diezmado no llega a 6 (`maxLineupSize`: los de campo + 1 arquero — el 2º POR no puede jugar en cancha), acepta presentar a todos los que queden en pie y devuelve `short: true` para que la UI avise; el motor ya castiga la inferioridad (match/powers). Sin esta válvula la run moría en softlock con 4+ bajas de campo simultáneas. |
+| `maxLineupSize(available)` | Cuántos titulares puede presentar HOY el plantel (6, salvo emergencia). |
 | `formationLabel(selected)` | Etiqueta de formación del once (ej. `2-1-2`). |
 
 ⚠️ **Por qué `autoLineup()` sin formación no se toca a la ligera**: elige la misma nota TOTAL que
@@ -133,7 +134,8 @@ resueltos hacia el ataque. Si se toca, recalcular la línea base de CORE.md §10
 ### 3. Rivales — `js/game/opponents.js`
 | Función | Qué hace |
 |---|---|
-| `genOpponentLineup(team)` | Alineación de 6 titulares del rival (formato 6v6). Un jugable usa sus mejores 6; un rival normal deriva stats desde su `rating` con `POS_MODS` y suma un "Jugador6" genérico que clona a su último jugador de campo. |
+| `genOpponentSquad(team)` | Plantel de 10 de un rival no jugable: sus 5 figuras (stats derivadas del `rating` con `POS_MODS`) + 5 genéricos "Jugador6..Jugador10" que cubren todas las líneas — incluido un POR suplente — con `GENERIC_MALUS` (−4: perder una figura por suspensión duele; con −6 el % de campeón derivaba arriba). |
+| `genOpponentLineup(team, banned)` | Alineación de 6 titulares del rival (formato 6v6), excluyendo a los suspendidos de `run.rivalBans`. Jugables usan sus mejores 6 disponibles; el resto arma su mejor seis del plantel de 10 (mejor POR + mejor por línea + relleno por nota). |
 
 ### 4. La run — `js/game/run.js`
 | Función | Qué hace |
@@ -144,8 +146,12 @@ El objeto `run` guarda: `teamId`, `squad`, `groups`, `stage` (`groups→r32→r1
 `matchday`, `koMatches`, `buffs`, `stats` acumuladas, y el calendario: `day` (día actual,
 1 = 11-jun-2026), `nextMatchDay` (día del próximo partido), `dayPlan` (evento pre-sorteado
 de cada día intermedio: `{kind, id, tema}`), `actionPending` (Acción del Día por elegir),
-`lastAction` (`{day, icon, title}` de la última acción aplicada) y `dayMod` (modificador
-de las acciones de HOY: `{icon, title, desc, mods}`, dura exactamente un día).
+`lastAction` (`{day, icon, title}` de la última acción aplicada), `dayMod` (modificador
+de las acciones de HOY: `{icon, title, desc, mods}`, dura exactamente un día),
+`lastNight` (partidos ajenos "de anoche", escribe `tournament/world`), `koPlayed`
+(`{idx: resultado}` de cruces ajenos ya jugados; resetea flow al armar cada ronda) y
+`rivalBans` (`{teamId: [nombres]}` suspendidos por roja ajena para SU próximo partido;
+escribe world, limpia flow cuando lo cumplen ante mí).
 
 ### 5. Simulación IA — `js/game/tournament/sim.js`
 | Función | Qué hace |
@@ -156,16 +162,24 @@ de las acciones de HOY: `{icon, title, desc, mods}`, dura exactamente un día).
 | Función | Qué hace |
 |---|---|
 | `computeTable(group)` | Tabla de posiciones (pts, DG, GF; empates al azar). |
-| `simMatchday(run,md)` | Simula la fecha `md` de todos los grupos, saltando mi partido. |
 | `myNextGroupRival(run)` | Rival del usuario en la fecha actual. |
 | `qualifyRound32(run)` | Cierra los grupos: 12 primeros + 12 segundos + 8 mejores terceros → bracket de 16avos. |
 
 ### 7. Eliminatorias — `js/game/tournament/knockout.js`
 | Función | Qué hace |
 |---|---|
-| `simKnockoutRound(matches,myId)` | Simula una ronda entera salvo mi partido; devuelve ganadores. |
 | `pairNextRound(winners)` | Empareja ganadores para la ronda siguiente. |
 | `nextOpponentId(run)` | Id del próximo rival del usuario (fecha de grupo o cruce de eliminatoria). |
+
+### 7b. El mundo vivo — `js/game/tournament/world.js`
+Los partidos ajenos se reparten por los días del calendario (Ley 7: el Mundial sigue
+sin ti). Sin plan almacenado: lo pendiente se deriva del estado, así el reparto
+sobrevive a cualquier re-agendado.
+| Función | Qué hace |
+|---|---|
+| `playWorldDay(run)` | La tanda "de anoche": simula `ceil(pendientes/días restantes)` partidos ajenos de la fecha/ronda actual y llena `run.lastNight` (entradas `{a,b,gA,gB,stage,groupName?,myGroup?,pens?,win?,red?}`). Las rojas (9%, más en el perdedor) SUSPENDEN de verdad: quedan en `run.rivalBans[teamId]` y se cumplen en el próximo partido del equipo — contra mí, esa figura no forma (genOpponentLineup); contra otro simulado se cumple sin efecto en el marcador (quickSim no modela planteles). La llama `advanceDay`. |
+| `finishGroupMatchday(run)` | Al jugarse mi partido: simula lo que el mundo no alcanzó y devuelve los otros resultados de MI grupo en la fecha (para post-partido). La llama `flow.closeMatch`. |
+| `finishKnockoutRound(run)` | Ídem en eliminatorias: cierra los cruces pendientes y devuelve `{winners, results}` alineados con `koMatches` (mi posición en null; la completa flow). |
 
 ### 8. Partido interactivo — funciones de poder (`js/game/match/powers.js`)
 | Función | Qué hace |
@@ -181,7 +195,7 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 **Estado y consultas**
 | Método | Qué hace |
 |---|---|
-| `constructor(my, oppTeam, knockout)` | Inicializa el partido (`my` = {team, lineup, bench, mentalidad, buffs}). |
+| `constructor(my, oppTeam, knockout, oppBanned)` | Inicializa el partido (`my` = {team, lineup, bench, mentalidad, buffs}; `oppBanned` = suspendidos del rival por rojas del mundo vivo). |
 | `log(kind,text)` | Agrega una línea al relato (kind define el estilo visual). |
 | `activeMine()` | Mis jugadores en cancha (sin expulsados ni lesionados). |
 | `availableBench()` | Suplentes que aún pueden entrar. |
@@ -228,6 +242,7 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | `advanceDay(run)` | Pasa al día siguiente y resuelve lo que trae: `{type:"match"}` (llegó el partido), `{type:"evento",…, rareza}` (inevitable, ya aplicado; `effect` puede devolver un desc con protagonista) o `{type:"conflicto",…}` (dilema: la UI aplica la opción elegida). Todo día sin partido levanta además `run.actionPending`; si el evento trae `mod`, lo deja en `run.dayMod` (se limpia al empezar cada día). Las legendarias van al diario con tono dorado. |
 | `applyDayAction(run,actionId)` | **day-action**: aplica la Acción del Día elegida (`DAY_ACTIONS`) escalada por el modificador del día, baja `actionPending`, escribe `lastAction` y anota el diario. Devuelve `{...accion, mult}` o `null` si no había acción pendiente, el id no existe o la acción está bloqueada hoy. |
 | `actionMult(run,action)` | **day-action**: multiplicador de una acción HOY según `run.dayMod` (1 sin modificador; 0 = bloqueada). |
+| `buildDaily(run)` | **daily**: arma la edición del World Cup Daily — `{day, isMatchDay, items}` con 1-5 titulares `{icon, tag, text}` ordenados por prioridad (PORTADA/PLANTEL/GRUPO/RIVAL/MUNDIAL/HOY/COLOR, ver CORE §9); el primero es la nota de tapa. GRUPO marca al próximo rival si jugó anoche; RIVAL avisa sus suspendidos (`rivalBans`) y da el framing por paridad solo en la previa (≤2 días); MUNDIAL puntúa `run.lastNight` (batacazos por tier, goleadas, festivales, grandes, rojas); HOY es el `teaser` del evento/conflicto que trae el día (anticipa sin revelar). Solo lectura (el flavor consume rng). |
 | `multLabel(mult)` | **day-action**: etiqueta corta para la UI ("×2", "×½"); `""` si es 1 o bloqueo. |
 | `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced}`. |
 | `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario por jugador (delega en `applyMedicalPostMatch` y `applyDisciplinePostMatch`), limpia buffs y **re-agenda**. |
@@ -246,6 +261,8 @@ decisión, también con `tema`) y `DAY_ACTIONS` (5 Acciones del Día en
 `content/day-actions.js`: 3 focos de entrenamiento con `group:"entrenar"`, recuperación
 y sesión táctica; los `effect(run, mult)` escalan su recompensa — no el costo — por el
 modificador; exporta también `TRAIN_BUFF`, `TRAIN_FATIGUE` y `TACTICS_BONUS`).
+También `DAILY_FLAVOR` (12 titulares de color `{icon, text}` para el World Cup Daily,
+máximo 1 por edición y solo en días tranquilos).
 El esquema de todo este contenido es LEY en `tests/events.validate.js`, que además
 aplica cada efecto contra una run fresca (energías en rango, buffs finitos).
 
@@ -351,6 +368,7 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 | `nextOpponentId()` | Id del próximo rival (grupo o cruce). |
 | `renderHub()` | Pantalla central: rival, calendario, alineación; el botón principal pasa el día o juega el partido según toque. "Pasar al día" queda bloqueado mientras `run.actionPending` — primero se elige la Acción del Día. |
 | `actionCard()` | Panel de la **Acción del Día** (Bible §4.7): los focos de Entrenar agrupados en una fila + una tarjeta-botón por acción suelta; elegida la acción, lo reemplaza una línea de confirmación. Aplica vía `game/day-action`. Si hay `run.dayMod` muestra su banner y bloquea (`disabled` + gris) o etiqueta ("×2 hoy") las acciones afectadas. |
+| `showDaily(daily,onClose)` | La **portada del Diario del Mundial** (papel crema, serifas, doble filete, nota de tapa grande + titulares secundarios con su sección en rojo). Se abre al llegar a un día nuevo, antes del evento; "Doblar el diario" dispara `onClose`, que encadena el modal de evento/conflicto o el toast de día de partido. |
 | `renderCalendarCard(opp)` | Franja de días hasta el próximo partido: hoy resaltado, temática por día, rival en el día de partido. |
 | `buffChips()` | Chips con los efectos acumulados para el próximo partido (incluye el de `tactica` con su multiplicador de sesiones). |
 | `themeHeader(tema)` | Cabecera de temática (icono/color fijos) de los modales de evento/conflicto. |

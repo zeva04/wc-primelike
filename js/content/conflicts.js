@@ -6,8 +6,9 @@
    que en prep-events.
 
    Agregar un conflicto nuevo = agregar una fila con `tema`,
-   `text` (string o función(run)) y 2+ `options` cuyo effect(run)
-   devuelve el texto del resultado. Nada más.
+   `teaser` (el pronóstico ambiguo que publica el World Cup
+   Daily esa mañana), `text` (string o función(run)) y 2+
+   `options` cuyo effect(run) devuelve el texto del resultado.
    ============================================================ */
 import { rnd, shuffle } from "../core/rng.js";
 import { clamp } from "../core/math.js";
@@ -15,6 +16,7 @@ import { clamp } from "../core/math.js";
 export const RANDOM_EVENTS = [
   {
     id: "sponsor", tema: "entorno", icon: "💰", title: "Oferta de sponsor",
+    teaser: "Ejecutivos de traje rondan la concentración desde temprano.",
     text: "Una marca deportiva ofrece una sesión publicitaria con el plantel. Es agotadora, pero motiva al grupo.",
     options: [
       { label: "Aceptar", effect: r => { r.squad.forEach(p => { p.stats.aura = clamp(p.stats.aura + 5, 1, 99); p.energia = clamp(p.energia - 15, 5, 100); }); return "El plantel posa para las cámaras: +5 de Aura permanente, −15 energía."; } },
@@ -23,6 +25,7 @@ export const RANDOM_EVENTS = [
   },
   {
     id: "localia", tema: "entorno", icon: "🏟️", title: "¡Marea de hinchas!",
+    teaser: "La ciudad empieza a teñirse de nuestros colores.",
     text: "Miles de compatriotas viajaron a la sede. El estadio será prácticamente una localía.",
     options: [
       { label: "Salir a saludarlos", effect: r => { r.buffs.aura = (r.buffs.aura || 0) + 5; return "El equipo se llena de energía emocional: +5 de Aura el próximo partido."; } },
@@ -31,6 +34,7 @@ export const RANDOM_EVENTS = [
   },
   {
     id: "medicos", tema: "fisico", icon: "🧑‍⚕️", title: "Insumos médicos de primera",
+    teaser: "La federación anuncia novedades del área médica para hoy.",
     text: "La federación consiguió un equipo médico de élite para esta fase.",
     options: [
       { label: "Recuperación intensiva", effect: r => { r.squad.forEach(p => { p.energia = clamp(p.energia + 25, 5, 100); if (p.lesionadoPartidos > 0) p.lesionadoPartidos--; }); return "+25 energía para todos y las lesiones se aceleran en su recuperación."; } },
@@ -39,6 +43,7 @@ export const RANDOM_EVENTS = [
   },
   {
     id: "pelea", tema: "vestuario", icon: "🥊", title: "¡Pelea en el entrenamiento!",
+    teaser: "El clima en la práctica viene espeso desde temprano.",
     text: (r) => { const [a, b] = shuffle(r.squad).slice(0, 2); r._peleaA = a; r._peleaB = b; return `${a.name} y ${b.name} se fueron a las manos en la práctica. El camarín está dividido.`; },
     options: [
       { label: "Castigar a ambos", effect: r => { [r._peleaA, r._peleaB].forEach(p => p.stats.aura = clamp(p.stats.aura - 5, 1, 99)); return `Disciplina ante todo: ${r._peleaA.name} y ${r._peleaB.name} pierden 5 de Aura, pero el grupo respeta tu autoridad.`; } },
@@ -47,6 +52,7 @@ export const RANDOM_EVENTS = [
   },
   {
     id: "virus", tema: "fisico", icon: "🤒", title: "Virus en la concentración",
+    teaser: "En el hotel se habla de varios estómagos revueltos.",
     text: "Un virus estomacal recorre el hotel. Varios jugadores amanecieron débiles.",
     options: [
       { label: "Aislar a los enfermos", effect: r => { shuffle(r.squad).slice(0, 3).forEach(p => p.energia = clamp(p.energia - 25, 5, 100)); return "3 jugadores pierden 25 de energía, pero el resto se salva."; } },
@@ -55,6 +61,7 @@ export const RANDOM_EVENTS = [
   },
   {
     id: "periodista", tema: "entorno", icon: "🎤", title: "Polémica en la prensa",
+    teaser: "Un titular de la prensa promete sacudir el día.",
     text: "Un periodista publicó declaraciones sacadas de contexto de tu capitán. Hay revuelo.",
     options: [
       { label: "Conferencia para aclarar", effect: r => { r.buffs.aura = (r.buffs.aura || 0) + 5; r.squad.forEach(p => p.energia = clamp(p.energia - 5, 5, 100)); return "La aclaración une al grupo contra la prensa: +5 de Aura el próximo partido, −5 energía."; } },

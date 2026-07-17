@@ -22,7 +22,7 @@ function startMatch(oppId) {
   const opp = getTeam(oppId);
   const bench = S.run.squad.filter(p => !S.selectedLineup.includes(p) && !p.suspendido && p.lesionadoPartidos === 0);
   S.matchCtx = { team: me, lineup: S.selectedLineup.slice(), bench, mentalidad: "normal", buffs: { ...S.run.buffs } };
-  S.match = new Match(S.matchCtx, opp, S.run.stage !== "groups");
+  S.match = new Match(S.matchCtx, opp, S.run.stage !== "groups", S.run.rivalBans[oppId] || []);
   S.feedRendered = 0;
   S.paused = false;
   renderMatchScreen();

@@ -299,6 +299,68 @@ El calendario del hub muestra de antemano **solo la temática** de cada día
 color): sabes *de qué* vendrá el golpe o el regalo, no *cuál* es — información
 aproximada, como pide el Game Vision.
 
+### El World Cup Daily (`buildDaily`)
+
+Cada día nuevo arranca con **la portada del Diario del Mundial** (Bible §4.4): 1-5
+titulares generados desde el estado real de la run, ANTES del evento del día — primero
+informar, después transformar. La jerarquía es la del Bible y el orden de armado ES la
+prioridad (el primer titular es la nota de tapa):
+
+| Prio | Sección | Fuentes |
+|---|---|---|
+| P0 | PORTADA | Día de partido: la tapa es el partido, nada compite con el clímax |
+| P1 | PLANTEL | Reacción de la prensa al partido de ayer (por resultado) · parte médico · suspendidos · en capilla · goleador con ≥2 goles · energía media <60 · posición en el grupo |
+| P1.5 | GRUPO | Anoche en MI grupo (rivales directos), señalando al **próximo rival** si jugó |
+| P2 | RIVAL | Suspendidos del próximo rival (`run.rivalBans` — scouting accionable, se repite hasta que la cumpla) · framing por paridad de medias, **solo en la previa** (≤2 días): repetirlo toda la ventana era ruido |
+| P3 | MUNDIAL | Hasta 2 titulares puntuados de `run.lastNight`, ver abajo |
+| P3.5 | HOY | El `teaser` del evento/conflicto que trae el día (Bible §4.4: el Daily anticipa — "se esperan lluvias" — y el evento materializa). Insinúa el tema sin revelar magnitud ni rareza |
+| P4 | COLOR | `DAILY_FLAVOR`, solo si hay <3 titulares y máximo 1 |
+
+Es **solo lectura** (no muta la run; el pick del flavor consume rng). La densidad
+variable es deliberada: los días tranquilos hacen que los días grandes se sientan
+grandes.
+
+### El mundo se mueve entre partidos (`tournament/world.js`)
+
+Ley 7 del Game Vision: el Mundial continúa sin el jugador. Los partidos ajenos de la
+fecha/ronda actual ya NO se simulan de golpe al cerrar mi partido: **se reparten por
+los días del calendario**. Cada mañana, `advanceDay` llama a `playWorldDay`, que
+simula `ceil(pendientes / días_restantes)` partidos (~5 por noche en grupos) y los
+deja en `run.lastNight` — la materia prima del Daily. No hay plan almacenado: lo
+pendiente se deriva del estado (resultados por par en grupos, `run.koPlayed` en
+eliminatorias), y `finishGroupMatchday`/`finishKnockoutRound` cierran lo que falte
+cuando yo juego. Efecto colateral buscado: las tablas del hub y de "Estado del
+Mundial" **evolucionan entre mis partidos** (PJ dispares a mitad de ventana) y los
+cruces ajenos ya resueltos muestran su marcador.
+
+**Puntaje de los titulares del MUNDIAL** (por partido de anoche): batacazo por tier
+(un "Sorpresa/Leyenda" venciendo a un "Favorito", +100) o por gap de media ≥12 (+60 —
+umbral alto a propósito: un batacazo diario devalúa la palabra) · favorito eliminado
+en KO (+50) · goleada margen ≥3 (+25) · festival 5+ goles (+20) · cruce KO (+15) ·
+media del ganador ≥85 (+12) · roja (+8). Entran los 2 mejores con puntaje ≥12; una
+roja de un partido que no llegó a titular puede entrar como "escándalo" aparte.
+
+### Rojas ajenas con consecuencia real (`run.rivalBans`)
+
+La roja de un partido ajeno (9% por partido, cae más en el perdedor) **suspende de
+verdad** a esa figura para el próximo partido de su equipo. Si ese partido es contra
+mí: el diario lo avisa cada mañana ("Buena noticia: Wirtz está suspendido…") y su
+alineación se genera sin él. Para que la baja DUELA, los rivales no jugables ahora
+tienen **plantel de 10** (`genOpponentSquad`): sus 5 figuras + 5 genéricos
+"Jugador6..Jugador10" que cubren todas las líneas (incluido un arquero suplente) con
+un malus de −4 sobre el rating (−6 derivaba el % de campeón: el 6º titular por
+defecto ya es un genérico). Si su próximo partido es contra otro simulado, la
+suspensión se cumple sin efecto en el marcador — quickSim no modela planteles.
+
+### Plantel diezmado: el partido se juega igual (`maxLineupSize`)
+
+Descubierto por el smoke (~1 cada 5.000 runs): con 4+ bajas de campo simultáneas un
+plantel de 10 no puede formar 6 (el 2º arquero no juega en cancha) y la run moría en
+softlock. Regla nueva: si no llegas a 6, **presentas a los que queden en pie** —
+`validateLineup` lo acepta (`short: true`), el hub lo avisa (🆘) y el motor aplica la
+misma pena de inferioridad numérica que una roja (§5). Perder por diezmado es una
+historia; un botón bloqueado no.
+
 ### La Acción Principal del Día (`DAY_ACTIONS`, `applyDayAction`)
 
 Además del suceso que le toca, **cada día sin partido el DT elige exactamente UNA

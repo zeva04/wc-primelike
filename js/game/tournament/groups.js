@@ -3,7 +3,6 @@
    16avos (formato Mundial 2026: 12 grupos de 4).
    ============================================================ */
 import { rnd, shuffle } from "../../core/rng.js";
-import { quickSim } from "./sim.js";
 
 /** Tabla de posiciones de un grupo (pts, DG, GF; empate se resuelve al azar). */
 export function computeTable(group) {
@@ -20,20 +19,8 @@ export function computeTable(group) {
     y.pts - x.pts || (y.gf - y.gc) - (x.gf - x.gc) || y.gf - x.gf || (rnd() - 0.5));
 }
 
-/** Simula la fecha `md` de TODOS los grupos, saltando mi partido (lo juega el usuario). */
-export function simMatchday(run, md) {
-  const results = [];
-  run.groups.forEach((g, gi) => {
-    for (const [i, j] of run.rounds[md]) {
-      const a = g.teamIds[i], b = g.teamIds[j];
-      if (a === run.teamId || b === run.teamId) continue; // lo juega el usuario
-      const r = quickSim(a, b);
-      g.results.push({ a, b, gA: r.gA, gB: r.gB });
-      if (gi === run.myGroupIdx) results.push({ a, b, gA: r.gA, gB: r.gB });
-    }
-  });
-  return results; // resultados del propio grupo para mostrar
-}
+// La simulación de la fecha ajena vive en tournament/world.js: el mundo juega
+// día a día (playWorldDay) y flow cierra lo pendiente (finishGroupMatchday).
 
 /** Rival del usuario en la fecha actual de la fase de grupos. */
 export function myNextGroupRival(run) {

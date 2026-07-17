@@ -13,8 +13,9 @@ import { addJournal } from "./journal.js";
 import { scheduleNextMatch } from "./calendar.js";
 import { applyMedicalPostMatch } from "./medical.js";
 import { applyDisciplinePostMatch, clearAmarillas } from "./discipline.js";
-import { simMatchday, qualifyRound32, computeTable } from "./tournament/groups.js";
-import { simKnockoutRound, pairNextRound, STAGE_ORDER, STAGE_LABEL } from "./tournament/knockout.js";
+import { qualifyRound32, computeTable } from "./tournament/groups.js";
+import { pairNextRound, STAGE_ORDER, STAGE_LABEL } from "./tournament/knockout.js";
+import { finishGroupMatchday, finishKnockoutRound } from "./tournament/world.js";
 
 /**
  * Cierra un partido jugado por el usuario: stats de la run, entrada del diario
@@ -44,14 +45,16 @@ export function closeMatch(run, match) {
   });
 
   const oppId = match.oppTeam.id;
+  delete run.rivalBans[oppId]; // si tenía un suspendido, lo cumplió ante mí
   let otherResults = [], advanced = null;
 
   if (run.stage === "groups") {
     run.groups[run.myGroupIdx].results.push({ a: run.teamId, b: oppId, gA: res.gMy, gB: res.gOpp });
-    otherResults = simMatchday(run, run.matchday);
+    // El mundo ya jugó su fecha durante la ventana (tournament/world); acá solo se cierra lo que falte
+    otherResults = finishGroupMatchday(run);
     run.matchday++;
   } else {
-    const sim = simKnockoutRound(run.koMatches, run.teamId);
+    const sim = finishKnockoutRound(run);
     const myIdx = run.koMatches.findIndex(([a, b]) => a === run.teamId || b === run.teamId);
     sim.winners[myIdx] = won ? run.teamId : oppId;
     otherResults = sim.results.filter(Boolean);
@@ -94,6 +97,7 @@ export function advanceStage(run, advanced) {
     if (!qual.meIn) return { type: "eliminated" };
     run.stage = "r32";
     run.koMatches = qual.matches;
+    run.koPlayed = {}; // ronda nueva: el mundo la irá jugando día a día
     const myPos = computeTable(run.groups[run.myGroupIdx]).findIndex(r => r.id === run.teamId) + 1;
     addJournal(run, { icon: "🎊", tone: "gold", title: "¡Clasificados a 16avos de final!", desc: `Terminaron ${myPos}º del Grupo ${run.groups[run.myGroupIdx].name}. Desde aquí, todo es a vida o muerte.` });
     // Regla FIFA adaptada: al cerrar la fase de grupos se borran las amarillas acumuladas
@@ -104,6 +108,7 @@ export function advanceStage(run, advanced) {
   if (run.stage === "final") return { type: "champion" };
   const nextStage = STAGE_ORDER[STAGE_ORDER.indexOf(run.stage) + 1];
   run.koMatches = pairNextRound(run.lastWinners);
+  run.koPlayed = {}; // ronda nueva: el mundo la irá jugando día a día
   run.stage = nextStage;
   addJournal(run, { icon: "🔥", tone: "gold", title: nextStage === "final" ? "¡FINALISTAS del Mundial!" : `¡A ${STAGE_LABEL[nextStage]}!`, desc: `Sobreviven ${run.koMatches.length * 2} equipos.` });
   // Regla FIFA adaptada: al terminar los cuartos también se borran las amarillas

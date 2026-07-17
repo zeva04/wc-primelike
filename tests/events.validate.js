@@ -9,7 +9,7 @@
 import { loadEngine } from "./load-engine.js";
 
 const { Engine: E } = await loadEngine();
-const { PREP_EVENTS, RANDOM_EVENTS, RARITIES, EVENT_THEMES, DAY_ACTIONS } = E;
+const { PREP_EVENTS, RANDOM_EVENTS, RARITIES, EVENT_THEMES, DAY_ACTIONS, DAILY_FLAVOR } = E;
 
 let fails = 0, checks = 0;
 const assert = (cond, msg, ctx) => { checks++; if (!cond) { fails++; console.error("FAIL:", msg, ctx ?? ""); } };
@@ -33,6 +33,7 @@ for (const ev of PREP_EVENTS) {
   assert(tierIds.includes(ev.rareza), "rareza válida", `${ev.id}: ${ev.rareza}`);
   assert(ev.tipo === "buff" || ev.tipo === "debuff", "tipo buff|debuff", ev.id);
   assert(ev.icon && ev.title && ev.desc, "icon/title/desc presentes", ev.id);
+  assert(typeof ev.teaser === "string" && ev.teaser.length > 10, "teaser presente (el Daily lo anticipa)", ev.id);
   assert(typeof ev.effect === "function", "effect es función", ev.id);
   if (ev.mod) {
     assert(ev.mod.desc, "mod con desc para la UI", ev.id);
@@ -75,10 +76,17 @@ for (const a of DAY_ACTIONS) {
   assert(typeof a.effect === "function" && a.icon && a.title && a.desc, "acción completa", a.id);
 }
 
+// ---------- DAILY_FLAVOR: titulares de color del World Cup Daily ----------
+assert(DAILY_FLAVOR.length >= 8, "hay al menos 8 titulares de color", DAILY_FLAVOR.length);
+for (const f of DAILY_FLAVOR) {
+  assert(typeof f.icon === "string" && f.icon && typeof f.text === "string" && f.text.length > 10, "flavor con icon y texto", JSON.stringify(f));
+}
+
 // ---------- RANDOM_EVENTS siguen sanos (esquema mínimo) ----------
 for (const ev of RANDOM_EVENTS) {
   assert(EVENT_THEMES[ev.tema], "conflicto con tema válido", ev.id);
   assert(Array.isArray(ev.options) && ev.options.length >= 2, "conflicto con ≥2 opciones", ev.id);
+  assert(typeof ev.teaser === "string" && ev.teaser.length > 10, "conflicto con teaser", ev.id);
 }
 
 console.log(`events.validate: ${checks} checks · ${PREP_EVENTS.length} eventos (${tierIds.map(t => `${perTier[t]} ${t}`).join(" · ")})`);

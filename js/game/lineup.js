@@ -104,7 +104,7 @@ function orderBySlots(lineup, formationId) {
 export function currentLineup(squad, prev, formationId) {
   const available = squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
   let lineup = prev, id = formationId;
-  const vigente = lineup && lineup.length === 6 && lineup.every(p => available.includes(p));
+  const vigente = lineup && lineup.every(p => available.includes(p)) && validateLineup(available, lineup).ok;
   if (!vigente) {
     lineup = autoLineup(available, id);
     // Si la formación elegida ya no se puede armar, la nueva sale del once que quedó.
@@ -166,16 +166,36 @@ function bestLineup(available) {
   return picks;
 }
 
-/** Valida una alineación: exactamente 6, 1 arquero y al menos 1 por línea disponible. */
+/**
+ * Cuántos titulares puede presentar HOY este plantel: 6, salvo emergencia.
+ * Un plantel diezmado (4+ bajas de campo simultáneas) no llega a 6 porque el
+ * segundo arquero no puede jugar en cancha (canPlayAt) — y el partido se juega
+ * IGUAL: presentar menos de 6 ya lo castiga el motor con la misma pena de
+ * inferioridad que una roja (match/powers). Sin esta válvula la run moría en
+ * un softlock: el botón de jugar quedaba bloqueado para siempre.
+ */
+export function maxLineupSize(available) {
+  const field = available.filter(p => p.pos !== "POR").length;
+  return Math.min(6, field + (available.some(p => p.pos === "POR") ? 1 : 0));
+}
+
+/**
+ * Valida una alineación: exactamente 6 (o TODOS los presentables, si el plantel
+ * diezmado no llega — devuelve `short: true` para que la UI avise), 1 arquero y
+ * al menos 1 por línea disponible.
+ */
 export function validateLineup(available, selected) {
-  if (selected.length !== 6) return { ok: false, msg: `Selecciona 6 titulares (llevas ${selected.length}).` };
+  const size = maxLineupSize(available);
+  if (selected.length !== size) {
+    return { ok: false, msg: size === 6 ? `Selecciona 6 titulares (llevas ${selected.length}).` : `Plantel diezmado: presenta a los ${size} que quedan en pie (llevas ${selected.length}).` };
+  }
   const count = pos => selected.filter(p => p.pos === pos).length;
   const avail = pos => available.some(p => p.pos === pos);
   if (avail("POR") && count("POR") !== 1) return { ok: false, msg: "Necesitas exactamente 1 arquero." };
   for (const pos of ["DEF", "MED", "DEL"]) {
     if (avail(pos) && count(pos) < 1) return { ok: false, msg: `Necesitas al menos 1 ${pos}.` };
   }
-  return { ok: true };
+  return { ok: true, short: size < 6 };
 }
 
 /**
