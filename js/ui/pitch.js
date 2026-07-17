@@ -21,7 +21,7 @@ export const POS_NAME = { POR: "Arquero", DEF: "Defensa", MED: "Mediocampista", 
 // Equiespaciadas a 23%: menos que eso y las fichas se pisan en pantallas chicas.
 const ROW_Y = { DEL: 20, MED: 43, DEF: 66, POR: 89 };
 // Anillo del destino válido según el tono que pida quien la monta.
-const TONE_RING = { sky: "ring-sky-400", emerald: "ring-emerald-400" };
+const TONE_RING = { sky: "ring-sky-400", emerald: "ring-emerald-400", amber: "ring-amber-400" };
 
 let drag = null; // jugador que se está arrastrando ahora
 let view = null; // configuración de la cancha montada (solo hay una a la vez)

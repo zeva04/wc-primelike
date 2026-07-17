@@ -242,10 +242,16 @@ function openSquadModal() {
   const restantes = () => match.subsLeft - pendientes.length;
   const hayPlan = () => pendientes.length > 0 || once.some(p => (p.posJugada || null) !== previo.get(p));
 
+  /** El cambio pendiente cuyo ENTRANTE es p (si p entró al once solo en el plan). */
+  const pendienteDe = p => pendientes.find(c => c.entra === p);
+
   /**
    * Qué significa arrastrar `a` sobre `b`, o null si no se puede:
    *  - dos titulares activos → REUBICAR: intercambian el puesto, gratis (azul).
    *  - banco → titular → CAMBIO: se suma al plan y gastará 1 de 3 (verde).
+   *  - un ENTRANTE del plan → banco → EDITAR el plan, gratis (ámbar): sobre el que
+   *    salía lo DESHACE; sobre otro suplente elegible, entra ese en su lugar.
+   *    Mientras no se confirme, el plan es plastilina — nada se gastó todavía.
    * Las reglas del cambio las manda el motor (`eligibleFor`): el arco solo lo cubre un
    * arquero, un arquero no sale a la cancha, y el sustituido no reingresa.
    */
@@ -257,9 +263,18 @@ function openSquadModal() {
     }
     const sale = activo(a) ? a : activo(b) ? b : null;
     const entra = sale === a ? b : a;
-    if (!sale || enOnce(entra) || restantes() <= 0) return null;
+    if (!sale || enOnce(entra)) return null;
+    const plan = pendienteDe(sale);
+    if (plan) {
+      // Editar el plan no gasta ni consulta `restantes`: ese cambio ya estaba contado
+      if (entra === plan.sale) return { tone: "amber", kind: "deshacer", plan };
+      if (match.availableBench().includes(entra) && match.eligibleFor(plan.sale).includes(entra))
+        return { tone: "amber", kind: "reemplazar", plan, entra };
+      return null;
+    }
+    if (restantes() <= 0) return null;
     // El que sale tiene que ser titular de verdad: no se encadenan cambios sobre un
-    // jugador que recién metiste en el plan.
+    // jugador que recién metiste en el plan (editar su cambio sí se puede, arriba).
     if (!S.matchCtx.lineup.includes(sale)) return null;
     if (!match.availableBench().includes(entra) || !match.eligibleFor(sale).includes(entra)) return null;
     return { tone: "emerald", kind: "cambio", sale, entra };
@@ -280,6 +295,7 @@ function openSquadModal() {
     <div class="flex items-center gap-4 mt-3 text-[10px] text-slate-400 flex-wrap">
       <span class="flex items-center gap-1.5"><i class="w-3 h-3 rounded ring-2 ring-sky-400 inline-block"></i> Reubicar — gratis</span>
       <span class="flex items-center gap-1.5"><i class="w-3 h-3 rounded ring-2 ring-emerald-400 inline-block"></i> Cambio — gasta 1 de 3</span>
+      <span class="flex items-center gap-1.5"><i class="w-3 h-3 rounded ring-2 ring-amber-400 inline-block"></i> Ajustar un cambio sin aplicar — gratis</span>
       <span class="flex items-center gap-1.5"><i class="text-orange-400 font-black">!</i> Fuera de puesto</span>
     </div>
     <div id="plan-resumen" class="mt-3"></div>
@@ -300,13 +316,30 @@ function openSquadModal() {
       badge: p => `${p.usado ? "🔄" : ""}${p.amarillaPartido ? "🟨" : ""}${p.expulsado ? "🟥" : ""}${p.lesionado ? "🚑" : ""}${p.sustituido ? "↩" : ""}`,
       extra: p => `<span class="block w-10 mx-auto mt-0.5">${energyBar(p.energia)}</span>`,
       muted: p => p.expulsado || p.lesionado || p.sustituido,
-      draggable: p => activo(p) || (!enOnce(p) && match.availableBench().includes(p)),
+      // Arrastrables: los activos del once previsualizado, el banco real disponible y
+      // el que SALÍA en un cambio pendiente (vive en el banco de la vista previa y
+      // tiene que poder volver — es la edición del plan).
+      draggable: p => activo(p) || (!enOnce(p) && (match.availableBench().includes(p) || pendientes.some(c => c.sale === p))),
       canSwap: tipo,
       onSwap: (a, b) => {
         const s = tipo(a, b);
         if (!s) return;
         if (s.kind === "mover") {
           if (!swapAssignments(a, b)) return toast("No pueden intercambiar ese puesto.");
+        } else if (s.kind === "deshacer") {
+          // El cambio pendiente se anula entero: cada uno vuelve a donde estaba
+          once[once.indexOf(s.plan.entra)] = s.plan.sale;
+          banco = banco.filter(x => x !== s.plan.sale).concat(s.plan.entra);
+          s.plan.entra.posJugada = previo.get(s.plan.entra) || null;
+          pendientes.splice(pendientes.indexOf(s.plan), 1);
+        } else if (s.kind === "reemplazar") {
+          // Mismo cambio, otro protagonista: hereda el puesto que dejaba el anterior
+          const puesto = s.plan.entra.posJugada || s.plan.entra.pos;
+          once[once.indexOf(s.plan.entra)] = s.entra;
+          banco = banco.filter(x => x !== s.entra).concat(s.plan.entra);
+          s.plan.entra.posJugada = previo.get(s.plan.entra) || null;
+          s.entra.posJugada = canPlayAt(s.entra, puesto) ? puesto : s.entra.pos;
+          s.plan.entra = s.entra;
         } else {
           once[once.indexOf(s.sale)] = s.entra;
           banco = banco.filter(x => x !== s.entra).concat(s.sale);
