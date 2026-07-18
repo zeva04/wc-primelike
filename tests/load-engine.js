@@ -29,6 +29,8 @@ export async function loadEngine() {
     import("../js/game/day-action.js"),
     import("../js/game/discipline.js"),
     import("../js/game/medical.js"),
+    import("../js/game/momentum.js"),
+    import("../js/game/morale.js"),
     import("../js/game/journal.js"),
     import("../js/game/tournament/sim.js"),
     import("../js/game/tournament/groups.js"),

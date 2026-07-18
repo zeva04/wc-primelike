@@ -3,6 +3,7 @@
    Las matemáticas están explicadas en docs/CORE.md §2-3.
    ============================================================ */
 import { clamp } from "../core/math.js";
+import { momentoMult } from "./momentum.js";
 
 export const STAT_KEYS = ["tiro", "defensa", "cabezazo", "pase", "aura"];        // jugadores de campo
 export const GK_STAT_KEYS = ["atajadas", "reflejos", "salidas", "pase", "aura"]; // arqueros
@@ -32,11 +33,15 @@ export function penaltyAt(p, pos) { return OUT_OF_POS_STEP * posDistance(p.pos, 
 export function outOfPosPenalty(p) { return penaltyAt(p, playedPos(p)); }
 
 // Stat castigada según el puesto que se le pase. El **aura no se castiga**: es carisma y
-// sangre fría, no depende del puesto en el que lo paren.
-function statAt(p, key, pos) {
+// sangre fría, no depende del puesto en el que lo paren. El Momento (game/momentum) sí
+// escala TODAS las stats — incluida el aura: la confianza es exactamente eso. Los rivales
+// no tienen `momento`, así que su multiplicador es 1 (poder asimétrico, ver momentum.js).
+// `conMomento: false` da la stat SIN la forma del día (naturalOverall la usa: talento puro).
+function statAt(p, key, pos, conMomento = true) {
   const v = p.stats[key];
-  if (key === "aura" || v === undefined) return v;
-  return clamp(v - penaltyAt(p, pos), 1, 99);
+  if (v === undefined) return v;
+  const base = key === "aura" ? v : v - penaltyAt(p, pos);
+  return clamp(Math.round(base * (conMomento ? momentoMult(p) : 1)), 1, 99);
 }
 
 /**
@@ -46,11 +51,15 @@ function statAt(p, key, pos) {
  */
 export function effectiveStat(p, key) { return statAt(p, key, playedPos(p)); }
 
-/** Stats que le bajan al jugador por estar fuera de puesto: `[{key, base, real, delta}]` (vacío si juega en el suyo). */
+/**
+ * Stats que le bajan al jugador por estar fuera de puesto: `[{key, base, real, delta}]`
+ * (vacío si juega en el suyo). `base` es lo que tendría EN SU PUESTO con su momento
+ * actual — así la ficha aísla el castigo posicional sin mezclarlo con el % del Momento.
+ */
 export function statPenalties(p) {
   if (!outOfPosPenalty(p)) return [];
   const keys = p.pos === "POR" ? GK_STAT_KEYS : STAT_KEYS;
-  return keys.map(k => ({ key: k, base: p.stats[k], real: effectiveStat(p, k) }))
+  return keys.map(k => ({ key: k, base: statAt(p, k, p.pos), real: effectiveStat(p, k) }))
     .filter(s => s.real !== s.base)
     .map(s => ({ ...s, delta: s.real - s.base }));
 }
@@ -70,10 +79,10 @@ export const OVR_WEIGHTS = {
  * doble, y es intencional: se lo mide con los pesos del puesto nuevo (a un DEL de DEF le
  * pesa la defensa, su peor stat) y encima sus stats van castigadas.
  */
-export function overallAt(p, pos) {
+export function overallAt(p, pos, conMomento = true) {
   const w = OVR_WEIGHTS[pos];
   let sum = 0;
-  for (const k in w) sum += statAt(p, k, pos) * w[k];
+  for (const k in w) sum += statAt(p, k, pos, conMomento) * w[k];
   return Math.round(sum);
 }
 
@@ -81,12 +90,14 @@ export function overallAt(p, pos) {
 export function playerOverall(p) { return overallAt(p, playedPos(p)); }
 
 /**
- * Nota del jugador EN SU PUESTO, ignorando dónde lo hayan parado hoy: es su talento, no su
- * circunstancia. Ordena el plantel (`autoLineup`) y sirve de referencia en la ficha.
+ * Nota del jugador EN SU PUESTO, ignorando dónde lo hayan parado hoy Y su momento: es su
+ * talento, no su circunstancia (el Momento es circunstancia, así que tampoco entra — y de
+ * paso el once automático no persigue al que está en racha: recorte de balance 17-jul).
+ * Ordena el plantel (`autoLineup`) y sirve de referencia en la ficha.
  * Sin esto, el once automático manda al banco al crack que venías usando fuera de puesto:
  * lo compara castigado contra suplentes intactos.
  */
-export function naturalOverall(p) { return overallAt(p, p.pos); }
+export function naturalOverall(p) { return overallAt(p, p.pos, false); }
 
 // Estrellas 0.5–5 con curva futbolera (antes nota/20 comprimía todo: España 92 daba 4.5★).
 // 85+ = 5★ (las grandes: Argentina, Brasil, Francia...), y media estrella en todo el rango.

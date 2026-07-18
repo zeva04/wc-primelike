@@ -23,7 +23,7 @@ for (const [id, t] of Object.entries(RARITIES)) {
 }
 
 // ---------- PREP_EVENTS: esquema ----------
-assert(PREP_EVENTS.length === 30, `hay 30 eventos (hay ${PREP_EVENTS.length})`);
+assert(PREP_EVENTS.length === 33, `hay 33 eventos (hay ${PREP_EVENTS.length})`);
 const ids = new Set();
 const perTier = Object.fromEntries(tierIds.map(t => [t, 0]));
 const MOD_KEYS = new Set(["entrenar", "recuperar", "tactica"]);
@@ -47,8 +47,8 @@ for (const ev of PREP_EVENTS) {
   perTier[ev.rareza]++;
 }
 for (const t of tierIds) assert(perTier[t] > 0, "cada rareza tiene al menos un evento", t);
-assert(perTier.comun === 10 && perTier.infrecuente === 8 && perTier.rara === 7 && perTier.legendaria === 5,
-  "distribución 10/8/7/5 por rareza", JSON.stringify(perTier));
+assert(perTier.comun === 10 && perTier.infrecuente === 10 && perTier.rara === 8 && perTier.legendaria === 5,
+  "distribución 10/10/8/5 por rareza (sprint Forma y Ánimo sumó 3)", JSON.stringify(perTier));
 
 // ---------- PREP_EVENTS: aplicar cada efecto contra una run fresca ----------
 const anyPlayable = "BRA";
@@ -57,7 +57,11 @@ for (const ev of PREP_EVENTS) {
   let out;
   try { out = ev.effect(run); } catch (e) { assert(false, "effect no debe lanzar", `${ev.id}: ${e.message}`); continue; }
   assert(out === undefined || typeof out === "string", "effect devuelve string (desc) o nada", ev.id);
-  for (const p of run.squad) assert(p.energia >= 5 && p.energia <= 100, "energía en rango tras el efecto", `${ev.id}: ${p.name}=${p.energia}`);
+  for (const p of run.squad) {
+    assert(p.energia >= 5 && p.energia <= 100, "energía en rango tras el efecto", `${ev.id}: ${p.name}=${p.energia}`);
+    assert(p.momento >= 1 && p.momento <= 7, "momento en rango 1..7 tras el efecto", `${ev.id}: ${p.name}=${p.momento}`);
+  }
+  assert(run.moral >= 1 && run.moral <= 100, "moral en rango 1..100 tras el efecto", `${ev.id}: ${run.moral}`);
   for (const [k, v] of Object.entries(run.buffs)) assert(Number.isFinite(v), "buff numérico finito", `${ev.id}: ${k}=${v}`);
 }
 // El golpe en la práctica debe descartar exactamente un jugador (con plantel sano)

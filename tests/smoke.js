@@ -51,6 +51,8 @@ function playMatch(run, oppId) {
   for (const name of banned) assert(!match.oppLineup.some(p => p.name === name), "suspendido fuera del once rival", name);
   assert(match.oppLineup.length === 6, "el rival siempre forma 6 (los genéricos cubren al suspendido)");
   assert(match.oppLineup.some(p => p.pos === "POR"), "el rival nunca se queda sin arquero");
+  // El Momento es poder asimétrico POR DATOS: ningún rival debe llevar el campo
+  assert(match.oppLineup.every(p => p.momento === undefined), "los rivales no tienen Momento");
   let guard = 0;
   while (!match.finished && guard++ < 500) {
     const r = match.tick();
@@ -161,7 +163,9 @@ function playRun(teamId) {
         else assert(p.amarillas === 1 && !p.suspendido, "1ª amarilla deja apercibido", p.name);
       } else if (b.amP === 0) assert((p.amarillas || 0) === b.am, "sin amarilla el contador no cambia", p.name);
       assert(p.energia >= 5 && p.energia <= 100, "energía fuera de rango", `${p.name}=${p.energia}`);
+      assert(Number.isInteger(p.momento) && p.momento >= 1 && p.momento <= 7, "momento en rango 1..7", `${p.name}=${p.momento}`);
     }
+    assert(Number.isInteger(run.moral) && run.moral >= 1 && run.moral <= 100, "moral en rango 1..100", run.moral);
     assert(run.journal.length >= journalBefore + 1, "el diario debe crecer con el partido");
 
     const adv = E.advanceStage(run, out.advanced);

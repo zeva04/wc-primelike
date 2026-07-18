@@ -12,7 +12,7 @@ import { STAGE_LABEL } from "../../game/tournament/knockout.js";
 import { Match } from "../../game/match/Match.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, modal, closeModal, toast, numTag, posBadge, energyBar } from "../components.js";
+import { screenShell, $, flagImg, modal, closeModal, toast, numTag, posBadge, energyBar, momentoChip } from "../components.js";
 import { mountPitch, POS_NAME } from "../pitch.js";
 import { spriteSvg } from "../sprites.js";
 
@@ -144,7 +144,7 @@ export function updateMatchUI() {
       ${spriteSvg(p, matchCtx.team, "w-5 h-6")}
       ${numTag(p)}
       ${posBadge(playedPos(p))}
-      <span class="flex-1 truncate">${p.name} ${outOfPosPenalty(p) > 0 ? `<span class="text-orange-400 font-black" title="Fuera de puesto: es ${p.pos}">!</span>` : ""}${p.usado ? "🔄" : ""}${p.amarillaPartido ? "🟨" : ""}${p.expulsado ? "🟥" : ""}${p.lesionado ? "🚑" : ""}</span>
+      <span class="flex-1 truncate">${p.name} ${momentoChip(p)}${outOfPosPenalty(p) > 0 ? `<span class="text-orange-400 font-black" title="Fuera de puesto: es ${p.pos}">!</span>` : ""}${p.usado ? "🔄" : ""}${p.amarillaPartido ? "🟨" : ""}${p.expulsado ? "🟥" : ""}${p.lesionado ? "🚑" : ""}</span>
       <span class="w-12">${energyBar(p.energia)}</span>
     </div>`).join("");
   const opc = $("#oppcourt");
@@ -258,6 +258,9 @@ function openSquadModal() {
   const tipo = (a, b) => {
     if (match.finished) return null;
     if (activo(a) && activo(b)) {
+      // Enrocar dos que juegan el MISMO puesto no cambia nada (mismas stats de posición):
+      // se prohíbe para no ofrecer un gesto sin efecto (pedido del PO).
+      if (playedPos(a) === playedPos(b)) return null;
       // El arco no se permuta: solo un arquero puede ocuparlo (game/lineup.canPlayAt).
       return canPlayAt(a, playedPos(b)) && canPlayAt(b, playedPos(a)) ? { tone: "sky", kind: "mover" } : null;
     }
@@ -313,7 +316,7 @@ function openSquadModal() {
       lineup: once,
       bench: banco,
       sizes: { sprite: "w-9 h-11", bench: "w-8 h-10" },
-      badge: p => `${p.usado ? "🔄" : ""}${p.amarillaPartido ? "🟨" : ""}${p.expulsado ? "🟥" : ""}${p.lesionado ? "🚑" : ""}${p.sustituido ? "↩" : ""}`,
+      badge: p => `${momentoChip(p)}${p.usado ? "🔄" : ""}${p.amarillaPartido ? "🟨" : ""}${p.expulsado ? "🟥" : ""}${p.lesionado ? "🚑" : ""}${p.sustituido ? "↩" : ""}`,
       extra: p => `<span class="block w-10 mx-auto mt-0.5">${energyBar(p.energia)}</span>`,
       muted: p => p.expulsado || p.lesionado || p.sustituido,
       // Arrastrables: los activos del once previsualizado, el banco real disponible y

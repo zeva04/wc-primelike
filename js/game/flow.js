@@ -13,6 +13,8 @@ import { addJournal } from "./journal.js";
 import { scheduleNextMatch } from "./calendar.js";
 import { applyMedicalPostMatch } from "./medical.js";
 import { applyDisciplinePostMatch, clearAmarillas } from "./discipline.js";
+import { applyMomentumPostMatch } from "./momentum.js";
+import { applyMoralePostMatch, bumpMorale } from "./morale.js";
 import { qualifyRound32, computeTable } from "./tournament/groups.js";
 import { pairNextRound, STAGE_ORDER, STAGE_LABEL } from "./tournament/knockout.js";
 import { finishGroupMatchday, finishKnockoutRound } from "./tournament/world.js";
@@ -66,17 +68,22 @@ export function closeMatch(run, match) {
   return { res, otherResults, advanced };
 }
 
-/** Cierre físico y disciplinario del partido, jugador por jugador, y re-agendado. */
+/** Cierre físico, disciplinario y anímico del partido, jugador por jugador, y re-agendado. */
 export function postMatchUpdate(run, match) {
   for (const p of run.squad) {
-    const played = match.my.lineup.includes(p) || p.usado;
+    // Jugó = está en el once final, entró desde el banco (`usado`) o SALIÓ por un cambio
+    // (`sustituido`): sin este último, al sustituido no se le contaba el partido y recuperaba
+    // energía como si hubiera descansado (bug reportado por el PO).
+    const played = match.my.lineup.includes(p) || p.usado || p.sustituido;
     if (played) p.partidos++;
     applyMedicalPostMatch(run, p, played);
     applyDisciplinePostMatch(run, p);
+    applyMomentumPostMatch(run, p, played, match); // antes de resetear flags: lee p.sustituido
     p.usado = false;
     p.sustituido = false;
     p.enCancha = false;
   }
+  applyMoralePostMatch(run, match);
   run.buffs = {};
   // El partido consumió el día: se agenda el siguiente a 5-6 días con sus eventos diarios
   scheduleNextMatch(run);
@@ -102,6 +109,7 @@ export function advanceStage(run, advanced) {
     addJournal(run, { icon: "🎊", tone: "gold", title: "¡Clasificados a 16avos de final!", desc: `Terminaron ${myPos}º del Grupo ${run.groups[run.myGroupIdx].name}. Desde aquí, todo es a vida o muerte.` });
     // Regla FIFA adaptada: al cerrar la fase de grupos se borran las amarillas acumuladas
     clearAmarillas(run, "Terminó la fase de grupos");
+    bumpMorale(run, 5, "Clasificar a las eliminatorias enciende al grupo."); // pasar de ronda sube la moral
     return { type: "qualified", myPos };
   }
   if (!advanced) return { type: "eliminated" };
@@ -111,6 +119,7 @@ export function advanceStage(run, advanced) {
   run.koPlayed = {}; // ronda nueva: el mundo la irá jugando día a día
   run.stage = nextStage;
   addJournal(run, { icon: "🔥", tone: "gold", title: nextStage === "final" ? "¡FINALISTAS del Mundial!" : `¡A ${STAGE_LABEL[nextStage]}!`, desc: `Sobreviven ${run.koMatches.length * 2} equipos.` });
+  bumpMorale(run, 5, "Pasar de ronda agranda el sueño."); // pasar de ronda sube la moral
   // Regla FIFA adaptada: al terminar los cuartos también se borran las amarillas
   if (nextStage === "sf") clearAmarillas(run, "Terminaron los cuartos de final");
   return { type: "next-round", stage: nextStage };

@@ -24,6 +24,7 @@
 import { pick } from "../core/rng.js";
 import { getTeam } from "../data/teams-repo.js";
 import { teamRating, difficultyOf } from "./ratings.js";
+import { moraleBand } from "./morale.js";
 import { computeTable } from "./tournament/groups.js";
 import { nextOpponentId, STAGE_LABEL } from "./tournament/knockout.js";
 import { DAILY_FLAVOR } from "../content/daily-flavor.js";
@@ -165,6 +166,19 @@ export function buildDaily(run) {
   // P1 — la racha del goleador y el desgaste del plantel
   const scorer = [...run.squad].sort((a, b) => b.goles - a.goles)[0];
   if (scorer && scorer.goles >= 2) items.push({ icon: "🔥", tag: "PLANTEL", text: `${scorer.name} está en racha: ${scorer.goles} goles en el torneo. ¿La revelación de ${me.name}?` });
+
+  // P1 — Forma y Ánimo: Momento en los extremos (6-7 / 1-2) y la moral cuando es noticia
+  const racha = run.squad.filter(p => (p.momento ?? 4) >= 6).sort((a, b) => b.momento - a.momento);
+  if (racha.length) items.push({ icon: "🔥", tag: "PLANTEL", text: racha.length === 1
+    ? `${racha[0].name} atraviesa un momento brillante: la pelota le obedece.`
+    : `${racha.slice(0, 2).map(p => p.name).join(" y ")} atraviesan un momento brillante: el equipo se apoya en ellos.` });
+  const frios = run.squad.filter(p => (p.momento ?? 4) <= 2).sort((a, b) => a.momento - b.momento);
+  if (frios.length) items.push({ icon: "❄️", tag: "PLANTEL", text: frios.length === 1
+    ? `Preocupa ${frios[0].name}: nada le sale y la confianza no aparece.`
+    : `Crisis de confianza: ${frios.slice(0, 2).map(p => p.name).join(" y ")} están lejos de su nivel.` });
+  const banda = moraleBand(run.moral ?? 50);
+  if (banda.id === "nubes") items.push({ icon: banda.icon, tag: "PLANTEL", text: `La concentración es una fiesta: la moral del grupo está por las nubes.` });
+  else if (banda.id === "baja" || banda.id === "suelo") items.push({ icon: banda.icon, tag: "PLANTEL", text: `Silencio en la concentración: la moral del grupo está ${banda.id === "suelo" ? "por el suelo" : "baja"} y el cuerpo técnico busca respuestas.` });
   const avgEnergy = Math.round(run.squad.reduce((s, p) => s + p.energia, 0) / run.squad.length);
   if (avgEnergy < 60) items.push({ icon: "🥵", tag: "PLANTEL", text: `El plantel acusa el desgaste del torneo (energía media ${avgEnergy}): el cuerpo técnico evalúa rotar.` });
 

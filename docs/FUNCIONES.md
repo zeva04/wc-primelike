@@ -99,10 +99,10 @@ Las secciones siguientes documentan las mismas funciones, ahora indicando su mó
 | `playedPos(p)` | Puesto que juega hoy (`posJugada`, lo escribe `lineup.assignPositions`) o el natural. El arco es exclusivo de los POR, así que `playedPos(p)==="POR"` ⟺ `p.pos==="POR"`. |
 | `posDistance(a,b)` / `penaltyAt(p,pos)` | Pasos entre dos puestos en la línea POR–DEF–MED–DEL / castigo que sufriría ahí (6 por paso). |
 | `outOfPosPenalty(p)` | Castigo que sufre hoy cada stat técnica (0 si juega en su puesto). |
-| `effectiveStat(p,key)` | Stat ya castigada. **Única fuente de verdad**: la leen `playerOverall` (la ficha) y `match/powers.effStat` (la cancha), así la UI no puede mentir. El aura nunca se castiga. |
-| `statPenalties(p)` | `[{key, base, real, delta}]` de lo que le bajó — es lo que pinta la ficha. |
-| `overallAt(p,pos)` | Nota que tendría parado en `pos` (pesos de ese puesto + castigo). |
-| `naturalOverall(p)` | Nota EN SU PUESTO, ignore dónde esté parado. **La que ordena el plantel** (`autoLineup`): con `playerOverall` el auto manda al banco al crack que estabas usando fuera de puesto. |
+| `effectiveStat(p,key)` | Stat ya castigada y escalada por el Momento (`momentoMult`, CORE §2c). **Única fuente de verdad**: la leen `playerOverall` (la ficha) y `match/powers.effStat` (la cancha), así la UI no puede mentir. El aura nunca se castiga por posición (por Momento sí se escala). |
+| `statPenalties(p)` | `[{key, base, real, delta}]` de lo que le baja por POSICIÓN — `base` va con su Momento actual para aislar el castigo posicional del % de forma. Es lo que pinta la ficha. |
+| `overallAt(p,pos,conMomento=true)` | Nota que tendría parado en `pos` (pesos de ese puesto + castigo); `conMomento:false` la da sin la forma del día. |
+| `naturalOverall(p)` | Nota EN SU PUESTO y SIN Momento: talento, no circunstancia. **La que ordena el plantel** (`autoLineup`): con `playerOverall` el auto manda al banco al crack que estabas usando fuera de puesto (y perseguiría al que está en racha — recorte de balance 17-jul). |
 | `starsFromRating(r)` | Convierte un rating 1–99 en estrellas 0.5–5 con la curva futbolera. |
 | `statLine(p)` | Resumen de stats para tooltips ("T90 D35…" / "AT90 RF88…"). |
 | `difficultyOf(team)` | Dificultad temática (umbrales 85/78/68): `{tier, label, desc}`; la UI mapea `tier`→colores. |
@@ -237,7 +237,7 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | `_checkShootoutEnd()` | Cierra la tanda por definición matemática o muerte súbita. |
 | `result()` | Resultado final: marcador, ganador y detalle de penales. |
 
-### 9. Entre partidos — `js/game/calendar.js`, `day-action.js`, `flow.js`, `discipline.js`, `journal.js` y `js/content/`
+### 9. Entre partidos — `js/game/calendar.js`, `day-action.js`, `flow.js`, `discipline.js`, `momentum.js`, `morale.js`, `journal.js` y `js/content/`
 | Función | Qué hace |
 |---|---|
 | `dayLabel(day)` | Fecha real del día de la run ("Jue 11 jun"; día 1 = 11-jun-2026). |
@@ -249,17 +249,24 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | `buildDaily(run)` | **daily**: arma la edición del World Cup Daily — `{day, isMatchDay, items}` con 1-5 titulares `{icon, tag, text}` ordenados por prioridad (PORTADA/PLANTEL/GRUPO/RIVAL/MUNDIAL/HOY/COLOR, ver CORE §9); el primero es la nota de tapa. GRUPO marca al próximo rival si jugó anoche; RIVAL avisa sus suspendidos (`rivalBans`) y da el framing por paridad solo en la previa (≤2 días); MUNDIAL puntúa `run.lastNight` (batacazos por tier, goleadas, festivales, grandes, rojas); HOY es el `teaser` del evento/conflicto que trae el día (anticipa sin revelar). Solo lectura (el flavor consume rng). |
 | `multLabel(mult)` | **day-action**: etiqueta corta para la UI ("×2", "×½"); `""` si es 1 o bloqueo. |
 | `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced}`. |
-| `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario por jugador (delega en `applyMedicalPostMatch` y `applyDisciplinePostMatch`), limpia buffs y **re-agenda**. |
-| `advanceStage(run,advanced)` | **flow**: avanza el torneo y devuelve `{type: "next-matchday"\|"qualified"\|"eliminated"\|"next-round"\|"champion"}`; dispara `clearAmarillas` al cerrar grupos y tras 4tos. La UI solo rutea. |
+| `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario/anímico por jugador (delega en `applyMedicalPostMatch`, `applyDisciplinePostMatch` y `applyMomentumPostMatch` — este ANTES de resetear flags: lee `p.sustituido`), cierra la moral (`applyMoralePostMatch`), limpia buffs y **re-agenda**. "Jugó" = está en el once final, entró del banco (`usado`) o **salió por un cambio** (`sustituido`); sin este último, al sustituido no se le contaba el partido y recuperaba energía como si hubiera descansado. |
+| `advanceStage(run,advanced)` | **flow**: avanza el torneo y devuelve `{type: "next-matchday"\|"qualified"\|"eliminated"\|"next-round"\|"champion"}`; dispara `clearAmarillas` al cerrar grupos y tras 4tos, y `bumpMorale(+5)` al pasar de ronda. La UI solo rutea. |
 | `applyMedicalPostMatch(run,p,played)` | **medical**: energía (+15/+30), descuento de baja y diario de lesión. |
 | `applyDisciplinePostMatch(run,p)` | **discipline**: roja→suspensión; **acumulación de amarillas** (2 en el torneo = 1 partido fuera, contador a 0; doble amarilla = roja y NO acumula). |
+| `momentoPct(p)` / `momentoMult(p)` | **momentum**: efecto % del Momento 1..7 sobre las stats (±2% por paso desde el neutro 4, tope ±4%; CORE §2c). Sin campo `momento` (rivales) → 0 / ×1: la asimetría vive en los datos. |
+| `applyMomentumPostMatch(run,p,played,match)` | **momentum**: mueve `p.momento` con las señales del partido (resultado solo en la banda 3..5, goles, penales fallados, arquero; tope ±2) o lo decae 1 paso hacia el neutro si no hubo señal. Lee `match.scorers`, `match.pensFallados`, `match.pensAtajadosPor` y `p.sustituido`. |
+| `moraleBand(v)` / `MORAL_BANDS` | **morale**: banda anímica de un valor 1..100 (5 bandas, CORE §9). |
+| `bumpMorale(run,delta,motivo)` | **morale**: mueve `run.moral` con clamp 1..100; cruzar de banda escribe el `motivo` en el diario. |
+| `applyMoralePostMatch(run,match)` | **morale**: la moral del resultado y de CÓMO se dio — base ±10, goles agónicos ≥85' que deciden (±4/±5, lee `match.oppGoalMins`), tanda ±3. v1 sin efecto mecánico en el partido (hook `[MORAL → OCASIONES]` comentado en `Match.tick`). |
 | `addJournal(run,entry)` | Agrega una entrada `{day,icon,title,desc,tone}` al Diario de Campaña (`run.journal`). El día se toma de `run.day` salvo override. |
 | `clearAmarillas(run,motivo)` | Borra las amarillas acumuladas de todo el plantel y lo anota en el diario. Se llama al cerrar la fase de grupos y tras los cuartos. Las suspensiones pendientes NO se perdonan. |
 
 Constantes de datos: `EVENT_THEMES` (4 temáticas con icono/color fijos: entrenamiento,
 físico, vestuario, entorno), `RARITIES` (4 niveles con peso de sorteo y colores:
-común 55 · infrecuente 27 · rara 13 · legendaria 5), `PREP_EVENTS` (30 eventos
-inevitables con `rareza` — 10/8/7/5 por nivel, magnitud creciente — y `mod` opcional
+común 55 · infrecuente 27 · rara 13 · legendaria 5), `PREP_EVENTS` (33 eventos
+inevitables con `rareza` — 10/10/8/5 por nivel, magnitud creciente; 3 interactúan con
+Forma y Ánimo mutando `p.momento`/`r.moral` con primitivas + clamp, sin importar
+`game/` — y `mod` opcional
 que modifica las Acciones del Día vía `run.dayMod`), `RANDOM_EVENTS` (6 conflictos con
 decisión, también con `tema`) y `DAY_ACTIONS` (5 Acciones del Día en
 `content/day-actions.js`: 3 focos de entrenamiento con `group:"entrenar"`, recuperación
@@ -274,7 +281,8 @@ ventana, el modificador del día no las toca, y la que no se toma expira sin ras
 Las de calidad permanente llevan `choose: {label, candidates(run)}`: el DT elige al
 jugador protagonista y `effect(run, jugador)` lo recibe).
 El esquema de todo este contenido es LEY en `tests/events.validate.js`, que además
-aplica cada efecto contra una run fresca (energías en rango, buffs finitos, stats 1-99).
+aplica cada efecto contra una run fresca (energías en rango, buffs finitos, stats 1-99,
+momento 1..7 y moral 1..100).
 
 ### 10. API pública
 No existe fachada (F7): la superficie pública del motor es la suma de los exports de sus
@@ -397,7 +405,7 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 ### 8. Partido en vivo — `ui/screens/match.js`
 | Función | Qué hace |
 |---|---|
-| `openSquadModal()` | **Gestión de plantilla en vivo**: la cancha de `ui/pitch.js` con el partido en pausa. Arrastrar titular sobre titular reubica (azul, gratis); traer a alguien del banco es un cambio (verde, gasta 1 de 3). **Nada toca el partido hasta Confirmar**: los cambios se arman como plan y se aplican juntos; "Salir sin guardar" lo descarta. Las reubicaciones sí mutan `posJugada` en el momento (es lo que la cancha lee para previsualizar), por eso se guarda el estado previo y se restaura al cancelar. Al confirmar se aplican **primero los cambios y después las posiciones finales**: si el DT reubicó a alguien DESPUÉS de meterlo, `makeSub` le pondría el puesto del que salió y el plan quedaría pisado. |
+| `openSquadModal()` | **Gestión de plantilla en vivo**: la cancha de `ui/pitch.js` con el partido en pausa. Arrastrar titular sobre titular reubica (azul, gratis) — **salvo dos que jueguen el MISMO puesto** (enrocar dos defensas no cambia nada: se prohíbe, pedido del PO); traer a alguien del banco es un cambio (verde, gasta 1 de 3). **Nada toca el partido hasta Confirmar**: los cambios se arman como plan y se aplican juntos; "Salir sin guardar" lo descarta. Las reubicaciones sí mutan `posJugada` en el momento (es lo que la cancha lee para previsualizar), por eso se guarda el estado previo y se restaura al cancelar. Al confirmar se aplican **primero los cambios y después las posiciones finales**: si el DT reubicó a alguien DESPUÉS de meterlo, `makeSub` le pondría el puesto del que salió y el plan quedaría pisado. |
 | `startMatch(oppId)` | Crea el `Match` y arranca el reloj. |
 | `renderMatchScreen()` | Estructura fija: marcador, controles, relato, alineaciones. |
 | `startTimer()` / `stopTimer()` / `togglePause()` | Control del reloj de ticks. |
@@ -446,4 +454,9 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
   libre por decisión del PO); sprites duplicados = advertencia.
 - **`discipline.test.js`** — 24 checks deterministas de amarillas acumuladas, suspensiones,
   limpiezas, lesiones y energía post-partido.
+- **`momentum.test.js`** — el Momento 1..7: mapa nivel→% con tope, asimetría (rival sin
+  campo = sin efecto), integración con ratings (ficha/naturalOverall/statPenalties) y las
+  reglas post-partido (banda 3..5 del resultado, señales individuales, decaimiento, clamps).
+- **`morale.test.js`** — la Moral 1..100: bandas, clamps, diario solo al cruzar de banda y
+  el cierre post-partido (base V/E/D, goles agónicos que deciden, extra de la tanda).
 - **`load-engine.js`** — loader compartido (import del motor real, sin eval).

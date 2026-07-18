@@ -48,6 +48,24 @@ export function numTag(p, extra = "") {
   return `<span class="text-[10px] font-black text-slate-300 bg-slate-700/80 rounded px-1 min-w-[1.3rem] inline-block text-center ${extra}">${p.num || "–"}</span>`;
 }
 
+/** Chip del Momento (game/momentum): 🔥 en racha (6-7), ❄️ congelado (1-2), "" en el resto. */
+export function momentoChip(p) {
+  if (p.momento === undefined) return "";
+  return p.momento >= 6 ? "🔥" : p.momento <= 2 ? "❄️" : "";
+}
+
+/**
+ * Flechas del Momento 1..7 para la ficha: ▲ verdes por paso sobre el neutro (4),
+ * ▼ celestes por paso bajo el neutro, — en el neutro.
+ */
+export function momentoArrows(p, size = "text-xs") {
+  const m = p.momento === undefined ? 4 : p.momento;
+  const n = m - 4;
+  const cls = n > 0 ? "text-emerald-400" : n < 0 ? "text-sky-400" : "text-slate-500";
+  const sym = n > 0 ? "▲".repeat(n) : n < 0 ? "▼".repeat(-n) : "—";
+  return `<span class="${cls} ${size} font-black leading-none">${sym}</span>`;
+}
+
 /** Notificación flotante que desaparece sola (~4s). */
 export function toast(msg) {
   const t = document.createElement("div");

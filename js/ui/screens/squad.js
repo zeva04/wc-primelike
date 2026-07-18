@@ -14,15 +14,16 @@
 import { getTeam } from "../../data/teams-repo.js";
 import {
   playerOverall, naturalOverall, overallAt, playerStars, teamRating, teamStars, lineupRating,
-  STAT_KEYS, GK_STAT_KEYS, playedPos, outOfPosPenalty, statPenalties,
+  STAT_KEYS, GK_STAT_KEYS, playedPos, posDistance, effectiveStat, outOfPosPenalty, statPenalties,
 } from "../../game/ratings.js";
+import { momentoPct } from "../../game/momentum.js";
 import {
   currentLineup, autoLineup, validateLineup, assignPositions, canPlayAt,
   formationSlots, FORMATIONS, getFormation, canUseFormation,
 } from "../../game/lineup.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, toast, modal, closeModal } from "../components.js";
+import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, momentoChip, momentoArrows, toast, modal, closeModal } from "../components.js";
 import { mountPitch, POS_NAME } from "../pitch.js";
 import { spriteSvg } from "../sprites.js";
 
@@ -114,7 +115,7 @@ function renderAll() {
     lineup: S.selectedLineup,
     bench: S.run.squad.filter(p => !S.selectedLineup.includes(p)),
     selected: selName,
-    badge: p => (p.amarillas > 0 ? " 🟨" : "") + (p.suspendido ? "🟥" : p.lesionadoPartidos > 0 ? "🚑" : ""),
+    badge: p => momentoChip(p) + (p.amarillas > 0 ? " 🟨" : "") + (p.suspendido ? "🟥" : p.lesionadoPartidos > 0 ? "🚑" : ""),
     muted: p => !isAvailable(p),
     draggable: isAvailable,
     canSwap: (a, b) => swapCandidates(a).includes(b) ? { tone: "sky" } : null,
@@ -225,6 +226,10 @@ function renderPlayerCard() {
         <span class="text-slate-400">Energía</span>
         <span class="flex items-center gap-1.5"><span class="w-16">${energyBar(p.energia)}</span><b class="w-8 text-right ${p.energia > 65 ? "text-emerald-400" : p.energia > 35 ? "text-amber-400" : "text-red-400"}">${p.energia}%</b></span>
       </div>
+      <div class="flex items-center justify-between gap-2" title="Forma del jugador (1-7, neutro 4): sube y baja con su rendimiento en los partidos y afecta sus stats">
+        <span class="text-slate-400">Momento ${momentoChip(p)}</span>
+        <span class="flex items-center gap-1.5">${momentoArrows(p)}<b class="text-right text-slate-300">${p.momento ?? 4}/7</b>${momentoPct(p) !== 0 ? `<span class="font-bold ${momentoPct(p) > 0 ? "text-emerald-400" : "text-sky-400"}">(${momentoPct(p) > 0 ? "+" : ""}${momentoPct(p)}% stats)</span>` : ""}</span>
+      </div>
       <div class="flex items-center justify-between gap-2"><span class="text-slate-400">Estado</span><span class="${st.cls} font-semibold text-right">${st.txt}</span></div>
       <div class="flex items-center justify-between gap-2"><span class="text-slate-400">Partidos</span><b>${p.partidos}</b></div>
       <div class="flex items-center justify-between gap-2"><span class="text-slate-400">Goles</span><b>${p.goles}</b></div>
@@ -241,7 +246,9 @@ function renderPlayerCard() {
 
 /** Explica el castigo por jugar fuera de puesto: cuánto pierde y por qué. */
 function outOfPosNote(p, bajas) {
-  const pasos = bajas[0] ? Math.abs(bajas[0].delta) / 6 : 0;
+  // Distancia real en la línea POR-DEF-MED-DEL: la baja mostrada puede venir
+  // levemente escalada por el Momento, así que no sirve para derivar los pasos.
+  const pasos = posDistance(p.pos, playedPos(p));
   return `<div class="mb-3 p-2 rounded-lg border border-orange-400/60 bg-orange-400/10">
     <div class="text-[11px] font-black text-orange-300 mb-1">❗ Jugando de ${POS_NAME[playedPos(p)].toLowerCase()}</div>
     <p class="text-[10px] text-slate-300 leading-snug">No es su puesto: ${POS_NAME[p.pos].toLowerCase()} está a ${pasos} ${pasos === 1 ? "línea" : "líneas"} de distancia.
@@ -250,9 +257,9 @@ function outOfPosNote(p, bajas) {
   </div>`;
 }
 
-/** Fila de una stat: si el jugador está fuera de puesto, muestra base → castigada. */
+/** Fila de una stat: el valor REAL del motor (con Momento); fuera de puesto muestra base → castigada. */
 function statRow(p, key, baja) {
-  const v = baja ? baja.real : p.stats[key];
+  const v = baja ? baja.real : effectiveStat(p, key);
   const color = v >= 75 ? "bg-emerald-500" : v >= 55 ? "bg-amber-500" : "bg-red-500";
   const txt = v >= 75 ? "text-emerald-400" : v >= 55 ? "text-amber-400" : "text-red-400";
   return `<div class="flex items-center gap-2 text-xs">

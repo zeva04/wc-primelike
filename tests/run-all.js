@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
-const FILES = ["teams.validate.js", "events.validate.js", "discipline.test.js", "lineup.test.js", "scouting.test.js", "smoke.js"];
+const FILES = ["teams.validate.js", "events.validate.js", "discipline.test.js", "lineup.test.js", "scouting.test.js", "momentum.test.js", "morale.test.js", "smoke.js"];
 
 let fails = 0;
 for (const f of FILES) {

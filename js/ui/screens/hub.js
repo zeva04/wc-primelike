@@ -13,6 +13,7 @@ import { applyDayAction, actionMult, multLabel, dayOpportunity } from "../../gam
 import { DAY_ACTIONS, TACTICS_BONUS, TRAIN_BUFF, TRAIN_FATIGUE } from "../../content/day-actions.js";
 import { RARITIES } from "../../content/rarities.js";
 import { addJournal } from "../../game/journal.js";
+import { moraleBand } from "../../game/morale.js";
 import { nextOpponentId, STAGE_LABEL } from "../../game/tournament/knockout.js";
 import { buildOpponentReport } from "../../game/scouting.js";
 import { EVENT_THEMES } from "../../content/themes.js";
@@ -96,6 +97,23 @@ function buffChips() {
     chips.push(`<span class="px-2 py-0.5 rounded-full border ${pos ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" : "border-red-500/50 bg-red-500/10 text-red-400"}">${LABELS[k]} ${pos ? "+" : ""}${v}</span>`);
   }
   return chips.length ? `<div class="flex flex-wrap gap-1.5 text-[10px] font-bold">${chips.join("")}</div>` : "";
+}
+
+/**
+ * Fila de la Moral del equipo (game/morale): banda anímica + barra 1..100, para
+ * embeber en el bloque de plantilla (decisión PO: va con el equipo, no en card aparte).
+ * v1 es termómetro narrativo — el efecto mecánico llegará en otra iteración.
+ */
+function moraleRow() {
+  const moral = S.run.moral ?? 50;
+  const b = moraleBand(moral);
+  const barColor = moral >= 61 ? "bg-emerald-500" : moral >= 41 ? "bg-amber-500" : "bg-red-500";
+  const txtColor = moral >= 61 ? "text-emerald-400" : moral >= 41 ? "text-slate-300" : "text-red-400";
+  return `<div class="mt-2.5 flex items-center gap-2 text-xs" title="Moral del equipo (reacciona a los resultados y a cómo se dan: goles agónicos, pasar de ronda…)">
+    <span class="text-slate-400 shrink-0">${b.icon} Moral</span>
+    <span class="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden"><span class="block h-full ${barColor} rounded-full transition-all" style="width:${moral}%"></span></span>
+    <b class="${txtColor} shrink-0">${b.label}</b>
+  </div>`;
 }
 
 /**
@@ -309,6 +327,7 @@ function renderHub() {
   const v = validateLineup(available, S.selectedLineup);
   const discipline = { susp: run.squad.filter(p => p.suspendido), aperc: run.squad.filter(p => p.amarillas > 0 && !p.suspendido) };
   const fueraDePuesto = S.selectedLineup.filter(p => outOfPosPenalty(p) > 0);
+  const forma = { racha: run.squad.filter(p => (p.momento ?? 4) >= 6), frios: run.squad.filter(p => (p.momento ?? 4) <= 2) };
 
   screenShell(`
     <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
@@ -362,10 +381,13 @@ function renderHub() {
             <span class="text-amber-300 font-black text-2xl">${teamRating(me)}</span>
           </div>
           <div class="mt-1">${starsHtml(teamStars(me))}</div>
+          ${moraleRow()}
           <div class="text-xs mt-2 ${!v.ok ? "text-amber-400" : v.short ? "text-orange-400" : "text-slate-400"}">${!v.ok ? `⚠️ ${v.msg}` : v.short ? `🆘 Plantel diezmado: presentas ${S.selectedLineup.length} — jugarás en inferioridad numérica` : `Formación ${getFormation(S.formation) ? S.formation : "improvisada"} · alineación lista`}</div>
           ${fueraDePuesto.length ? `<div class="text-xs text-orange-400 mt-1.5" title="Sus stats bajan mientras jueguen ahí">❗ Fuera de puesto: ${fueraDePuesto.map(p => `${p.name} (de ${p.posJugada})`).join(", ")}</div>` : ""}
           ${discipline.susp.length ? `<div class="text-xs text-red-400 mt-1.5">🟥 Suspendido${discipline.susp.length > 1 ? "s" : ""}: ${discipline.susp.map(p => p.name).join(", ")}</div>` : ""}
           ${discipline.aperc.length ? `<div class="text-xs text-yellow-400 mt-1.5" title="Con otra amarilla quedan suspendidos un partido">🟨 Apercibido${discipline.aperc.length > 1 ? "s" : ""}: ${discipline.aperc.map(p => p.name).join(", ")}</div>` : ""}
+          ${forma.racha.length ? `<div class="text-xs text-emerald-400 mt-1.5" title="Momento alto: sus stats rinden por encima">🔥 En racha: ${forma.racha.map(p => p.name).join(", ")}</div>` : ""}
+          ${forma.frios.length ? `<div class="text-xs text-sky-400 mt-1.5" title="Momento bajo: sus stats rinden por debajo">❄️ Fríos: ${forma.frios.map(p => p.name).join(", ")}</div>` : ""}
           <p class="text-xs tp-text font-semibold mt-2">Gestión de Plantilla →</p>
         </button>
         <button id="btn-journal" class="w-full text-left bg-slate-800/60 border border-slate-700 hover:border-[var(--team-primary)] rounded-2xl p-4 cursor-pointer transition-all hover:scale-[1.01]">

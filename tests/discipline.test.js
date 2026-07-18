@@ -16,10 +16,17 @@ function t(cond, msg) {
   if (!cond) { fails++; console.error("  ❌", msg); }
 }
 
-/** Run nueva + partido falso donde jugaron los primeros 6 del plantel. */
+/** Run nueva + partido falso donde jugaron los primeros 6 del plantel.
+    El 0-0 neutro incluye lo que leen momentum/morale en el cierre sin mover la moral. */
 function setup() {
   const run = E.newRun("ARG");
-  const match = { my: { lineup: run.squad.slice(0, 6) } };
+  const match = {
+    my: { lineup: run.squad.slice(0, 6) },
+    oppTeam: { name: "Rival de Prueba" },
+    gMy: 0, gOpp: 0,
+    scorers: [], oppGoalMins: [], pensFallados: [], pensAtajadosPor: [],
+    result: () => ({ winner: null, gMy: 0, gOpp: 0, pens: null }),
+  };
   return { run, match, j: (p) => run.journal.filter(e => e.title.includes(p)) };
 }
 

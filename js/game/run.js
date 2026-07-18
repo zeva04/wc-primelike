@@ -43,6 +43,7 @@ export function newRun(myTeamId) {
     stats: { ...p.stats },
     look: p.look, // apariencia del sprite (el bug de "todos iguales" era esta copia perdida)
     energia: 100,
+    momento: 4,               // Momento 1..7, nace neutro (escribe game/momentum)
     amarillas: 0, suspendido: false, lesionadoPartidos: 0,
     goles: 0, partidos: 0,
   }));
@@ -69,6 +70,7 @@ export function newRun(myTeamId) {
     lastAction: null,          // {day, icon, title} de la última acción (escribe day-action)
     dayMod: null,              // modificador de las acciones de HOY: {icon,title,desc,mods} (escribe calendar)
     dayOpp: null,              // Oportunidad viva HOY: {id} o null (escribe calendar; day-action la consume)
+    moral: 50,                 // Moral del equipo 1..100 (escribe game/morale; content/ la muta con clamp)
     stats: { pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, tarjetas: 0, eventos: 0, penalesAtajados: 0, oppOfrecidas: 0, oppAprovechadas: 0 },
     champion: false,
     journal: [],               // Diario de Campaña: la memoria narrativa de la run

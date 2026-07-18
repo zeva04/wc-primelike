@@ -55,6 +55,10 @@ export class Match {
     this.pens = null;
     this.stats = { misTiros: 0, oppTiros: 0, decisiones: 0, penalesAtajados: 0 };
     this.scorers = [];
+    // Señales por protagonista para el cierre post-partido (momentum/morale):
+    this.oppGoalMins = [];     // minutos de los goles rivales (¿nos empataron al final?)
+    this.pensFallados = [];    // nombres míos que fallaron un penal (en juego o tanda)
+    this.pensAtajadosPor = []; // nombre de MI arquero por cada penal que atajó
     this._interactiveChanceCooldown = 0;
   }
 
@@ -105,6 +109,11 @@ export class Match {
     if (this.min === 45) { this.log("info", "⏸️ Entretiempo. Ajusta tu equipo si quieres."); return "halftime"; }
     if (this.phase === "extra" && this.min === 105) { this.log("info", "⏸️ Fin del primer tiempo extra."); return "halftime"; }
 
+    // [MORAL → OCASIONES] PRÓXIMA ITERACIÓN (decisión PO 17-jul-2026): la Moral del
+    // equipo (run.moral, game/morale.js) modulará AQUÍ el tipo y número de ocasiones
+    // propias — p. ej. escalar la probabilidad de abajo según la banda anímica, o sesgar
+    // el mix de jugadas. Requiere pasar la moral por el contexto `my` (el Match no
+    // conoce la run). v1: sin efecto mecánico.
     // ¿Ocasión mía? (leve ventaja al DT humano: sus decisiones deben poder torcer partidos)
     const ratioMy = mine.atk / (mine.atk + opp.def);
     if (rnd() < 0.12 + 0.22 * ratioMy) return this._myChance(opp);

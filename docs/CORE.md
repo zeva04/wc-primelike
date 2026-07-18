@@ -97,10 +97,52 @@ castigo_por_stat = 6 × distancia        // escala 1–99, piso en 1
 > delantero no tiene `atajadas` ni un arquero tiene `defensa`, así que cruzarlos no sería
 > un castigo sino una división por la nada. Lo impone `lineup.canPlayAt`.
 
-> **Ojo al ordenar el plantel**: `playerOverall` es la nota de HOY (donde esté parado), y
-> `naturalOverall` la de su puesto. `autoLineup` debe usar la segunda: con la primera, al
-> crack que venías usando fuera de puesto lo compara castigado contra suplentes intactos
-> y lo manda al banco.
+> **Ojo al ordenar el plantel**: `playerOverall` es la nota de HOY (donde esté parado y
+> con su Momento, §2c), y `naturalOverall` la de su puesto SIN el Momento — talento, no
+> circunstancia. `autoLineup` debe usar la segunda: con la primera, al crack que venías
+> usando fuera de puesto lo compara castigado contra suplentes intactos y lo manda al
+> banco (y además el once automático perseguiría al que está en racha).
+
+---
+
+## 2c. El Momento del jugador (`game/momentum.js`)
+
+La mitad **dinámica** de la progresión (Bible cap. 6): una stat temporal **1..7 por
+jugador** (nace en 4 = neutro) que refleja su forma actual. Visible como flechas ▲/▼ en
+la ficha y chips 🔥 (6-7) / ❄️ (1-2) en cancha, hub y panel del partido.
+
+**Efecto mecánico** (decisión PO 17-jul-2026):
+
+```
+pct = clamp((momento − 4) × 2, −4, +4)      // % sobre TODAS las stats (aura incluida)
+stat_final = round(stat_castigada × (1 + pct/100))
+```
+
+- **±2% por paso, tope ±4%**: los niveles 1 y 7 rinden igual que 2 y 6 — son estados
+  narrativos más profundos, no más poder.
+- Entra por `ratings.statAt`, la fuente única: la ficha, la cancha y el partido ven el
+  mismo número. Un jugador SIN el campo `momento` (todos los rivales) multiplica por 1:
+  **la asimetría vive en los datos, no en caminos de código separados**.
+- **Excepciones (recortes de balance, medidos el 17-jul-2026)**: la definición de
+  **penales y tandas** va sin el %, y `naturalOverall` (el orden de `autoLineup`) lo
+  ignora. Con el efecto pleno BRA derivaba **+5.0pp** de campeón; con la banda 3..5 de
+  abajo quedó en +2.1pp; con estos dos recortes, **+1.4pp residual** (n=8000 vs HEAD
+  n=4000) — dentro del gate de ±2pp. Precedente FEAT-003: si vuelve a derivar, se
+  recorta más (el siguiente dial es el % por paso), no se relaja el gate.
+
+**Cómo se mueve** (en `postMatchUpdate`, jugador por jugador, suma acotada a ±2):
+
+| Señal | Efecto |
+|---|---|
+| Resultado del equipo | acerca y **sostiene** la forma solo en la banda **3..5**: victoria empuja/sostiene hasta 5, derrota hasta 3, empate no mueve |
+| Gol propio | +1 por gol (máx +2) |
+| Penal fallado (juego o tanda) | −1 por fallo |
+| Arquero: valla invicta / 3+ goles / penal atajado | +1 / −1 / +1 |
+| Sin señal neta o sin jugar | **decae 1 paso hacia el neutro (4)** |
+
+Los extremos 6-7 y 1-2 **solo se alcanzan y sostienen con actuaciones individuales**: la
+regla original (victoria = +1 plano para todo el que jugaba) plantaba al equipo entero en
+6-7 durante una racha y fue el origen del +5pp.
 
 ---
 
@@ -416,6 +458,30 @@ en el torneo** (`p.amarillas`, en `postMatchUpdate`). Las reglas:
 
 Medido en smoke (400 runs, decisiones al azar): ~0.03 suspensiones por acumulación y
 ~0.08 por roja por run. La acumulación es rara — es el techo de drama, no rutina.
+
+### Moral del equipo (`run.moral`, `game/morale.js`)
+
+Estado anímico **colectivo 1..100** (nace en 50), con 5 bandas: Por el suelo (1-20),
+Baja (21-40), Estable (41-60), Alta (61-80), Por las nubes (81-100). Reacciona a los
+resultados y a **cómo** se dan (en `postMatchUpdate` + `advanceStage`):
+
+| Qué pasó | Δ moral |
+|---|---|
+| Victoria / derrota / empate | +10 / −10 / 0 |
+| Gol agónico (≥85') que decide: triunfo por la mínima / nos ganan al final | +5 / −5 |
+| Empatarlo al final / que te lo empaten al final | +4 / −4 |
+| Ganar / perder la tanda de penales (extra) | +3 / −3 |
+| Pasar de ronda (clasificar de grupos o avanzar en KO) | +5 |
+
+Visible en el hub (card con banda y barra) y en el Daily cuando es noticia (por las
+nubes, baja o por el suelo). Cruzar de banda escribe en el Diario de Campaña; moverse
+dentro de una banda es silencioso. Los eventos de `content/` pueden mutarla directo
+(`r.moral = clamp(...)`, p. ej. `pais_ilusionado` +8, `critica_demoledora` −8).
+
+> **v1 sin efecto mecánico** (decisión PO 17-jul-2026). La próxima iteración hará que la
+> moral module el **tipo y número de ocasiones** que el equipo genera en el partido — el
+> hook está comentado en `Match.tick` (`[MORAL → OCASIONES]`); requerirá pasar la moral
+> por `matchCtx` porque el motor del partido no conoce la run.
 
 ### Diario de Campaña (`run.journal`)
 

@@ -7,6 +7,7 @@
 import { rnd, pick } from "../../core/rng.js";
 import { clamp } from "../../core/math.js";
 import { teamRating, currentAura, playedPos } from "../ratings.js";
+import { momentoMult } from "../momentum.js";
 import { effStat } from "./powers.js";
 
 /** Ocasión de mi equipo: puede ser penal, decisión interactiva (55%) o remate automático. */
@@ -90,10 +91,16 @@ export function myPenalty(m) {
 export function resolvePenaltyMine(m, name) {
   const p = m.my.lineup.find(x => x.name === name);
   m.decision = null;
-  const q = (effStat(p, "tiro", m.my.buffs) + effStat(p, "aura", m.my.buffs)) / 2;
+  // RECORTE DE BALANCE (17-jul-2026): la definición de penales NO lleva el % del Momento
+  // (÷ momentoMult lo neutraliza). Fue la "primera línea de recorte" pactada al aprobar
+  // la feature: con el efecto pleno, BRA derivaba ~+2pp en el smoke (precedente FEAT-003).
+  const q = (effStat(p, "tiro", m.my.buffs) + effStat(p, "aura", m.my.buffs)) / 2 / momentoMult(p);
   const prob = clamp(0.52 + q * 0.07 + (m.my.buffs.penales || 0), 0.5, 0.93);
   if (rnd() < prob) goalMine(m, p, "¡PENAL CONVERTIDO con sangre fría!");
-  else m.log("chance", `min ${m.min}' — ${p.name} patea el penal... ${pick(["¡EL ARQUERO LO ATAJA!", "¡LO TIRA AFUERA! Increíble.", "¡AL PALO!"])}`);
+  else {
+    m.pensFallados.push(p.name); // señal para el momento post-partido
+    m.log("chance", `min ${m.min}' — ${p.name} patea el penal... ${pick(["¡EL ARQUERO LO ATAJA!", "¡LO TIRA AFUERA! Increíble.", "¡AL PALO!"])}`);
+  }
   return false;
 }
 
@@ -132,12 +139,13 @@ export function resolvePenaltyOpp(m, key) {
   const { mine } = m.powers();
   const shooterDir = pick(["izq", "centro", "der"]);
   const por = mine.por;
-  // En penales mandan los reflejos y el aura del arquero
-  const porQ = por ? effStat(por, "reflejos", m.my.buffs) * 0.6 + effStat(por, "aura", m.my.buffs) * 0.4 : 1;
+  // En penales mandan los reflejos y el aura del arquero (sin Momento: recorte de balance, ver resolvePenaltyMine)
+  const porQ = por ? (effStat(por, "reflejos", m.my.buffs) * 0.6 + effStat(por, "aura", m.my.buffs) * 0.4) / momentoMult(por) : 1;
   if (key === shooterDir) {
     const pSave = clamp(0.35 + porQ * 0.09, 0.35, 0.85);
     if (rnd() < pSave) {
       m.stats.penalesAtajados++;
+      if (por) m.pensAtajadosPor.push(por.name); // señal para el momento post-partido
       m.log("event", `min ${m.min}' — ¡¡ATAJADO!! ${por ? por.name : "Tu arquero"} adivinó el lado. ¡HÉROE!`);
       return false;
     }
@@ -147,6 +155,7 @@ export function resolvePenaltyOpp(m, key) {
     m.log("goal_opp", `min ${m.min}' — ${d.shooter.name} la puso al otro lado. Gol de ${m.oppTeam.name}.`);
   }
   m.gOpp++;
+  m.oppGoalMins.push(m.min);
   return false;
 }
 
@@ -174,10 +183,12 @@ export function goalMine(m, p, flavor) {
 /** Anota gol rival (el VAR te salva el 10%×35% de las veces). */
 export function goalOpp(m, p) {
   m.gOpp++;
+  m.oppGoalMins.push(m.min);
   if (rnd() < 0.10) {
     m.log("event", `min ${m.min}' — Gol de ${m.oppTeam.name}... ¡VAR en revisión!`);
     if (rnd() < 0.35) {
       m.gOpp--;
+      m.oppGoalMins.pop();
       m.log("event", `✅ ¡ANULADO! El VAR te salva. Sigue ${m.gMy}-${m.gOpp}.`);
       return;
     }

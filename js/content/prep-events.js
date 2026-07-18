@@ -1,5 +1,5 @@
 /* ============================================================
-   content/prep-events — los 30 eventos inevitables del calendario
+   content/prep-events — los 33 eventos inevitables del calendario
    (Game Vision: "Eventos" = cambios del mundo que no se deciden).
 
    Cada día sin partido trae uno (o un conflicto, ver calendar.js),
@@ -86,6 +86,20 @@ export const PREP_EVENTS = [
     teaser: "Se escuchan bombos a lo lejos: la hinchada anda cerca del hotel.",          effect: r => buff(r, "aura", 8) },
   { id: "viaje_pesado",rareza: "infrecuente", tema: "fisico",        icon: "✈️", title: "Viaje pesado",             tipo: "debuff", desc: "−12 de energía para todo el plantel.",
     teaser: "Toca micro y avión: día de traslado a la próxima sede.",                    effect: r => energia(r, -12) },
+  // Interactúan con Forma y Ánimo (sprint 17-jul): content/ muta run con primitivas + clamp, sin importar game/ (ARQUITECTURA §4)
+  { id: "psicologo_deportivo", rareza: "infrecuente", tema: "vestuario", icon: "🧠", title: "Sesión con el psicólogo deportivo", tipo: "buff",
+    desc: "El jugador más golpeado anímicamente recupera la confianza.",
+    teaser: "Un especialista llegó a la concentración con una libreta bajo el brazo.",
+    effect: r => {
+      const peor = r.squad.reduce((a, b) => ((b.momento ?? 4) < (a.momento ?? 4) ? b : a));
+      if ((peor.momento ?? 4) >= 4) return "La charla fue pura prevención: el grupo está bien de la cabeza.";
+      peor.momento = 4;
+      return `${peor.name} salió de la sesión con otra cara: recupera la confianza (Momento al neutro).`;
+    } },
+  { id: "pais_ilusionado", rareza: "infrecuente", tema: "entorno", icon: "🇺🇳", title: "El país se ilusiona", tipo: "buff",
+    desc: "+8 de Moral: el aliento se siente desde casa.",
+    teaser: "Las calles amanecieron pintadas con los colores de la selección.",
+    effect: r => { r.moral = clamp((r.moral ?? 50) + 8, 1, 100); } },
 
   // ---------- RARAS (±10-12, combos o golpes al plantel) ----------
   { id: "masajista",     rareza: "rara", tema: "fisico",        icon: "🙌", title: "Fisios de élite",            tipo: "buff",   desc: "+25 de energía para todo el plantel.",
@@ -102,6 +116,16 @@ export const PREP_EVENTS = [
     desc: "−15 de energía para todo el plantel, y hoy Recuperar rinde la mitad.",
     teaser: "El termómetro amenaza con romper récords hoy.",
     mod: { mods: { recuperar: 0.5 }, desc: "Recuperar rinde la mitad hoy" }, effect: r => energia(r, -15) },
+  { id: "critica_demoledora", rareza: "rara", tema: "entorno", icon: "🗞️", title: "Crítica demoledora", tipo: "debuff",
+    desc: "−8 de Moral, y la presión alcanza a tu figura del momento.",
+    teaser: "Una pluma famosa prepara una columna venenosa sobre el equipo.",
+    effect: r => {
+      r.moral = clamp((r.moral ?? 50) - 8, 1, 100);
+      const figura = r.squad.reduce((a, b) => ((b.momento ?? 4) > (a.momento ?? 4) ? b : a));
+      if ((figura.momento ?? 4) <= 4) return "El vestuario acusa el golpe: −8 de Moral.";
+      figura.momento -= 1;
+      return `La columna apunta directo a ${figura.name} y la presión le pasa factura: −8 de Moral y su Momento cae.`;
+    } },
   { id: "golpe_practica", rareza: "rara", tema: "entrenamiento", icon: "🚑", title: "Golpe en la práctica", tipo: "debuff",
     desc: "Un jugador queda descartado para el próximo partido.",
     teaser: "Los médicos miran con preocupación la intensidad de la práctica.",
