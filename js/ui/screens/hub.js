@@ -106,24 +106,6 @@ function buffChips() {
   return chips.length ? `<div class="flex flex-wrap gap-1.5 text-[10px] font-bold">${chips.join("")}</div>` : "";
 }
 
-/**
- * Tarjeta de efectos: card completa cuando hay chips que mostrar; cuando no hay
- * nada, una sola línea discreta (una card entera diciendo "no hay nada" era un
- * bloque que solo ocupaba espacio).
- */
-function effectsCard() {
-  const chips = buffChips();
-  if (!chips) {
-    return `<div class="border border-slate-700/70 bg-slate-800/40 rounded-2xl px-4 py-2.5 text-xs text-slate-500">
-      ✨ Sin efectos para el próximo partido — los días del calendario los irán sumando.
-    </div>`;
-  }
-  return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-    <h3 class="font-bold text-sm mb-2">✨ Efectos para el próximo partido</h3>
-    ${chips}
-  </div>`;
-}
-
 // Colores del nivel de amenaza del informe: Alto = peligro, Bajo = ventaja tuya
 const NIVEL_CHIP = {
   Alto: "border-red-500/60 bg-red-500/10 text-red-400",
@@ -185,18 +167,28 @@ function showScoutReport(oppId) {
  * Card de la Oportunidad del día (Bible §4.5): la oferta única que compite con
  * las acciones normales. Borde y badge de su rareza; el calendario nunca la
  * anticipó y mañana no va a estar — la card lo dice. "" si hoy no hay.
+ * `state`: "active" (elegible) · "chosen" (fue la acción de hoy) · "muted"
+ * (elegiste otra). La card se queda visible en los tres casos para que el
+ * panel no cambie de tamaño (evita huecos al elegir).
  */
-function oppCard() {
+function oppCard(state = "active") {
   const o = dayOpportunity(S.run);
   if (!o) return "";
   const rar = RARITIES[o.rareza];
-  return `<button id="da-opp" class="w-full text-left rounded-xl border-2 ${rar.border} bg-slate-900/60 p-3 mb-2 transition-all hover:scale-[1.01] hover:brightness-110 cursor-pointer">
+  const chosen = state === "chosen", muted = state === "muted";
+  const box = chosen ? `${rar.border} ring-2 ring-emerald-400/50 bg-slate-900/70`
+    : muted ? "border-slate-700 bg-slate-900/40 opacity-40 cursor-not-allowed"
+    : `${rar.border} bg-slate-900/60 hover:scale-[1.01] hover:brightness-110 cursor-pointer`;
+  const foot = chosen ? `<div class="text-[9px] text-emerald-400 font-bold mt-1">✓ Aprovechada hoy — ocupó tu Acción del Día</div>`
+    : muted ? `<div class="text-[9px] text-slate-500 mt-1">Hoy elegiste otra acción</div>`
+    : `<div class="text-[9px] ${rar.color} font-bold mt-1">⏳ Solo por hoy — ocupa tu Acción del Día${o.choose ? " · tú eliges al protagonista" : ""}</div>`;
+  return `<button id="da-opp" ${state === "active" ? "" : "disabled"} class="w-full text-left rounded-xl border-2 ${box} p-3 mb-2 transition-all">
     <div class="flex items-center justify-between gap-2 flex-wrap">
       <span class="font-semibold text-sm">${o.icon} ${o.title}</span>
       <span class="px-2 py-0.5 rounded-full border ${rar.border} ${rar.color} text-[9px] font-black uppercase tracking-widest">Oportunidad · ${rar.label}</span>
     </div>
     <div class="text-[10px] text-slate-400 mt-0.5">${o.desc}</div>
-    <div class="text-[9px] ${rar.color} font-bold mt-1">⏳ Solo por hoy — ocupa tu Acción del Día${o.choose ? " · tú eliges al protagonista" : ""}</div>
+    ${foot}
   </button>`;
 }
 
@@ -242,21 +234,16 @@ function showOppChooser(o) {
  * Panel de la Acción del Día (Bible §4.7): un día sin partido = una inversión.
  * La Oportunidad del día (si hay) va arriba, tentando; Entrenar agrupa sus
  * focos en una fila de botones; las demás acciones son una tarjeta-botón cada
- * una. Cuando la acción ya se eligió, una línea de confirmación reemplaza al
- * panel y se desbloquea "Pasar al día siguiente".
+ * una. Una vez elegida la acción, el panel NO desaparece: se queda con la
+ * elegida resaltada (✓ Elegida hoy) y las demás en gris, no clickeables. Así
+ * el bloque no cambia de tamaño (no deja huecos) y queda claro qué decidiste.
  */
 function actionCard() {
   const run = S.run;
-  const oppNextId = nextOpponentId(run);
-  const opp = oppNextId ? getTeam(oppNextId) : null;
-  if (!run.actionPending) {
-    const done = run.lastAction && run.lastAction.day === run.day;
-    return done
-      ? `<div class="border border-slate-700/70 bg-slate-800/40 rounded-2xl px-4 py-2.5 text-xs text-slate-400">
-          Acción de hoy: <b class="text-slate-200">${run.lastAction.icon} ${run.lastAction.title}</b> ✓
-        </div>`
-      : "";
-  }
+  const opp = nextOpponentId(run) ? getTeam(nextOpponentId(run)) : null;
+  const chosen = !run.actionPending && run.lastAction?.day === run.day; // ya se eligió hoy
+  const chosenId = chosen ? run.lastAction.id : null;
+  const chosenGroup = chosen ? run.lastAction.group : null;
   const training = DAY_ACTIONS.filter(a => a.group === "entrenar");
   const rest = DAY_ACTIONS.filter(a => !a.group);
   // Badge del modificador del día sobre una acción: bloqueada / ×2 / ×½
@@ -265,30 +252,53 @@ function actionCard() {
     : m !== 1
       ? `<span class="text-[9px] font-black ${m > 1 ? "text-emerald-400" : "text-orange-400"}">${multLabel(m)} hoy</span>`
       : "";
+  const chosenBadge = `<span class="text-[9px] font-black text-emerald-400 uppercase">✓ Elegida hoy</span>`;
+  // Estado de una acción individual: chosen (la de hoy) · muted (descartada) · active.
+  const stOf = id => !chosen ? "active" : (id === chosenId ? "chosen" : "muted");
   const tMult = actionMult(run, training[0]);
-  return `<div class="bg-slate-800/60 border tp-border rounded-2xl p-4">
-    <h3 class="font-bold">🧭 Acción del día</h3>
-    <p class="text-[10px] text-slate-500 mt-0.5 mb-3">Un día, una inversión: lo que elijas hoy es lo que NO harás. Revisa plantilla y rival antes de decidir.</p>
+  const trainState = !chosen ? "active" : (chosenGroup === "entrenar" ? "chosen" : "muted");
+  return `<div class="bg-slate-800/60 border tp-border rounded-2xl p-4 flex-1 flex flex-col">
+    <h3 class="font-bold shrink-0">🧭 ${chosen ? "Tu acción de hoy" : "Acción del día"}</h3>
+    <p class="text-[10px] text-slate-500 mt-0.5 mb-3">${chosen
+      ? "Ya está decidido: el resto queda para otro día. Pasa al día siguiente cuando estés listo."
+      : "Un día, una inversión: lo que elijas hoy es lo que NO harás. Revisa plantilla y rival antes de decidir."}</p>
     ${run.dayMod ? `<div class="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-300 mb-3">${run.dayMod.icon} ${run.dayMod.title}: ${run.dayMod.desc}.</div>` : ""}
-    ${oppCard()}
-    <div class="rounded-xl border border-slate-700 bg-slate-900/50 p-3 mb-2 ${tMult === 0 ? "opacity-50" : ""}">
+    ${oppCard(stOf(dayOpportunity(run)?.id))}
+    <div class="rounded-xl border p-3 mb-2 transition-all ${
+      trainState === "chosen" ? "tp-border ring-2 ring-emerald-400/40 bg-slate-800/80"
+      : trainState === "muted" ? "border-slate-700 bg-slate-900/40 opacity-40"
+      : `border-slate-700 bg-slate-900/50 ${tMult === 0 ? "opacity-50" : ""}`}">
       <div class="flex items-center justify-between">
         <span class="font-semibold text-sm">🏋️ Entrenar</span>
-        ${modBadge(tMult) || `<span class="text-[10px] font-bold text-red-400/90">cansa al plantel</span>`}
+        ${trainState === "chosen" ? chosenBadge : trainState === "muted" ? "" : (modBadge(tMult) || `<span class="text-[10px] font-bold text-red-400/90">cansa al plantel</span>`)}
       </div>
       <p class="text-[10px] text-slate-500 mt-0.5 mb-2">+${TRAIN_BUFF} a la stat del foco elegido hasta el próximo partido · −${TRAIN_FATIGUE} de energía al plantel.</p>
       <div class="grid grid-cols-3 gap-2">
-        ${training.map(a => `<button data-action="${a.id}" ${tMult === 0 ? "disabled" : ""} class="da-opt px-2 py-2 rounded-lg border border-slate-600 bg-slate-700/60 text-xs font-semibold transition-all ${tMult === 0 ? "cursor-not-allowed text-slate-500" : "hover:border-amber-400 hover:bg-slate-700 cursor-pointer"}" title="${a.desc}">${a.icon} ${a.label}</button>`).join("")}
+        ${training.map(a => {
+          const foco = chosen && a.id === chosenId;
+          const active = !chosen && tMult !== 0;
+          return `<button data-action="${a.id}" ${active ? "" : "disabled"} class="${active ? "da-opt " : ""}px-2 py-2 rounded-lg border text-xs font-semibold transition-all ${
+            foco ? "tp-border tp-text bg-slate-700"
+            : chosen ? "border-slate-700 text-slate-500 opacity-60 cursor-not-allowed"
+            : tMult === 0 ? "border-slate-700 text-slate-500 cursor-not-allowed"
+            : "border-slate-600 bg-slate-700/60 hover:border-amber-400 hover:bg-slate-700 cursor-pointer"}" title="${a.desc}">${a.icon} ${a.label}${foco ? " ✓" : ""}</button>`;
+        }).join("")}
       </div>
     </div>
     ${rest.map(a => {
       const m = actionMult(run, a);
+      const st = stOf(a.id);
+      const active = st === "active" && m !== 0;
       // La Sesión Táctica se prepara contra ALGUIEN: el informe del rival (card VS) es su insumo
       const desc = a.id === "tactica" && opp ? `Preparar el partido vs ${opp.name}: el equipo llega mejor plantado (bonus de ataque y defensa)` : a.desc;
-      return `<button data-action="${a.id}" ${m === 0 ? "disabled" : ""} class="da-opt w-full text-left rounded-xl border border-slate-700 bg-slate-900/50 p-3 mb-2 transition-all ${m === 0 ? "opacity-50 cursor-not-allowed" : "hover:border-amber-400 hover:bg-slate-800 cursor-pointer"}">
+      return `<button data-action="${a.id}" ${active ? "" : "disabled"} class="${active ? "da-opt " : ""}w-full text-left rounded-xl border p-3 mb-2 transition-all ${
+        st === "chosen" ? "tp-border ring-2 ring-emerald-400/40 bg-slate-800/80"
+        : st === "muted" ? "border-slate-700 bg-slate-900/40 opacity-40 cursor-not-allowed"
+        : m === 0 ? "border-slate-700 bg-slate-900/50 opacity-50 cursor-not-allowed"
+        : "border-slate-700 bg-slate-900/50 hover:border-amber-400 hover:bg-slate-800 cursor-pointer"}">
         <div class="flex items-center justify-between">
           <span class="font-semibold text-sm">${a.icon} ${a.title}</span>
-          ${modBadge(m)}
+          ${st === "chosen" ? chosenBadge : st === "muted" ? "" : modBadge(m)}
         </div>
         <div class="text-[10px] text-slate-500 mt-0.5">${desc}.</div>
       </button>`;
@@ -309,9 +319,12 @@ function stateChip(icon, label, value, cls) {
 
 /**
  * Columna izquierda "Estado del equipo": formación, la cancha con el once (solo
- * lectura, clic → Gestión de Plantilla), chips de Moral y Energía, los avisos que
- * importan (alineación inválida, fuera de puesto, sanciones, forma) y el botón a
- * Gestión de Plantilla. La cancha la monta renderHub tras pintar (necesita el DOM).
+ * lectura, clic → Gestión de Plantilla), chips de Moral y Energía, los efectos para
+ * el próximo partido, los avisos que importan (alineación inválida, fuera de puesto,
+ * sanciones, forma) y el botón a Gestión de Plantilla. La card llena su columna
+ * (`h-full flex flex-col`) y la cancha absorbe el alto sobrante (`flex-1`) — así el
+ * arquero se ve completo y la columna nunca deja hueco. La cancha la monta renderHub
+ * tras pintar (necesita el DOM).
  */
 function teamStateCard(v, discipline, fueraDePuesto, forma) {
   const run = S.run;
@@ -321,6 +334,7 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
   const avgEnergy = Math.round(run.squad.reduce((s, p) => s + p.energia, 0) / run.squad.length);
   const enCls = avgEnergy > 65 ? "text-emerald-400" : avgEnergy > 35 ? "text-amber-400" : "text-red-400";
   const formationLabel = getFormation(S.formation) ? S.formation : "Improvisada";
+  const chips = buffChips();
   const avisos = [];
   if (!v.ok) avisos.push(`<div class="text-amber-400">⚠️ ${v.msg}</div>`);
   else if (v.short) avisos.push(`<div class="text-orange-400">🆘 Plantel diezmado: presentas ${S.selectedLineup.length} — jugarás en inferioridad</div>`);
@@ -329,18 +343,22 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
   if (discipline.aperc.length) avisos.push(`<div class="text-yellow-400" title="Con otra amarilla se pierde un partido">🟨 Apercibido${discipline.aperc.length > 1 ? "s" : ""}: ${discipline.aperc.map(p => p.name).join(", ")}</div>`);
   if (forma.racha.length) avisos.push(`<div class="text-emerald-400" title="Momento alto: rinden por encima">🔥 En racha: ${forma.racha.map(p => p.name).join(", ")}</div>`);
   if (forma.frios.length) avisos.push(`<div class="text-sky-400" title="Momento bajo: rinden por debajo">❄️ Fríos: ${forma.frios.map(p => p.name).join(", ")}</div>`);
-  return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-    <div class="flex items-center justify-between mb-2.5">
+  return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 h-full flex flex-col">
+    <div class="flex items-center justify-between mb-2.5 shrink-0">
       <h3 class="font-bold text-sm">👕 Estado del equipo</h3>
       <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Formación <b class="tp-text">${formationLabel}</b></span>
     </div>
-    <div id="hub-pitch" class="pitch relative w-full h-56 rounded-xl overflow-hidden border-2 border-slate-900 mb-3 cursor-pointer" title="Ir a Gestión de Plantilla"></div>
-    <div class="flex gap-2 mb-3">
+    <div id="hub-pitch" class="pitch relative w-full flex-1 min-h-[22rem] rounded-xl overflow-hidden border-2 border-slate-900 mb-3 cursor-pointer" title="Ir a Gestión de Plantilla"></div>
+    <div class="flex gap-2 mb-3 shrink-0">
       ${stateChip(mb.icon, "Moral", mb.label, moralCls)}
       ${stateChip("⚡", "Energía", avgEnergy + "%", enCls)}
     </div>
-    ${avisos.length ? `<div class="space-y-1 text-xs mb-3">${avisos.join("")}</div>` : ""}
-    <button id="btn-squad" class="w-full text-sm font-bold py-2.5 rounded-lg tp-gradient cursor-pointer hover:brightness-110 transition-all">📋 Gestión de Plantilla →</button>
+    <div class="mb-3 shrink-0">
+      <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">✨ Efectos próximo partido</div>
+      ${chips || `<div class="text-[10px] text-slate-500">Sin efectos aún — los días del calendario los irán sumando.</div>`}
+    </div>
+    ${avisos.length ? `<div class="space-y-1 text-xs mb-3 shrink-0">${avisos.join("")}</div>` : ""}
+    <button id="btn-squad" class="w-full text-sm font-bold py-2.5 rounded-lg tp-gradient cursor-pointer hover:brightness-110 transition-all shrink-0">📋 Gestión de Plantilla →</button>
   </div>`;
 }
 
@@ -406,29 +424,30 @@ function renderHub() {
       <p class="text-[10px] tp-text font-semibold text-right mt-2">📋 Informe del rival →</p>
     </div>
 
-    <div class="grid lg:grid-cols-[19rem_minmax(0,1fr)_20rem] gap-5 items-start">
-      <!-- IZQUIERDA: estado del equipo -->
+    <!-- Cuerpo en 3 columnas de IGUAL alto (items-stretch): en cada columna un bloque
+         crece (flex-1) para llenar y no dejar hueco — la cancha (izq), la acción del
+         día (centro) y la tabla de goleadores (der). -->
+    <div class="grid lg:grid-cols-[20rem_minmax(0,1fr)_20rem] gap-5 items-stretch">
+      <!-- IZQUIERDA: estado del equipo (la card ya llena su columna) -->
       ${teamStateCard(v, discipline, fueraDePuesto, forma)}
 
-      <!-- CENTRO: ¿qué harás hoy? + efectos -->
-      <div class="space-y-5 min-w-0">
+      <!-- CENTRO: la acción del día llena la columna -->
+      <div class="flex flex-col min-w-0">
         ${isMatchDay
-          ? `<div class="bg-slate-800/60 border tp-border rounded-2xl p-5 text-center">
+          ? `<div class="bg-slate-800/60 border tp-border rounded-2xl p-5 text-center flex-1 flex flex-col justify-center">
               <div class="text-4xl mb-2">⚽</div>
               <h3 class="text-xl font-black">¡Hoy se juega!</h3>
               <p class="text-sm text-slate-400 mt-1">${me.name} enfrenta a ${opp.name}. Revisa tu plantilla y cuando estés listo, salta a la cancha.</p>
             </div>`
           : actionCard()}
-        ${effectsCard()}
       </div>
 
-      <!-- DERECHA: grupo + goleadores -->
-      <div class="space-y-5">
-        <div id="btn-standings2" class="cursor-pointer transition-transform hover:scale-[1.01]" title="Ver el estado de todos los grupos">
+      <!-- DERECHA: grupo (fijo) + goleadores (llena el resto) -->
+      <div class="flex flex-col gap-5">
+        <div id="btn-standings2" class="cursor-pointer transition-transform hover:scale-[1.01] shrink-0" title="Ver el estado de todos los grupos">
           ${run.stage === "groups" ? renderGroupTableCard() : renderKoInfoCard()}
-          <p class="text-[10px] tp-text font-semibold text-right mt-1 pr-1">Ver estado del Mundial →</p>
         </div>
-        <div id="btn-scorers" class="cursor-pointer transition-transform hover:scale-[1.01]" title="Ver la tabla completa de goleadores">
+        <div id="btn-scorers" class="cursor-pointer transition-transform hover:scale-[1.01] flex-1 flex flex-col" title="Ver la tabla completa de goleadores">
           ${renderScorersCard()}
         </div>
       </div>

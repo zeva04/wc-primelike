@@ -32,10 +32,10 @@ export function renderScorersCard() {
         <tbody>${top.map(s => scorerRow(s, true)).join("")}</tbody>
       </table>`
     : `<p class="text-xs text-slate-500 py-1">Aún no se abrió el marcador del torneo — los goles llegarán con las primeras fechas.</p>`;
-  return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-    <h3 class="font-bold mb-2">⚽ Goleadores del torneo</h3>
+  // `h-full flex flex-col w-full`: la card llena su columna en el hub (sin dejar hueco).
+  return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 h-full w-full flex flex-col">
+    <h3 class="font-bold mb-2 shrink-0">⚽ Goleadores del torneo</h3>
     ${body}
-    ${top.length ? `<p class="text-[10px] tp-text font-semibold text-right mt-2">Ver tabla completa →</p>` : ""}
   </div>`;
 }
 

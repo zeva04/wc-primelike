@@ -63,7 +63,7 @@ export function applyDayAction(run, actionId, targetName) {
   const desc = (isOpp ? a.effect(run, target) : a.effect(run, mult)) || a.desc;
   if (isOpp) run.stats.oppAprovechadas++;
   run.actionPending = false;
-  run.lastAction = { day: run.day, icon: a.icon, title: a.title };
+  run.lastAction = { day: run.day, id: a.id, group: a.group || null, icon: a.icon, title: a.title };
   addJournal(run, isOpp
     ? { icon: a.icon, tone: a.rareza === "legendaria" ? "gold" : "good", title: a.title, desc: `Oportunidad única: ${desc}` }
     : { icon: a.icon, tone: "neutral", title: a.title, desc: `Acción del día: ${desc}${mult !== 1 ? ` (${multLabel(mult)} por "${run.dayMod.title}")` : ""}.` });
