@@ -13,10 +13,11 @@
    ============================================================ */
 import { getTeam } from "../../data/teams-repo.js";
 import {
-  playerOverall, naturalOverall, overallAt, playerStars, teamRating, teamStars, lineupRating,
+  playerOverall, naturalOverall, overallAt, playerStars, lineupRating,
   STAT_KEYS, GK_STAT_KEYS, playedPos, posDistance, effectiveStat, outOfPosPenalty, statPenalties,
 } from "../../game/ratings.js";
 import { momentoPct } from "../../game/momentum.js";
+import { moraleBand } from "../../game/morale.js";
 import {
   currentLineup, autoLineup, validateLineup, assignPositions, canPlayAt,
   formationSlots, FORMATIONS, getFormation, canUseFormation,
@@ -47,7 +48,6 @@ function renderSquadScreen() {
     <button id="btn-back" class="text-slate-400 hover:text-white mb-4 cursor-pointer">← Volver a la concentración</button>
     <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
       <h1 class="text-2xl font-black flex items-center gap-2">${flagImg(me, "w-8 h-[1.4rem]")} Gestión de Plantilla</h1>
-      <div class="text-sm">${starsHtml(teamStars(me))} <span class="text-amber-300 font-black ml-1">Media ${teamRating(me)}</span></div>
     </div>
 
     <div class="grid lg:grid-cols-[minmax(0,1fr)_20rem] gap-4 items-start">
@@ -57,9 +57,12 @@ function renderSquadScreen() {
             <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Formación actual</div>
             <div id="formation-picker" class="relative"></div>
           </div>
-          <div class="text-right">
-            <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Media del once</div>
-            <div id="lineup-avg" class="flex items-center gap-2 justify-end"></div>
+          <div class="flex items-end gap-4">
+            ${moraleBadge()}
+            <div class="text-right">
+              <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Media del once</div>
+              <div id="lineup-avg" class="flex items-center gap-2 justify-end"></div>
+            </div>
           </div>
         </div>
         <!-- Alto fijo por breakpoint, no aspect-ratio: con las filas al 20/43/66/89% las
@@ -93,6 +96,21 @@ function renderSquadScreen() {
 
 const availables = () => S.run.squad.filter(isAvailable);
 const isAvailable = p => !p.suspendido && p.lesionadoPartidos === 0;
+
+/** Barra de moral del equipo, a la izquierda de la Media del once en el bloque de la cancha. */
+function moraleBadge() {
+  const moral = S.run.moral ?? 50;
+  const b = moraleBand(moral);
+  const barColor = moral >= 61 ? "bg-emerald-500" : moral >= 41 ? "bg-amber-500" : "bg-red-500";
+  const txtColor = moral >= 61 ? "text-emerald-400" : moral >= 41 ? "text-slate-300" : "text-red-400";
+  return `<div title="Moral del equipo (${moral}/100)">
+    <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">${b.icon} Moral del equipo</div>
+    <div class="flex items-center gap-2">
+      <span class="w-20 h-1.5 bg-slate-700 rounded-full overflow-hidden inline-block"><span class="block h-full ${barColor} rounded-full" style="width:${moral}%"></span></span>
+      <b class="${txtColor} text-sm">${b.label}</b>
+    </div>
+  </div>`;
+}
 
 /** Trae el once vigente del motor (lo rearma si hay bajas nuevas) y deja los puestos asignados. */
 function refreshLineup() {

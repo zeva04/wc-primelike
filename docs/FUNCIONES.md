@@ -237,18 +237,20 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | `_checkShootoutEnd()` | Cierra la tanda por definición matemática o muerte súbita. |
 | `result()` | Resultado final: marcador, ganador y detalle de penales. |
 
-### 9. Entre partidos — `js/game/calendar.js`, `day-action.js`, `flow.js`, `discipline.js`, `momentum.js`, `morale.js`, `journal.js` y `js/content/`
+### 9. Entre partidos — `js/game/calendar.js`, `day-action.js`, `flow.js`, `discipline.js`, `momentum.js`, `morale.js`, `scorers.js`, `journal.js` y `js/content/`
 | Función | Qué hace |
 |---|---|
 | `dayLabel(day)` | Fecha real del día de la run ("Jue 11 jun"; día 1 = 11-jun-2026). |
-| `scheduleNextMatch(run)` | Agenda el próximo partido a 5-6 días y pre-sortea el evento de cada día intermedio (75% evento — nivel de rareza ponderado por `RARITIES.weight` y luego un evento del nivel — / 25% conflicto, sin repetir dentro de la ventana). Además, a lo sumo UN día libre esconde una Oportunidad (`dayPlan[d].opp`): cada día tira 20% y el primero que acierta corta. Llena `run.nextMatchDay` y `run.dayPlan`. |
+| `scheduleNextMatch(run)` | Agenda el próximo partido a 5-6 días y pre-sortea el evento de cada día intermedio (75% evento — nivel de rareza ponderado por `RARITIES.weight` y luego un evento del nivel — / 25% conflicto, sin repetir dentro de la ventana). Además, a lo sumo UN día libre esconde una Oportunidad (`dayPlan[d].opp`): cada día tira 20% y el primero que acierta corta. Llena `run.nextMatchDay`, `run.dayPlan` y `run.windowStart` (primer día de la ventana: hoy en el arranque, día siguiente al partido tras jugar — el calendario mantiene a la vista los días ya vividos). |
+| `addTournamentGoal(run,teamId,name)` / `assignScorers(run,teamId,n)` | **scorers**: suma un gol a un jugador / reparte `n` goles de un equipo entre sus figuras ponderando por puesto (DEL 3 · MED 2 · DEF 1 · POR 0.05). Alimentan `run.scorers` (solo equipos ajenos). |
+| `tournamentScorers(run,limit?)` | **scorers**: tabla de goleadores del torneo combinando mi equipo (`run.squad[].goles`) con `run.scorers`, ordenada por goles con ranking de competición (`rank`). Sin doble conteo. |
 | `advanceDay(run)` | Pasa al día siguiente y resuelve lo que trae: `{type:"match"}` (llegó el partido), `{type:"evento",…, rareza}` (inevitable, ya aplicado; `effect` puede devolver un desc con protagonista) o `{type:"conflicto",…}` (dilema: la UI aplica la opción elegida). Todo día sin partido levanta además `run.actionPending`; si el evento trae `mod`, lo deja en `run.dayMod`; si el plan del día esconde una Oportunidad, la deja viva en `run.dayOpp` (ambos se limpian al empezar cada día: la oportunidad no tomada expira sin rastro). Las legendarias van al diario con tono dorado. |
 | `applyDayAction(run,actionId,targetName?)` | **day-action**: aplica la Acción del Día elegida (`DAY_ACTIONS` o la Oportunidad viva hoy) escalada por el modificador del día — la Oportunidad NO se escala (decisión PO: premio externo) —, baja `actionPending`, escribe `lastAction` y anota el diario (la oportunidad con tono por rareza). Si la oportunidad trae `choose`, exige `targetName` válido entre sus candidatos (por nombre, §3.1); sin él no aplica NI consume el turno. Devuelve `{...accion, mult, desc}` (`desc` puede traer protagonista) o `null` si no había acción pendiente, el id no existe, la acción está bloqueada hoy o faltó el objetivo. |
 | `actionMult(run,action)` | **day-action**: multiplicador de una acción HOY según `run.dayMod` (1 sin modificador; 0 = bloqueada). |
 | `dayOpportunity(run)` | **day-action**: la Oportunidad viva HOY (fila completa de `content/opportunities`) o `null`. |
 | `buildDaily(run)` | **daily**: arma la edición del World Cup Daily — `{day, isMatchDay, items}` con 1-5 titulares `{icon, tag, text}` ordenados por prioridad (PORTADA/PLANTEL/GRUPO/RIVAL/MUNDIAL/HOY/COLOR, ver CORE §9); el primero es la nota de tapa. GRUPO marca al próximo rival si jugó anoche; RIVAL avisa sus suspendidos (`rivalBans`) y da el framing por paridad solo en la previa (≤2 días); MUNDIAL puntúa `run.lastNight` (batacazos por tier, goleadas, festivales, grandes, rojas); HOY es el `teaser` del evento/conflicto que trae el día (anticipa sin revelar). Solo lectura (el flavor consume rng). |
 | `multLabel(mult)` | **day-action**: etiqueta corta para la UI ("×2", "×½"); `""` si es 1 o bloqueo. |
-| `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced}`. |
+| `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, goles del rival a la tabla de goleadores (`assignScorers`), resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced}`. |
 | `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario/anímico por jugador (delega en `applyMedicalPostMatch`, `applyDisciplinePostMatch` y `applyMomentumPostMatch` — este ANTES de resetear flags: lee `p.sustituido`), cierra la moral (`applyMoralePostMatch`), limpia buffs y **re-agenda**. "Jugó" = está en el once final, entró del banco (`usado`) o **salió por un cambio** (`sustituido`); sin este último, al sustituido no se le contaba el partido y recuperaba energía como si hubiera descansado. |
 | `advanceStage(run,advanced)` | **flow**: avanza el torneo y devuelve `{type: "next-matchday"\|"qualified"\|"eliminated"\|"next-round"\|"champion"}`; dispara `clearAmarillas` al cerrar grupos y tras 4tos, y `bumpMorale(+5)` al pasar de ronda. La UI solo rutea. |
 | `applyMedicalPostMatch(run,p,played)` | **medical**: energía (+15/+30), descuento de baja y diario de lesión. |
@@ -380,22 +382,26 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 - Las filas salen de **`playedPos(p)`, no del índice del slot**: así cae bien el arquero que entra por una roja, que ocupa el índice del jugador de campo que salió pero juega en el arco.
 - El resalte de destinos válidos va **por clases, sin repintar**: repintar en `dragstart` destruye el nodo que el mouse arrastra y cancela el drag.
 
-### 7. Hub y sus pantallas satélite — `ui/screens/hub.js` · `squad.js` · `worldcup.js` · `journal.js`
+### 7. Hub y sus pantallas satélite — `ui/screens/hub.js` · `squad.js` · `worldcup.js` · `scorers.js` · `journal.js`
 | Función | Qué hace |
 |---|---|
 | `nextOpponentId()` | Id del próximo rival (grupo o cruce). |
-| `renderHub()` | Pantalla central: rival, calendario, alineación; el botón principal pasa el día o juega el partido según toque. "Pasar al día" queda bloqueado mientras `run.actionPending` — primero se elige la Acción del Día. |
+| `renderHub()` | Pantalla central (layout calcado de la referencia del PO): cabecera con iconos de Diario 📖 y Estado del Mundial 🏆; banda VS a lo ancho; cuerpo en **3 columnas** (`lg:` — IZQ estado del equipo con la cancha · CENTRO "¿Qué harás hoy?" + efectos · DER grupo + goleadores); y a lo ancho abajo el calendario y el botón del día. En móvil apila. "Pasar al día" queda bloqueado mientras `run.actionPending`. Usa contenedor ancho (`max-w-7xl`). |
+| `teamStateCard(v,discipline,fueraDePuesto,forma)` / `stateChip(...)` | Columna izquierda "Estado del equipo": formación, la cancha del once (solo lectura, clic → Gestión de Plantilla), chips de Moral y Energía, los avisos que importan (alineación inválida, fuera de puesto, sanciones, forma) y el botón a Gestión de Plantilla. La cancha la monta `renderHub` con `mountPitch` tras pintar. |
 | `actionCard()` | Panel de la **Acción del Día** (Bible §4.7): la Oportunidad del día arriba (si hay), los focos de Entrenar agrupados en una fila + una tarjeta-botón por acción suelta; elegida la acción, lo reemplaza una línea de confirmación. Aplica vía `game/day-action`. Si hay `run.dayMod` muestra su banner y bloquea (`disabled` + gris) o etiqueta ("×2 hoy") las acciones afectadas. |
 | `oppCard()` | Card de la **Oportunidad del día** (Bible §4.5): borde y badge de su rareza + recordatorio "solo por hoy, ocupa tu Acción del Día". Click: aplica directo, o abre `showOppChooser` si trae `choose`. `""` si hoy no hay. |
 | `showOppChooser(o)` | Modal selector de protagonista de una oportunidad con `choose`: candidatos con sprite/nombre/puesto/nota; elegir aplica (`applyDayAction` con el nombre) y consume el día; "decidir más tarde" cierra sin tocar nada. |
 | `showDaily(daily,onClose)` | La **portada del Diario del Mundial** (papel crema, serifas, doble filete, nota de tapa grande + titulares secundarios con su sección en rojo). Se abre al llegar a un día nuevo, antes del evento; "Doblar el diario" dispara `onClose`, que encadena el modal de evento/conflicto o el toast de día de partido. |
-| `renderCalendarCard(opp)` | Franja de días hasta el próximo partido: hoy resaltado, temática por día, rival en el día de partido. |
+| `renderCalendarCard(opp)` | Franja de la ventana COMPLETA (`windowStart..nextMatchDay`): días ya vividos en gris ("✓ vivido"), HOY resaltado, temática por día futuro, rival en el día de partido. Los días no se borran al avanzar. |
+| `moraleRow()` | Fila de la Moral del equipo (banda + barra) embebida en el bloque de plantilla del hub. |
+| `renderScorersCard()` (en `scorers.js`) | Card top-5 de **Goleadores del torneo** para el hub (o aviso si aún no hay goles); el hub la envuelve en un contenedor clickeable que va a la pantalla completa. |
+| `renderScorers()` (pantalla `scorers`) | Tabla completa de goleadores del torneo (`tournamentScorers`): puesto, bandera, jugador, selección y goles; mi equipo resaltado. |
 | `buffChips()` | Chips con los efectos acumulados para el próximo partido (incluye el de `tactica` con su multiplicador de sesiones). |
 | `themeHeader(tema)` | Cabecera de temática (icono/color fijos) de los modales de evento/conflicto. |
 | `showDayEvent(ev)` | Modal del evento inevitable del día (ya aplicado por el motor), con su badge de rareza coloreado (`RARITIES`). |
 | `renderJournal(back)` | Pantalla del **Diario de Campaña**: entradas agrupadas por día, coloreadas por `tone`; `back` define a dónde vuelve (hub o desenlace). |
 | `renderGroupTableCard()` / `renderKoInfoCard()` | Tarjetas de tabla / info de eliminatoria. |
-| `renderSquadScreen()` | **Gestión de Plantilla**: cancha con el once, selector de formación, ficha del jugador y los 4 suplentes. Las reglas son de `game/lineup`; aquí solo viven las coordenadas (`ROW_Y`, `spreadX`), que son presentación. |
+| `renderSquadScreen()` / `moraleBadge()` | **Gestión de Plantilla**: cancha con el once, selector de formación, ficha del jugador y los 4 suplentes; el encabezado muestra la barra de Moral (`moraleBadge`) a la izquierda de la media. Las reglas son de `game/lineup`; aquí solo viven las coordenadas (`ROW_Y`, `spreadX`), que son presentación. |
 | `renderPitch()` / `pitchToken(p,…)` | Dibuja el once sobre el césped. Las filas salen del once REAL, no de la formación elegida: así una alineación improvisada también se pinta bien. |
 | `renderFormationPicker(available)` | Selector con las 6 formaciones y su diagrama de puntos; desactiva las que el plantel no cubre (Brasil no puede 3-1-1: tiene 2 DEF). |
 | `renderPlayerCard()` / `renderBench()` | Ficha del seleccionado (stats reales del motor) y las 4 fichas del banco. |
@@ -459,4 +465,7 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
   reglas post-partido (banda 3..5 del resultado, señales individuales, decaimiento, clamps).
 - **`morale.test.js`** — la Moral 1..100: bandas, clamps, diario solo al cruzar de banda y
   el cierre post-partido (base V/E/D, goles agónicos que deciden, extra de la tanda).
+- **`scorers.test.js`** — la tabla de goleadores: `assignScorers` reparte n goles ponderados
+  por puesto, `tournamentScorers` combina mi equipo con el resto sin doble conteo y con
+  ranking de competición.
 - **`load-engine.js`** — loader compartido (import del motor real, sin eval).

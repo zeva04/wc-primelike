@@ -15,6 +15,7 @@ import "./ui/screens/draw.js";
 import "./ui/screens/hub.js";
 import "./ui/screens/squad.js";
 import "./ui/screens/worldcup.js";
+import "./ui/screens/scorers.js";
 import "./ui/screens/journal.js";
 import "./ui/screens/match.js";
 import "./ui/screens/shootout.js";

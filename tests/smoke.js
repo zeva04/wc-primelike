@@ -186,6 +186,13 @@ function playRun(teamId) {
     }
   }
   assert(guard < 60, "la run no terminó (loop guard)");
+  // Goleadores del torneo: entradas sanas y mi equipo nunca entra (se lee de squad)
+  for (const s of Object.values(run.scorers)) {
+    assert(s.goles > 0 && s.name && s.teamId, "goleador del torneo válido", JSON.stringify(s));
+    assert(s.teamId !== teamId, "mi equipo no entra en run.scorers", s.name);
+  }
+  const tabla = E.tournamentScorers(run);
+  for (let k = 1; k < tabla.length; k++) assert(tabla[k].goles <= tabla[k - 1].goles, "tabla de goleadores ordenada");
   assert(run.stats.oppOfrecidas === oppSeen, "oppOfrecidas cuadra con las oportunidades vistas", `stats=${run.stats.oppOfrecidas} vistas=${oppSeen}`);
   assert(run.stats.oppAprovechadas === oppTaken, "oppAprovechadas cuadra con las tomadas", `stats=${run.stats.oppAprovechadas} tomadas=${oppTaken}`);
   for (let k = 1; k < run.journal.length; k++) {

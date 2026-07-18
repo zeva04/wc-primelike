@@ -299,6 +299,13 @@ de 2026, arranque real del Mundial; las fechas son ambientación). Los partidos 
 cada **5-6 días** (`ri(5,6)` en `scheduleNextMatch`) y cada día intermedio trae
 exactamente un suceso, pre-sorteado al agendar el partido:
 
+> **La ventana de preparación no se borra al avanzar.** `scheduleNextMatch` guarda
+> `run.windowStart` (hoy en el arranque, o el día siguiente al último partido) y el
+> calendario del hub muestra `windowStart..nextMatchDay` completo: los días ya vividos
+> quedan **en gris** ("✓ vivido") en vez de desaparecer, HOY se resalta y los futuros
+> anticipan su temática. Da sensación de avance dentro de la ventana.
+
+
 - **75% evento inevitable** (`PREP_EVENTS`, 30, sorteado por **rareza**): buff o debuff
   que se aplica solo, o un **modificador del día** (ver más abajo).
 - **25% conflicto con decisión** (`RANDOM_EVENTS`, 6): dilema con dos opciones y
@@ -473,15 +480,36 @@ resultados y a **cómo** se dan (en `postMatchUpdate` + `advanceStage`):
 | Ganar / perder la tanda de penales (extra) | +3 / −3 |
 | Pasar de ronda (clasificar de grupos o avanzar en KO) | +5 |
 
-Visible en el hub (card con banda y barra) y en el Daily cuando es noticia (por las
-nubes, baja o por el suelo). Cruzar de banda escribe en el Diario de Campaña; moverse
-dentro de una banda es silencioso. Los eventos de `content/` pueden mutarla directo
-(`r.moral = clamp(...)`, p. ej. `pais_ilusionado` +8, `critica_demoledora` −8).
+Visible en el hub (fila dentro del bloque de plantilla, con banda y barra), en la
+Gestión de Plantilla (a la izquierda de la media) y en el Daily cuando es noticia (por
+las nubes, baja o por el suelo). Cruzar de banda escribe en el Diario de Campaña;
+moverse dentro de una banda es silencioso. Los eventos de `content/` pueden mutarla
+directo (`r.moral = clamp(...)`, p. ej. `pais_ilusionado` +8, `critica_demoledora` −8).
 
 > **v1 sin efecto mecánico** (decisión PO 17-jul-2026). La próxima iteración hará que la
 > moral module el **tipo y número de ocasiones** que el equipo genera en el partido — el
 > hook está comentado en `Match.tick` (`[MORAL → OCASIONES]`); requerirá pasar la moral
 > por `matchCtx` porque el motor del partido no conoce la run.
+
+### Goleadores del torneo (`run.scorers`, `game/scorers.js`)
+
+El motor solo produce marcadores (`quickSim`: gA-gB), no autores. La tabla de goleadores
+le pone nombre a cada gol repartiéndolo entre las **figuras del equipo, ponderando por
+posición** (`POS_GOAL_WEIGHT` DEL 3 · MED 2 · DEF 1 · POR 0.05): coherente aunque no sea
+un simulador de goleadores real (un delantero anota mucho más seguido que un defensa).
+
+- Los goles de **equipos ajenos** (partidos simulados del mundo vivo y el rival de MIS
+  partidos) se acumulan en `run.scorers` (`"teamId|name" → {teamId, name, goles}`), vía
+  `assignScorers` desde `tournament/world.simWorldMatch` y `flow.closeMatch`.
+- Los goles de **mi equipo** NO entran ahí: ya son exactos en `run.squad[].goles`
+  (fuente de la ficha, el Daily y el cierre). `tournamentScorers(run)` combina ambos al
+  vuelo, ordena por goles (desempate alfabético) y asigna **ranking de competición**
+  (mismos goles → misma posición: 1·2·2·4…). Así no hay doble conteo.
+- La tanda de penales **no** cuenta como goles (solo el marcador de juego).
+
+Visible como card top-5 en el hub (clic → pantalla con la tabla completa). No afecta el
+balance: solo consume rng al asignar autores (desplaza la secuencia, sin cambiar el
+modelo — verificado, BRA campeón sin deriva).
 
 ### Diario de Campaña (`run.journal`)
 

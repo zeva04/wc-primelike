@@ -19,9 +19,11 @@ import { buildOpponentReport } from "../../game/scouting.js";
 import { EVENT_THEMES } from "../../content/themes.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, starsHtml, modal, closeModal, toast } from "../components.js";
+import { screenShell, $, flagImg, starsHtml, modal, closeModal, toast, momentoChip } from "../components.js";
 import { spriteSvg } from "../sprites.js";
+import { mountPitch } from "../pitch.js";
 import { renderGroupTableCard, renderKoInfoCard } from "./worldcup.js";
+import { renderScorersCard } from "./scorers.js";
 
 /**
  * Figuras a mostrar del rival: las de mayor nota, sin duplicados y con un solo arquero.
@@ -43,35 +45,40 @@ function keyPlayers(team, max = 5) {
 }
 
 /**
- * Tarjeta del calendario: la ventana de días desde hoy hasta el próximo partido.
- * Cada día futuro muestra SOLO la temática de su evento (siempre caracterizada igual);
- * el día de partido muestra al rival. Los días se reparten TODO el ancho de la tarjeta
- * (flex-1): sin huecos muertos a la derecha.
+ * Tarjeta del calendario: la ventana de preparación COMPLETA, desde su primer día
+ * (`windowStart`, tras el último partido) hasta el próximo partido. Los días ya vividos
+ * NO se borran: quedan en gris para dar sensación de avance; HOY se resalta y los futuros
+ * anticipan su temática. El día de partido muestra al rival. Todo a lo ancho (flex-1).
  */
 function renderCalendarCard(opp) {
   const run = S.run;
   const days = [];
-  for (let d = run.day; d <= run.nextMatchDay; d++) days.push(d);
+  for (let d = run.windowStart ?? run.day; d <= run.nextMatchDay; d++) days.push(d);
   return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
     <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
       <h3 class="font-bold">📅 Calendario</h3>
-      <span class="text-xs text-slate-400">Próximo partido: <b class="text-slate-200">${dayLabel(run.nextMatchDay)}</b> vs ${opp.name}</span>
+      <span class="text-xs text-slate-400">Hoy es <b class="text-slate-200">${dayLabel(run.day)}</b> · próximo partido <b class="text-slate-200">${dayLabel(run.nextMatchDay)}</b> vs ${opp.name}</span>
     </div>
     <div class="flex gap-2 overflow-x-auto pb-1">
       ${days.map(d => {
         const today = d === run.day;
+        const past = d < run.day;
         const isMatch = d === run.nextMatchDay;
         const plan = run.dayPlan[d];
         const th = plan ? EVENT_THEMES[plan.tema] : null;
-        const box = today ? "tp-border tp-bg-soft" : isMatch ? "border-amber-500/70 bg-amber-500/10" : "border-slate-700 bg-slate-900/50";
+        const box = today ? "tp-border tp-bg-soft"
+          : past ? "border-slate-800 bg-slate-900/40 opacity-45"
+          : isMatch ? "border-amber-500/70 bg-amber-500/10"
+          : "border-slate-700 bg-slate-900/50";
         return `<div class="rounded-xl border ${box} px-2 py-2 text-center flex-1 min-w-[4.6rem]">
-          <div class="text-[9px] uppercase tracking-wider font-bold ${today ? "tp-text" : "text-slate-500"}">${today ? "HOY" : dayLabel(d).split(" ")[0]}</div>
-          <div class="text-[10px] text-slate-400 mb-1">${dayLabel(d).split(" ").slice(1).join(" ")}</div>
+          <div class="text-[9px] uppercase tracking-wider font-bold ${today ? "tp-text" : past ? "text-slate-600" : "text-slate-500"}">${today ? "HOY" : dayLabel(d).split(" ")[0]}</div>
+          <div class="text-[10px] ${past ? "text-slate-600" : "text-slate-400"} mb-1">${dayLabel(d).split(" ").slice(1).join(" ")}</div>
           ${isMatch
             ? `<div class="text-lg leading-none">⚽</div><div class="text-[9px] font-bold text-amber-400 mt-0.5 flex items-center justify-center gap-1">${flagImg(opp, "w-4 h-3")}<span class="truncate max-w-[3.2rem]">${opp.name}</span></div>`
             : th
-              ? `<div class="text-lg leading-none">${th.icon}</div><div class="text-[9px] font-semibold ${th.color} mt-0.5">${th.name}</div>`
-              : `<div class="text-lg leading-none">🧘</div><div class="text-[9px] text-slate-500 mt-0.5">Tranquilo</div>`}
+              ? `<div class="text-lg leading-none">${th.icon}</div><div class="text-[9px] font-semibold ${past ? "text-slate-600" : th.color} mt-0.5">${th.name}</div>`
+              : `<div class="text-lg leading-none">🧘</div><div class="text-[9px] text-slate-600 mt-0.5">Tranquilo</div>`}
+          ${past ? `<div class="text-[8px] text-slate-600 mt-0.5">✓ vivido</div>` : ""}
         </div>`;
       }).join("")}
     </div>
@@ -97,23 +104,6 @@ function buffChips() {
     chips.push(`<span class="px-2 py-0.5 rounded-full border ${pos ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" : "border-red-500/50 bg-red-500/10 text-red-400"}">${LABELS[k]} ${pos ? "+" : ""}${v}</span>`);
   }
   return chips.length ? `<div class="flex flex-wrap gap-1.5 text-[10px] font-bold">${chips.join("")}</div>` : "";
-}
-
-/**
- * Fila de la Moral del equipo (game/morale): banda anímica + barra 1..100, para
- * embeber en el bloque de plantilla (decisión PO: va con el equipo, no en card aparte).
- * v1 es termómetro narrativo — el efecto mecánico llegará en otra iteración.
- */
-function moraleRow() {
-  const moral = S.run.moral ?? 50;
-  const b = moraleBand(moral);
-  const barColor = moral >= 61 ? "bg-emerald-500" : moral >= 41 ? "bg-amber-500" : "bg-red-500";
-  const txtColor = moral >= 61 ? "text-emerald-400" : moral >= 41 ? "text-slate-300" : "text-red-400";
-  return `<div class="mt-2.5 flex items-center gap-2 text-xs" title="Moral del equipo (reacciona a los resultados y a cómo se dan: goles agónicos, pasar de ronda…)">
-    <span class="text-slate-400 shrink-0">${b.icon} Moral</span>
-    <span class="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden"><span class="block h-full ${barColor} rounded-full transition-all" style="width:${moral}%"></span></span>
-    <b class="${txtColor} shrink-0">${b.label}</b>
-  </div>`;
 }
 
 /**
@@ -306,11 +296,60 @@ function actionCard() {
   </div>`;
 }
 
+/** Chip de un indicador del estado del equipo (icono + label + valor coloreado). */
+function stateChip(icon, label, value, cls) {
+  return `<div class="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900/50 px-2 py-1.5 flex-1 min-w-0">
+    <span class="text-base leading-none">${icon}</span>
+    <div class="min-w-0">
+      <div class="text-[9px] uppercase tracking-wider text-slate-500 font-bold leading-none">${label}</div>
+      <div class="text-xs font-black ${cls} truncate">${value}</div>
+    </div>
+  </div>`;
+}
+
 /**
- * Concentración Mundialista: pantalla central entre partidos.
- * Layout balanceado en 2 columnas: IZQUIERDA posición + efectos;
- * DERECHA plantilla + diario + la Acción del Día + el botón del día
- * (pasar día — bloqueado hasta elegir acción — o jugar).
+ * Columna izquierda "Estado del equipo": formación, la cancha con el once (solo
+ * lectura, clic → Gestión de Plantilla), chips de Moral y Energía, los avisos que
+ * importan (alineación inválida, fuera de puesto, sanciones, forma) y el botón a
+ * Gestión de Plantilla. La cancha la monta renderHub tras pintar (necesita el DOM).
+ */
+function teamStateCard(v, discipline, fueraDePuesto, forma) {
+  const run = S.run;
+  const moral = run.moral ?? 50;
+  const mb = moraleBand(moral);
+  const moralCls = moral >= 61 ? "text-emerald-400" : moral >= 41 ? "text-slate-300" : "text-red-400";
+  const avgEnergy = Math.round(run.squad.reduce((s, p) => s + p.energia, 0) / run.squad.length);
+  const enCls = avgEnergy > 65 ? "text-emerald-400" : avgEnergy > 35 ? "text-amber-400" : "text-red-400";
+  const formationLabel = getFormation(S.formation) ? S.formation : "Improvisada";
+  const avisos = [];
+  if (!v.ok) avisos.push(`<div class="text-amber-400">⚠️ ${v.msg}</div>`);
+  else if (v.short) avisos.push(`<div class="text-orange-400">🆘 Plantel diezmado: presentas ${S.selectedLineup.length} — jugarás en inferioridad</div>`);
+  if (fueraDePuesto.length) avisos.push(`<div class="text-orange-400" title="Sus stats bajan mientras jueguen ahí">❗ Fuera de puesto: ${fueraDePuesto.map(p => p.name).join(", ")}</div>`);
+  if (discipline.susp.length) avisos.push(`<div class="text-red-400">🟥 Suspendido${discipline.susp.length > 1 ? "s" : ""}: ${discipline.susp.map(p => p.name).join(", ")}</div>`);
+  if (discipline.aperc.length) avisos.push(`<div class="text-yellow-400" title="Con otra amarilla se pierde un partido">🟨 Apercibido${discipline.aperc.length > 1 ? "s" : ""}: ${discipline.aperc.map(p => p.name).join(", ")}</div>`);
+  if (forma.racha.length) avisos.push(`<div class="text-emerald-400" title="Momento alto: rinden por encima">🔥 En racha: ${forma.racha.map(p => p.name).join(", ")}</div>`);
+  if (forma.frios.length) avisos.push(`<div class="text-sky-400" title="Momento bajo: rinden por debajo">❄️ Fríos: ${forma.frios.map(p => p.name).join(", ")}</div>`);
+  return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+    <div class="flex items-center justify-between mb-2.5">
+      <h3 class="font-bold text-sm">👕 Estado del equipo</h3>
+      <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Formación <b class="tp-text">${formationLabel}</b></span>
+    </div>
+    <div id="hub-pitch" class="pitch relative w-full h-56 rounded-xl overflow-hidden border-2 border-slate-900 mb-3 cursor-pointer" title="Ir a Gestión de Plantilla"></div>
+    <div class="flex gap-2 mb-3">
+      ${stateChip(mb.icon, "Moral", mb.label, moralCls)}
+      ${stateChip("⚡", "Energía", avgEnergy + "%", enCls)}
+    </div>
+    ${avisos.length ? `<div class="space-y-1 text-xs mb-3">${avisos.join("")}</div>` : ""}
+    <button id="btn-squad" class="w-full text-sm font-bold py-2.5 rounded-lg tp-gradient cursor-pointer hover:brightness-110 transition-all">📋 Gestión de Plantilla →</button>
+  </div>`;
+}
+
+/**
+ * Concentración Mundialista: pantalla central entre partidos. Calca el layout de
+ * referencia del PO: banda VS a lo ancho; cuerpo en 3 columnas (IZQ estado del
+ * equipo con la cancha · CENTRO "¿Qué harás hoy?" + efectos · DER grupo + goleadores);
+ * y a lo ancho abajo el calendario y el botón del día. El Diario y el Estado del
+ * Mundial viven como iconos en la cabecera.
  */
 function renderHub() {
   const run = S.run;
@@ -335,7 +374,11 @@ function renderHub() {
         <div class="text-xs uppercase tracking-widest tp-text font-bold">${stageTxt}</div>
         <h1 class="text-2xl font-black mt-1 flex items-center gap-2">${flagImg(me, "w-8 h-[1.4rem]")} Concentración Mundialista</h1>
       </div>
-      <button id="btn-abandon" class="text-xs text-slate-500 hover:text-red-400 cursor-pointer">Abandonar torneo</button>
+      <div class="flex items-center gap-2">
+        <button id="btn-journal" title="Diario de Campaña (${run.journal.length})" class="relative w-11 h-11 flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 text-xl hover:border-[var(--team-primary)] cursor-pointer transition-all">📖</button>
+        <button id="btn-standings" title="Estado del Mundial" class="w-11 h-11 flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 text-xl hover:border-[var(--team-primary)] cursor-pointer transition-all">🏆</button>
+        <button id="btn-abandon" class="text-xs text-slate-500 hover:text-red-400 cursor-pointer ml-1 px-3 py-2 rounded-xl border border-slate-700 hover:border-red-400/50">Abandonar torneo</button>
+      </div>
     </div>
 
     <div id="btn-scout" title="Ver el informe del cuerpo técnico" class="bg-slate-800/80 border border-slate-600 tp-topbar rounded-2xl p-5 mb-5 cursor-pointer transition-all hover:scale-[1.005] hover:border-[var(--team-primary)]">
@@ -363,54 +406,66 @@ function renderHub() {
       <p class="text-[10px] tp-text font-semibold text-right mt-2">📋 Informe del rival →</p>
     </div>
 
-    <div class="mb-5">${renderCalendarCard(opp)}</div>
+    <div class="grid lg:grid-cols-[19rem_minmax(0,1fr)_20rem] gap-5 items-start">
+      <!-- IZQUIERDA: estado del equipo -->
+      ${teamStateCard(v, discipline, fueraDePuesto, forma)}
 
-    <div class="grid md:grid-cols-2 gap-5 md:items-start">
-      <div class="space-y-5">
-        <div id="btn-standings" class="cursor-pointer transition-transform hover:scale-[1.01]" title="Ver el estado de todos los grupos">
-          ${run.stage === "groups" ? renderGroupTableCard() : renderKoInfoCard()}
-          <p class="text-[10px] tp-text font-semibold text-right mt-1 pr-1">Ver estado del Mundial →</p>
-        </div>
+      <!-- CENTRO: ¿qué harás hoy? + efectos -->
+      <div class="space-y-5 min-w-0">
+        ${isMatchDay
+          ? `<div class="bg-slate-800/60 border tp-border rounded-2xl p-5 text-center">
+              <div class="text-4xl mb-2">⚽</div>
+              <h3 class="text-xl font-black">¡Hoy se juega!</h3>
+              <p class="text-sm text-slate-400 mt-1">${me.name} enfrenta a ${opp.name}. Revisa tu plantilla y cuando estés listo, salta a la cancha.</p>
+            </div>`
+          : actionCard()}
         ${effectsCard()}
       </div>
 
+      <!-- DERECHA: grupo + goleadores -->
       <div class="space-y-5">
-        <button id="btn-squad" class="w-full text-left bg-slate-800/60 border border-slate-700 hover:border-[var(--team-primary)] rounded-2xl p-4 cursor-pointer transition-all hover:scale-[1.01]">
-          <div class="flex items-center justify-between">
-            <h3 class="font-bold">📊 Media del equipo</h3>
-            <span class="text-amber-300 font-black text-2xl">${teamRating(me)}</span>
-          </div>
-          <div class="mt-1">${starsHtml(teamStars(me))}</div>
-          ${moraleRow()}
-          <div class="text-xs mt-2 ${!v.ok ? "text-amber-400" : v.short ? "text-orange-400" : "text-slate-400"}">${!v.ok ? `⚠️ ${v.msg}` : v.short ? `🆘 Plantel diezmado: presentas ${S.selectedLineup.length} — jugarás en inferioridad numérica` : `Formación ${getFormation(S.formation) ? S.formation : "improvisada"} · alineación lista`}</div>
-          ${fueraDePuesto.length ? `<div class="text-xs text-orange-400 mt-1.5" title="Sus stats bajan mientras jueguen ahí">❗ Fuera de puesto: ${fueraDePuesto.map(p => `${p.name} (de ${p.posJugada})`).join(", ")}</div>` : ""}
-          ${discipline.susp.length ? `<div class="text-xs text-red-400 mt-1.5">🟥 Suspendido${discipline.susp.length > 1 ? "s" : ""}: ${discipline.susp.map(p => p.name).join(", ")}</div>` : ""}
-          ${discipline.aperc.length ? `<div class="text-xs text-yellow-400 mt-1.5" title="Con otra amarilla quedan suspendidos un partido">🟨 Apercibido${discipline.aperc.length > 1 ? "s" : ""}: ${discipline.aperc.map(p => p.name).join(", ")}</div>` : ""}
-          ${forma.racha.length ? `<div class="text-xs text-emerald-400 mt-1.5" title="Momento alto: sus stats rinden por encima">🔥 En racha: ${forma.racha.map(p => p.name).join(", ")}</div>` : ""}
-          ${forma.frios.length ? `<div class="text-xs text-sky-400 mt-1.5" title="Momento bajo: sus stats rinden por debajo">❄️ Fríos: ${forma.frios.map(p => p.name).join(", ")}</div>` : ""}
-          <p class="text-xs tp-text font-semibold mt-2">Gestión de Plantilla →</p>
-        </button>
-        <button id="btn-journal" class="w-full text-left bg-slate-800/60 border border-slate-700 hover:border-[var(--team-primary)] rounded-2xl p-4 cursor-pointer transition-all hover:scale-[1.01]">
-          <div class="flex items-center justify-between">
-            <h3 class="font-bold">📖 Diario de Campaña</h3>
-            <span class="text-xs text-slate-500">${run.journal.length} momento${run.journal.length !== 1 ? "s" : ""}</span>
-          </div>
-          <p class="text-xs text-slate-400 mt-1 truncate">Último: ${run.journal.length ? run.journal[run.journal.length - 1].title : "la historia recién comienza."}</p>
-          <p class="text-xs tp-text font-semibold mt-2">Revivir la campaña →</p>
-        </button>
-        ${isMatchDay ? "" : actionCard()}
-        ${isMatchDay
-          ? `<button id="btn-play" class="tp-gradient w-full text-lg font-black py-3 rounded-xl shadow-lg cursor-pointer transition-all hover:scale-[1.01] hover:brightness-110">⚽ JUGAR PARTIDO</button>`
-          : run.actionPending
-            ? `<button id="btn-nextday" disabled class="w-full text-lg font-black py-3 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-500 shadow-lg cursor-not-allowed" title="Primero elige la Acción del día">🌙 Pasar al día siguiente →</button>`
-            : `<button id="btn-nextday" class="w-full text-lg font-black py-3 rounded-xl border border-slate-500 bg-slate-700/70 hover:bg-slate-600 shadow-lg cursor-pointer transition-all hover:scale-[1.01]">🌙 Pasar al día siguiente →</button>`}
+        <div id="btn-standings2" class="cursor-pointer transition-transform hover:scale-[1.01]" title="Ver el estado de todos los grupos">
+          ${run.stage === "groups" ? renderGroupTableCard() : renderKoInfoCard()}
+          <p class="text-[10px] tp-text font-semibold text-right mt-1 pr-1">Ver estado del Mundial →</p>
+        </div>
+        <div id="btn-scorers" class="cursor-pointer transition-transform hover:scale-[1.01]" title="Ver la tabla completa de goleadores">
+          ${renderScorersCard()}
+        </div>
       </div>
     </div>
-  `);
+
+    <div class="mt-5">${renderCalendarCard(opp)}</div>
+
+    <div class="mt-5">
+      ${isMatchDay
+        ? `<button id="btn-play" class="tp-gradient w-full text-lg font-black py-3.5 rounded-xl shadow-lg cursor-pointer transition-all hover:scale-[1.005] hover:brightness-110">⚽ JUGAR PARTIDO</button>`
+        : run.actionPending
+          ? `<button id="btn-nextday" disabled class="w-full text-lg font-black py-3.5 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-500 shadow-lg cursor-not-allowed" title="Primero elige la Acción del día">🌙 Pasar al día siguiente →</button>`
+          : `<button id="btn-nextday" class="w-full text-lg font-black py-3.5 rounded-xl border border-slate-500 bg-slate-700/70 hover:bg-slate-600 shadow-lg cursor-pointer transition-all hover:scale-[1.005]">🌙 Pasar al día siguiente →</button>`}
+    </div>
+  `, "max-w-7xl");
+
+  // La cancha del "Estado del equipo": solo lectura, clic (ficha o césped) → Gestión de Plantilla.
+  mountPitch({
+    pitchEl: $("#hub-pitch"),
+    team: me,
+    lineup: S.selectedLineup,
+    bench: [],
+    selected: null,
+    sizes: { sprite: "w-7 h-9", bench: "w-7 h-9" },
+    draggable: () => false,
+    canSwap: () => null,
+    onSelect: () => {}, // el clic lo captura el contenedor (abajo): toda la cancha lleva a plantilla
+    badge: p => momentoChip(p) + (p.suspendido ? "🟥" : p.lesionadoPartidos > 0 ? "🚑" : p.amarillas > 0 ? "🟨" : ""),
+    muted: p => p.suspendido || p.lesionadoPartidos > 0,
+  });
+  $("#hub-pitch").onclick = () => go("squad");
 
   $("#btn-abandon").onclick = () => { if (confirm("¿Abandonar el torneo? La partida terminará.")) go("end-run", false, true); };
   $("#btn-scout").onclick = () => showScoutReport(oppId);
   $("#btn-standings").onclick = () => go("worldcup");
+  $("#btn-standings2").onclick = () => go("worldcup");
+  $("#btn-scorers").onclick = () => go("scorers");
   $("#btn-journal").onclick = () => go("journal", "hub");
   $("#btn-squad").onclick = () => go("squad");
   if (isMatchDay) {

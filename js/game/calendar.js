@@ -53,6 +53,10 @@ function drawByRarity(pools) {
  * calendario no la muestra — se descubre al llegar el día (decisión del PO).
  */
 export function scheduleNextMatch(run) {
+  // Primer día de esta ventana de preparación: hoy en el arranque (aún no hubo partido),
+  // o el día siguiente al partido recién jugado. El calendario lo usa para mantener los
+  // días ya vividos a la vista (en gris) en vez de borrarlos al pasar el día.
+  run.windowStart = run.nextMatchDay == null ? run.day : run.day + 1;
   run.nextMatchDay = run.day + ri(5, 6);
   run.dayPlan = {};
   const eventPools = {};

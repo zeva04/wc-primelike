@@ -15,6 +15,7 @@ import { applyMedicalPostMatch } from "./medical.js";
 import { applyDisciplinePostMatch, clearAmarillas } from "./discipline.js";
 import { applyMomentumPostMatch } from "./momentum.js";
 import { applyMoralePostMatch, bumpMorale } from "./morale.js";
+import { assignScorers } from "./scorers.js";
 import { qualifyRound32, computeTable } from "./tournament/groups.js";
 import { pairNextRound, STAGE_ORDER, STAGE_LABEL } from "./tournament/knockout.js";
 import { finishGroupMatchday, finishKnockoutRound } from "./tournament/world.js";
@@ -47,6 +48,9 @@ export function closeMatch(run, match) {
   });
 
   const oppId = match.oppTeam.id;
+  // Los goles del rival en MI partido van a la tabla de goleadores como figuras ponderadas
+  // (los míos ya son exactos en run.squad). La tanda no cuenta: solo el marcador de juego.
+  assignScorers(run, oppId, res.gOpp);
   delete run.rivalBans[oppId]; // si tenía un suspendido, lo cumplió ante mí
   let otherResults = [], advanced = null;
 

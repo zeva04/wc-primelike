@@ -65,12 +65,14 @@ export function newRun(myTeamId) {
     buffs: {},                 // bonus temporales del próximo partido  (escriben content/, limpia flow)
     day: 1,                    // día 1 = 11 de junio de 2026           (escribe game/calendar)
     nextMatchDay: null,        // día del próximo partido               (escribe game/calendar)
+    windowStart: 1,            // primer día de la ventana de prep actual (escribe game/calendar)
     dayPlan: {},               // {día: {kind, id, tema}} pre-sorteados (escribe game/calendar)
     actionPending: true,       // Acción del Día por elegir (levanta calendar, baja day-action)
     lastAction: null,          // {day, icon, title} de la última acción (escribe day-action)
     dayMod: null,              // modificador de las acciones de HOY: {icon,title,desc,mods} (escribe calendar)
     dayOpp: null,              // Oportunidad viva HOY: {id} o null (escribe calendar; day-action la consume)
     moral: 50,                 // Moral del equipo 1..100 (escribe game/morale; content/ la muta con clamp)
+    scorers: {},               // goleadores del torneo ajenos {"teamId|name": {teamId,name,goles}} (escribe game/scorers)
     stats: { pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, tarjetas: 0, eventos: 0, penalesAtajados: 0, oppOfrecidas: 0, oppAprovechadas: 0 },
     champion: false,
     journal: [],               // Diario de Campaña: la memoria narrativa de la run

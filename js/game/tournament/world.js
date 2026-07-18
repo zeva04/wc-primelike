@@ -27,6 +27,7 @@
 import { rnd, pick, shuffle } from "../../core/rng.js";
 import { getTeam } from "../../data/teams-repo.js";
 import { quickSim } from "./sim.js";
+import { assignScorers } from "../scorers.js";
 
 // Probabilidad de que un partido ajeno deje una roja para el titular del diario
 const RED_CARD_CHANCE = 0.09;
@@ -69,6 +70,10 @@ function simWorldMatch(run, mch) {
   delete run.rivalBans[mch.a];
   delete run.rivalBans[mch.b];
   const r = quickSim(mch.a, mch.b, knockout);
+  // A cada gol del partido se le pone autor (una figura del equipo, ponderada): alimenta
+  // la tabla de goleadores del torneo. Los penales de la tanda no cuentan como goles.
+  assignScorers(run, mch.a, r.gA);
+  assignScorers(run, mch.b, r.gB);
   const entry = { a: mch.a, b: mch.b, gA: r.gA, gB: r.gB, stage: run.stage };
   if (knockout) {
     entry.pens = r.pens;
