@@ -119,6 +119,22 @@ function playRun(teamId) {
         if (opp && a.id === opp.id) { oppTaken++; assert(res.mult === 1, "el modificador del día no escala la oportunidad", a.id); }
         assert(!run.actionPending, "aplicar la acción consume el turno del día");
       }
+      // Canje de entrenamiento (game/day-action): si un buff llegó al umbral, el DT lo
+      // convierte en crecimiento permanente. Greedy (siempre que se pueda) para medir el
+      // TECHO del balance de una feature asimétrica; es gratis y no consume rng.
+      // `--nocanje` lo apaga para medir el baseline (TRAIN_BUFF=1 sin la feature).
+      for (let cGuard = 0; !args.nocanje && E.canjeableBuffs(run).length && cGuard < 20; cGuard++) {
+        const c = E.canjeableBuffs(run)[0];
+        const buffBefore = run.buffs[c.key];
+        const before = run.squad.filter(p => p.stats[c.key] !== undefined).map(p => ({ p, v: p.stats[c.key] }));
+        const res = E.canjeBuff(run, c.key);
+        assert(res && res.key === c.key, "el canje ofrecido debe aplicarse", c.key);
+        assert((run.buffs[c.key] || 0) === buffBefore - E.CANJE_THRESHOLD, "el canje descuenta el umbral del buff", `${c.key}: ${buffBefore}→${run.buffs[c.key] || 0}`);
+        for (const b of before) {
+          assert(b.p.stats[c.key] === Math.min(99, b.v + E.CANJE_PERMANENT), "el canje suma el crecimiento permanente con techo 99", `${b.p.name} ${b.v}→${b.p.stats[c.key]}`);
+          assert(b.p.stats[c.key] >= b.v, "el crecimiento permanente nunca decrece", b.p.name);
+        }
+      }
       const ev = E.advanceDay(run);
       if (run.dayOpp) {
         oppDays++; oppSeen++;

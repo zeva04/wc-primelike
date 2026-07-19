@@ -24,6 +24,12 @@ assert(E.momentoPct({}) === 0, "un jugador SIN campo momento (rival) no tiene ef
 assert(E.momentoMult({ momento: 4 }) === 1, "el neutro multiplica por 1 exacto");
 assert(E.momentoMult({ momento: 7 }) === 1.04, "el tope multiplica por 1.04");
 
+// ---------- etiquetas cualitativas ----------
+assert(E.MOMENTO_RISE_MAX === 1 && E.MOMENTO_FALL_MAX === 2, "sube máx +1, baja hasta −2 (decisión PO 18-jul)");
+const LBL = { 1: "Paupérrimo", 2: "Apagado", 3: "Malo", 4: "Normal", 5: "Bueno", 6: "Encendido", 7: "Inspirado" };
+for (const [n, txt] of Object.entries(LBL)) assert(E.momentoLabel({ momento: +n }) === txt, `nivel ${n} = ${txt}`, E.momentoLabel({ momento: +n }));
+assert(E.momentoLabel({}) === "Normal", "un jugador sin momento (rival/run vieja) se lee como Normal");
+
 // ---------- nacimiento ----------
 const run = E.newRun("BRA");
 assert(run.squad.every(p => p.momento === 4), "todo el plantel nace con momento neutro (4)");
@@ -69,44 +75,65 @@ const fakeMatch = ({ winner = null, scorers = [], pensFallados = [], pensAtajado
 const jugador = (momento, pos = "DEL") => ({ name: "Tester", pos, momento, stats: {} });
 const aplica = (p, played, m) => { E.applyMomentumPostMatch(run, p, played, m); return p.momento; };
 
-assert(aplica(jugador(4), true, fakeMatch({ winner: "my" })) === 5, "victoria +1");
-assert(aplica(jugador(4), true, fakeMatch({ winner: "opp" })) === 3, "derrota −1");
-assert(aplica(jugador(4), true, fakeMatch({ winner: "my", scorers: [{ name: "Tester", min: 30 }] })) === 6, "victoria + gol = +2");
-assert(aplica(jugador(4), true, fakeMatch({ winner: "my", scorers: [{ name: "Tester", min: 30 }, { name: "Tester", min: 60 }] })) === 6, "el tope por partido es ±2");
-assert(aplica(jugador(7), true, fakeMatch({ winner: "my", scorers: [{ name: "Tester", min: 30 }] })) === 7, "clamp superior en 7");
-assert(aplica(jugador(4), true, fakeMatch({ winner: "opp", gOpp: 3 })) === 3, "los goles en contra no castigan al de campo");
-// victoria (+1) + penal fallado (−1) = 0 de señal neta → aplica el decaimiento (desde 4, queda 4)
-assert(aplica(jugador(4), true, fakeMatch({ winner: "my", pensFallados: ["Tester"] })) === 4, "victoria + penal fallado se anulan y decae");
-assert(aplica(jugador(7), true, fakeMatch({ winner: "my", pensFallados: ["Tester"] })) === 6, "en llamas + penal fallado: la victoria no lo salva (el resultado no empuja sobre 5)");
+// El RESULTADO ya no mueve el momento (eso es Moral del equipo): sin señal INDIVIDUAL decae.
+assert(aplica(jugador(4), true, fakeMatch({ winner: "my" })) === 4, "ganar NO mueve el momento (va a la Moral); en el neutro no pasa nada");
+assert(aplica(jugador(5), true, fakeMatch({ winner: "my" })) === 4, "ni sostiene: un Bueno sin gol decae aunque el equipo gane");
+assert(aplica(jugador(3), true, fakeMatch({ winner: "opp" })) === 4, "perder tampoco lo hunde: un Malo sin fallo sube hacia el neutro");
 
-// ---------- la banda del resultado (recorte de balance 17-jul): 3..5 ----------
-assert(aplica(jugador(5), true, fakeMatch({ winner: "my" })) === 5, "ganar SOSTIENE la buena forma en 5, pero no la sube");
-assert(aplica(jugador(6), true, fakeMatch({ winner: "my" })) === 5, "un 6 sin brillo propio decae aunque el equipo gane: la forma alta exige actuaciones");
-assert(aplica(jugador(6), true, fakeMatch({ winner: "my", scorers: [{ name: "Tester", min: 10 }] })) === 7, "el gol sí sostiene y sube al que está en racha");
-assert(aplica(jugador(3), true, fakeMatch({ winner: "opp" })) === 3, "perder sostiene el bajón en 3");
-assert(aplica(jugador(2), true, fakeMatch({ winner: "opp" })) === 3, "el 2 no sigue cayendo por resultados: decae hacia el neutro");
-assert(aplica(jugador(2), true, fakeMatch({ winner: "opp", pensFallados: ["Tester"] })) === 1, "el fallo individual sí congela más allá de la banda");
-assert(aplica(jugador(2), true, fakeMatch({ winner: "my" })) === 3, "una victoria ayuda a salir del congelador");
+// Las señales INDIVIDUALES sí mueven (subida topada en +1, bajada hasta −2):
+assert(aplica(jugador(4), true, fakeMatch({ scorers: [{ name: "Tester", min: 30 }] })) === 5, "un gol sube +1");
+assert(aplica(jugador(4), true, fakeMatch({ scorers: [{ name: "Tester", min: 30 }, { name: "Tester", min: 60 }] })) === 5, "dos goles topan en +1 por partido");
+assert(aplica(jugador(7), true, fakeMatch({ scorers: [{ name: "Tester", min: 30 }] })) === 7, "clamp superior en 7");
+assert(aplica(jugador(4), true, fakeMatch({ pensFallados: ["Tester"] })) === 3, "fallar un penal baja −1 (el resultado ya no compensa)");
+assert(aplica(jugador(4), true, fakeMatch({ gOpp: 3 })) === 4, "los goles en contra no tocan al de campo (y sin señal, se queda en el neutro)");
 
-// ---------- decaimiento ----------
-assert(aplica(jugador(6), true, fakeMatch()) === 5, "empate sin señal: decae hacia el neutro");
+// ---------- decaimiento hacia el neutro (4) ----------
+assert(aplica(jugador(6), true, fakeMatch()) === 5, "sin señal: decae hacia el neutro");
 assert(aplica(jugador(2), true, fakeMatch()) === 3, "el decaimiento también sube al que está frío");
 assert(aplica(jugador(4), true, fakeMatch()) === 4, "en el neutro sin señal no pasa nada");
-assert(aplica(jugador(7), false, fakeMatch({ winner: "my" })) === 6, "el que no jugó decae aunque el equipo gane");
-assert(aplica(jugador(1), false, fakeMatch({ winner: "opp" })) === 2, "el que no jugó decae hacia arriba si estaba helado");
+assert(aplica(jugador(7), false, fakeMatch()) === 6, "el que no jugó decae");
+assert(aplica(jugador(1), false, fakeMatch()) === 2, "el que no jugó decae hacia arriba si estaba helado");
+
+// ---------- una lesión resetea el momento (decisión PO 18-jul) ----------
+{
+  const p = jugador(7); p.lesionadoPartidos = 2;
+  const r = E.applyMomentumPostMatch(run, p, true, fakeMatch({ scorers: [{ name: "Tester", min: 30 }] }));
+  assert(p.momento === 4, "el lesionado vuelve al neutro sin importar lo que hizo antes de caer", p.momento);
+  assert(r.reasons.some(x => /lesión/i.test(x.text)), "el resumen explica que la lesión le cortó la forma");
+}
 
 // sustituido cuenta como participante (flow le pasa played=false porque ya no está en el once)
 {
   const p = jugador(4);
   p.sustituido = true;
-  E.applyMomentumPostMatch(run, p, false, fakeMatch({ winner: "my" }));
-  assert(p.momento === 5, "el sustituido también vivió el partido: victoria +1");
+  E.applyMomentumPostMatch(run, p, false, fakeMatch({ scorers: [{ name: "Tester", min: 20 }] }));
+  assert(p.momento === 5, "el sustituido también vivió el partido: su gol cuenta (+1)");
 }
 
 // ---------- arquero ----------
-assert(aplica(jugador(4, "POR"), true, fakeMatch({ winner: "my", gOpp: 0 })) === 6, "arquero: victoria + valla invicta = +2");
-assert(aplica(jugador(4, "POR"), true, fakeMatch({ winner: "opp", gOpp: 3 })) === 2, "arquero: derrota + goleada en contra = −2");
+assert(aplica(jugador(4, "POR"), true, fakeMatch({ gOpp: 0 })) === 5, "arquero: valla invicta +1");
+assert(aplica(jugador(4, "POR"), true, fakeMatch({ gOpp: 3 })) === 3, "arquero: 3+ goles en contra −1 (la derrota va a la Moral)");
 assert(aplica(jugador(4, "POR"), true, fakeMatch({ gOpp: 1, pensAtajadosPor: ["Tester"] })) === 5, "arquero: penal atajado +1");
+assert(aplica(jugador(2, "POR"), true, fakeMatch({ gOpp: 5 })) === 1, "arquero: goleada en contra baja −1 (2→1)");
+
+// ---------- resumen devuelto (análisis del cuerpo técnico) ----------
+{
+  const p = jugador(4);
+  const r = E.applyMomentumPostMatch(run, p, true, fakeMatch({ scorers: [{ name: "Tester", min: 12 }, { name: "Tester", min: 40 }] }));
+  assert(r.before === 4 && r.after === 5 && r.delta === 1, "el resumen trae before/after/delta reales", JSON.stringify(r));
+  const textos = r.reasons.map(x => x.text);
+  assert(textos.some(t => /2 goles/.test(t)), "explica los goles");
+  assert(!textos.some(t => /por partido/.test(t)), "ya NO avisa el tope de +1 (borrado a pedido del PO)", textos.join(" | "));
+  assert(!textos.some(t => /ganó|perdió|victoria|derrota/i.test(t)), "el resumen del momento no habla del resultado (eso es Moral)");
+}
+{
+  const r1 = E.applyMomentumPostMatch(run, jugador(6), true, fakeMatch());
+  assert(r1.after === 5 && r1.reasons.some(x => /vuelve hacia lo normal/.test(x.text)), "el decaimiento se narra", JSON.stringify(r1));
+  const r2 = E.applyMomentumPostMatch(run, jugador(6), false, fakeMatch());
+  assert(r2.reasons.some(x => /No sumó minutos/.test(x.text)), "el que no jugó tiene su razón", JSON.stringify(r2));
+  const r3 = E.applyMomentumPostMatch(run, jugador(4), false, fakeMatch());
+  assert(r3.delta === 0 && r3.reasons.length === 0, "neutro sin jugar no genera ni cambio ni ruido");
+}
 
 // ---------- compat: runs guardadas antes del sprint ----------
 {

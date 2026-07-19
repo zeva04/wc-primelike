@@ -53,6 +53,17 @@ assert(cierra(fakeMatch({ winner: "opp", gMy: 0, gOpp: 0, pens: { myGoals: 2, op
 // un gol agónico que NO decide (goleada) no suma el extra
 assert(cierra(fakeMatch({ winner: "my", gMy: 3, gOpp: 0, scorers: [{ name: "A", min: 10 }, { name: "A", min: 40 }, { name: "A", min: 89 }] })) === 60, "el gol del 3-0 en el 89' no es agónico: +10");
 
+// ---------- resumen devuelto (alimenta el análisis del cuerpo técnico) ----------
+{
+  run.moral = 50;
+  const r = E.applyMoralePostMatch(run, fakeMatch({ winner: "my", gMy: 1, gOpp: 0, scorers: [{ name: "A", min: 88 }] }));
+  assert(r.before === 50 && r.after === 65 && r.delta === 15, "el resumen trae before/after/delta", JSON.stringify(r));
+  assert(r.bandBefore.id === "estable" && r.bandAfter.id === "alta", "trae las bandas antes y después");
+  assert(r.reasons.includes("Victoria") && r.reasons.some(t => /sobre la hora/.test(t)), "explica el resultado y el gol agónico", r.reasons.join(" | "));
+  run.moral = 50;
+  assert(E.applyMoralePostMatch(run, fakeMatch({ gMy: 0, gOpp: 0 })).reasons.includes("Empate"), "el empate se narra");
+}
+
 console.log(`morale.test: ${checks} checks · fallos: ${fails}`);
 console.log(fails ? "❌ morale con fallos" : "✅ morale OK");
 process.exit(fails ? 1 : 0);

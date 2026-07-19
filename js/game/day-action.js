@@ -15,13 +15,52 @@
    día no la toca (decisión PO: es un premio externo, no una
    acción del club) y su rareza colorea el diario.
    ============================================================ */
-import { DAY_ACTIONS } from "../content/day-actions.js";
+import { clamp } from "../core/math.js";
+import { DAY_ACTIONS, CANJE_THRESHOLD, CANJE_PERMANENT, CANJEABLE_STATS, STAT_LABELS } from "../content/day-actions.js";
 import { OPPORTUNITIES } from "../content/opportunities.js";
 import { addJournal } from "./journal.js";
 
 /** La Oportunidad viva HOY (fila completa de content/opportunities) o null. */
 export function dayOpportunity(run) {
   return run.dayOpp ? OPPORTUNITIES.find(o => o.id === run.dayOpp.id) || null : null;
+}
+
+/**
+ * Stats cuyo buff acumulado para el próximo partido ya llega al umbral de canje
+ * (CANJE_THRESHOLD): `[{key, buff, label, alcance}]` listas para convertir en
+ * crecimiento permanente. `alcance` = cuántos jugadores del plantel tienen esa stat
+ * (a quiénes alcanzaría el +CANJE_PERMANENT: atajadas solo a los arqueros, etc.).
+ * Vacío si ninguna llegó. Solo stats reales; los buffs de tactica/penales no cuentan.
+ */
+export function canjeableBuffs(run) {
+  return CANJEABLE_STATS
+    .filter(k => (run.buffs[k] || 0) >= CANJE_THRESHOLD)
+    .map(k => ({ key: k, buff: run.buffs[k], label: STAT_LABELS[k], alcance: run.squad.filter(p => p.stats[k] !== undefined).length }));
+}
+
+/**
+ * Canjea el boost de entrenamiento de una stat por crecimiento PERMANENTE (Bible cap.6,
+ * "Permanent Growth"): descuenta CANJE_THRESHOLD del buff del próximo partido y suma
+ * +CANJE_PERMANENT PERMANENTE a esa stat en cada jugador del plantel que la tenga (los de
+ * campo no tienen atajadas/reflejos/salidas: no los toca). El crecimiento nunca decrece y
+ * respeta el techo de 99. Es GRATIS: no consume la Acción del Día (ya se pagó con los días
+ * de Entrenar). Escribe squad[].stats — mismo caño que usan medical y los efectos de
+ * content/ (ARQUITECTURA §3.1); si la progresión crece (equipo, cuerpo técnico), se muda a
+ * game/progression.js. Devuelve {key, label, permanent, alcance, jugadores} para el toast y
+ * el diario, o null si esa stat no llegaba al umbral (la UI no debería ofrecerlo).
+ */
+export function canjeBuff(run, key) {
+  if (!CANJEABLE_STATS.includes(key) || (run.buffs[key] || 0) < CANJE_THRESHOLD) return null;
+  run.buffs[key] -= CANJE_THRESHOLD;
+  if (run.buffs[key] === 0) delete run.buffs[key];
+  const jugadores = run.squad.filter(p => p.stats[key] !== undefined);
+  for (const p of jugadores) p.stats[key] = clamp(p.stats[key] + CANJE_PERMANENT, 1, 99);
+  const label = STAT_LABELS[key];
+  addJournal(run, {
+    icon: "✨", tone: "gold", title: "El entrenamiento dio frutos permanentes",
+    desc: `El plantel convirtió el trabajo de la cancha en crecimiento: +${CANJE_PERMANENT} de ${label} PERMANENTE para ${jugadores.length} jugador${jugadores.length > 1 ? "es" : ""} (el resto de la run).`,
+  });
+  return { key, label, permanent: CANJE_PERMANENT, alcance: jugadores.length, jugadores: jugadores.map(p => p.name) };
 }
 
 /** Multiplicador de una acción HOY según el modificador del día (1 si no hay; 0 = bloqueada). */

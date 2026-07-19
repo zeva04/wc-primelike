@@ -14,9 +14,9 @@
 import { getTeam } from "../../data/teams-repo.js";
 import {
   playerOverall, naturalOverall, overallAt, playerStars, lineupRating,
-  STAT_KEYS, GK_STAT_KEYS, playedPos, posDistance, effectiveStat, outOfPosPenalty, statPenalties,
+  STAT_KEYS, GK_STAT_KEYS, playedPos, posDistance, effectiveStat, baseStatAt, outOfPosPenalty, statPenalties,
 } from "../../game/ratings.js";
-import { momentoPct } from "../../game/momentum.js";
+import { momentoPct, momentoLabel } from "../../game/momentum.js";
 import { moraleBand } from "../../game/morale.js";
 import {
   currentLineup, autoLineup, validateLineup, assignPositions, canPlayAt,
@@ -24,7 +24,7 @@ import {
 } from "../../game/lineup.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, momentoChip, momentoArrows, toast, modal, closeModal } from "../components.js";
+import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, momentoChip, toast, modal, closeModal } from "../components.js";
 import { mountPitch, POS_NAME } from "../pitch.js";
 import { spriteSvg } from "../sprites.js";
 
@@ -236,7 +236,7 @@ function renderPlayerCard() {
     ${fuera ? outOfPosNote(p, bajas) : ""}
 
     <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">Estadísticas</div>
-    <div class="space-y-1 mb-3">${keys.map(k => statRow(p, k, bajas.find(b => b.key === k))).join("")}</div>
+    <div class="space-y-1 mb-3">${keys.map(k => statRow(p, k)).join("")}</div>
 
     <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">Información</div>
     <div class="space-y-1 mb-3 text-xs">
@@ -244,9 +244,9 @@ function renderPlayerCard() {
         <span class="text-slate-400">Energía</span>
         <span class="flex items-center gap-1.5"><span class="w-16">${energyBar(p.energia)}</span><b class="w-8 text-right ${p.energia > 65 ? "text-emerald-400" : p.energia > 35 ? "text-amber-400" : "text-red-400"}">${p.energia}%</b></span>
       </div>
-      <div class="flex items-center justify-between gap-2" title="Forma del jugador (1-7, neutro 4): sube y baja con su rendimiento en los partidos y afecta sus stats">
-        <span class="text-slate-400">Momento ${momentoChip(p)}</span>
-        <span class="flex items-center gap-1.5">${momentoArrows(p)}<b class="text-right text-slate-300">${p.momento ?? 4}/7</b>${momentoPct(p) !== 0 ? `<span class="font-bold ${momentoPct(p) > 0 ? "text-emerald-400" : "text-sky-400"}">(${momentoPct(p) > 0 ? "+" : ""}${momentoPct(p)}% stats)</span>` : ""}</span>
+      <div class="flex items-center justify-between gap-2" title="Forma del jugador (Normal es lo neutro): sube y baja con su rendimiento en los partidos y afecta sus stats">
+        <span class="text-slate-400">Momento</span>
+        <span class="flex items-center gap-1.5"><b class="${momentoPct(p) > 0 ? "text-emerald-400" : momentoPct(p) < 0 ? "text-sky-400" : "text-slate-300"}">${momentoLabel(p)}</b>${momentoChip(p)}${momentoPct(p) !== 0 ? `<span class="font-bold text-[11px] ${momentoPct(p) > 0 ? "text-emerald-400" : "text-sky-400"}">(${momentoPct(p) > 0 ? "+" : ""}${momentoPct(p)}% stats)</span>` : ""}</span>
       </div>
       <div class="flex items-center justify-between gap-2"><span class="text-slate-400">Estado</span><span class="${st.cls} font-semibold text-right">${st.txt}</span></div>
       <div class="flex items-center justify-between gap-2"><span class="text-slate-400">Partidos</span><b>${p.partidos}</b></div>
@@ -275,17 +275,25 @@ function outOfPosNote(p, bajas) {
   </div>`;
 }
 
-/** Fila de una stat: el valor REAL del motor (con Momento); fuera de puesto muestra base → castigada. */
-function statRow(p, key, baja) {
-  const v = baja ? baja.real : effectiveStat(p, key);
-  const color = v >= 75 ? "bg-emerald-500" : v >= 55 ? "bg-amber-500" : "bg-red-500";
-  const txt = v >= 75 ? "text-emerald-400" : v >= 55 ? "text-amber-400" : "text-red-400";
+/**
+ * Fila de una stat: la BARRA muestra el valor BASE (sin el % del Momento, con los colores
+ * de siempre; el entrenamiento/canje suben esa base), y aparte el boost/nerf que aporta el
+ * Momento — dorado si suma, celeste si resta. El castigo por fuera de puesto ya está en la
+ * base (la nota de "jugando de …" lo explica arriba).
+ */
+function statRow(p, key) {
+  const base = baseStatAt(p, key);
+  const mDelta = effectiveStat(p, key) - base; // lo que suma o resta el Momento
+  const color = base >= 75 ? "bg-emerald-500" : base >= 55 ? "bg-amber-500" : "bg-red-500";
+  const txt = base >= 75 ? "text-emerald-400" : base >= 55 ? "text-amber-400" : "text-red-400";
+  const delta = mDelta !== 0
+    ? `<span class="w-8 text-right font-black text-[11px] ${mDelta > 0 ? "text-amber-300" : "text-sky-400"}" title="Efecto del Momento">${mDelta > 0 ? "+" : ""}${mDelta}</span>`
+    : `<span class="w-8"></span>`;
   return `<div class="flex items-center gap-2 text-xs">
     <span class="text-slate-400 w-20 shrink-0">${STAT_NAME[key]}</span>
-    <span class="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden"><span class="block h-full ${color} rounded-full" style="width:${v}%"></span></span>
-    ${baja ? `<span class="text-[9px] text-slate-500 line-through w-5 text-right">${baja.base}</span>
-              <b class="w-6 text-right text-orange-400">${v}</b>`
-            : `<b class="w-6 text-right ${txt}">${v}</b><span class="w-5"></span>`}
+    <span class="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden"><span class="block h-full ${color} rounded-full" style="width:${base}%"></span></span>
+    <b class="w-6 text-right ${txt}">${base}</b>
+    ${delta}
   </div>`;
 }
 

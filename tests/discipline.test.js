@@ -26,6 +26,7 @@ function setup() {
     gMy: 0, gOpp: 0,
     scorers: [], oppGoalMins: [], pensFallados: [], pensAtajadosPor: [],
     result: () => ({ winner: null, gMy: 0, gOpp: 0, pens: null }),
+    minutesByName: () => Object.fromEntries(run.squad.slice(0, 6).map(p => [p.name, 90])), // los 6 titulares jugaron los 90'
   };
   return { run, match, j: (p) => run.journal.filter(e => e.title.includes(p)) };
 }
@@ -110,7 +111,7 @@ function setup() {
   t(j("lesionado").length === 1, "lesión: entrada en el diario");
 }
 
-// 8. Energía: +15 si jugó, +30 si descansó (tope 100)
+// 8. Energía: jugar CANSA (−10 cada 30' → −30 los 90'), descansar recupera (+30, tope 100)
 {
   const { run, match } = setup();
   const jugador = match.my.lineup[0];
@@ -118,8 +119,8 @@ function setup() {
   jugador.energia = 50;
   banca.energia = 50;
   E.postMatchUpdate(run, match);
-  t(jugador.energia === 65, `energía del titular: 50→65 (quedó ${jugador.energia})`);
-  t(banca.energia === 80, `energía del suplente: 50→80 (quedó ${banca.energia})`);
+  t(jugador.energia === 20, `energía del titular que jugó 90': 50→20 (−30) (quedó ${jugador.energia})`);
+  t(banca.energia === 80, `energía del suplente que descansó: 50→80 (+30) (quedó ${banca.energia})`);
 }
 
 // 9. postMatchUpdate re-agenda el calendario y limpia buffs

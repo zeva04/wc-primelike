@@ -9,8 +9,8 @@ import { teamRating, teamStars, playerOverall, outOfPosPenalty } from "../../gam
 import { currentLineup, validateLineup, getFormation } from "../../game/lineup.js";
 import { dayLabel, advanceDay } from "../../game/calendar.js";
 import { buildDaily } from "../../game/daily.js";
-import { applyDayAction, actionMult, multLabel, dayOpportunity } from "../../game/day-action.js";
-import { DAY_ACTIONS, TACTICS_BONUS, TRAIN_BUFF, TRAIN_FATIGUE } from "../../content/day-actions.js";
+import { applyDayAction, actionMult, multLabel, dayOpportunity, canjeableBuffs, canjeBuff } from "../../game/day-action.js";
+import { DAY_ACTIONS, TACTICS_BONUS, TRAIN_BUFF, TRAIN_FATIGUE, CANJE_THRESHOLD, CANJE_PERMANENT, STAT_LABELS } from "../../content/day-actions.js";
 import { RARITIES } from "../../content/rarities.js";
 import { addJournal } from "../../game/journal.js";
 import { moraleBand } from "../../game/morale.js";
@@ -88,7 +88,6 @@ function renderCalendarCard(opp) {
 
 /** Chips con los efectos acumulados para el próximo partido; "" si no hay ninguno. */
 function buffChips() {
-  const LABELS = { tiro: "Tiro", defensa: "Defensa", atajadas: "Atajadas", reflejos: "Reflejos", pase: "Pase", aura: "Aura", cabezazo: "Cabezazo" };
   const chips = [];
   for (const [k, v] of Object.entries(S.run.buffs)) {
     if (k === "antiLesion") { if (v) chips.push(`<span class="px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/10 text-emerald-400">🧑‍⚕️ Sin lesiones</span>`); continue; }
@@ -99,11 +98,41 @@ function buffChips() {
       chips.push(`<span class="px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/10 text-emerald-400">📋 Preparación táctica${n > 1 ? ` ×${n}` : ""}</span>`);
       continue;
     }
-    if (!v || !LABELS[k]) continue;
+    if (!v || !STAT_LABELS[k]) continue;
     const pos = v > 0;
-    chips.push(`<span class="px-2 py-0.5 rounded-full border ${pos ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" : "border-red-500/50 bg-red-500/10 text-red-400"}">${LABELS[k]} ${pos ? "+" : ""}${v}</span>`);
+    const canje = v >= CANJE_THRESHOLD; // ya alcanza el umbral: se resalta como canjeable
+    chips.push(`<span class="px-2 py-0.5 rounded-full border ${canje ? "tp-border tp-text" : pos ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" : "border-red-500/50 bg-red-500/10 text-red-400"}">${canje ? "✨ " : ""}${STAT_LABELS[k]} ${pos ? "+" : ""}${v}</span>`);
   }
   return chips.length ? `<div class="flex flex-wrap gap-1.5 text-[10px] font-bold">${chips.join("")}</div>` : "";
+}
+
+/**
+ * Confirmación del canje (Bible cap.6): renuncias a +CANJE_THRESHOLD del boost del próximo
+ * partido y, a cambio, ganas +CANJE_PERMANENT PERMANENTE en esa stat para todos los que la
+ * tienen. Es irreversible (crece y no baja) pero gratis (no gasta la Acción del Día).
+ */
+function showCanje(key) {
+  const label = STAT_LABELS[key];
+  const alcance = S.run.squad.filter(p => p.stats[key] !== undefined).length;
+  const m = modal(`
+    <div class="text-center">
+      <div class="text-5xl mb-2">✨</div>
+      <h2 class="text-xl font-black mb-1">Canjear entrenamiento</h2>
+      <p class="text-slate-300 text-sm mb-4">Renuncias a <b class="text-emerald-400">+${CANJE_THRESHOLD} de ${label}</b> para el próximo partido y, a cambio, sumas <b class="tp-text">+${CANJE_PERMANENT} de ${label} PERMANENTE</b> a los <b>${alcance}</b> jugadores del plantel que tienen esa stat — para el resto de la run.</p>
+      <p class="text-[11px] text-slate-500 mb-5">El crecimiento permanente no baja y no pasa a otras runs. Gratis: no gasta tu Acción del Día.</p>
+      <div class="flex gap-2">
+        <button id="canje-cancel" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-800 cursor-pointer transition-all">Mejor no</button>
+        <button id="canje-ok" class="flex-1 btn-primary">✨ Canjear</button>
+      </div>
+    </div>
+  `);
+  m.querySelector("#canje-cancel").onclick = closeModal;
+  m.querySelector("#canje-ok").onclick = () => {
+    const res = canjeBuff(S.run, key);
+    closeModal();
+    if (res) toast(`✨ +${res.permanent} de ${res.label} PERMANENTE para ${res.alcance} jugador${res.alcance > 1 ? "es" : ""}.`);
+    renderHub();
+  };
 }
 
 // Colores del nivel de amenaza del informe: Alto = peligro, Bajo = ventaja tuya
@@ -335,6 +364,7 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
   const enCls = avgEnergy > 65 ? "text-emerald-400" : avgEnergy > 35 ? "text-amber-400" : "text-red-400";
   const formationLabel = getFormation(S.formation) ? S.formation : "Improvisada";
   const chips = buffChips();
+  const canjeables = canjeableBuffs(run);
   const avisos = [];
   if (!v.ok) avisos.push(`<div class="text-amber-400">⚠️ ${v.msg}</div>`);
   else if (v.short) avisos.push(`<div class="text-orange-400">🆘 Plantel diezmado: presentas ${S.selectedLineup.length} — jugarás en inferioridad</div>`);
@@ -356,6 +386,12 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
     <div class="mb-3 shrink-0">
       <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">✨ Efectos próximo partido</div>
       ${chips || `<div class="text-[10px] text-slate-500">Sin efectos aún — los días del calendario los irán sumando.</div>`}
+      ${canjeables.length ? `<div class="mt-2 space-y-1.5">
+        ${canjeables.map(c => `<button data-key="${c.key}" class="canje-opt w-full flex items-center justify-between gap-2 rounded-lg border tp-border tp-bg-soft px-2.5 py-1.5 text-left hover:brightness-125 cursor-pointer transition-all" title="Convierte el boost en crecimiento permanente para el resto de la run">
+          <span class="text-[11px] font-bold tp-text">✨ Canjear ${c.label} +${CANJE_THRESHOLD} → +${CANJE_PERMANENT} permanente</span>
+          <span class="text-[9px] text-slate-400 shrink-0">a ${c.alcance} jug.</span>
+        </button>`).join("")}
+      </div>` : ""}
     </div>
     ${avisos.length ? `<div class="space-y-1 text-xs mb-3 shrink-0">${avisos.join("")}</div>` : ""}
     <button id="btn-squad" class="w-full text-sm font-bold py-2.5 rounded-lg tp-gradient cursor-pointer hover:brightness-110 transition-all shrink-0">📋 Gestión de Plantilla →</button>
@@ -369,7 +405,28 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
  * y a lo ancho abajo el calendario y el botón del día. El Diario y el Estado del
  * Mundial viven como iconos en la cabecera.
  */
-function renderHub() {
+/**
+ * Pasa al día siguiente: lo resuelve el motor (advanceDay), re-pinta el hub y abre la
+ * portada del Daily; al cerrarla llega el evento/conflicto (o el toast de día de partido).
+ * Lo usan el botón "Pasar al día" y la vuelta del partido (el partido consume su día, así
+ * que al volver al hub arranca el día siguiente — no el del partido).
+ */
+function pasarDia() {
+  const res = advanceDay(S.run);
+  if (!res) { renderHub(); return; }
+  renderHub(); // el hub del día nuevo queda detrás de la portada
+  // Bible §4.4: el día arranca con el Daily (informa); el evento llega después (transforma)
+  showDaily(buildDaily(S.run), () => {
+    if (res.type === "match") { closeModal(); toast(`⚽ ${dayLabel(S.run.day)} — ¡Día de partido!`); }
+    else if (res.type === "evento") showDayEvent(res);
+    else showRandomEvent(res);
+  });
+}
+
+function renderHub(opts = {}) {
+  // Al volver de un partido (opts.autoAdvance) el día ya se jugó: se avanza al siguiente
+  // en vez de quedarse en el hub del día del partido (evita re-mostrar ese día).
+  if (opts.autoAdvance) { pasarDia(); return; }
   const run = S.run;
   const me = getTeam(run.teamId);
   const oppId = nextOpponentId(run);
@@ -487,6 +544,9 @@ function renderHub() {
   $("#btn-scorers").onclick = () => go("scorers");
   $("#btn-journal").onclick = () => go("journal", "hub");
   $("#btn-squad").onclick = () => go("squad");
+  // El canje está disponible siempre que un buff llegue al umbral (también el día de
+  // partido: renunciar al boost de hoy por crecimiento permanente es una decisión válida).
+  document.querySelectorAll(".canje-opt").forEach(b => b.onclick = () => showCanje(b.dataset.key));
   if (isMatchDay) {
     const play = $("#btn-play");
     play.disabled = !v.ok;
@@ -510,17 +570,7 @@ function renderHub() {
       toast(`${res.icon} ${res.title}: ${res.desc}`);
       renderHub();
     };
-    if (!S.run.actionPending) $("#btn-nextday").onclick = () => {
-      const res = advanceDay(S.run);
-      if (!res) { renderHub(); return; }
-      renderHub(); // el hub del día nuevo queda detrás de la portada
-      // Bible §4.4: el día arranca con el Daily (informa); el evento llega después (transforma)
-      showDaily(buildDaily(S.run), () => {
-        if (res.type === "match") { closeModal(); toast(`⚽ ${dayLabel(S.run.day)} — ¡Día de partido!`); }
-        else if (res.type === "evento") showDayEvent(res);
-        else showRandomEvent(res);
-      });
-    };
+    if (!S.run.actionPending) $("#btn-nextday").onclick = pasarDia;
   }
 }
 

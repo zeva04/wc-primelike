@@ -182,7 +182,7 @@ Formato: **propósito · contiene · NUNCA debe contener**.
 | `game/calendar.js` | El tiempo de la run | dayLabel, scheduleNextMatch, advanceDay | Efectos de eventos (viven en content), render |
 | `game/discipline.js` | Tarjetas y sanciones | acumulación, suspensiones, clearAmarillas | Faltas EN partido (eso es `match/incidents`) |
 | `game/medical.js` | Cuerpo y energía | rollInjury, recuperación post-partido | Tabla de lesiones (content/injuries) |
-| `game/momentum.js` | El Momento del jugador (forma 1..7) | momentoPct/momentoMult, applyMomentumPostMatch | Render de chips/flechas (ui/components), reglas de moral |
+| `game/momentum.js` | El Momento del jugador (forma 1..7) | momentoPct/momentoMult, momentoLabel/MOMENTO_LABELS, applyMomentumPostMatch (devuelve el resumen anímico) | Render de chips/flechas (ui/components), reglas de moral |
 | `game/morale.js` | La Moral del equipo (1..100) | MORAL_BANDS, moraleBand, bumpMorale, applyMoralePostMatch | Efecto en partido (v1 no tiene; el hook vive comentado en Match.tick) |
 | `game/scorers.js` | Goleadores del torneo | addTournamentGoal, assignScorers, tournamentScorers | Resultados de partido (solo pone autor a goles ya decididos) |
 | `game/journal.js` | Memoria de la run | addJournal, tonos válidos | Render del diario, decisiones de qué anotar (cada sistema anota lo suyo) |
@@ -208,7 +208,7 @@ Este mapa es ley: si un módulo escribe un campo que no le pertenece, es un bug 
 | Campo de `run` | Dueño (escribe) | Lectores típicos |
 |---|---|---|
 | `teamId`, `groups`, `myGroupIdx`, `rounds` | `run.js` (nacen) · `tournament/groups` (results) | todos |
-| `squad[].stats/energia` | `medical`, efectos de `content/` | match, ui |
+| `squad[].stats/energia` | `medical`, efectos de `content/`, `day-action` (canje → crecimiento permanente, Bible cap.6) | match, ui |
 | `squad[].amarillas/suspendido/expulsado` | `discipline` (post-partido) · `match/incidents` (en juego) | lineup, ui |
 | `squad[].lesionado*` | `match/incidents` · `medical` | lineup, ui |
 | `squad[].momento` | `momentum.js` (post-partido) · efectos de `content/` (mutación directa 1..7) | ratings (statAt), ui, daily |

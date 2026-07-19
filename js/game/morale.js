@@ -64,31 +64,40 @@ export function bumpMorale(run, delta, motivo) {
 
 /**
  * Cierre anímico del partido (lo llama flow.postMatchUpdate):
- *  - base: victoria +10 · derrota −10 · empate 0
+ *  - base: victoria +10 · derrota −10 · empate 0 (el RESULTADO mueve la moral del equipo,
+ *    no el momento individual — decisión PO 18-jul)
  *  - gol agónico (≥85') que decide: triunfo por la mínima +5 · empate propio al
  *    final +4 · nos empatan al final −4 · derrota por la mínima al final −5
  *  - tanda de penales: ganarla +3 extra, perderla −3 extra (el drama pesa)
  * "Pasar de ronda" suma aparte en flow.advanceStage (bumpMorale +5).
+ *
+ * Devuelve el RESUMEN para el análisis del cuerpo técnico del post-partido:
+ * `{before, after, delta, bandBefore, bandAfter, reasons:[texto]}`.
  */
 export function applyMoralePostMatch(run, match) {
   const res = match.result();
   const won = res.winner === "my", lost = res.winner === "opp";
+  const reasons = [];
   let delta = won ? 10 : lost ? -10 : 0;
+  reasons.push(won ? "Victoria" : lost ? "Derrota" : "Empate");
 
   const lastMy = match.scorers.at(-1);          // mi último gol {name, min}
   const lastOpp = match.oppGoalMins.at(-1);     // minuto del último gol rival
   const margen = match.gMy - match.gOpp;        // marcador de los 90/120 (sin tanda)
-  if (margen === 1 && lastMy && lastMy.min >= MIN_AGONICO) delta += 5;
-  else if (margen === -1 && lastOpp >= MIN_AGONICO) delta -= 5;
+  if (margen === 1 && lastMy && lastMy.min >= MIN_AGONICO) { delta += 5; reasons.push("triunfo sobre la hora"); }
+  else if (margen === -1 && lastOpp >= MIN_AGONICO) { delta -= 5; reasons.push("gol rival sobre la hora"); }
   else if (margen === 0 && (lastMy || lastOpp !== undefined)) {
     const myMin = lastMy ? lastMy.min : -1;
     const oppMin = lastOpp !== undefined ? lastOpp : -1;
-    if (myMin > oppMin && myMin >= MIN_AGONICO) delta += 4;       // lo empatamos al final
-    else if (oppMin > myMin && oppMin >= MIN_AGONICO) delta -= 4; // nos empataron al final
+    if (myMin > oppMin && myMin >= MIN_AGONICO) { delta += 4; reasons.push("empate rescatado al final"); }
+    else if (oppMin > myMin && oppMin >= MIN_AGONICO) { delta -= 4; reasons.push("empate sufrido al final"); }
   }
-  if (res.pens) delta += won ? 3 : -3;
+  if (res.pens) { delta += won ? 3 : -3; reasons.push(won ? "tanda ganada" : "tanda perdida"); }
 
-  return bumpMorale(run, delta, motivoDe(match, res, won, lost));
+  const before = run.moral ?? MORAL_INICIAL;
+  const bandBefore = moraleBand(before);
+  bumpMorale(run, delta, motivoDe(match, res, won, lost));
+  return { before, after: run.moral, delta, bandBefore, bandAfter: moraleBand(run.moral), reasons };
 }
 
 /** Frase del diario para un cambio de banda tras el partido. */

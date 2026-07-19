@@ -134,6 +134,7 @@ export const PREP_EVENTS = [
       if (!sanos.length) { energia(r, -10); return "El susto quedó en nada, pero el plantel gastó energías de más (−10)."; }
       const p = pick(sanos);
       p.lesionadoPartidos = 1;
+      p.momento = 4; // la lesión le corta la forma (neutro; content no importa game/momentum)
       return `${p.name} cayó mal en la práctica: se pierde el próximo partido.`;
     } },
 

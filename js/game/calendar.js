@@ -8,6 +8,7 @@ import { RANDOM_EVENTS } from "../content/conflicts.js";
 import { OPPORTUNITIES } from "../content/opportunities.js";
 import { RARITIES } from "../content/rarities.js";
 import { addJournal } from "./journal.js";
+import { applyDailyRecovery } from "./medical.js";
 import { playWorldDay } from "./tournament/world.js";
 
 // Día 1 = 11 de junio de 2026, arranque real del Mundial. Las fechas son ambientación:
@@ -98,6 +99,7 @@ export function advanceDay(run) {
   playWorldDay(run); // "anoche" el resto del Mundial jugó lo suyo (run.lastNight → Daily)
   if (run.day >= run.nextMatchDay) { run.actionPending = false; return { type: "match" }; }
   run.actionPending = true;
+  applyDailyRecovery(run); // descanso pasivo del día de preparación (medical)
   const plan = run.dayPlan[run.day];
   if (!plan) { run.actionPending = false; return { type: "match" }; } // no debería ocurrir: todo día intermedio tiene plan
   if (plan.opp) { run.dayOpp = { id: plan.opp }; run.stats.oppOfrecidas++; } // la cuenta final revela las que dejaste pasar

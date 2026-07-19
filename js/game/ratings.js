@@ -52,6 +52,13 @@ function statAt(p, key, pos, conMomento = true) {
 export function effectiveStat(p, key) { return statAt(p, key, playedPos(p)); }
 
 /**
+ * Stat BASE en el puesto que juega, SIN el % del Momento: el valor sobre el que el Momento
+ * suma/resta (lo usa la ficha para pintar la barra base y el boost/nerf por separado).
+ * Incluye el castigo por fuera de puesto y el crecimiento permanente del canje (`p.stats`).
+ */
+export function baseStatAt(p, key) { return statAt(p, key, playedPos(p), false); }
+
+/**
  * Stats que le bajan al jugador por estar fuera de puesto: `[{key, base, real, delta}]`
  * (vacío si juega en el suyo). `base` es lo que tendría EN SU PUESTO con su momento
  * actual — así la ficha aísla el castigo posicional sin mezclarlo con el % del Momento.

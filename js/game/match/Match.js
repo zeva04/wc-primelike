@@ -60,6 +60,10 @@ export class Match {
     this.pensFallados = [];    // nombres míos que fallaron un penal (en juego o tanda)
     this.pensAtajadosPor = []; // nombre de MI arquero por cada penal que atajó
     this._interactiveChanceCooldown = 0;
+    // Minutos jugados por jugador (para el cansancio post-partido, medical): los titulares
+    // entran al minuto 0; un cambio cierra los del que sale y arranca los del que entra.
+    this._minutes = new Map();                              // jugador → minutos ya acumulados (los que salieron)
+    this._enteredAt = new Map(my.lineup.map(p => [p, 0]));  // jugador en cancha → minuto en que entró
   }
 
   // ---------- Estado y consultas ----------
@@ -178,6 +182,8 @@ export class Match {
     inP.posJugada = canPlayAt(inP, puesto) ? puesto : inP.pos;
     this.my.lineup[idx] = inP;
     this.my.bench = this.my.bench.filter(b => b !== inP);
+    this._accrueMinutes(outPlayer);          // cierra los minutos del que sale
+    this._enteredAt.set(inP, this.min);      // el que entra empieza a contar ahora
     outPlayer.sustituido = true;
     if (!outPlayer.lesionado) this.my.bench.push(outPlayer); // queda visible en banca, en gris
     outPlayer.enCancha = false;
@@ -211,6 +217,27 @@ export class Match {
     let r = rnd() * total;
     for (let i = 0; i < arr.length; i++) { r -= weights[i]; if (r <= 0) return arr[i]; }
     return arr[arr.length - 1];
+  }
+
+  /** Cierra los minutos acumulados de un jugador que deja la cancha (cambio) en el minuto actual. */
+  _accrueMinutes(p) {
+    const enter = this._enteredAt.get(p);
+    if (enter === undefined) return;
+    this._minutes.set(p, (this._minutes.get(p) || 0) + Math.max(0, this.min - enter));
+    this._enteredAt.delete(p);
+  }
+
+  /**
+   * Minutos jugados por jugador, por NOMBRE (§3.1): los que salieron ya están cerrados en
+   * `_minutes`; los que siguen en cancha se cierran al minuto actual (al llamarla el partido
+   * ya terminó, así que `this.min` es el minuto final: 90 o 120). Lo usa medical para el
+   * cansancio. No muta el estado — se puede llamar más de una vez.
+   */
+  minutesByName() {
+    const out = {};
+    for (const [p, m] of this._minutes) out[p.name] = m;
+    for (const [p, enter] of this._enteredAt) out[p.name] = (out[p.name] || 0) + Math.max(0, this.min - enter);
+    return out;
   }
 
   /** Resultado final: marcador, ganador ("my"/"opp"/null=empate) y detalle de penales si hubo. */

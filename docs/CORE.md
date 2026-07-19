@@ -108,8 +108,12 @@ castigo_por_stat = 6 × distancia        // escala 1–99, piso en 1
 ## 2c. El Momento del jugador (`game/momentum.js`)
 
 La mitad **dinámica** de la progresión (Bible cap. 6): una stat temporal **1..7 por
-jugador** (nace en 4 = neutro) que refleja su forma actual. Visible como flechas ▲/▼ en
-la ficha y chips 🔥 (6-7) / ❄️ (1-2) en cancha, hub y panel del partido.
+jugador** (nace en 4 = neutro) que refleja su forma actual. En la UI se lee **cualitativo,
+no numérico** (decisión PO 18-jul): los 7 niveles son Paupérrimo · Apagado · Malo · Normal ·
+Bueno · Encendido · Inspirado (`MOMENTO_LABELS`, en la ficha). Sobre la ficha en cancha lo
+marca un icono por nivel — el color codifica la distancia al neutro (amarillo = 1 paso,
+verde = 2) y abajo amarillo (3) → celeste (2); la forma da la dirección: **7 🔥 · 6 ▲verde ·
+5 ▲amarillo · 4 nada · 3 ▼amarillo · 2 ▼celeste · 1 ❄️**.
 
 **Efecto mecánico** (decisión PO 17-jul-2026):
 
@@ -130,19 +134,32 @@ stat_final = round(stat_castigada × (1 + pct/100))
   n=4000) — dentro del gate de ±2pp. Precedente FEAT-003: si vuelve a derivar, se
   recorta más (el siguiente dial es el % por paso), no se relaja el gate.
 
-**Cómo se mueve** (en `postMatchUpdate`, jugador por jugador, suma acotada a ±2):
+**Cómo se mueve** (en `postMatchUpdate`, jugador por jugador; la suma **sube hasta +1 y
+baja hasta −2** por partido, `MOMENTO_RISE_MAX`/`MOMENTO_FALL_MAX`). El Momento es
+**individual**: el resultado del equipo **NO** lo mueve (decisión PO 18-jul — eso va a la
+**Moral**, §9).
 
-| Señal | Efecto |
+| Señal (individual) | Efecto |
 |---|---|
-| Resultado del equipo | acerca y **sostiene** la forma solo en la banda **3..5**: victoria empuja/sostiene hasta 5, derrota hasta 3, empate no mueve |
 | Gol propio | +1 por gol (máx +2) |
 | Penal fallado (juego o tanda) | −1 por fallo |
 | Arquero: valla invicta / 3+ goles / penal atajado | +1 / −1 / +1 |
-| Sin señal neta o sin jugar | **decae 1 paso hacia el neutro (4)** |
+| **Lesión** que lo deja de baja | **vuelve al neutro (4)**: la lesión corta la forma |
+| Sin señal individual o sin jugar | **decae 1 paso hacia el neutro (4)** |
 
-Los extremos 6-7 y 1-2 **solo se alcanzan y sostienen con actuaciones individuales**: la
-regla original (victoria = +1 plano para todo el que jugaba) plantaba al equipo entero en
-6-7 durante una racha y fue el origen del +5pp.
+**Subir cuesta más que caer** (decisión PO 18-jul): aunque un jugador haga méritos de
+sobra (doblete → +2 en crudo), su Momento **sube como mucho +1 por partido**; una mala
+actuación sí puede restarle hasta −2. Como el resultado ya no sostiene la forma, **mantener
+6-7 exige rendir partido a partido**: el que no marca/ataja decae hacia el neutro. El
+efecto sigue siendo asimétrico (los rivales no tienen Momento) pero mucho más contenido que
+antes — quitarle el empuje del resultado bajó el % de campeón (BRA 32.2→31.0% n=4000, dentro
+del gate). El post-partido devuelve el **resumen por jugador** (`{before, after, delta,
+reasons}`) para el "Análisis del cuerpo técnico".
+
+El cierre de cada partido devuelve el **resumen anímico por jugador** (`{before, after,
+delta, reasons}`) que alimenta el **"Análisis del cuerpo técnico"** del post-partido: quién
+subió o bajó y por qué (goles, penales, valla, resultado o simple decaimiento) — el motor,
+dueño de la regla, también narra el motivo.
 
 ---
 
@@ -420,16 +437,42 @@ después el DT decide. No se puede pasar el día sin elegir. Las 5 acciones
 
 | Acción | Efecto | Trade-off |
 |---|---|---|
-| 🎯/🛡️/🎩 **Entrenar** (foco ataque, defensa o pases) | +4 al buff de la stat elegida | **−5 de energía** a todo el plantel |
-| 🧘 **Recuperar** | +15 de energía a todo el plantel | No mejora ninguna stat |
+| 🎯/🛡️/🎩 **Entrenar** (foco ataque, defensa o pases) | +1 al buff de la stat elegida (`TRAIN_BUFF`) | **−5 de energía** a todo el plantel |
+| 🧘 **Recuperar** | +10 de energía a todo el plantel | No mejora ninguna stat |
 | 📋 **Sesión táctica** | +0.1 a **atk y def** (escala de poder §5) para el próximo partido, vía `buffs.tactica` | No recupera ni sube stats individuales |
 
-Calibración: +4 de una stat entrenada equivale a +0.06–0.14 de poder según la stat
-(§5), así que la sesión táctica (+0.1 repartido en ambas fases, sin costo de energía)
-compite de igual a igual con entrenar — ninguna acción domina, como pide el Bible.
-El bonus táctico solo alcanza al equipo del usuario (el rival calcula sus poderes con
+Calibración: el foco de entrenamiento es **+1 y no +4** (el PO lo bajó el 17-jul: con +4
+el buff dominaba la preparación y el canje —ver abajo— se conseguía en un solo día).
+Un +1 mueve el poder del equipo apenas ~+0.02 (§5), pero es **elegible** (siempre apunta
+a la stat que quieres), mientras que los eventos de ±5 caen donde caen — a igual magnitud,
+elegible gana. La sesión táctica (+0.1 en ambas fases, sin costo de energía) pesa más por
+partido pero no apunta a una stat concreta: ninguna acción domina, como pide el Bible. El
+bonus táctico solo alcanza al equipo del usuario (el rival calcula sus poderes con
 `buffs = {}`) y se limpia con el resto de los buffs al terminar el partido. La sesión
 táctica es además el gancho donde se enchufará la **Filosofía**.
+
+#### El canje de entrenamiento (`canjeBuff`, Bible cap.6 "Permanent Growth")
+
+Los buffs de stat son temporales (se limpian al terminar el partido). El **canje** deja
+convertir ese trabajo en crecimiento **permanente**: cuando el buff de una stat real llega
+a **+4** (`CANJE_THRESHOLD`) en "Efectos próximo partido", el DT puede canjearlo por **+1
+permanente** (`CANJE_PERMANENT`) a esa stat para **todo el plantel** que la tenga (atajadas
+solo alcanza a los arqueros, etc.). El canje **descuenta 4 del buff** (renuncias al boost
+del próximo partido) y es **gratis** —no consume la Acción del Día: el costo ya se pagó
+acumulando el +4—. El crecimiento nunca decrece y respeta el techo de 99; como toda mejora
+de la run, no se traslada a otras runs (Bible cap.6). Escribe `squad[].stats` desde
+`game/day-action.js` (si la progresión crece —equipo, cuerpo técnico— se mudará a
+`game/progression.js`).
+
+**Balance — poder asimétrico (precedente FEAT-003 / Momento).** Los rivales no canjean:
+es ventaja del DT humano, vigilada por el smoke. Como el modelo lee `run.buffs` de
+**cualquier fuente**, en la práctica las **oportunidades** (que vuelcan +5/+7/+10 a una
+stat) son las que más habilitan el canje. Con +2 permanente el techo (smoke greedy, BRA
+n=4000) saltaba a **35.5% (+4.4pp** sobre el baseline 31.1%): fuera del gate ±2pp → se
+recortó el efecto **+2 → +1** (decisión del PO 18-jul, no se relaja el gate). Con +1:
+**32.8% (+1.7pp)**, dentro del gate — costo aceptado y documentado, igual que el residual
+del Momento. Próximos diales si vuelve a derivar: bajar el reward, subir el umbral o contar
+solo lo entrenado (excluir oportunidades).
 
 Medido tras introducirla (1500 runs, decisiones al azar): BRA 34.9%→35.8%, CAN
 37.6%→37.0%, CPV 9.9%→10.1% de campeón — dentro del ruido; el diario crece de ~40 a
@@ -438,8 +481,15 @@ BRA 32.1%, CAN 35.8%, CPV 8.9% — la baja leve es la asimetría deliberada desc
 
 Las palancas de la economía:
 
-- **Energía** (0–100): baja en cancha, se recupera al cerrar cada partido (+15 si
-  jugó, +30 si descansó) y la mueven varios eventos. Alimenta el factor de `effStat` (§4).
+- **Energía** (0–100): **jugar CANSA** — cada partido resta **−10 cada 30' disputados**
+  (`matchFatigue`: un titular de 90' pierde −30; un suplente que entra a los 30' del final,
+  −10). El que **descansó** recupera **+30**. Entre partidos hay **recuperación pasiva**:
+  **+8 por día de preparación** (`applyDailyRecovery`, en `advanceDay`), más la acción
+  Recuperar y varios eventos. Sin la pasiva, el cansancio entra en espiral (no hay forma de
+  reponer a un titular fijo) — medido: BRA se hunde a 5.9%; con la pasiva vuelve a 28.8%
+  (decisión PO 18-jul: el cansancio se siente como dificultad extra). Alimenta el factor de
+  `effStat` (§4), así que descuidar la energía castiga de verdad; obliga a **rotar y
+  recuperar**. Los rivales siempre están al 100% (asimetría en contra del DT humano).
 - **Buffs de stat** (±5 por evento): se **acumulan** día a día hasta el próximo
   partido y se limpian al terminarlo. Son ±5 y no ±10 porque con 4-5 días de eventos
   por ventana el apilamiento esperado equivale al antiguo evento único de ±10.

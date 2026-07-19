@@ -68,29 +68,36 @@ export function closeMatch(run, match) {
     advanced = won;
   }
 
-  postMatchUpdate(run, match);
-  return { res, otherResults, advanced };
+  const { momentum, morale } = postMatchUpdate(run, match);
+  return { res, otherResults, advanced, momentum, morale };
 }
 
-/** Cierre físico, disciplinario y anímico del partido, jugador por jugador, y re-agendado. */
+/**
+ * Cierre físico, disciplinario y anímico del partido, jugador por jugador, y re-agendado.
+ * Devuelve `{momentum, morale}` para el análisis del cuerpo técnico del post-partido:
+ * `momentum` = resumen por jugador; `morale` = resumen del ánimo colectivo.
+ */
 export function postMatchUpdate(run, match) {
+  const minutos = match.minutesByName ? match.minutesByName() : {}; // duck-typed en algunos tests
+  const momentum = [];
   for (const p of run.squad) {
     // Jugó = está en el once final, entró desde el banco (`usado`) o SALIÓ por un cambio
     // (`sustituido`): sin este último, al sustituido no se le contaba el partido y recuperaba
     // energía como si hubiera descansado (bug reportado por el PO).
     const played = match.my.lineup.includes(p) || p.usado || p.sustituido;
     if (played) p.partidos++;
-    applyMedicalPostMatch(run, p, played);
+    applyMedicalPostMatch(run, p, played, minutos[p.name] || 0);
     applyDisciplinePostMatch(run, p);
-    applyMomentumPostMatch(run, p, played, match); // antes de resetear flags: lee p.sustituido
+    momentum.push(applyMomentumPostMatch(run, p, played, match)); // antes de resetear flags: lee p.sustituido
     p.usado = false;
     p.sustituido = false;
     p.enCancha = false;
   }
-  applyMoralePostMatch(run, match);
+  const morale = applyMoralePostMatch(run, match);
   run.buffs = {};
   // El partido consumió el día: se agenda el siguiente a 5-6 días con sus eventos diarios
   scheduleNextMatch(run);
+  return { momentum, morale };
 }
 
 /**

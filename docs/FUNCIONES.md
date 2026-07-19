@@ -100,6 +100,7 @@ Las secciones siguientes documentan las mismas funciones, ahora indicando su mó
 | `posDistance(a,b)` / `penaltyAt(p,pos)` | Pasos entre dos puestos en la línea POR–DEF–MED–DEL / castigo que sufriría ahí (6 por paso). |
 | `outOfPosPenalty(p)` | Castigo que sufre hoy cada stat técnica (0 si juega en su puesto). |
 | `effectiveStat(p,key)` | Stat ya castigada y escalada por el Momento (`momentoMult`, CORE §2c). **Única fuente de verdad**: la leen `playerOverall` (la ficha) y `match/powers.effStat` (la cancha), así la UI no puede mentir. El aura nunca se castiga por posición (por Momento sí se escala). |
+| `baseStatAt(p,key)` | Stat BASE en el puesto que juega, **sin** el % del Momento (base sobre la que el Momento suma/resta; la ficha pinta la barra base y el boost/nerf por separado). Incluye el castigo por fuera de puesto y el crecimiento permanente del canje. |
 | `statPenalties(p)` | `[{key, base, real, delta}]` de lo que le baja por POSICIÓN — `base` va con su Momento actual para aislar el castigo posicional del % de forma. Es lo que pinta la ficha. |
 | `overallAt(p,pos,conMomento=true)` | Nota que tendría parado en `pos` (pesos de ese puesto + castigo); `conMomento:false` la da sin la forma del día. |
 | `naturalOverall(p)` | Nota EN SU PUESTO y SIN Momento: talento, no circunstancia. **La que ordena el plantel** (`autoLineup`): con `playerOverall` el auto manda al banco al crack que estabas usando fuera de puesto (y perseguiría al que está en racha — recorte de balance 17-jul). |
@@ -224,7 +225,8 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 |---|---|
 | `_foulEvent()` | Falta → amarilla/roja o decisión de proteger a un amonestado. |
 | `_injuryEvent()` | Lesión → golpe leve o cambio forzado. |
-| `makeSub(out,inName,force)` | Sustitución. Reglas: máx 3, el sustituido no reingresa, y el que entra debe poder ocupar el puesto del que sale (`canPlayAt`). El que entra hereda `posJugada` del que sale — si salía un improvisado de defensa, el recambio también juega ahí. `force` es la excepción de la roja al arquero: el POR suplente entra por un jugador de campo y se va **al arco**, no a su puesto. No hay excepción a la inversa. |
+| `makeSub(out,inName,force)` | Sustitución. Reglas: máx 3, el sustituido no reingresa, y el que entra debe poder ocupar el puesto del que sale (`canPlayAt`). El que entra hereda `posJugada` del que sale — si salía un improvisado de defensa, el recambio también juega ahí. `force` es la excepción de la roja al arquero: el POR suplente entra por un jugador de campo y se va **al arco**, no a su puesto. También **cierra los minutos** del que sale y arranca los del que entra (para el cansancio). |
+| `minutesByName()` | Minutos jugados por jugador (por nombre), para el cansancio de `medical`: titulares desde el 0, los cambios cortan/arrancan el conteo, y los que siguen en cancha se cierran al minuto final (90/120). No muta estado. |
 
 **Goles, cierre y penales**
 | Método | Qué hace |
@@ -248,18 +250,21 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | `applyDayAction(run,actionId,targetName?)` | **day-action**: aplica la Acción del Día elegida (`DAY_ACTIONS` o la Oportunidad viva hoy) escalada por el modificador del día — la Oportunidad NO se escala (decisión PO: premio externo) —, baja `actionPending`, escribe `lastAction` y anota el diario (la oportunidad con tono por rareza). Si la oportunidad trae `choose`, exige `targetName` válido entre sus candidatos (por nombre, §3.1); sin él no aplica NI consume el turno. Devuelve `{...accion, mult, desc}` (`desc` puede traer protagonista) o `null` si no había acción pendiente, el id no existe, la acción está bloqueada hoy o faltó el objetivo. |
 | `actionMult(run,action)` | **day-action**: multiplicador de una acción HOY según `run.dayMod` (1 sin modificador; 0 = bloqueada). |
 | `dayOpportunity(run)` | **day-action**: la Oportunidad viva HOY (fila completa de `content/opportunities`) o `null`. |
+| `canjeableBuffs(run)` | **day-action**: stats cuyo buff para el próximo partido ya llega al umbral (`CANJE_THRESHOLD`): `[{key, buff, label, alcance}]` (`alcance` = jugadores del plantel con esa stat). Solo stats reales (`CANJEABLE_STATS`); tactica/penales/antiLesion nunca. Vacío si ninguna llegó. |
+| `canjeBuff(run,key)` | **day-action** (Bible cap.6): canjea el buff de una stat por crecimiento PERMANENTE — descuenta `CANJE_THRESHOLD` del buff y suma `+CANJE_PERMANENT` (hoy +1) a esa stat en cada jugador que la tenga (clamp 1..99, nunca decrece). Gratis (no consume la Acción del Día) y anota el diario (tono gold). Devuelve `{key, label, permanent, alcance, jugadores}` o `null` si no llegaba al umbral / no es stat real. Escribe `squad[].stats` (ARQUITECTURA §3.1). |
 | `buildDaily(run)` | **daily**: arma la edición del World Cup Daily — `{day, isMatchDay, items}` con 1-5 titulares `{icon, tag, text}` ordenados por prioridad (PORTADA/PLANTEL/GRUPO/RIVAL/MUNDIAL/HOY/COLOR, ver CORE §9); el primero es la nota de tapa. GRUPO marca al próximo rival si jugó anoche; RIVAL avisa sus suspendidos (`rivalBans`) y da el framing por paridad solo en la previa (≤2 días); MUNDIAL puntúa `run.lastNight` (batacazos por tier, goleadas, festivales, grandes, rojas); HOY es el `teaser` del evento/conflicto que trae el día (anticipa sin revelar). Solo lectura (el flavor consume rng). |
 | `multLabel(mult)` | **day-action**: etiqueta corta para la UI ("×2", "×½"); `""` si es 1 o bloqueo. |
-| `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, goles del rival a la tabla de goleadores (`assignScorers`), resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced}`. |
-| `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario/anímico por jugador (delega en `applyMedicalPostMatch`, `applyDisciplinePostMatch` y `applyMomentumPostMatch` — este ANTES de resetear flags: lee `p.sustituido`), cierra la moral (`applyMoralePostMatch`), limpia buffs y **re-agenda**. "Jugó" = está en el once final, entró del banco (`usado`) o **salió por un cambio** (`sustituido`); sin este último, al sustituido no se le contaba el partido y recuperaba energía como si hubiera descansado. |
+| `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, goles del rival a la tabla de goleadores (`assignScorers`), resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced, momentum}` (`momentum` = resumen anímico por jugador para el análisis del post-partido). |
+| `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario/anímico por jugador (delega en `applyMedicalPostMatch` con los **minutos** de `match.minutesByName()`, `applyDisciplinePostMatch` y `applyMomentumPostMatch` — este ANTES de resetear flags: lee `p.sustituido`), cierra la moral (`applyMoralePostMatch`), limpia buffs y **re-agenda**. "Jugó" = está en el once final, entró del banco (`usado`) o **salió por un cambio** (`sustituido`). **Devuelve** `{momentum, morale}` (resúmenes para el análisis del post-partido). |
 | `advanceStage(run,advanced)` | **flow**: avanza el torneo y devuelve `{type: "next-matchday"\|"qualified"\|"eliminated"\|"next-round"\|"champion"}`; dispara `clearAmarillas` al cerrar grupos y tras 4tos, y `bumpMorale(+5)` al pasar de ronda. La UI solo rutea. |
-| `applyMedicalPostMatch(run,p,played)` | **medical**: energía (+15/+30), descuento de baja y diario de lesión. |
+| `applyMedicalPostMatch(run,p,played,minutos)` / `matchFatigue(minutos)` / `applyDailyRecovery(run)` | **medical**: energía — jugar **cansa** (`matchFatigue`: −10 cada 30' disputados), descansar recupera +30; **recuperación pasiva** +8 por día de preparación (`applyDailyRecovery`, la llama `calendar.advanceDay`). Además descuenta la baja por lesión y anota el diario. `minutos` los calcula `Match.minutesByName`. |
 | `applyDisciplinePostMatch(run,p)` | **discipline**: roja→suspensión; **acumulación de amarillas** (2 en el torneo = 1 partido fuera, contador a 0; doble amarilla = roja y NO acumula). |
 | `momentoPct(p)` / `momentoMult(p)` | **momentum**: efecto % del Momento 1..7 sobre las stats (±2% por paso desde el neutro 4, tope ±4%; CORE §2c). Sin campo `momento` (rivales) → 0 / ×1: la asimetría vive en los datos. |
-| `applyMomentumPostMatch(run,p,played,match)` | **momentum**: mueve `p.momento` con las señales del partido (resultado solo en la banda 3..5, goles, penales fallados, arquero; tope ±2) o lo decae 1 paso hacia el neutro si no hubo señal. Lee `match.scorers`, `match.pensFallados`, `match.pensAtajadosPor` y `p.sustituido`. |
+| `momentoLabel(p)` / `MOMENTO_LABELS` | **momentum**: etiqueta cualitativa del nivel (Paupérrimo/Apagado/Malo/Normal/Bueno/Encendido/Inspirado). La UI muestra la palabra, no el número. |
+| `applyMomentumPostMatch(run,p,played,match)` | **momentum**: mueve `p.momento` con señales **individuales** (goles, penales fallados, arquero) — el **resultado NO lo toca** (eso es Moral) — acotado a +`MOMENTO_RISE_MAX` (=1) / −`MOMENTO_FALL_MAX` (=2); una **lesión** (`lesionadoPartidos>0`) lo **resetea al neutro**; sin señal, decae 1 paso hacia el neutro. Lee `match.scorers`, `match.pensFallados`, `match.pensAtajadosPor`, `p.sustituido`, `p.lesionadoPartidos`. **Devuelve** `{name, pos, before, after, delta, reasons:[{tone,text}]}` para el análisis del cuerpo técnico. |
 | `moraleBand(v)` / `MORAL_BANDS` | **morale**: banda anímica de un valor 1..100 (5 bandas, CORE §9). |
 | `bumpMorale(run,delta,motivo)` | **morale**: mueve `run.moral` con clamp 1..100; cruzar de banda escribe el `motivo` en el diario. |
-| `applyMoralePostMatch(run,match)` | **morale**: la moral del resultado y de CÓMO se dio — base ±10, goles agónicos ≥85' que deciden (±4/±5, lee `match.oppGoalMins`), tanda ±3. v1 sin efecto mecánico en el partido (hook `[MORAL → OCASIONES]` comentado en `Match.tick`). |
+| `applyMoralePostMatch(run,match)` | **morale**: la moral del **resultado** (base ±10) y de CÓMO se dio — goles agónicos ≥85' que deciden (±4/±5, lee `match.oppGoalMins`), tanda ±3. **Devuelve** `{before, after, delta, bandBefore, bandAfter, reasons:[texto]}` para el análisis del post-partido. v1 sin efecto mecánico en el partido (hook `[MORAL → OCASIONES]` comentado en `Match.tick`). |
 | `addJournal(run,entry)` | Agrega una entrada `{day,icon,title,desc,tone}` al Diario de Campaña (`run.journal`). El día se toma de `run.day` salvo override. |
 | `clearAmarillas(run,motivo)` | Borra las amarillas acumuladas de todo el plantel y lo anota en el diario. Se llama al cerrar la fase de grupos y tras los cuartos. Las suspensiones pendientes NO se perdonan. |
 
@@ -273,7 +278,9 @@ que modifica las Acciones del Día vía `run.dayMod`), `RANDOM_EVENTS` (6 confli
 decisión, también con `tema`) y `DAY_ACTIONS` (5 Acciones del Día en
 `content/day-actions.js`: 3 focos de entrenamiento con `group:"entrenar"`, recuperación
 y sesión táctica; los `effect(run, mult)` escalan su recompensa — no el costo — por el
-modificador; exporta también `TRAIN_BUFF`, `TRAIN_FATIGUE` y `TACTICS_BONUS`).
+modificador; exporta también `TRAIN_BUFF` (+1), `TRAIN_FATIGUE`, `TACTICS_BONUS` y las
+constantes del canje `CANJE_THRESHOLD` (+4), `CANJE_PERMANENT` (+1), `CANJEABLE_STATS` y
+`STAT_LABELS`).
 También `DAILY_FLAVOR` (12 titulares de color `{icon, text}` para el World Cup Daily,
 máximo 1 por edición y solo en días tranquilos) y `OPPORTUNITIES`
 (`content/opportunities.js`: 19 Eventos de Oportunidad — Bible §4.5 — que compiten con
@@ -338,6 +345,7 @@ Los helpers `app()` y `$()` viven en `ui/components.js`.
 | `applyTeamColors(team)` | Vuelca los colores del equipo a variables CSS `--team-*`. |
 | `teamChip(team)` | Bandera + nombre en línea. |
 | `numTag(p)` | Dorsal como mini-placa. |
+| `momentoChip(p)` | Icono del Momento sobre la ficha por nivel 1..7: 7 🔥 · 6 ▲verde · 5 ▲amarillo · 4 nada · 3 ▼amarillo · 2 ▼celeste · 1 ❄️ (color = intensidad, forma = dirección). `""` si no tiene `momento`. |
 | `nameHash(s)` | Hash FNV-1a → entero estable (sprites deterministas). |
 | `rivalLook(name,team)` | Apariencia procedural de un rival sin `look` propio. |
 | `spriteSvg(player,team)` | Sprite pixelado 12×14 dibujado píxel a píxel en SVG. |
@@ -386,8 +394,8 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 | Función | Qué hace |
 |---|---|
 | `nextOpponentId()` | Id del próximo rival (grupo o cruce). |
-| `renderHub()` | Pantalla central (layout calcado de la referencia del PO): cabecera con iconos de Diario 📖 y Estado del Mundial 🏆; banda VS a lo ancho; cuerpo en **3 columnas de igual alto** (`items-stretch` — IZQ estado del equipo con la cancha y los efectos · CENTRO acción del día · DER grupo + goleadores). En cada columna un bloque crece (`flex-1`: la cancha, la acción, la tabla de goleadores) para llenar y **no dejar hueco entre columnas** — sin importar si hay goleadores o efectos. A lo ancho abajo, el calendario y el botón del día. En móvil apila. Contenedor `max-w-7xl`. |
-| `teamStateCard(v,discipline,fueraDePuesto,forma)` / `stateChip(...)` | Columna izquierda "Estado del equipo": formación, la cancha del once (solo lectura, clic → Gestión de Plantilla), chips de Moral y Energía, **los efectos para el próximo partido** (`buffChips`), los avisos que importan (alineación inválida, fuera de puesto, sanciones, forma) y el botón a Gestión de Plantilla. La card llena su columna (`h-full flex flex-col`) y la cancha absorbe el alto sobrante (`flex-1`, piso `min-h-[22rem]`) — el arquero se ve completo y la columna nunca deja hueco. La cancha la monta `renderHub` con `mountPitch` tras pintar. |
+| `renderHub(opts)` / `pasarDia()` | Pantalla central (layout calcado de la referencia del PO): cabecera con iconos de Diario 📖 y Estado del Mundial 🏆; banda VS a lo ancho; cuerpo en **3 columnas de igual alto** (`items-stretch` — IZQ estado del equipo con la cancha y los efectos · CENTRO acción del día · DER grupo + goleadores). En cada columna un bloque crece (`flex-1`) para no dejar hueco. A lo ancho abajo, el calendario y el botón del día. En móvil apila. Contenedor `max-w-7xl`. `pasarDia()` avanza al día siguiente (advanceDay + portada del Daily + evento); lo usan el botón "Pasar al día" y, vía `opts.autoAdvance`, la **vuelta del partido** — el partido consume su día, así que al volver al hub arranca el día siguiente, no el del partido. |
+| `teamStateCard(v,discipline,fueraDePuesto,forma)` / `stateChip(...)` | Columna izquierda "Estado del equipo": formación, la cancha del once (solo lectura, clic → Gestión de Plantilla), chips de Moral y Energía, **los efectos para el próximo partido** (`buffChips`) con los botones de **canje** (`canjeableBuffs` → `showCanje`, disponibles también en día de partido), los avisos que importan (alineación inválida, fuera de puesto, sanciones, forma) y el botón a Gestión de Plantilla. La card llena su columna (`h-full flex flex-col`) y la cancha absorbe el alto sobrante (`flex-1`, piso `min-h-[22rem]`) — el arquero se ve completo y la columna nunca deja hueco. La cancha la monta `renderHub` con `mountPitch` tras pintar. |
 | `actionCard()` | Panel de la **Acción del Día** (Bible §4.7): la Oportunidad del día arriba (si hay), los focos de Entrenar agrupados en una fila + una tarjeta-botón por acción suelta. Aplica vía `game/day-action`. Si hay `run.dayMod` muestra su banner y bloquea (`disabled` + gris) o etiqueta ("×2 hoy") las acciones afectadas. **Una vez elegida, el panel NO desaparece**: se queda con la acción elegida resaltada (✓ Elegida hoy, usando `run.lastAction.id`/`.group`) y las demás en gris no clickeables — así el bloque no cambia de tamaño (evita huecos en la columna) y queda claro qué se decidió y que no se puede elegir otra. |
 | `oppCard()` | Card de la **Oportunidad del día** (Bible §4.5): borde y badge de su rareza + recordatorio "solo por hoy, ocupa tu Acción del Día". Click: aplica directo, o abre `showOppChooser` si trae `choose`. `""` si hoy no hay. |
 | `showOppChooser(o)` | Modal selector de protagonista de una oportunidad con `choose`: candidatos con sprite/nombre/puesto/nota; elegir aplica (`applyDayAction` con el nombre) y consume el día; "decidir más tarde" cierra sin tocar nada. |
@@ -396,7 +404,8 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 | `moraleRow()` | Fila de la Moral del equipo (banda + barra) embebida en el bloque de plantilla del hub. |
 | `renderScorersCard()` (en `scorers.js`) | Card top-5 de **Goleadores del torneo** para el hub (o aviso si aún no hay goles); llena su columna (`h-full flex flex-col`). El hub la envuelve en un contenedor clickeable que va a la pantalla completa (sin texto "Ver tabla completa": el clic basta). |
 | `renderScorers()` (pantalla `scorers`) | Tabla completa de goleadores del torneo (`tournamentScorers`): puesto, bandera, jugador, selección y goles; mi equipo resaltado. |
-| `buffChips()` | Chips con los efectos acumulados para el próximo partido (incluye el de `tactica` con su multiplicador de sesiones). |
+| `buffChips()` | Chips con los efectos acumulados para el próximo partido (incluye el de `tactica` con su multiplicador de sesiones; usa `STAT_LABELS` de `content/day-actions`). Un buff de stat que ya llega a `CANJE_THRESHOLD` se resalta con ✨ y colores del equipo (es canjeable). |
+| `showCanje(key)` | Modal de confirmación del **canje de entrenamiento** (Bible cap.6): explica que renuncias a +`CANJE_THRESHOLD` del boost por +`CANJE_PERMANENT` PERMANENTE a esa stat para todos los que la tienen; confirma con `canjeBuff` y re-renderiza. |
 | `themeHeader(tema)` | Cabecera de temática (icono/color fijos) de los modales de evento/conflicto. |
 | `showDayEvent(ev)` | Modal del evento inevitable del día (ya aplicado por el motor), con su badge de rareza coloreado (`RARITIES`). |
 | `renderJournal(back)` | Pantalla del **Diario de Campaña**: entradas agrupadas por día, coloreadas por `tone`; `back` define a dónde vuelve (hub o desenlace). |
@@ -404,7 +413,7 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 | `renderSquadScreen()` / `moraleBadge()` | **Gestión de Plantilla**: cancha con el once, selector de formación, ficha del jugador y los 4 suplentes; el encabezado muestra la barra de Moral (`moraleBadge`) a la izquierda de la media. Las reglas son de `game/lineup`; aquí solo viven las coordenadas (`ROW_Y`, `spreadX`), que son presentación. |
 | `renderPitch()` / `pitchToken(p,…)` | Dibuja el once sobre el césped. Las filas salen del once REAL, no de la formación elegida: así una alineación improvisada también se pinta bien. |
 | `renderFormationPicker(available)` | Selector con las 6 formaciones y su diagrama de puntos; desactiva las que el plantel no cubre (Brasil no puede 3-1-1: tiene 2 DEF). |
-| `renderPlayerCard()` / `renderBench()` | Ficha del seleccionado (stats reales del motor) y las 4 fichas del banco. |
+| `renderPlayerCard()` / `renderBench()` / `statRow(p,key)` | Ficha del seleccionado y las 4 fichas del banco. Cada `statRow` pinta la **barra del stat base** (`baseStatAt`, colores de siempre) y aparte el **boost/nerf del Momento** (dorado si suma, celeste si resta). La fila del Momento muestra la **etiqueta cualitativa** (`momentoLabel`) + su icono, sin el número 1..7. |
 | `partnersFor(p)` / `onPick(name)` | Recambios válidos (solo misma posición: la posición ES la formación) y clic sobre una ficha: permuta si es recambio, si no abre su ficha. |
 | `showRandomEvent(ev)` | Modal de un conflicto con decisión y aplicación del efecto elegido. |
 
@@ -431,8 +440,8 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 ### 10. Fin de partido y avance — `ui/screens/post-match.js`
 | Función | Qué hace |
 |---|---|
-| `finishMatch()` | Acumula stats, anota el partido en el diario y simula el resto de la ronda. |
-| `renderPostMatch(...)` | Pantalla post-partido. |
+| `finishMatch()` | Cierra el partido en el motor (`closeMatch`) y pinta el post-partido (o rutea directo al desenlace tras la final). |
+| `renderPostMatch(res,advanced,momentum,morale)` / `analisisCard(momentum,morale)` | Pantalla post-partido: marcador, goleadores y el **"🧠 Análisis del cuerpo técnico"** (reemplaza a los otros marcadores) — arriba la **Moral del equipo** (banda antes → después + razones del resultado) y debajo el **Momento** de cada jugador que se movió (nivel antes → después + `reasons`). En grupos va a 2 columnas (tabla del grupo + análisis); en KO, una columna centrada. Al continuar, `routeAdvance` vuelve al hub **con el día ya avanzado** (`go("hub",{autoAdvance})`). |
 | `advanceTournament(advanced)` | Decide qué sigue (fecha, clasificación, ronda o fin). Anota los hitos en el diario y llama a `clearAmarillas` al cerrar grupos y tras cuartos. |
 | `showQualifiedModal()` | Celebración al clasificar a eliminatorias. |
 

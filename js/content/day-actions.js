@@ -4,26 +4,45 @@
    exactamente UNA inversión estratégica; elegir es renunciar).
 
    Trade-offs deliberados:
-   - Entrenar sube una stat (+4 hasta el próximo partido) pero
+   - Entrenar sube una stat (+1 hasta el próximo partido) pero
      CANSA (−5 de energía a todo el plantel).
    - Recuperar devuelve energía pero no mejora a nadie.
    - La Sesión Táctica da un bonus de equipo (atk y def) solo
      para el próximo partido — es el gancho donde después se
      enchufa la Filosofía.
 
+   El CANJE (regla en game/day-action.js) cierra el círculo: un
+   boost de entrenamiento acumulado hasta +CANJE_THRESHOLD en una
+   stat puede convertirse en +CANJE_PERMANENT PERMANENTE a esa stat
+   para TODO el plantel — renuncias al boost del próximo partido a
+   cambio de crecimiento que dura el resto de la run (Bible cap.6
+   "Permanent Growth": nace del entrenamiento, es gradual, nunca
+   decrece y no se traslada a otras runs).
+
    Agregar una acción nueva = agregar una fila con su `effect(run)`.
    `group: "entrenar"` agrupa los focos de entrenamiento en la UI.
    ============================================================ */
 import { clamp } from "../core/math.js";
 
-// +4 y no +5: el entrenamiento es elegible (siempre apunta donde quieres),
-// los eventos de ±5 no. Elegible > aleatorio a igual magnitud.
-export const TRAIN_BUFF = 4;
+// +1 y no +5: el entrenamiento es elegible (siempre apunta donde quieres),
+// los eventos de ±5 no. Elegible > aleatorio a igual magnitud. El PO lo bajó
+// de +4 a +1 (17-jul): con +4 el buff dominaba y el canje se conseguía en un día.
+export const TRAIN_BUFF = 1;
 export const TRAIN_FATIGUE = 5;
-const RECOVER_ENERGY = 15;
+const RECOVER_ENERGY = 10;
+
+// El canje de entrenamiento (game/day-action.js): un buff de +CANJE_THRESHOLD en una
+// stat se convierte en +CANJE_PERMANENT PERMANENTE a esa stat para todo el plantel.
+export const CANJE_THRESHOLD = 4;
+export const CANJE_PERMANENT = 1;
+// Stats reales que admiten canje: las de campo + las de arquero. Los buffs que NO son
+// stats (tactica, penales, antiLesion) nunca se canjean.
+export const CANJEABLE_STATS = ["tiro", "defensa", "cabezazo", "pase", "aura", "atajadas", "reflejos", "salidas"];
+// Etiquetas de stat para la UI y el diario (fuente única; la UI del hub las reusa).
+export const STAT_LABELS = { tiro: "Tiro", defensa: "Defensa", cabezazo: "Cabezazo", pase: "Pase", aura: "Aura", atajadas: "Atajadas", reflejos: "Reflejos", salidas: "Salidas" };
 // Bonus táctico en escala de poder ~0-5 (docs/CORE.md §5): +0.1 a atk y def.
-// Comparable a un foco de entrenamiento (+4 de stat ≈ +0.06-0.14 de poder)
-// pero repartido en ambas fases y sin costo de energía.
+// Un foco de entrenamiento (+1 de stat) mueve el poder ~+0.02: la táctica pesa más
+// por partido, pero se reparte en ambas fases y sin costo de energía — ninguna domina.
 export const TACTICS_BONUS = 0.1;
 
 const tire = r => r.squad.forEach(p => p.energia = clamp(p.energia - TRAIN_FATIGUE, 5, 100));

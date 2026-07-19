@@ -48,22 +48,25 @@ export function numTag(p, extra = "") {
   return `<span class="text-[10px] font-black text-slate-300 bg-slate-700/80 rounded px-1 min-w-[1.3rem] inline-block text-center ${extra}">${p.num || "–"}</span>`;
 }
 
-/** Chip del Momento (game/momentum): 🔥 en racha (6-7), ❄️ congelado (1-2), "" en el resto. */
+/**
+ * Icono del Momento sobre la ficha (game/momentum), por nivel 1..7 (decisión PO 18-jul):
+ * arriba el color sube con la distancia al neutro (amarillo = 1 paso, verde = 2); abajo
+ * el amarillo avisa (3) y el celeste marca la caída (2); los extremos son 🔥 (7,
+ * inspirado) y ❄️ (1, paupérrimo). La forma codifica la dirección (▲/▼). Neutro (4): nada.
+ *   7 🔥 · 6 ▲verde · 5 ▲amarillo · 4 — · 3 ▼amarillo · 2 ▼celeste · 1 ❄️
+ */
 export function momentoChip(p) {
   if (p.momento === undefined) return "";
-  return p.momento >= 6 ? "🔥" : p.momento <= 2 ? "❄️" : "";
-}
-
-/**
- * Flechas del Momento 1..7 para la ficha: ▲ verdes por paso sobre el neutro (4),
- * ▼ celestes por paso bajo el neutro, — en el neutro.
- */
-export function momentoArrows(p, size = "text-xs") {
-  const m = p.momento === undefined ? 4 : p.momento;
-  const n = m - 4;
-  const cls = n > 0 ? "text-emerald-400" : n < 0 ? "text-sky-400" : "text-slate-500";
-  const sym = n > 0 ? "▲".repeat(n) : n < 0 ? "▼".repeat(-n) : "—";
-  return `<span class="${cls} ${size} font-black leading-none">${sym}</span>`;
+  const arrow = (dir, color) => ` <span class="${color} font-black leading-none">${dir}</span>`;
+  switch (p.momento) {
+    case 7: return " 🔥";
+    case 6: return arrow("▲", "text-emerald-400");
+    case 5: return arrow("▲", "text-yellow-400");
+    case 3: return arrow("▼", "text-yellow-400");
+    case 2: return arrow("▼", "text-sky-400");
+    case 1: return " ❄️";
+    default: return "";
+  }
 }
 
 /** Notificación flotante que desaparece sola (~4s). */
