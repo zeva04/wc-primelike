@@ -177,8 +177,8 @@ export function buildDaily(run) {
     ? `Preocupa ${frios[0].name}: nada le sale y la confianza no aparece.`
     : `Crisis de confianza: ${frios.slice(0, 2).map(p => p.name).join(" y ")} están lejos de su nivel.` });
   const banda = moraleBand(run.moral ?? 50);
-  if (banda.id === "nubes") items.push({ icon: banda.icon, tag: "PLANTEL", text: `La concentración es una fiesta: la moral del grupo está por las nubes.` });
-  else if (banda.id === "baja" || banda.id === "suelo") items.push({ icon: banda.icon, tag: "PLANTEL", text: `Silencio en la concentración: la moral del grupo está ${banda.id === "suelo" ? "por el suelo" : "baja"} y el cuerpo técnico busca respuestas.` });
+  if (banda.id === "nubes") items.push({ icon: banda.icon, tag: "PLANTEL", text: `La concentración es una fiesta: la moral del grupo está por las nubes y el vestuario navega en calma.` });
+  else if (banda.id === "baja" || banda.id === "suelo") items.push({ icon: banda.icon, tag: "PLANTEL", text: `Silencio en la concentración: la moral del grupo está ${banda.id === "suelo" ? "por el suelo" : "baja"}; el vestuario se caldea y los conflictos asoman.` });
   const avgEnergy = Math.round(run.squad.reduce((s, p) => s + p.energia, 0) / run.squad.length);
   if (avgEnergy < 60) items.push({ icon: "🥵", tag: "PLANTEL", text: `El plantel acusa el desgaste del torneo (energía media ${avgEnergy}): el cuerpo técnico evalúa rotar.` });
 

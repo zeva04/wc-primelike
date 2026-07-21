@@ -64,6 +64,35 @@ assert(cierra(fakeMatch({ winner: "my", gMy: 3, gOpp: 0, scorers: [{ name: "A", 
   assert(E.applyMoralePostMatch(run, fakeMatch({ gMy: 0, gOpp: 0 })).reasons.includes("Empate"), "el empate se narra");
 }
 
+// ---------- Sprint 2: la Moral modula la frecuencia de conflictos (calendar) ----------
+{
+  // El mapa por banda es simétrico alrededor del 0.25 base y MONÓTONO: peor moral, más conflictos.
+  assert(E.conflictChanceFor(50) === 0.25, "moral estable = frecuencia base 0.25", E.conflictChanceFor(50));
+  assert(E.conflictChanceFor(90) === E.CONFLICT_CHANCE_BY_BAND.nubes, "moral por las nubes usa su banda");
+  assert(E.conflictChanceFor(10) === E.CONFLICT_CHANCE_BY_BAND.suelo, "moral por el suelo usa su banda");
+  const secuencia = [95, 70, 50, 30, 10].map(v => E.conflictChanceFor(v));
+  for (let k = 1; k < secuencia.length; k++) assert(secuencia[k] > secuencia[k - 1], "peor moral ⇒ más chance de conflicto (monótono)", secuencia.join(","));
+  assert(E.conflictChanceFor(undefined) === 0.25, "sin moral definida cae en la base (estable)");
+
+  // Estadístico: agendar muchas ventanas con moral alta vs baja debe dar MÁS conflictos con moral baja.
+  const ratioConMoral = (moral, N) => {
+    let conf = 0, dias = 0;
+    for (let i = 0; i < N; i++) {
+      const r = E.newRun("BRA");
+      r.moral = moral;
+      E.scheduleNextMatch(r); // re-agenda la ventana con la nueva moral
+      const plan = Object.values(r.dayPlan);
+      conf += plan.filter(p => p.kind === "conflicto").length;
+      dias += plan.length;
+    }
+    return conf / dias;
+  };
+  const alta = ratioConMoral(95, 500);  // nubes ≈ 0.12
+  const baja = ratioConMoral(10, 500);  // suelo ≈ 0.42
+  assert(baja > alta + 0.12, "la moral baja produce claramente más conflictos que la alta", `alta=${alta.toFixed(2)} baja=${baja.toFixed(2)}`);
+  assert(alta < 0.22 && baja > 0.32, "las frecuencias observadas rondan las esperadas por banda", `alta=${alta.toFixed(2)} baja=${baja.toFixed(2)}`);
+}
+
 console.log(`morale.test: ${checks} checks · fallos: ${fails}`);
 console.log(fails ? "❌ morale con fallos" : "✅ morale OK");
 process.exit(fails ? 1 : 0);

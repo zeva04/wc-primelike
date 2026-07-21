@@ -214,7 +214,7 @@ Este mapa es ley: si un módulo escribe un campo que no le pertenece, es un bug 
 | `squad[].lesionado*` | `match/incidents` · `medical` | lineup, ui |
 | `squad[].momento` | `momentum.js` (post-partido) · efectos de `content/` (mutación directa 1..7) | ratings (statAt), ui, daily |
 | `squad[].goles/asistencias` | `match/chances` (en juego: `goalMine` pone gol y asistidor) | scorers/assists (tabla), ui, daily |
-| `moral` | `morale.js` (post-partido y pasar de ronda) · efectos de `content/` (clamp 1..100) | ui/hub, ui/squad, daily |
+| `moral` | `morale.js` (post-partido y pasar de ronda) · efectos de `content/` (clamp 1..100) | ui/hub, ui/squad, daily, **calendar** (frecuencia de conflictos, Sprint 2) |
 | `scorers` | `scorers.js` (goles ajenos: world sim + rival de mis partidos) | ui/scorers, ui/hub |
 | `assists` | `assists.js` (asistencias ajenas: world sim + rival de mis partidos) | ui/scorers, ui/hub |
 | `windowStart` | `calendar.js` (al agendar) | ui/hub (calendario) |

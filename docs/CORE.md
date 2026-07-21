@@ -336,10 +336,12 @@ exactamente un suceso, pre-sorteado al agendar el partido:
 > anticipan su temática. Da sensación de avance dentro de la ventana.
 
 
-- **75% evento inevitable** (`PREP_EVENTS`, 30, sorteado por **rareza**): buff o debuff
+- **evento inevitable** (`PREP_EVENTS`, 30, sorteado por **rareza**): buff o debuff
   que se aplica solo, o un **modificador del día** (ver más abajo).
-- **25% conflicto con decisión** (`RANDOM_EVENTS`, 6): dilema con dos opciones y
-  trade-offs (sponsors, peleas, virus, localía, prensa, médicos).
+- **conflicto con decisión** (`RANDOM_EVENTS`, 6): dilema con dos opciones y
+  trade-offs (sponsors, peleas, virus, localía, prensa, médicos). Su probabilidad
+  (base **25%**) la modula la **Moral del equipo** — ver §Moral: vestuario feliz =
+  semana tranquila, vestuario hundido = más incendios.
 
 ### Rareza de los eventos (`RARITIES`)
 
@@ -549,10 +551,31 @@ las nubes, baja o por el suelo). Cruzar de banda escribe en el Diario de Campañ
 moverse dentro de una banda es silencioso. Los eventos de `content/` pueden mutarla
 directo (`r.moral = clamp(...)`, p. ej. `pais_ilusionado` +8, `critica_demoledora` −8).
 
-> **v1 sin efecto mecánico** (decisión PO 17-jul-2026). La próxima iteración hará que la
-> moral module el **tipo y número de ocasiones** que el equipo genera en el partido — el
-> hook está comentado en `Match.tick` (`[MORAL → OCASIONES]`); requerirá pasar la moral
-> por `matchCtx` porque el motor del partido no conoce la run.
+**Efecto mecánico — la turbulencia del vestuario (Sprint 2, decisión PO 20-jul-2026).** La
+Moral modula la **frecuencia de conflictos de vestuario** de la ventana entre partidos
+(`game/calendar.conflictChanceFor`, simétrica alrededor del 0.25 base):
+
+| Banda | Chance de conflicto por día |
+|---|---|
+| Por las nubes | 0.12 |
+| Alta | 0.18 |
+| Estable | **0.25** (base) |
+| Baja | 0.34 |
+| Por el suelo | 0.42 |
+
+Se lee `run.moral` al **agendar** la ventana (en `postMatchUpdate`, cuando la moral ya trae
+el resultado), así que toda la semana refleja el ánimo con que saliste del último partido:
+una mala racha llena el vestuario de dilemas, una buena lo serena. Es el efecto
+**auto-correctivo** que eligió el PO — muerde cuando ya vas mal, sin premiar al favorito con
+más poder (a diferencia de acoplar la Moral al Momento o a la energía, que habrían inflado el
+boost asimétrico). El hub avisa el clima ("🎭 Vestuario caldeado / en paz") y el Daily lo
+telegrafía. **Balance neutral**: BRA 28.5% n=4000 = baseline (los conflictos son de EV mixto
+—algunos regalan buffs permanentes, otros son riesgo puro—, así que modular su frecuencia no
+mueve sistemáticamente el % de campeón). Diales si deriva: `CONFLICT_CHANCE_BY_BAND`.
+
+> **El efecto EN-PARTIDO sigue diferido** (va con el rework del partido): la Moral modulará el
+> **tipo y número de ocasiones** que el equipo genera — hook `[MORAL → OCASIONES]` comentado
+> en `Match.tick`; requerirá pasar la moral por `matchCtx` porque el motor no conoce la run.
 
 ### Goleadores del torneo (`run.scorers`, `game/scorers.js`)
 

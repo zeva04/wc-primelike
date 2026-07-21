@@ -244,7 +244,8 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | Función | Qué hace |
 |---|---|
 | `dayLabel(day)` | Fecha real del día de la run ("Jue 11 jun"; día 1 = 11-jun-2026). |
-| `scheduleNextMatch(run)` | Agenda el próximo partido a 5-6 días y pre-sortea el evento de cada día intermedio (75% evento — nivel de rareza ponderado por `RARITIES.weight` y luego un evento del nivel — / 25% conflicto, sin repetir dentro de la ventana). Además, a lo sumo UN día libre esconde una Oportunidad (`dayPlan[d].opp`): cada día tira 20% y el primero que acierta corta. Llena `run.nextMatchDay`, `run.dayPlan` y `run.windowStart` (primer día de la ventana: hoy en el arranque, día siguiente al partido tras jugar — el calendario mantiene a la vista los días ya vividos). |
+| `scheduleNextMatch(run)` | Agenda el próximo partido a 5-6 días y pre-sortea el evento de cada día intermedio (evento inevitable — nivel de rareza ponderado por `RARITIES.weight` y luego un evento del nivel — o **conflicto** con probabilidad `conflictChanceFor(run.moral)`, sin repetir dentro de la ventana). Además, a lo sumo UN día libre esconde una Oportunidad (`dayPlan[d].opp`): cada día tira 20% y el primero que acierta corta. Llena `run.nextMatchDay`, `run.dayPlan` y `run.windowStart` (primer día de la ventana: hoy en el arranque, día siguiente al partido tras jugar — el calendario mantiene a la vista los días ya vividos). |
+| `conflictChanceFor(moral)` / `CONFLICT_CHANCE_BY_BAND` | **calendar** (Sprint 2): probabilidad de que un día traiga conflicto según la banda de moral — nubes 0.12 · alta 0.18 · estable **0.25** (base) · baja 0.34 · suelo 0.42 (simétrica: vestuario feliz = semana tranquila, hundido = más incendios). La fija `scheduleNextMatch` para TODA la ventana leyendo `run.moral` post-partido. Sin tocar el motor del partido. |
 | `addTournamentGoal(run,teamId,name)` / `assignScorers(run,teamId,n)` | **scorers**: suma un gol a un jugador / reparte `n` goles de un equipo entre sus figuras ponderando por puesto (DEL 3 · MED 2 · DEF 1 · POR 0.05). Alimentan `run.scorers` (solo equipos ajenos). |
 | `tournamentScorers(run,limit?)` | **scorers**: tabla de goleadores del torneo combinando mi equipo (`run.squad[].goles`) con `run.scorers`, ordenada por goles con ranking de competición (`rank`). Sin doble conteo. |
 | `addTournamentAssist(run,teamId,name)` / `assignAssists(run,teamId,n)` | **assists** (espejo de scorers): suma una asistencia / reparte los asistidores de `n` goles ajenos — cada gol con `ASSIST_CHANCE` (70%) de llevar asistencia, atribuida a una figura ponderada **pro-MED** (MED 3 · DEL 2 · DEF 1 · POR 0). Alimentan `run.assists` (solo ajenos). Consumen rng. |
@@ -267,7 +268,7 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | `applyMomentumPostMatch(run,p,played,match)` | **momentum**: mueve `p.momento` con señales **individuales** (goles, **asistencias**, **cortes de último hombre**, penales fallados, **tarjeta/penal de último hombre**, arquero) — el **resultado NO lo toca** (eso es Moral) — acotado a +`MOMENTO_RISE_MAX` (=1) / −`MOMENTO_FALL_MAX` (=2); una **lesión** (`lesionadoPartidos>0`) lo **resetea al neutro**; sin señal, decae 1 paso hacia el neutro. Lee `match.scorers`, `match.assists`, `match.lastManStops`, `match.lastManFouls`, `match.pensFallados`, `match.pensAtajadosPor`, `p.sustituido`, `p.lesionadoPartidos`. **Devuelve** `{name, pos, before, after, delta, reasons:[{tone,text}]}` para el análisis del cuerpo técnico. |
 | `moraleBand(v)` / `MORAL_BANDS` | **morale**: banda anímica de un valor 1..100 (5 bandas, CORE §9). |
 | `bumpMorale(run,delta,motivo)` | **morale**: mueve `run.moral` con clamp 1..100; cruzar de banda escribe el `motivo` en el diario. |
-| `applyMoralePostMatch(run,match)` | **morale**: la moral del **resultado** (base ±10) y de CÓMO se dio — goles agónicos ≥85' que deciden (±4/±5, lee `match.oppGoalMins`), tanda ±3. **Devuelve** `{before, after, delta, bandBefore, bandAfter, reasons:[texto]}` para el análisis del post-partido. v1 sin efecto mecánico en el partido (hook `[MORAL → OCASIONES]` comentado en `Match.tick`). |
+| `applyMoralePostMatch(run,match)` | **morale**: la moral del **resultado** (base ±10) y de CÓMO se dio — goles agónicos ≥85' que deciden (±4/±5, lee `match.oppGoalMins`), tanda ±3. **Devuelve** `{before, after, delta, bandBefore, bandAfter, reasons:[texto]}` para el análisis del post-partido. **Efecto mecánico** (Sprint 2): la moral modula la frecuencia de conflictos de la ventana (`calendar.conflictChanceFor`). El efecto EN-PARTIDO (hook `[MORAL → OCASIONES]` en `Match.tick`) sigue diferido al rework del partido. |
 | `addJournal(run,entry)` | Agrega una entrada `{day,icon,title,desc,tone}` al Diario de Campaña (`run.journal`). El día se toma de `run.day` salvo override. |
 | `clearAmarillas(run,motivo)` | Borra las amarillas acumuladas de todo el plantel y lo anota en el diario. Se llama al cerrar la fase de grupos y tras los cuartos. Las suspensiones pendientes NO se perdonan. |
 
@@ -476,8 +477,10 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
   campo = sin efecto), integración con ratings (ficha/naturalOverall/statPenalties) y las
   reglas post-partido (señales individuales incl. **asistencia/último hombre**, tope +1 que
   acota la suma de señales, decaimiento, clamps).
-- **`morale.test.js`** — la Moral 1..100: bandas, clamps, diario solo al cruzar de banda y
-  el cierre post-partido (base V/E/D, goles agónicos que deciden, extra de la tanda).
+- **`morale.test.js`** — la Moral 1..100: bandas, clamps, diario solo al cruzar de banda,
+  el cierre post-partido (base V/E/D, goles agónicos que deciden, extra de la tanda) y el
+  **efecto mecánico Sprint 2** (`conflictChanceFor` monótona por banda + comprobación
+  estadística de que la moral baja agenda más conflictos que la alta).
 - **`scorers.test.js`** — la tabla de goleadores: `assignScorers` reparte n goles ponderados
   por puesto, `tournamentScorers` combina mi equipo con el resto sin doble conteo y con
   ranking de competición.

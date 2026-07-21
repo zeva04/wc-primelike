@@ -9,6 +9,7 @@ import { OPPORTUNITIES } from "../content/opportunities.js";
 import { RARITIES } from "../content/rarities.js";
 import { addJournal } from "./journal.js";
 import { applyDailyRecovery } from "./medical.js";
+import { moraleBand, MORAL_INICIAL } from "./morale.js";
 import { playWorldDay } from "./tournament/world.js";
 
 // Día 1 = 11 de junio de 2026, arranque real del Mundial. Las fechas son ambientación:
@@ -23,8 +24,21 @@ export function dayLabel(day) {
   return `${DOW[d.getUTCDay()]} ${d.getUTCDate()} ${MES[d.getUTCMonth()]}`;
 }
 
-// Probabilidad de que el evento de un día sea un conflicto con decisión (vs evento inevitable)
-const CONFLICT_CHANCE = 0.25;
+// Probabilidad BASE de que el evento de un día sea un conflicto con decisión (vs evento
+// inevitable). Es el valor de la banda anímica "estable"; la Moral la modula (ver abajo).
+export const CONFLICT_CHANCE = 0.25;
+
+// SPRINT 2 — Moral con mordida (decisión PO 20-jul-2026): la Moral del equipo modula la
+// FRECUENCIA de conflictos de vestuario de la ventana, simétrica alrededor del 0.25 base —
+// un vestuario feliz vive semanas tranquilas (menos incendios), uno hundido se llena de
+// dilemas. Es el efecto AUTO-CORRECTIVO elegido por el PO: muerde cuando ya vas mal, no
+// premia al favorito con más poder (a diferencia de acoplar la Moral al Momento o la
+// energía). Sin tocar el motor del partido: se lee `run.moral` al AGENDAR la ventana, que
+// ocurre en postMatchUpdate, cuando la moral ya trae el resultado del último partido.
+export const CONFLICT_CHANCE_BY_BAND = { nubes: 0.12, alta: 0.18, estable: 0.25, baja: 0.34, suelo: 0.42 };
+
+/** Probabilidad de conflicto de un día según la banda de moral del equipo (Sprint 2). */
+export function conflictChanceFor(moral) { return CONFLICT_CHANCE_BY_BAND[moraleBand(moral ?? MORAL_INICIAL).id]; }
 // Probabilidad de que un día libre traiga además una Oportunidad (Bible §4.5);
 // el tope de 1 por ventana lo aplica scheduleNextMatch cortando en el primer acierto.
 const OPPORTUNITY_CHANCE = 0.20;
@@ -63,8 +77,10 @@ export function scheduleNextMatch(run) {
   const eventPools = {};
   for (const t of Object.keys(RARITIES)) eventPools[t] = shuffle(PREP_EVENTS.filter(e => e.rareza === t));
   const conflictPool = shuffle(RANDOM_EVENTS);
+  // La Moral del equipo (post-partido) fija la turbulencia de TODA la ventana (Sprint 2).
+  const conflictChance = conflictChanceFor(run.moral);
   for (let d = run.day + 1; d < run.nextMatchDay; d++) {
-    const kind = rnd() < CONFLICT_CHANCE && conflictPool.length ? "conflicto" : "evento";
+    const kind = rnd() < conflictChance && conflictPool.length ? "conflicto" : "evento";
     const ev = kind === "conflicto" ? conflictPool.pop() : drawByRarity(eventPools);
     run.dayPlan[d] = { kind, id: ev.id, tema: ev.tema };
   }

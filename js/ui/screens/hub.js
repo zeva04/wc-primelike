@@ -373,6 +373,9 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
   if (discipline.aperc.length) avisos.push(`<div class="text-yellow-400" title="Con otra amarilla se pierde un partido">🟨 Apercibido${discipline.aperc.length > 1 ? "s" : ""}: ${discipline.aperc.map(p => p.name).join(", ")}</div>`);
   if (forma.racha.length) avisos.push(`<div class="text-emerald-400" title="Momento alto: rinden por encima">🔥 En racha: ${forma.racha.map(p => p.name).join(", ")}</div>`);
   if (forma.frios.length) avisos.push(`<div class="text-sky-400" title="Momento bajo: rinden por debajo">❄️ Fríos: ${forma.frios.map(p => p.name).join(", ")}</div>`);
+  // Clima de vestuario: la Moral modula la frecuencia de conflictos de la ventana (Sprint 2).
+  if (mb.id === "suelo" || mb.id === "baja") avisos.push(`<div class="text-orange-400" title="La moral baja convulsiona el vestuario: más conflictos entre partidos">🎭 Vestuario caldeado: se vienen más conflictos</div>`);
+  else if (mb.id === "nubes") avisos.push(`<div class="text-emerald-400" title="La moral alta serena el vestuario: menos conflictos entre partidos">🎭 Vestuario en paz: semana tranquila por delante</div>`);
   return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 h-full flex flex-col">
     <div class="flex items-center justify-between mb-2.5 shrink-0">
       <h3 class="font-bold text-sm">👕 Estado del equipo</h3>
