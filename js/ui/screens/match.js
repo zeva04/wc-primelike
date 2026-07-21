@@ -185,6 +185,7 @@ function handleDecision(d, key) {
   if (d.id === "chance") match.resolveChance(key);
   else if (d.id === "penalty_mine") match.resolvePenaltyMine(key);
   else if (d.id === "penalty_opp") match.resolvePenaltyOpp(key);
+  else if (d.id === "last_man") match.resolveLastMan(key);
   else if (d.id === "forced_sub") { match.decision = null; match.makeSub(d.out, key); }
   else if (d.id === "gk_red") { match.decision = null; match.makeSub(match.my.lineup.find(p => p.name === key), d.gkIn, true); }
   else if (d.id === "protect") {

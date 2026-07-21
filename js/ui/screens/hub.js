@@ -23,7 +23,7 @@ import { screenShell, $, flagImg, starsHtml, modal, closeModal, toast, momentoCh
 import { spriteSvg } from "../sprites.js";
 import { mountPitch } from "../pitch.js";
 import { renderGroupTableCard, renderKoInfoCard } from "./worldcup.js";
-import { renderScorersCard } from "./scorers.js";
+import { renderScorersCard, wireScorersCard } from "./scorers.js";
 
 /**
  * Figuras a mostrar del rival: las de mayor nota, sin duplicados y con un solo arquero.
@@ -542,6 +542,7 @@ function renderHub(opts = {}) {
   $("#btn-standings").onclick = () => go("worldcup");
   $("#btn-standings2").onclick = () => go("worldcup");
   $("#btn-scorers").onclick = () => go("scorers");
+  wireScorersCard($("#btn-scorers")); // carrusel Goleadores↔Asistidores (corta la navegación al togglear)
   $("#btn-journal").onclick = () => go("journal", "hub");
   $("#btn-squad").onclick = () => go("squad");
   // El canje está disponible siempre que un buff llegue al umbral (también el día de

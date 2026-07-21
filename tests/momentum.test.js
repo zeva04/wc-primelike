@@ -70,8 +70,8 @@ assert(run.squad.every(p => p.momento === 4), "todo el plantel nace con momento 
 
 // ---------- reglas post-partido ----------
 // Match duck-typed: solo los campos que lee applyMomentumPostMatch
-const fakeMatch = ({ winner = null, scorers = [], pensFallados = [], pensAtajadosPor = [], gOpp = 0 } = {}) =>
-  ({ result: () => ({ winner }), scorers, pensFallados, pensAtajadosPor, gOpp });
+const fakeMatch = ({ winner = null, scorers = [], assists = [], pensFallados = [], pensAtajadosPor = [], lastManStops = [], lastManFouls = [], gOpp = 0 } = {}) =>
+  ({ result: () => ({ winner }), scorers, assists, pensFallados, pensAtajadosPor, lastManStops, lastManFouls, gOpp });
 const jugador = (momento, pos = "DEL") => ({ name: "Tester", pos, momento, stats: {} });
 const aplica = (p, played, m) => { E.applyMomentumPostMatch(run, p, played, m); return p.momento; };
 
@@ -86,6 +86,33 @@ assert(aplica(jugador(4), true, fakeMatch({ scorers: [{ name: "Tester", min: 30 
 assert(aplica(jugador(7), true, fakeMatch({ scorers: [{ name: "Tester", min: 30 }] })) === 7, "clamp superior en 7");
 assert(aplica(jugador(4), true, fakeMatch({ pensFallados: ["Tester"] })) === 3, "fallar un penal baja −1 (el resultado ya no compensa)");
 assert(aplica(jugador(4), true, fakeMatch({ gOpp: 3 })) === 4, "los goles en contra no tocan al de campo (y sin señal, se queda en el neutro)");
+
+// ---------- Sprint 1: asistencias y último hombre reparten Momento a MED y DEF ----------
+{
+  // Asistencia: +1 (la vía de los MED que no hacen goles)
+  const p = jugador(4, "MED");
+  const r = E.applyMomentumPostMatch(run, p, true, fakeMatch({ assists: [{ name: "Tester", min: 22 }] }));
+  assert(p.momento === 5, "una asistencia sube +1", p.momento);
+  assert(r.reasons.some(x => /asistencia/i.test(x.text)), "el resumen narra la asistencia", JSON.stringify(r.reasons));
+}
+assert(aplica(jugador(4, "DEF"), true, fakeMatch({ lastManStops: ["Tester"] })) === 5, "cortar un gol como último hombre sube +1 (la vía de los DEF)");
+{
+  const p = jugador(4, "DEF");
+  const r = E.applyMomentumPostMatch(run, p, true, fakeMatch({ lastManStops: ["Tester"] }));
+  assert(r.reasons.some(x => /último hombre/i.test(x.text)), "el corte se narra", JSON.stringify(r.reasons));
+}
+assert(aplica(jugador(4, "DEF"), true, fakeMatch({ lastManFouls: ["Tester"] })) === 3, "tarjeta/penal como último hombre baja −1");
+{
+  const p = jugador(4, "DEF");
+  const r = E.applyMomentumPostMatch(run, p, true, fakeMatch({ lastManFouls: ["Tester"] }));
+  assert(r.reasons.some(x => /tarjeta o penal/i.test(x.text)), "el error del último hombre se narra", JSON.stringify(r.reasons));
+}
+// El tope +1 acota la suma de señales: gol + asistencia + corte no dan más de +1 en un partido
+assert(aplica(jugador(4, "MED"), true, fakeMatch({ scorers: [{ name: "Tester", min: 10 }], assists: [{ name: "Tester", min: 50 }], lastManStops: ["Tester"] })) === 5,
+  "gol + asistencia + corte topan en +1 por partido (RISE_MAX)");
+// Un corte y un error en el mismo partido se cancelan (raw 0 → decae hacia el neutro)
+assert(aplica(jugador(4, "DEF"), true, fakeMatch({ lastManStops: ["Tester"], lastManFouls: ["Tester"] })) === 4,
+  "un corte y un error se compensan: sin señal neta, queda en el neutro");
 
 // ---------- decaimiento hacia el neutro (4) ----------
 assert(aplica(jugador(6), true, fakeMatch()) === 5, "sin señal: decae hacia el neutro");

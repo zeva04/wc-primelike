@@ -62,6 +62,7 @@ function playMatch(run, oppId) {
       if (d.id === "chance") match.resolveChance(opt.key);
       else if (d.id === "penalty_mine") match.resolvePenaltyMine(opt.key);
       else if (d.id === "penalty_opp") match.resolvePenaltyOpp(opt.key);
+      else if (d.id === "last_man") match.resolveLastMan(opt.key);
       else if (d.id === "forced_sub") { match.decision = null; match.makeSub(d.out, opt.key); }
       else if (d.id === "gk_red") { match.decision = null; match.makeSub(match.my.lineup.find(p => p.name === opt.key), d.gkIn, true); }
       else match.decision = null; // protect: lo deja en cancha
@@ -209,6 +210,15 @@ function playRun(teamId) {
   }
   const tabla = E.tournamentScorers(run);
   for (let k = 1; k < tabla.length; k++) assert(tabla[k].goles <= tabla[k - 1].goles, "tabla de goleadores ordenada");
+  // Asistidores del torneo: espejo de goleadores — mi equipo nunca entra en run.assists
+  // (mis asistencias viven en squad[].asistencias), entradas sanas, tabla ordenada.
+  for (const s of Object.values(run.assists)) {
+    assert(s.asistencias > 0 && s.name && s.teamId, "asistidor del torneo válido", JSON.stringify(s));
+    assert(s.teamId !== teamId, "mi equipo no entra en run.assists (se lee de squad)", s.name);
+  }
+  for (const p of run.squad) assert(Number.isInteger(p.asistencias) && p.asistencias >= 0, "asistencias del plantel sanas", `${p.name}=${p.asistencias}`);
+  const tablaA = E.tournamentAssists(run);
+  for (let k = 1; k < tablaA.length; k++) assert(tablaA[k].asistencias <= tablaA[k - 1].asistencias, "tabla de asistidores ordenada");
   assert(run.stats.oppOfrecidas === oppSeen, "oppOfrecidas cuadra con las oportunidades vistas", `stats=${run.stats.oppOfrecidas} vistas=${oppSeen}`);
   assert(run.stats.oppAprovechadas === oppTaken, "oppAprovechadas cuadra con las tomadas", `stats=${run.stats.oppAprovechadas} tomadas=${oppTaken}`);
   for (let k = 1; k < run.journal.length; k++) {

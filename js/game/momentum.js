@@ -56,7 +56,10 @@ export function momentoMult(p) { return 1 + momentoPct(p) / 100; }
  * eso va a la Moral del equipo, game/morale). Señales del partido (subida acotada a
  * +MOMENTO_RISE_MAX, bajada a −MOMENTO_FALL_MAX):
  *  - gol propio: +1 por gol (máx +2 de esta señal)
+ *  - asistencia: +1 por asistencia (Sprint 1 — llega a los MED que no hacen goles)
+ *  - corte de último hombre (barrerse/anticipar exitoso): +1 (Sprint 1 — llega a los DEF)
  *  - penal fallado (en juego o tanda): −1 por fallo
+ *  - tarjeta/penal como último hombre: −1 (el error del central cuesta forma)
  *  - arquero: valla invicta +1 · 3+ goles en contra −1 · penal atajado +1
  *
  * LESIÓN: si el jugador queda de baja (`lesionadoPartidos > 0`), la lesión le CORTA la
@@ -88,8 +91,14 @@ export function applyMomentumPostMatch(run, p, played, match) {
   if (participo) {
     const goles = Math.min(match.scorers.filter(s => s.name === p.name).length, 2);
     if (goles) { raw += goles; reasons.push({ tone: "up", text: goles === 1 ? "Marcó un gol" : `Marcó ${goles} goles` }); }
+    const asis = (match.assists || []).filter(a => a.name === p.name).length;
+    if (asis) { raw += asis; reasons.push({ tone: "up", text: asis === 1 ? "Dio una asistencia" : `Dio ${asis} asistencias` }); }
+    const cortes = (match.lastManStops || []).filter(n => n === p.name).length;
+    if (cortes) { raw += cortes; reasons.push({ tone: "up", text: cortes === 1 ? "Cortó un gol como último hombre" : `Cortó ${cortes} goles como último hombre` }); }
     const fallados = match.pensFallados.filter(n => n === p.name).length;
     if (fallados) { raw -= fallados; reasons.push({ tone: "down", text: fallados === 1 ? "Falló un penal" : `Falló ${fallados} penales` }); }
+    const fallosUH = (match.lastManFouls || []).filter(n => n === p.name).length;
+    if (fallosUH) { raw -= fallosUH; reasons.push({ tone: "down", text: "Cometió tarjeta o penal como último hombre" }); }
     if (p.pos === "POR") {
       if (match.gOpp === 0) { raw += 1; reasons.push({ tone: "up", text: "Mantuvo la valla invicta" }); }
       else if (match.gOpp >= 3) { raw -= 1; reasons.push({ tone: "down", text: `Le convirtieron ${match.gOpp}` }); }

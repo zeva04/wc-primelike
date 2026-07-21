@@ -185,6 +185,7 @@ Formato: **propósito · contiene · NUNCA debe contener**.
 | `game/momentum.js` | El Momento del jugador (forma 1..7) | momentoPct/momentoMult, momentoLabel/MOMENTO_LABELS, applyMomentumPostMatch (devuelve el resumen anímico) | Render de chips/flechas (ui/components), reglas de moral |
 | `game/morale.js` | La Moral del equipo (1..100) | MORAL_BANDS, moraleBand, bumpMorale, applyMoralePostMatch | Efecto en partido (v1 no tiene; el hook vive comentado en Match.tick) |
 | `game/scorers.js` | Goleadores del torneo | addTournamentGoal, assignScorers, tournamentScorers | Resultados de partido (solo pone autor a goles ya decididos) |
+| `game/assists.js` | Asistidores del torneo (espejo de scorers) | addTournamentAssist, assignAssists, tournamentAssists | Resultados de partido (reparte asistidor a una fracción de los goles ajenos) |
 | `game/journal.js` | Memoria de la run | addJournal, tonos válidos | Render del diario, decisiones de qué anotar (cada sistema anota lo suyo) |
 | `game/tournament/*` | La copa alrededor tuyo | tablas, fechas, clasificación, brackets, quickSim, nextOpponentId | Nada del partido interactivo |
 | `game/match/Match.js` | Máquina de estados del partido | constructor, tick, fases, subs, result | Resolución de ocasiones/faltas (delegada), textos de UI de pantalla |
@@ -212,8 +213,10 @@ Este mapa es ley: si un módulo escribe un campo que no le pertenece, es un bug 
 | `squad[].amarillas/suspendido/expulsado` | `discipline` (post-partido) · `match/incidents` (en juego) | lineup, ui |
 | `squad[].lesionado*` | `match/incidents` · `medical` | lineup, ui |
 | `squad[].momento` | `momentum.js` (post-partido) · efectos de `content/` (mutación directa 1..7) | ratings (statAt), ui, daily |
+| `squad[].goles/asistencias` | `match/chances` (en juego: `goalMine` pone gol y asistidor) | scorers/assists (tabla), ui, daily |
 | `moral` | `morale.js` (post-partido y pasar de ronda) · efectos de `content/` (clamp 1..100) | ui/hub, ui/squad, daily |
 | `scorers` | `scorers.js` (goles ajenos: world sim + rival de mis partidos) | ui/scorers, ui/hub |
+| `assists` | `assists.js` (asistencias ajenas: world sim + rival de mis partidos) | ui/scorers, ui/hub |
 | `windowStart` | `calendar.js` (al agendar) | ui/hub (calendario) |
 | `stage`, `matchday`, `koMatches`, `lastWinners` | `flow.js` (única pluma) | tournament, ui |
 | `groups[].results` | `run.js` (nacen) · `tournament/world` (sim ajenos) · `flow` (mi resultado) | tournament/groups, ui |
@@ -237,6 +240,7 @@ Las decisiones siguen siendo `{id, title, text, options[{label, hint, key}]}` co
 |---|---|---|
 | `chance` | chances.js | resolveChance |
 | `penalty_mine` / `penalty_opp` | chances.js | resolvePenaltyMine/Opp |
+| `last_man` | chances.js | resolveLastMan |
 | `protect` / `forced_sub` / `gk_red` | incidents.js | ruteo UI → makeSub |
 
 ### ⚖️ Autocrítica de la sección

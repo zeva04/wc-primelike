@@ -45,7 +45,7 @@ export function newRun(myTeamId) {
     energia: 100,
     momento: 4,               // Momento 1..7, nace neutro (escribe game/momentum)
     amarillas: 0, suspendido: false, lesionadoPartidos: 0,
-    goles: 0, partidos: 0,
+    goles: 0, asistencias: 0, partidos: 0,
   }));
 
   // Forma canónica del estado de una run. Propiedad de cada campo: ARQUITECTURA §3.1.
@@ -73,6 +73,7 @@ export function newRun(myTeamId) {
     dayOpp: null,              // Oportunidad viva HOY: {id} o null (escribe calendar; day-action la consume)
     moral: 50,                 // Moral del equipo 1..100 (escribe game/morale; content/ la muta con clamp)
     scorers: {},               // goleadores del torneo ajenos {"teamId|name": {teamId,name,goles}} (escribe game/scorers)
+    assists: {},               // asistidores del torneo ajenos {"teamId|name": {teamId,name,asistencias}} (escribe game/assists)
     stats: { pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, tarjetas: 0, eventos: 0, penalesAtajados: 0, oppOfrecidas: 0, oppAprovechadas: 0 },
     champion: false,
     journal: [],               // Diario de Campaña: la memoria narrativa de la run

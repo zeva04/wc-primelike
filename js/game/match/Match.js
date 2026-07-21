@@ -14,6 +14,7 @@
    | chance       | chances.js   | resolveChance          |
    | penalty_mine | chances.js   | resolvePenaltyMine     |
    | penalty_opp  | chances.js   | resolvePenaltyOpp      |
+   | last_man     | chances.js   | resolveLastMan         |
    | protect      | incidents.js | ruteo UI → makeSub     |
    | forced_sub   | incidents.js | ruteo UI → makeSub     |
    | gk_red       | incidents.js | ruteo UI → makeSub     |
@@ -55,10 +56,13 @@ export class Match {
     this.pens = null;
     this.stats = { misTiros: 0, oppTiros: 0, decisiones: 0, penalesAtajados: 0 };
     this.scorers = [];
+    this.assists = [];         // asistencias de MIS goles [{name, min}] (chances.goalMine)
     // Señales por protagonista para el cierre post-partido (momentum/morale):
     this.oppGoalMins = [];     // minutos de los goles rivales (¿nos empataron al final?)
     this.pensFallados = [];    // nombres míos que fallaron un penal (en juego o tanda)
     this.pensAtajadosPor = []; // nombre de MI arquero por cada penal que atajó
+    this.lastManStops = [];    // MIS centrales que cortaron un gol como último hombre (+Momento)
+    this.lastManFouls = [];    // MIS centrales que se ganaron tarjeta/penal como último hombre (−Momento)
     this._interactiveChanceCooldown = 0;
     // Minutos jugados por jugador (para el cansancio post-partido, medical): los titulares
     // entran al minuto 0; un cambio cierra los del que sale y arranca los del que entra.
@@ -148,6 +152,7 @@ export class Match {
   resolveChance(key) { return Chances.resolveChance(this, key); }
   resolvePenaltyMine(name) { return Chances.resolvePenaltyMine(this, name); }
   resolvePenaltyOpp(key) { return Chances.resolvePenaltyOpp(this, key); }
+  resolveLastMan(key) { return Chances.resolveLastMan(this, key); }
   _foulEvent() { return Incidents.foulEvent(this); }
   _injuryEvent() { return Incidents.injuryEvent(this); }
   startShootout() { return Shootout.startShootout(this); }

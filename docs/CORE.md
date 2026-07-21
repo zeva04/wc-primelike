@@ -142,10 +142,23 @@ baja hasta −2** por partido, `MOMENTO_RISE_MAX`/`MOMENTO_FALL_MAX`). El Moment
 | Señal (individual) | Efecto |
 |---|---|
 | Gol propio | +1 por gol (máx +2) |
+| **Asistencia** (gol de jugada con pase) | **+1 por asistencia** — la vía de los **MED** (Sprint 1) |
+| **Corte de último hombre** (barrerse/anticipar exitoso) | **+1** — la vía de los **DEF** (Sprint 1) |
 | Penal fallado (juego o tanda) | −1 por fallo |
+| **Tarjeta o penal como último hombre** | **−1** — el error del central cuesta forma |
 | Arquero: valla invicta / 3+ goles / penal atajado | +1 / −1 / +1 |
 | **Lesión** que lo deja de baja | **vuelve al neutro (4)**: la lesión corta la forma |
 | Sin señal individual o sin jugar | **decae 1 paso hacia el neutro (4)** |
+
+**Sprint 1 — Momento para todo el plantel** (decisión PO 20-jul): antes solo los goleadores y
+el arquero movían el Momento, así que DEF y MED vivían en *Normal*. Ahora las **asistencias**
+(atribuidas al convertir un gol de jugada con pase, §Asistidores) llegan a los MED, y los
+**cortes de último hombre** (§Match — decisión del central) a los DEF. El tope +1/partido acota
+la **suma** de señales: gol + asistencia + corte no dan más de +1. Balance: sumar fuentes de
+Momento + la ventaja defensiva del último hombre es poder asimétrico → se calibró la eficacia
+del último hombre para que, jugado al azar, quede **neutro en goles** (BRA 28.6% n=4000, =
+baseline; el residual real lo pone el humano que decide bien). Dial pactado si deriva al alza:
+`MOMENTO_PCT_STEP`; si el problema es el último hombre, su frecuencia/eficacia (no el gate).
 
 **Subir cuesta más que caer** (decisión PO 18-jul): aunque un jugador haga méritos de
 sobra (doblete → +2 en crudo), su Momento **sube como mucho +1 por partido**; una mala
@@ -560,6 +573,46 @@ un simulador de goleadores real (un delantero anota mucho más seguido que un de
 Visible como card top-5 en el hub (clic → pantalla con la tabla completa). No afecta el
 balance: solo consume rng al asignar autores (desplaza la secuencia, sin cambiar el
 modelo — verificado, BRA campeón sin deriva).
+
+### Asistidores del torneo (`run.assists`, `game/assists.js`) — Sprint 1
+
+Espejo exacto de los goleadores, otra estadística. El motor no modela pases, así que a una
+**fracción de los goles** (`ASSIST_CHANCE` = **70%**; penales y jugadas individuales no llevan
+asistencia) se le atribuye asistidor, repartido entre las figuras ponderando **pro-MED**
+(`POS_ASSIST_WEIGHT` MED 3 · DEL 2 · DEF 1 · POR 0 — el arquero **nunca** asiste). Es lo que
+hace que el sistema alimente sobre todo a los **mediocampistas**.
+
+- Asistencias de **equipos ajenos** → `run.assists` (`"teamId|name" → {teamId, name,
+  asistencias}`), vía `assignAssists` desde `world.simWorldMatch` y `flow.closeMatch`.
+- **Mis** asistencias son EXACTAS: las atribuye el **partido interactivo** al convertir
+  (`chances.goalMine` → `run.squad[].asistencias`) — la jugada de "pase" firma al pasador,
+  el remate de jugada abierta sortea un compañero pro-MED, y el VAR que anula el gol también
+  revierte la asistencia. Mi equipo NO entra en `run.assists` (sin doble conteo).
+- `tournamentAssists(run)` combina ambos, ordena y da ranking de competición (1·2·2·4).
+
+En el hub, la card de goleadores es un **carrusel** de 2 pestañas (⚽ Goleadores / 🅰️
+Asistidores); la pantalla completa tiene el mismo toggle. Igual que los goleadores, solo
+consume rng (desplaza la secuencia, sin cambiar el modelo).
+
+### Decisión de "último hombre" (`game/match/chances.js`) — Sprint 1
+
+Nueva decisión de partido (id `last_man`, contrato §3.2): el **25%** de las ocasiones
+peligrosas del rival (si hay un DEF mío en cancha) se convierte en una elección para ese
+central — **anticipar · barrerse · esperar** — ponderada por su `defensa` vs el ataque rival
+(el `aura` da temple al anticipar).
+
+| Opción | Si sale | Si falla | Momento |
+|---|---|---|---|
+| **Anticipar** (paso al frente) | corte limpio | el delantero queda de cara al arco → **gol muy probable** (sin tarjeta) | **+1** al cortar |
+| **Barrerse** (barrida) | corte limpio | falta → **PENAL** en el área, o tarjeta (amarilla, a veces **roja** de último hombre) | **+1** al cortar; **−1** por tarjeta/penal |
+| **Esperar** (contener) | baja la peligrosidad → remate normal a atajar | — | **nunca** da Momento |
+
+El error se paga con su **consecuencia natural** (gol/penal/tarjeta); el −Momento llega
+**solo** por tarjeta o penal (no por el gol de un anticipe fallado). Barrerse es más arriesgado
+que anticipar en tarjetas. Ayuda a **defender** y da Momento a los **DEF** — poder asimétrico
+(los rivales no deciden), así que su eficacia se **calibró para quedar neutra en goles jugada al
+azar** (baseline preservado); el humano que decide bien saca la ventaja. Diales si deriva:
+frecuencia (`LAST_MAN_CHANCE`) y probabilidades de corte/gol/penal/roja — **no el gate**.
 
 ### Diario de Campaña (`run.journal`)
 
