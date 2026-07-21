@@ -41,6 +41,16 @@ export function moraleBand(v) { return MORAL_BANDS.find(b => v >= b.min) || MORA
 // Un gol del minuto 85 en adelante es "agónico" (la prórroga entera lo es).
 const MIN_AGONICO = 85;
 
+// SPRINT 4 — interacción cruzada Momento → Moral (decisión PO 21-jul-2026): un vestuario
+// lleno de jugadores apagados hunde el ánimo colectivo. Cierra el loop individual →
+// colectivo sin sistemas nuevos: la forma de cada uno ya la calcula momentum.js, acá solo
+// se cuenta. Es un CASTIGO sin premio espejo a propósito (Bible §4.5: los sistemas deben
+// generar problemas). Se evalúa DESPUÉS del cierre de momento del partido —
+// flow.postMatchUpdate corre applyMomentumPostMatch de todo el plantel antes de llamar acá.
+export const FRIOS_UMBRAL = 4;   // cuántos jugadores en momento ≤2 hacen falta
+export const FRIOS_MOMENTO = 2;  // "frío" = momento 1 o 2 (Paupérrimo / Apagado)
+export const FRIOS_MORAL = 5;    // cuánta moral se lleva puesta
+
 /**
  * Mueve la moral del equipo con clamp 1..100. Si el movimiento cruza de banda,
  * lo anota en el Diario (el cambio de humor colectivo es un momento de la run;
@@ -69,6 +79,7 @@ export function bumpMorale(run, delta, motivo) {
  *  - gol agónico (≥85') que decide: triunfo por la mínima +5 · empate propio al
  *    final +4 · nos empatan al final −4 · derrota por la mínima al final −5
  *  - tanda de penales: ganarla +3 extra, perderla −3 extra (el drama pesa)
+ *  - vestuario apagado: FRIOS_UMBRAL+ jugadores en momento ≤2 restan FRIOS_MORAL (Sprint 4)
  * "Pasar de ronda" suma aparte en flow.advanceStage (bumpMorale +5).
  *
  * Devuelve el RESUMEN para el análisis del cuerpo técnico del post-partido:
@@ -93,6 +104,9 @@ export function applyMoralePostMatch(run, match) {
     else if (oppMin > myMin && oppMin >= MIN_AGONICO) { delta -= 4; reasons.push("empate sufrido al final"); }
   }
   if (res.pens) { delta += won ? 3 : -3; reasons.push(won ? "tanda ganada" : "tanda perdida"); }
+  // Cruce Momento → Moral: demasiados jugadores apagados pesan en el vestuario (Sprint 4).
+  const frios = (run.squad || []).filter(p => (p.momento ?? 4) <= FRIOS_MOMENTO).length;
+  if (frios >= FRIOS_UMBRAL) { delta -= FRIOS_MORAL; reasons.push(`${frios} jugadores apagados`); }
 
   const before = run.moral ?? MORAL_INICIAL;
   const bandBefore = moraleBand(before);

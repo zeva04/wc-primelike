@@ -93,6 +93,44 @@ assert(cierra(fakeMatch({ winner: "my", gMy: 3, gOpp: 0, scorers: [{ name: "A", 
   assert(alta < 0.22 && baja > 0.32, "las frecuencias observadas rondan las esperadas por banda", `alta=${alta.toFixed(2)} baja=${baja.toFixed(2)}`);
 }
 
+// ---------- SPRINT 4: cruce Momento → Moral (vestuario apagado) ----------
+{
+  const fake = ({ winner = null } = {}) =>
+    ({ result: () => ({ winner }), scorers: [], oppGoalMins: [], gMy: 0, gOpp: 0, oppTeam: { name: "Test FC" } });
+  // Run mínima duck-typed: applyMoralePostMatch solo necesita moral, squad y journal.
+  const conFrios = (n) => ({
+    moral: 50, journal: [],
+    squad: Array.from({ length: 12 }, (_, i) => ({ name: `P${i}`, momento: i < n ? 2 : 4 })),
+  });
+
+  const sinFrios = conFrios(0);
+  const r0 = E.applyMoralePostMatch(sinFrios, fake({ winner: "my" }));
+  assert(r0.delta === 10, "sin jugadores apagados, la victoria vale +10 limpio", r0.delta);
+
+  const bajoUmbral = conFrios(E.FRIOS_UMBRAL - 1);
+  const r1 = E.applyMoralePostMatch(bajoUmbral, fake({ winner: "my" }));
+  assert(r1.delta === 10, `con ${E.FRIOS_UMBRAL - 1} apagados todavía no muerde (umbral ${E.FRIOS_UMBRAL})`, r1.delta);
+
+  const enUmbral = conFrios(E.FRIOS_UMBRAL);
+  const r2 = E.applyMoralePostMatch(enUmbral, fake({ winner: "my" }));
+  assert(r2.delta === 10 - E.FRIOS_MORAL, `con ${E.FRIOS_UMBRAL} apagados la moral pierde ${E.FRIOS_MORAL}`, r2.delta);
+  assert(r2.reasons.some(t => /apagados/.test(t)), "el vestuario apagado se narra en el análisis", r2.reasons.join(" · "));
+
+  // El castigo es plano (no escala con la cantidad): un dial, no una espiral.
+  const muchos = conFrios(10);
+  const r3 = E.applyMoralePostMatch(muchos, fake({ winner: "my" }));
+  assert(r3.delta === 10 - E.FRIOS_MORAL, "el castigo es plano aunque haya el doble de apagados", r3.delta);
+
+  // Solo cuentan los momento ≤ FRIOS_MOMENTO: un plantel en "Malo" (3) no dispara nada.
+  const malos = { moral: 50, journal: [], squad: Array.from({ length: 12 }, (_, i) => ({ name: `Q${i}`, momento: 3 })) };
+  const r4 = E.applyMoralePostMatch(malos, fake({ winner: "my" }));
+  assert(r4.delta === 10, `"Malo" (3) no es apagado: el umbral es momento ≤${E.FRIOS_MOMENTO}`, r4.delta);
+
+  // Una run sin squad (tests duck-typed viejos) no puede romper el cierre anímico.
+  const r5 = E.applyMoralePostMatch({ moral: 50, journal: [] }, fake({ winner: "opp" }));
+  assert(r5.delta === -10, "sin squad el cruce no explota (fallback defensivo)", r5.delta);
+}
+
 console.log(`morale.test: ${checks} checks · fallos: ${fails}`);
 console.log(fails ? "❌ morale con fallos" : "✅ morale OK");
 process.exit(fails ? 1 : 0);

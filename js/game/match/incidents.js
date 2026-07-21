@@ -8,7 +8,7 @@
    ============================================================ */
 import { rnd, pick } from "../../core/rng.js";
 import { statLine } from "../ratings.js";
-import { rollInjury } from "../medical.js";
+import { rollInjury, fatigueInjuryMult } from "../medical.js";
 
 /** Falta aleatoria: puede derivar en amarilla, roja, o la decisión de proteger a un amonestado. */
 export function foulEvent(m) {
@@ -97,7 +97,8 @@ export function injuryEvent(m) {
     return false;
   }
   const p = pick(m.activeMine());
-  const grave = rnd() < 0.45;
+  // Cruce Energía → Lesión (Sprint 4): con las piernas vacías, el golpe termina peor.
+  const grave = rnd() < 0.45 * fatigueInjuryMult(p.energia);
   if (!grave) {
     p.energia = Math.max(10, p.energia - 20);
     m.log("event", `min ${m.min}' — ${p.name} recibe un golpe. Sigue, pero está tocado (−energía).`);

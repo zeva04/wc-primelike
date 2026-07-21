@@ -16,13 +16,19 @@ let fails = 0, checks = 0;
 const assert = (cond, msg, ctx) => { checks++; if (!cond) { fails++; console.error("FAIL:", msg, ctx ?? ""); } };
 
 // ---------- nivel → % (con tope) ----------
-const ESPERADO = { 1: -4, 2: -4, 3: -2, 4: 0, 5: 2, 6: 4, 7: 4 };
+// Los valores se DERIVAN de las constantes (STEP y CAP): así un rebalance del tope —como el
+// del Sprint 4, que lo bajó de 4 a 3— no rompe el test, pero la FORMA de la curva (simétrica,
+// topada, neutro exacto en 0) sí queda cubierta.
+const tope = (n) => Math.max(-E.MOMENTO_PCT_CAP, Math.min(E.MOMENTO_PCT_CAP, (n - 4) * E.MOMENTO_PCT_STEP));
+const ESPERADO = Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map(n => [n, tope(n)]));
+assert(E.MOMENTO_PCT_CAP < E.MOMENTO_PCT_STEP * 3, "el tope muerde: los niveles extremos (1 y 7) no rinden más que sus vecinos");
+assert(ESPERADO[4] === 0 && ESPERADO[3] === -ESPERADO[5] && ESPERADO[1] === -ESPERADO[7], "la curva es simétrica alrededor del neutro");
 for (const [nivel, pct] of Object.entries(ESPERADO)) {
   assert(E.momentoPct({ momento: +nivel }) === pct, `momento ${nivel} → ${pct}%`, E.momentoPct({ momento: +nivel }));
 }
 assert(E.momentoPct({}) === 0, "un jugador SIN campo momento (rival) no tiene efecto");
 assert(E.momentoMult({ momento: 4 }) === 1, "el neutro multiplica por 1 exacto");
-assert(E.momentoMult({ momento: 7 }) === 1.04, "el tope multiplica por 1.04");
+assert(E.momentoMult({ momento: 7 }) === 1 + E.MOMENTO_PCT_CAP / 100, "el tope multiplica por 1 + CAP%");
 
 // ---------- etiquetas cualitativas ----------
 assert(E.MOMENTO_RISE_MAX === 1 && E.MOMENTO_FALL_MAX === 2, "sube máx +1, baja hasta −2 (decisión PO 18-jul)");
@@ -39,11 +45,12 @@ assert(run.squad.every(p => p.momento === 4), "todo el plantel nace con momento 
   const p = run.squad.find(x => x.pos === "DEL");
   const raw = p.stats.tiro;
   assert(E.effectiveStat(p, "tiro") === raw, "momento 4 no toca la stat");
+  const mult = 1 + E.MOMENTO_PCT_CAP / 100; // niveles 6 y 2 ya están en el tope
   p.momento = 6;
-  assert(E.effectiveStat(p, "tiro") === Math.round(raw * 1.04), "momento 6 = +4%", `${raw} → ${E.effectiveStat(p, "tiro")}`);
-  assert(E.effectiveStat(p, "aura") === Math.round(p.stats.aura * 1.04), "el aura también se escala (la confianza es aura)");
+  assert(E.effectiveStat(p, "tiro") === Math.round(raw * mult), `momento 6 = +${E.MOMENTO_PCT_CAP}%`, `${raw} → ${E.effectiveStat(p, "tiro")}`);
+  assert(E.effectiveStat(p, "aura") === Math.round(p.stats.aura * mult), "el aura también se escala (la confianza es aura)");
   p.momento = 2;
-  assert(E.effectiveStat(p, "tiro") === Math.round(raw * 0.96), "momento 2 = −4%");
+  assert(E.effectiveStat(p, "tiro") === Math.round(raw * (2 - mult)), `momento 2 = −${E.MOMENTO_PCT_CAP}%`);
   const overFrio = E.playerOverall(p);
   p.momento = 6;
   assert(E.playerOverall(p) > overFrio, "la nota de la ficha refleja el momento (no puede mentir)");
@@ -77,8 +84,8 @@ const aplica = (p, played, m) => { E.applyMomentumPostMatch(run, p, played, m); 
 
 // El RESULTADO ya no mueve el momento (eso es Moral del equipo): sin señal INDIVIDUAL decae.
 assert(aplica(jugador(4), true, fakeMatch({ winner: "my" })) === 4, "ganar NO mueve el momento (va a la Moral); en el neutro no pasa nada");
-assert(aplica(jugador(5), true, fakeMatch({ winner: "my" })) === 4, "ni sostiene: un Bueno sin gol decae aunque el equipo gane");
-assert(aplica(jugador(3), true, fakeMatch({ winner: "opp" })) === 4, "perder tampoco lo hunde: un Malo sin fallo sube hacia el neutro");
+assert(aplica(jugador(5), true, fakeMatch({ winner: "my" })) === 5, "el titular sin gol CONSERVA su forma (Sprint 4: solo decae el que no juega)");
+assert(aplica(jugador(3), true, fakeMatch({ winner: "opp" })) === 3, "perder tampoco lo mueve: jugar sostiene la forma, buena o mala");
 
 // Las señales INDIVIDUALES sí mueven (subida topada en +1, bajada hasta −2):
 assert(aplica(jugador(4), true, fakeMatch({ scorers: [{ name: "Tester", min: 30 }] })) === 5, "un gol sube +1");
@@ -114,12 +121,14 @@ assert(aplica(jugador(4, "MED"), true, fakeMatch({ scorers: [{ name: "Tester", m
 assert(aplica(jugador(4, "DEF"), true, fakeMatch({ lastManStops: ["Tester"], lastManFouls: ["Tester"] })) === 4,
   "un corte y un error se compensan: sin señal neta, queda en el neutro");
 
-// ---------- decaimiento hacia el neutro (4) ----------
-assert(aplica(jugador(6), true, fakeMatch()) === 5, "sin señal: decae hacia el neutro");
-assert(aplica(jugador(2), true, fakeMatch()) === 3, "el decaimiento también sube al que está frío");
+// ---------- decaimiento hacia el neutro (4) — SOLO para quien NO jugó (Sprint 4) ----------
+assert(aplica(jugador(6), true, fakeMatch()) === 6, "el titular sin acciones decisivas NO decae: jugar alimenta la forma");
+assert(aplica(jugador(2), true, fakeMatch()) === 2, "tampoco el frío que jugó sube solo: la forma se mueve con hechos");
 assert(aplica(jugador(4), true, fakeMatch()) === 4, "en el neutro sin señal no pasa nada");
 assert(aplica(jugador(7), false, fakeMatch()) === 6, "el que no jugó decae");
 assert(aplica(jugador(1), false, fakeMatch()) === 2, "el que no jugó decae hacia arriba si estaba helado");
+// El sustituido cuenta como que jugó: sale por cambio pero vivió el partido → no se enfría.
+{ const p = jugador(6); p.sustituido = true; assert(aplica(p, false, fakeMatch()) === 6, "el sustituido no se enfría: participó"); }
 
 // ---------- una lesión resetea el momento (decisión PO 18-jul) ----------
 {
@@ -155,7 +164,7 @@ assert(aplica(jugador(2, "POR"), true, fakeMatch({ gOpp: 5 })) === 1, "arquero: 
 }
 {
   const r1 = E.applyMomentumPostMatch(run, jugador(6), true, fakeMatch());
-  assert(r1.after === 5 && r1.reasons.some(x => /vuelve hacia lo normal/.test(x.text)), "el decaimiento se narra", JSON.stringify(r1));
+  assert(r1.after === 6 && r1.delta === 0 && r1.reasons.length === 0, "el titular sin señal no genera ni cambio ni ruido en el análisis (anti-spam)", JSON.stringify(r1));
   const r2 = E.applyMomentumPostMatch(run, jugador(6), false, fakeMatch());
   assert(r2.reasons.some(x => /No sumó minutos/.test(x.text)), "el que no jugó tiene su razón", JSON.stringify(r2));
   const r3 = E.applyMomentumPostMatch(run, jugador(4), false, fakeMatch());

@@ -80,6 +80,13 @@ export const PREP_EVENTS = [
     desc: "La prensa publicó el plan de partido: hoy la Sesión táctica no sirve de nada.",
     teaser: "Hay revuelo en la prensa: alguien habló de más.",
     mod: { mods: { tactica: 0 }, desc: "Sesión táctica no disponible hoy" }, effect: () => {} },
+  // SPRINT 4 — evento-PROBLEMA (Bible §4.5: los eventos generan problemas, no premios).
+  // Pega donde más duele desde el rebalance del núcleo: el descanso. No baja un número —
+  // rompe el plan del día, que es la decisión que el DT ya tenía tomada.
+  { id: "jet_lag", rareza: "infrecuente", tema: "fisico", icon: "🥱", title: "Jet lag", tipo: "debuff",
+    desc: "El cambio de huso horario desarmó el sueño del plantel: hoy Recuperar rinde la mitad.",
+    teaser: "Media concentración amaneció mirando el techo a las cuatro de la mañana.",
+    mod: { mods: { recuperar: 0.5 }, desc: "Recuperar rinde la mitad hoy" }, effect: () => {} },
   { id: "toque_seda",  rareza: "infrecuente", tema: "entrenamiento", icon: "🎩", title: "Toque de seda",            tipo: "buff",   desc: "+8 de Pase para el próximo partido.",
     teaser: "Los ayudantes arman circuitos de pases en espacios reducidos.",             effect: r => buff(r, "pase", 8) },
   { id: "banderazo",   rareza: "infrecuente", tema: "entorno",       icon: "🥁", title: "Banderazo de la hinchada", tipo: "buff",   desc: "+8 de Aura para el próximo partido.",

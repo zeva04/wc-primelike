@@ -19,7 +19,7 @@ import { buildOpponentReport } from "../../game/scouting.js";
 import { EVENT_THEMES } from "../../content/themes.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, starsHtml, modal, closeModal, toast, momentoChip } from "../components.js";
+import { screenShell, $, flagImg, starsHtml, modal, closeModal, modalOpen, toast, momentoChip } from "../components.js";
 import { spriteSvg } from "../sprites.js";
 import { mountPitch } from "../pitch.js";
 import { renderGroupTableCard, renderKoInfoCard } from "./worldcup.js";
@@ -415,6 +415,11 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
  * que al volver al hub arranca el día siguiente — no el del partido).
  */
 function pasarDia() {
+  // Guarda anti doble-día (bug del PO, 21-jul-2026: "a veces doble evento"). Todo camino
+  // legítimo hasta acá deja la pantalla SIN modal (el botón del hub, o el post-partido que
+  // cierra el suyo antes de navegar); si hay uno abierto es porque la cadena Daily→evento
+  // de este día ya está en curso y el disparo es repetido (doble clic).
+  if (modalOpen()) return;
   const res = advanceDay(S.run);
   if (!res) { renderHub(); return; }
   renderHub(); // el hub del día nuevo queda detrás de la portada

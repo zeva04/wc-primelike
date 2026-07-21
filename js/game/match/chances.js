@@ -104,7 +104,7 @@ export function resolvePenaltyMine(m, name) {
   // la feature: con el efecto pleno, BRA derivaba ~+2pp en el smoke (precedente FEAT-003).
   const q = (effStat(p, "tiro", m.my.buffs) + effStat(p, "aura", m.my.buffs)) / 2 / momentoMult(p);
   const prob = clamp(0.52 + q * 0.07 + (m.my.buffs.penales || 0), 0.5, 0.93);
-  if (rnd() < prob) goalMine(m, p, "¡PENAL CONVERTIDO con sangre fría!");
+  if (rnd() < prob) goalMine(m, p, "¡PENAL CONVERTIDO con sangre fría!", undefined, false);
   else {
     m.pensFallados.push(p.name); // señal para el momento post-partido
     m.log("chance", `min ${m.min}' — ${p.name} patea el penal... ${pick(["¡EL ARQUERO LO ATAJA!", "¡LO TIRA AFUERA! Increíble.", "¡AL PALO!"])}`);
@@ -288,15 +288,17 @@ function assistFor(m, scorer, assist) {
  * revierten si el VAR anula, igual que los goles — así la tabla del torneo nunca cuenta
  * un gol fantasma.
  */
-export function goalMine(m, p, flavor, assist) {
+export function goalMine(m, p, flavor, assist, varOffside = true) {
   m.gMy++;
   p.goles = (p.goles || 0) + 1;
   m.scorers.push({ name: p.name, min: m.min });
   const assistP = assistFor(m, p, assist);
   if (assistP) { assistP.asistencias = (assistP.asistencias || 0) + 1; m.assists.push({ name: assistP.name, min: m.min }); }
   const assistTxt = assistP ? ` Asistencia de ${assistP.name}.` : "";
-  // VAR
-  if (rnd() < 0.12) {
+  // VAR. `varOffside = false` para los goles de PENAL: un penal convertido no puede
+  // anularse por posición adelantada (bug reportado por el PO, 21-jul-2026) — el
+  // pateador sale del punto blanco con todos detrás de la pelota.
+  if (varOffside && rnd() < 0.12) {
     m.log("event", `min ${m.min}' — ⚽ Gol de ${p.name}... ¡pero el VAR lo está revisando! 😬`);
     if (rnd() < 0.3) {
       m.gMy--; p.goles--; m.scorers.pop();

@@ -225,12 +225,13 @@ Este mapa es ley: si un módulo escribe un campo que no le pertenece, es un bug 
 | `day`, `nextMatchDay`, `dayPlan`, `actionPending`, `dayMod` | `calendar.js` (`actionPending` la baja day-action) | ui/hub, day-action |
 | `lastAction` | `day-action.js` | ui/hub |
 | `buffs` | efectos de `content/` (+), `flow` (reset) | match/powers, ui |
+| `peleaEntre`, `filtrador` | efectos de `content/conflicts` (NOMBRES, no referencias — regla de serialización) | el propio conflicto al aplicar la opción elegida |
 | `journal` | `journal.js` (todos anotan vía addJournal) | ui/journal |
 | `stats`, `champion` | `flow.js` | ui/end |
 
 Campos muertos a eliminar en la migración (F7): `lineup`, `extraPos`, `mentalidad`, `lastResults`, `eliminated`, `bracket`, `prepDone`. Y `koMatches`/`lastWinners` pasan a nacer en `newRun` (como `null`) para que la forma del estado sea estable.
 
-**Regla de serialización**: `run` contiene solo datos planos (JSON-izable). Prohibido guardar funciones, nodos DOM o referencias circulares. (El hack `_peleaA/_peleaB` del conflicto "pelea" se reemplaza por nombres.) Esto deja gratis el futuro "guardar run a medias". Excepción documentada: la instancia `Match` NO es serializable a mitad de partido — limitación aceptada.
+**Regla de serialización**: `run` contiene solo datos planos (JSON-izable). Prohibido guardar funciones, nodos DOM o referencias circulares. ✅ **DEUDA SALDADA (Sprint 4, 21-jul-2026)**: el hack `_peleaA/_peleaB` del conflicto "pelea" —que guardaba **referencias a objetos del squad** dentro de `run`— quedó reemplazado por `run.peleaEntre = [nombreA, nombreB]`, resuelto contra `run.squad` en el momento de aplicar el efecto (helper `peleadores(r)` en `content/conflicts.js`). El conflicto nuevo `fuga_vestuario` nace ya con el patrón correcto (`run.filtrador` = nombre). Verificado en navegador: `JSON.stringify(run)` no explota y los campos viejos ya no existen. Esto deja gratis el futuro "guardar run a medias". Excepción documentada: la instancia `Match` NO es serializable a mitad de partido — limitación aceptada.
 
 ### 3.2 El contrato de decisiones Match ↔ UI
 

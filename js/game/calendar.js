@@ -113,9 +113,13 @@ export function advanceDay(run) {
   run.dayMod = null; // los modificadores duran exactamente un día
   run.dayOpp = null; // la oportunidad no tomada ayer se perdió para siempre
   playWorldDay(run); // "anoche" el resto del Mundial jugó lo suyo (run.lastNight → Daily)
-  if (run.day >= run.nextMatchDay) { run.actionPending = false; return { type: "match" }; }
+  // El descanso pasivo es de la NOCHE anterior, así que lo cobra todo día nuevo — también
+  // el de partido (bug reportado por el PO, 21-jul-2026: se llegaba al partido sin haber
+  // recuperado nada de la víspera, castigando doble al que ya venía cansado).
+  const esDiaDePartido = run.day >= run.nextMatchDay;
+  applyDailyRecovery(run, esDiaDePartido); // descanso pasivo (medical); la víspera rinde menos
+  if (esDiaDePartido) { run.actionPending = false; return { type: "match" }; }
   run.actionPending = true;
-  applyDailyRecovery(run); // descanso pasivo del día de preparación (medical)
   const plan = run.dayPlan[run.day];
   if (!plan) { run.actionPending = false; return { type: "match" }; } // no debería ocurrir: todo día intermedio tiene plan
   if (plan.opp) { run.dayOpp = { id: plan.opp }; run.stats.oppOfrecidas++; } // la cuenta final revela las que dejaste pasar

@@ -118,12 +118,13 @@ verde = 2) y abajo amarillo (3) → celeste (2); la forma da la dirección: **7 
 **Efecto mecánico** (decisión PO 17-jul-2026):
 
 ```
-pct = clamp((momento − 4) × 2, −4, +4)      // % sobre TODAS las stats (aura incluida)
+pct = clamp((momento − 4) × 2, −3, +3)      // % sobre TODAS las stats (aura incluida)
 stat_final = round(stat_castigada × (1 + pct/100))
 ```
 
-- **±2% por paso, tope ±4%**: los niveles 1 y 7 rinden igual que 2 y 6 — son estados
-  narrativos más profundos, no más poder.
+- **±2% por paso, tope ±3%**: los niveles 1 y 7 rinden casi igual que 2 y 6 — son estados
+  narrativos más profundos, no más poder. El tope bajó de 4 a 3 en el **Sprint 4**, como
+  contrapeso de que el titular dejó de decaer (ver el bloque de balance más abajo).
 - Entra por `ratings.statAt`, la fuente única: la ficha, la cancha y el partido ven el
   mismo número. Un jugador SIN el campo `momento` (todos los rivales) multiplica por 1:
   **la asimetría vive en los datos, no en caminos de código separados**.
@@ -148,7 +149,8 @@ baja hasta −2** por partido, `MOMENTO_RISE_MAX`/`MOMENTO_FALL_MAX`). El Moment
 | **Tarjeta o penal como último hombre** | **−1** — el error del central cuesta forma |
 | Arquero: valla invicta / 3+ goles / penal atajado | +1 / −1 / +1 |
 | **Lesión** que lo deja de baja | **vuelve al neutro (4)**: la lesión corta la forma |
-| Sin señal individual o sin jugar | **decae 1 paso hacia el neutro (4)** |
+| Jugó sin señal individual | **no se mueve**: jugar ya alimenta la forma (Sprint 4) |
+| **No sumó minutos** | **decae 1 paso hacia el neutro (4)**: la forma se enfría en el banco |
 
 **Sprint 1 — Momento para todo el plantel** (decisión PO 20-jul): antes solo los goleadores y
 el arquero movían el Momento, así que DEF y MED vivían en *Normal*. Ahora las **asistencias**
@@ -171,8 +173,26 @@ reasons}`) para el "Análisis del cuerpo técnico".
 
 El cierre de cada partido devuelve el **resumen anímico por jugador** (`{before, after,
 delta, reasons}`) que alimenta el **"Análisis del cuerpo técnico"** del post-partido: quién
-subió o bajó y por qué (goles, penales, valla, resultado o simple decaimiento) — el motor,
+subió o bajó y por qué (goles, penales, valla o enfriamiento por no jugar) — el motor,
 dueño de la regla, también narra el motivo.
+
+### Sprint 4 — el titular ya no decae (decisión PO 21-jul-2026)
+
+Hasta el Sprint 3, **todo** el plantel decaía un paso hacia el neutro tras cada partido si no
+tenía señal individual. Dos problemas: (a) el que jugaba 90' sin marcar era castigado igual que
+el que miró desde el banco, y (b) el análisis del post-partido escupía una fila por jugador
+—casi todo el plantel— y enterraba los movimientos que sí importaban. **Regla nueva: solo decae
+quien NO sumó minutos** (el sustituido cuenta como que jugó). Mantener la forma alta pasa a
+exigir **jugar**, y rotar tiene ahora un costo anímico además del deportivo.
+
+**Balance (la lección del sprint).** Ese solo cambio valía **+3.0pp** de campeón para BRA
+(n=4000): sin decaimiento, la forma alta deja de enfriarse y el plantel se estaciona arriba —
+poder asimétrico puro, los rivales no tienen Momento. Se aplicó el precedente FEAT-003: se
+recorta el efecto, no el gate. **Dial usado: `MOMENTO_PCT_CAP` 4 → 3**, elegido en vez del
+`MOMENTO_PCT_STEP` porque el tope castiga justo la parte que se infló (los niveles 6-7) y deja
+intacta la sensación de los niveles intermedios. Resultado del sprint completo: **28.9% n=4000
+vs 27.3% de baseline = +1.6pp**, dentro del gate ±2pp (mismo orden que el residual aceptado del
+canje de entrenamiento).
 
 ---
 
@@ -366,8 +386,8 @@ evento de ese nivel. A mayor rareza, menor probabilidad y **mayor impacto**:
 | Rareza | Peso | Pool | Magnitud típica |
 |---|---|---|---|
 | Común | 55% | 10 | ±5 de stat, ±10/20 de energía (los originales) |
-| Infrecuente | 27% | 8 | ±8 de stat, ±12 de energía, o un modificador del día |
-| Rara | 13% | 7 | ±10-12, combos de dos stats, lesión en la práctica, +25 energía |
+| Infrecuente | 27% | 11 | ±8 de stat, ±12 de energía, o un modificador del día |
+| Rara | 13% | 8 | ±10-12, combos de dos stats, lesión en la práctica, +25 energía |
 | Legendaria | 5% | 5 | Campaña-defining: +5 a TODAS las stats, +3 PERMANENTE al mejor delantero, brote de gripe (−25), todas las acciones ×2 |
 
 Con ~19 eventos por run completa, una legendaria aparece ~1 vez por run: es un
@@ -378,7 +398,7 @@ momento, no una rutina. El diario marca las legendarias con tono dorado.
 Algunos eventos no tocan números: **cambian el problema de hoy** (Bible §4.5). Su campo
 `mod` queda en `run.dayMod` (dura exactamente un día) y multiplica el rendimiento de las
 Acciones del Día: `entrenar ×2` (doble turno), `entrenar 0` (cancha anegada: bloqueada),
-`recuperar ×2` (spa), `recuperar ×0.5` (ola de calor), `tactica 0` (alineación filtrada),
+`recuperar ×2` (spa), `recuperar ×0.5` (ola de calor y **jet lag**, Sprint 4), `tactica 0` (alineación filtrada),
 todas ×2 (legendaria "El día que todo sale"). El multiplicador escala la **recompensa**;
 el costo de energía de entrenar no se escala. La UI muestra el modificador como banner
 en el panel de acción y bloquea/etiqueta los botones afectados.
@@ -387,6 +407,34 @@ en el panel de acción y bloquea/etiqueta los botones afectados.
 > potenciada (habilidad de lectura); los castigos aplican solos. Con decisiones al azar
 > el smoke pierde ~1-3 pp de campeón respecto a la versión sin rarezas — un DT humano
 > que aprovecha los ×2 recupera esa diferencia. Es la "ventaja del DT humano" (§6).
+
+### Eventos-problema (Sprint 4)
+
+Bible §4.5: **los eventos deben generar problemas, no repartir premios**. Hasta el Sprint 3
+casi todo el contenido movía aura o energía en una sola dirección. El Sprint 4 sumó tres
+sucesos cuyo rasgo común es que **las dos (o tres) ramas cobran algo**:
+
+| Suceso | Tipo | El problema que plantea |
+|---|---|---|
+| 🥱 **Jet lag** | Evento (infrecuente) | Modificador del día: **Recuperar rinde la mitad**. Rompe el plan del DT justo en la palanca más sensible del juego, sin tocar un número del plantel |
+| 🏋️ **El preparador físico pide más** | Conflicto | Cargar la pierna (−18 de energía a todos, +0.15 de táctica) **o** bajar la carga (+8 de energía, −5 de Aura). No hay rama gratis |
+| 🕳️ **Fuga en el vestuario** | Conflicto (3 opciones) | Apartar al filtrador (−10 de Moral, +5 de Aura, su Momento cae) · taparlo (45% no pasa nada, si no **−14 de Moral**) · hablar de frente (−10 de energía a todos). Cada rama paga en una moneda distinta: Moral, riesgo o energía |
+
+El pool de conflictos pasó de 6 a **8**; el de eventos inevitables, de 33 a **34**.
+
+### Interacciones cruzadas (Sprint 4)
+
+Profundidad barata: reglas que conectan dos sistemas que ya existen, sin sumar sustantivos
+nuevos al dominio. Ambas son **castigos sin premio espejo**, a propósito.
+
+| Cruce | Regla | Dónde vive |
+|---|---|---|
+| **Energía → Lesión** | Un golpe en juego es más probable que resulte GRAVE cuanto más vacío está el jugador: multiplicador **1.0 → 1.8** lineal desde energía 50 hacia el piso (5). Escala la *gravedad*, no la *frecuencia* de golpes: el cansancio no provoca más choques, hace que terminen peor | `medical.fatigueInjuryMult`, aplicado en `match/incidents.injuryEvent` |
+| **Momento → Moral** | Si al cerrar el partido hay **4+ jugadores en momento ≤2** (Paupérrimo/Apagado), la Moral pierde **−5 extra**, con su línea propia en el análisis. Castigo **plano**: no escala con la cantidad, para que sea un dial y no una espiral | `morale.applyMoralePostMatch` (corre después del cierre de Momento de todo el plantel) |
+
+El cruce Energía→Lesión refuerza la rotación del Sprint 3 con una consecuencia que se siente.
+Costo medido: le quita ~1pp a la estrategia "siempre Entrenar" (que ya paga energía) — se
+acepta porque es exactamente el trade-off que la regla quiere expresar.
 
 Dentro de una ventana no se repite el mismo suceso (se sortea sin reposición).
 El calendario del hub muestra de antemano **solo la temática** de cada día
@@ -553,8 +601,8 @@ Las palancas de la economía:
   (`matchFatigue`: un titular de 90' pierde −42; un suplente que entra a los 30' del final,
   −14). Subió de −10 a −14 en el rebalance del 20-jul-2026, acoplado a bajar el peso de la
   energía en el rendimiento (§4): el partido vacía más rápido, pero cada punto pesa menos. El que **descansó** recupera **+30**. Entre partidos hay **recuperación pasiva**:
-  **+8 por día de preparación** (`applyDailyRecovery`, en `advanceDay`), más la acción
-  Recuperar y varios eventos. Sin la pasiva, el cansancio entra en espiral (no hay forma de
+  **+8 por día de preparación** y **+2 el día de partido** (`applyDailyRecovery`, en
+  `advanceDay`), más la acción Recuperar y varios eventos. Sin la pasiva, el cansancio entra en espiral (no hay forma de
   reponer a un titular fijo) — medido: BRA se hunde a 5.9%; con la pasiva vuelve a 28.8%
   (decisión PO 18-jul: el cansancio se siente como dificultad extra). Alimenta el factor de
   `effStat` (§4), así que descuidar la energía castiga de verdad; obliga a **rotar y
@@ -565,6 +613,19 @@ Las palancas de la economía:
   elige el DT** — el PO la quiso como evento raro y no como Acción del Día, para que la
   rotación fina sea un premio ocasional y no una herramienta permanente (que habría
   inflado la ventaja de energía del humano).
+
+  > **La víspera del partido también descansa** (Sprint 4, bug reportado por el PO). Hasta el
+  > Sprint 3, `advanceDay` cobraba el descanso pasivo **solo en días de preparación**: al llegar
+  > el día de partido se salía antes del `applyDailyRecovery`, así que se jugaba sin haber
+  > repuesto nada de la noche anterior. Ahora **todo día nuevo recupera**, pero la víspera lo
+  > hace a tasa reducida (`MATCHDAY_RECOVERY = 2` vs `DAILY_RECOVERY = 8`): viaje a la sede,
+  > charla técnica y nervios no son una jornada de recuperación.
+  >
+  > **Ojo con este dial: es el más sensible del juego.** Medido en este sprint, `DAILY_RECOVERY`
+  > mueve **~5pp de campeón por punto** (BRA n=1500: con 6 → 25.9%, con 7 → 30.7%), porque
+  > rompe o restaura la espiral de fatiga en vez de sumar linealmente. Arreglar el bug con la
+  > tasa completa (+8 el día de partido) valía **+6pp** — por eso el arreglo entró por una
+  > constante propia y reducida, y no subiendo la recuperación de todos.
 - **Buffs de stat** (±5 por evento): se **acumulan** día a día hasta el próximo
   partido y se limpian al terminarlo. Son ±5 y no ±10 porque con 4-5 días de eventos
   por ventana el apilamiento esperado equivale al antiguo evento único de ±10.
@@ -603,6 +664,7 @@ resultados y a **cómo** se dan (en `postMatchUpdate` + `advanceStage`):
 | Gol agónico (≥85') que decide: triunfo por la mínima / nos ganan al final | +5 / −5 |
 | Empatarlo al final / que te lo empaten al final | +4 / −4 |
 | Ganar / perder la tanda de penales (extra) | +3 / −3 |
+| **Vestuario apagado**: 4+ jugadores en momento ≤2 (Sprint 4) | **−5** (plano) |
 | Pasar de ronda (clasificar de grupos o avanzar en KO) | +5 |
 
 Visible en el hub (fila dentro del bloque de plantilla, con banda y barra), en la

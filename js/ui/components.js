@@ -95,6 +95,9 @@ export function modal(html, maxW = "max-w-lg") {
 /** Cierra el modal activo si existe. */
 export function closeModal() { const m = document.getElementById("modal"); if (m) m.remove(); }
 
+/** ¿Hay un modal abierto? Lo usa el hub para no avanzar el día dos veces (ver pasarDia). */
+export function modalOpen() { return !!document.getElementById("modal"); }
+
 /** Reemplaza la pantalla completa con el contenido dado (contenedor centrado). */
 export function screenShell(inner, maxW = "max-w-5xl") {
   app().innerHTML = `<div class="${maxW} mx-auto px-4 py-6">${inner}</div>`;

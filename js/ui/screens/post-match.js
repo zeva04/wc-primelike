@@ -13,8 +13,20 @@ import { screenShell, $, flagImg, modal, closeModal } from "../components.js";
 import { renderGroupTableCard } from "./worldcup.js";
 import { stopTimer } from "./match.js";
 
+// Guardas de UN SOLO DISPARO para el cierre del partido (bug del PO, 21-jul-2026: "los días
+// posteriores al juego a veces tenían doble evento"). Tanto `finishMatch` como `routeAdvance`
+// son alcanzables por más de un camino —el reloj del partido, el fin de la tanda, el botón
+// Continuar, el modal de clasificados— y un doble disparo avanzaba DOS días de una: se
+// mostraban dos eventos seguidos y se perdía un día de preparación. Se arman al cerrar el
+// partido y se consumen una vez cada uno.
+let cerrando = false;   // finishMatch en curso o ya hecho para este partido
+let avanzando = false;  // routeAdvance ya disparado para este partido
+
 /** Cierra el partido en el motor y pinta los resultados (o va directo al desenlace tras la final). */
 function finishMatch() {
+  if (cerrando) return; // el partido ya se está cerrando: ignorar el segundo disparo
+  cerrando = true;
+  avanzando = false;
   closeModal();
   stopTimer();
   const { res, advanced, momentum, morale } = closeMatch(S.run, S.match);
@@ -28,9 +40,20 @@ function finishMatch() {
  * los otros marcadores). Arriba la Moral del EQUIPO (la mueve el resultado) y debajo el
  * Momento de cada jugador que se movió — su nivel antes → después (cualitativo) y las
  * razones que lo explican (`reasons`, las narra el motor).
+ *
+ * ANTI-SPAM (Sprint 4, decisión PO 21-jul-2026): se listan en detalle solo los MOVIMIENTOS
+ * REALES — los que cambiaron por una acción del partido (gol, asistencia, corte, penal,
+ * lesión). Los enfriamientos por no sumar minutos se colapsan en UNA línea desplegable:
+ * antes ocupaban una fila por jugador y enterraban lo que de verdad importaba.
+ * El criterio de corte es la primera razón del jugador (`decay`), no el signo del delta:
+ * un enfriamiento y una mala actuación pueden dar el mismo −1 y no son lo mismo.
  */
+const esDecaimiento = m => m.reasons.length > 0 && m.reasons.every(r => r.text.startsWith("No sumó minutos"));
+
 function analisisCard(momentum, morale) {
-  const moved = (momentum || []).filter(m => m.delta !== 0 || m.reasons.length);
+  const all = (momentum || []).filter(m => m.delta !== 0 || m.reasons.length);
+  const moved = all.filter(m => !esDecaimiento(m));
+  const frios = all.filter(esDecaimiento);
   moved.sort((a, b) => b.delta - a.delta || b.after - a.after);
   const dirIcon = m => m.delta > 0 ? `<span class="text-emerald-400">▲</span>` : m.delta < 0 ? `<span class="text-sky-400">▼</span>` : `<span class="text-slate-500">•</span>`;
   const afterCls = m => m.delta > 0 ? "text-emerald-400" : m.delta < 0 ? "text-sky-400" : "text-slate-300";
@@ -60,7 +83,28 @@ function analisisCard(momentum, morale) {
         </div>
       </div>`).join("")}</div>`
       : `<p class="text-sm text-slate-500">El partido no movió el Momento individual.</p>`}
+    ${friosBlock(frios)}
   </div>`;
+}
+
+/**
+ * Los que se enfriaron por no jugar, colapsados en una línea con `<details>` (cero JS:
+ * el navegador maneja el desplegar). Se despliega y muestra la lista con su nivel nuevo.
+ */
+function friosBlock(frios) {
+  if (!frios.length) return "";
+  return `<details class="mt-3 group">
+    <summary class="cursor-pointer list-none text-[11px] text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1.5">
+      <span class="text-sky-400">▼</span>
+      <span>${frios.length === 1 ? "1 jugador sin minutos enfrió su forma" : `${frios.length} jugadores sin minutos enfriaron su forma`}</span>
+      <span class="text-slate-600 group-open:hidden">· ver</span>
+    </summary>
+    <div class="mt-2 pl-5 space-y-1">${frios.map(m => `
+      <div class="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
+        <b class="text-slate-400">${m.name}</b>
+        <span>${MOMENTO_LABELS[m.before]} → <b class="text-sky-400">${MOMENTO_LABELS[m.after]}</b></span>
+      </div>`).join("")}</div>
+  </details>`;
 }
 
 /**
@@ -97,6 +141,9 @@ function renderPostMatch(res, advanced, momentum, morale) {
 
 /** Avanza el torneo en el motor y navega según el desenlace. */
 function routeAdvance(advanced) {
+  if (avanzando) return; // doble clic en "Continuar →": el torneo ya avanzó
+  avanzando = true;
+  cerrando = false; // el partido quedó cerrado; el siguiente podrá cerrarse
   const out = advanceStage(S.run, advanced);
   if (out.type === "eliminated") return go("end-run", false);
   if (out.type === "champion") return go("end-run", true);

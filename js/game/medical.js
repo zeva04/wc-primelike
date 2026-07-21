@@ -27,13 +27,40 @@ export const REST_RECOVERY = 30;
 // Recuperación pasiva: cada día de preparación el plantel descansa un poco (sin esto, el
 // cansancio de −42/partido entra en espiral y no hay forma de reponer a un titular fijo).
 export const DAILY_RECOVERY = 8;
+// La VÍSPERA del partido rinde menos (Sprint 4): el día de partido también cobra descanso
+// pasivo —antes no cobraba nada, bug reportado por el PO— pero a tasa reducida: viaje al
+// estadio, charla técnica y nervios no son una jornada de recuperación. Es además el dial
+// FINO de la economía de energía: `DAILY_RECOVERY` mueve ~5pp de título por punto (medido),
+// así que el arreglo del bug entra por acá y no subiendo la recuperación de todos.
+export const MATCHDAY_RECOVERY = 2;
+
+// SPRINT 4 — interacción cruzada Energía → Lesión (decisión PO 21-jul-2026): las piernas
+// cansadas se rompen más. La escala arranca en FATIGUE_INJURY_FROM (energía 50) y crece
+// lineal hasta FATIGUE_INJURY_MAX en el piso de energía (5). Multiplica la probabilidad de
+// que un golpe en juego sea GRAVE (match/incidents.injuryEvent), no la frecuencia de golpes:
+// el cansancio no provoca más choques, hace que los choques terminen peor.
+// Refuerza la rotación del Sprint 3 con una consecuencia que se siente, sin sistemas nuevos.
+export const FATIGUE_INJURY_FROM = 50;
+export const FATIGUE_INJURY_MAX = 1.8;
+
+/** Multiplicador de gravedad de lesión según la energía del jugador (1.0 sano → 1.8 vacío). */
+export function fatigueInjuryMult(energia) {
+  const e = energia ?? 100;
+  if (e >= FATIGUE_INJURY_FROM) return 1;
+  return 1 + (FATIGUE_INJURY_MAX - 1) * (FATIGUE_INJURY_FROM - e) / (FATIGUE_INJURY_FROM - 5);
+}
 
 /** Energía perdida por disputar `minutos` (proporcional: −14 cada 30'). */
 export function matchFatigue(minutos) { return Math.round(minutos / 30 * FATIGUE_PER_30); }
 
-/** Descanso pasivo de un día de preparación: +DAILY_RECOVERY de energía a todo el plantel. */
-export function applyDailyRecovery(run) {
-  for (const p of run.squad) p.energia = clamp(p.energia + DAILY_RECOVERY, 5, 100);
+/**
+ * Descanso pasivo de un día: +DAILY_RECOVERY a todo el plantel, o +MATCHDAY_RECOVERY si el
+ * día que arranca es de partido (la víspera rinde menos). Lo llama calendar.advanceDay en
+ * TODO día nuevo — también el de partido (bug del PO, 21-jul-2026).
+ */
+export function applyDailyRecovery(run, esDiaDePartido = false) {
+  const v = esDiaDePartido ? MATCHDAY_RECOVERY : DAILY_RECOVERY;
+  for (const p of run.squad) p.energia = clamp(p.energia + v, 5, 100);
 }
 
 /**

@@ -29,7 +29,7 @@ el PO vía **AskUserQuestion** al arrancarlo.
 | **Momento** | Reworkeado a individual (goles/penales/arquero), cualitativo, +1/partido, reset por lesión | Solo goleadores/arquero lo mueven → **DEF/MED no tienen vía de subir**; casi todo el plantel vive en *Normal* | **Sprint 1** |
 | **Moral** | Reacciona al resultado, visible en hub/Daily/análisis | **Sin efecto mecánico** (el README lo admite) — tablero inerte | Sprint 2 |
 | **Energía** | Cansancio −10/30' + pasiva +8/día | Falta herramienta de rotación/descanso dirigido; el cansancio probablemente rompió el equilibrio de la Acción del Día (Entrenar quedó dominado) | Sprint 3 |
-| Análisis / Eventos / Cruces | Funcionales | Análisis spammea decaimientos; eventos poco variados y sin diálogo con los sistemas nuevos; falta profundidad cruzada | Sprint 4 |
+| Análisis / Eventos / Cruces | Funcionales | Análisis spammea decaimientos; eventos poco variados y sin diálogo con los sistemas nuevos; falta profundidad cruzada | **Sprint 4 ✅ CERRADO** |
 
 ---
 
@@ -151,17 +151,63 @@ con smoke (la moral reacciona al resultado, así que puede correlacionar con el 
 
 ---
 
-## SPRINT 4 — Pulido y profundidad cruzada
+## SPRINT 4 — Pulido y profundidad cruzada ✅ **CERRADO (21-jul-2026)**
 
-- **Anti-spam del "Análisis del cuerpo técnico":** agrupar/colapsar los decaimientos (tras cada partido
-  casi todo el plantel decae a *Normal*); destacar solo los movimientos reales.
-- **Eventos-problema** (Bible §4.5: los eventos deben generar problemas, no repartir premios) que usen
-  Momento/Energía/Moral; más variedad de consecuencia (hoy casi todo mueve aura/energía).
-- **Interacciones cruzadas** (baratas, dan profundidad sin sistemas nuevos): fatiga alta ↑ riesgo de
-  lesión; muchos jugadores fríos ↓ moral; etc.
-- **Deuda técnica:** migrar el side-channel `run._peleaA/_peleaB` del conflicto "pelea" a nombres
-  (ARQUITECTURA §3.1 regla de serialización); `ui/screens/squad.js` en luz amarilla (>300 líneas) —
-  extracción si crece.
+Alcance cumplido (decisiones del PO vía AskUserQuestion), más 4 bugs que reportó al arrancar.
+
+- ✅ **Anti-spam del "Análisis del cuerpo técnico":** se detallan solo los **movimientos reales**;
+  los enfriamientos por no jugar van colapsados en una línea desplegable (`<details>`, sin JS).
+  El criterio de corte es la **razón** del cambio, no el signo del delta.
+- ✅ **Eventos-problema** (Bible §4.5): 🥱 **jet lag** (modificador: Recuperar rinde la mitad),
+  🏋️ **el preparador físico pide más** y 🕳️ **fuga en el vestuario** (3 opciones que cobran en
+  monedas distintas: Moral, riesgo, energía). Pool de conflictos 6 → 8; eventos 33 → 34.
+- ✅ **Interacciones cruzadas:** **Energía→Lesión** (`fatigueInjuryMult` 1.0→1.8 bajo energía 50,
+  escala la *gravedad* del golpe) y **Momento→Moral** (4+ jugadores en momento ≤2 ⇒ −5 de Moral,
+  castigo plano).
+- ✅ **Deuda técnica:** `run._peleaA/_peleaB` migrado a `run.peleaEntre` = **nombres**
+  (ARQUITECTURA §3.1, regla de serialización — verificado: `JSON.stringify(run)` limpio).
+  `ui/screens/squad.js` **no se tocó**: sigue en 443 líneas, no creció, así que no se extrajo.
+
+### Bugs reportados por el PO y arreglados
+
+| Bug | Causa | Arreglo |
+|---|---|---|
+| Un gol de **penal** se anulaba por offside | `resolvePenaltyMine` pasaba por el VAR genérico de `goalMine`, cuyo único motivo de anulación es "posición adelantada" | `goalMine(..., varOffside)`; los penales lo saltan |
+| Pérdida de Momento por "sin acciones decisivas" | El decaimiento se aplicaba a TODO el plantel | Solo decae quien **no sumó minutos** (el sustituido cuenta como que jugó) |
+| **Doble evento** en los días posteriores al partido | `finishMatch`/`routeAdvance`/`pasarDia` son alcanzables por varios caminos (reloj, tanda, botón, modal de clasificados); un doble disparo avanzaba **dos días** de una | Guardas de un solo disparo (`cerrando`/`avanzando`) + `pasarDia` corta si hay un modal abierto. Verificado: triple clic ⇒ avanza 1 día |
+| El día de partido no recuperaba energía pasiva | `advanceDay` salía antes de `applyDailyRecovery` | Recupera **todo** día nuevo; la víspera a tasa reducida (`MATCHDAY_RECOVERY`=2) |
+
+### ⚖️ La lección de balance del sprint (leer antes del próximo)
+
+Baseline HEAD **27.3% n=4000**. La primera pasada completa dio **31.6% (+4.3pp, fuera del gate)**.
+Atribución medida a n=4000:
+
+| Cambio | Costo |
+|---|---|
+| Titular deja de decaer | **+3.0pp** |
+| Descanso de la víspera a tasa completa (+8) | **+6.0pp** (a tasa 4: +2.7pp) |
+| Resto (penal-VAR, conflictos nuevos, cruces) | −1.4pp |
+
+Dos recortes (FEAT-003: se recorta el efecto, no el gate): `MATCHDAY_RECOVERY` 8→**2** y
+`MOMENTO_PCT_CAP` 4→**3**. Final: **28.9% n=4000 = +1.6pp, dentro del gate.**
+
+**Dos lecciones para el futuro:**
+1. **`DAILY_RECOVERY` es el dial más sensible del juego: ~5pp de campeón POR PUNTO** (6→25.9%,
+   7→30.7% a n=1500). No es lineal: rompe o restaura la espiral de fatiga. Cualquier cambio en la
+   economía de energía debe entrar por una constante propia y medirse, nunca "ajustando el 8".
+2. **n=1500 NO alcanza para gatear un cambio grande.** La misma versión midió 28.3% (n=1500) y
+   31.6% (n=4000): la primera lectura habría dado el gate por aprobado. Para cambios que tocan la
+   economía de energía o el Momento, **medir directo a n=4000** contra un baseline de HEAD medido
+   a n=4000 en worktree.
+
+### Pendiente anotado (no bloqueante)
+
+"Siempre Entrenar" quedó en ~20% vs 28.9% del juego mixto (−9pp), un poco peor que el −6.4pp con
+que cerró el Sprint 3. ~1pp es atribuible al cruce Energía→Lesión (que castiga doble a la
+estrategia que gasta energía) y el resto es ruido + el nuevo equilibrio energético. No está
+"muerta" (el umbral era 12% = −16.9pp), pero conviene re-mirarla junto a los otros dos pendientes
+de balance que el PO dejó anotados (siempre-Recuperar sigue siendo la más fuerte; la brecha
+favorito/underdog se comprimió).
 
 ---
 

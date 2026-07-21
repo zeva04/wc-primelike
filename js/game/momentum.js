@@ -6,8 +6,8 @@
 
    Efecto mecánico (decisión PO 17-jul-2026): buff/debuff
    porcentual a TODAS las stats — ±2% por paso desde el neutro,
-   con tope ±4% (los niveles 1 y 7 rinden igual que 2 y 6: son
-   estados narrativos más profundos, no más poder). Entra al
+   con tope ±3% (los niveles 1 y 7 rinden casi igual que 2 y 6:
+   son estados narrativos más profundos, no más poder). Entra al
    juego por game/ratings.statAt, la fuente única de stats:
    ficha, partido, penales y tanda lo ven por el mismo caño.
 
@@ -21,9 +21,14 @@ import { clamp } from "../core/math.js";
 export const MOMENTO_MIN = 1;
 export const MOMENTO_NEUTRO = 4;
 export const MOMENTO_MAX = 7;
-// Efecto por paso desde el neutro y tope, en % (decisión PO 17-jul-2026)
+// Efecto por paso desde el neutro y tope, en % (decisión PO 17-jul-2026).
+// RECORTE DE BALANCE (Sprint 4, 21-jul-2026): el tope bajó de 4 a 3. Al dejar de decaer el
+// titular sin acciones decisivas, la forma alta pasó a SOSTENERSE partido a partido en vez
+// de enfriarse: medido, ese solo cambio valía +3.0pp de título para BRA (poder asimétrico —
+// los rivales no tienen momento). Se recorta el efecto, no el gate (precedente FEAT-003), y
+// se recorta arriba: el tope castiga justo la parte que se infló (niveles 6-7).
 export const MOMENTO_PCT_STEP = 2;
-export const MOMENTO_PCT_CAP = 4;
+export const MOMENTO_PCT_CAP = 3;
 // Cuánto puede moverse en UN partido (decisión PO 18-jul-2026): subir cuesta más que
 // caer — como mucho +1 hacia arriba, pero una mala actuación puede restar hasta −2.
 // Asimétrico a propósito: reforzar la forma alta es lento; perderla, rápido.
@@ -36,7 +41,7 @@ export const MOMENTO_LABELS = { 1: "Paupérrimo", 2: "Apagado", 3: "Malo", 4: "N
 export function momentoLabel(p) { return MOMENTO_LABELS[p.momento === undefined ? MOMENTO_NEUTRO : p.momento]; }
 
 /**
- * Efecto porcentual del momento sobre las stats (−4..+4). Un jugador sin el
+ * Efecto porcentual del momento sobre las stats (−3..+3). Un jugador sin el
  * campo (rivales, jugadores de la DB) devuelve 0: la asimetría vive en los
  * DATOS, no en caminos de código separados.
  */
@@ -45,7 +50,7 @@ export function momentoPct(p) {
   return clamp((p.momento - MOMENTO_NEUTRO) * MOMENTO_PCT_STEP, -MOMENTO_PCT_CAP, MOMENTO_PCT_CAP);
 }
 
-/** Multiplicador de stats por momento (1 ± 0.04 como máximo). */
+/** Multiplicador de stats por momento (1 ± 0.03 como máximo). */
 export function momentoMult(p) { return 1 + momentoPct(p) / 100; }
 
 /**
@@ -65,9 +70,13 @@ export function momentoMult(p) { return 1 + momentoPct(p) / 100; }
  * LESIÓN: si el jugador queda de baja (`lesionadoPartidos > 0`), la lesión le CORTA la
  * forma — vuelve al neutro (decisión PO 18-jul), sin importar lo que hizo antes de caer.
  *
- * DECAIMIENTO: sin señal individual (delta 0) — o sin jugar — el momento da un paso hacia
- * el neutro (4): la forma, buena o mala, se enfría sola si no se alimenta. Como el
- * resultado ya no la sostiene, mantener 6-7 exige rendir partido a partido.
+ * DECAIMIENTO: solo lo sufre QUIEN NO JUGÓ (decisión PO 21-jul-2026). El titular que
+ * disputó el partido sin acciones decisivas CONSERVA su forma: jugar ya es alimentarla.
+ * El que no sumó minutos da un paso hacia el neutro (4) — la forma, buena o mala, se
+ * enfría en el banco. Antes decaía todo el plantel tras cada partido, lo que apagaba a
+ * los que no hacen goles (DEF/MED) y spameaba el análisis del cuerpo técnico con una
+ * fila por jugador. Consecuencia buscada: mantener la forma alta exige JUGAR, y rotar
+ * tiene un costo anímico además del deportivo.
  *
  * Devuelve el RESUMEN del cierre para el post-partido (análisis del cuerpo técnico):
  * `{name, pos, before, after, delta, reasons:[{tone:"up"|"down"|"flat", text}]}` —
@@ -109,11 +118,12 @@ export function applyMomentumPostMatch(run, p, played, match) {
   const delta = clamp(raw, -MOMENTO_FALL_MAX, MOMENTO_RISE_MAX);
   if (delta !== 0) {
     p.momento = clamp(p.momento + delta, MOMENTO_MIN, MOMENTO_MAX);
-  } else {
+  } else if (!participo) {
+    // Solo el que NO jugó se enfría. El titular sin acciones decisivas conserva su forma.
     const step = Math.sign(MOMENTO_NEUTRO - p.momento);
     if (step !== 0) {
       p.momento += step;
-      reasons.push({ tone: step > 0 ? "up" : "down", text: participo ? "Sin acciones decisivas, su forma vuelve hacia lo normal" : "No sumó minutos: su forma se enfría hacia lo normal" });
+      reasons.push({ tone: step > 0 ? "up" : "down", text: "No sumó minutos: su forma se enfría hacia lo normal" });
     }
   }
   return { name: p.name, pos: p.pos, before, after: p.momento, delta: p.momento - before, reasons };
