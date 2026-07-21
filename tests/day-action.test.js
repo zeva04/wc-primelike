@@ -120,6 +120,60 @@ assert(TH === 4 && PERM === 1, "umbral 4 → +1 permanente (constantes; +1 es el
   assert(run.journal.at(-1).tone === "gold", "la entrada del canje es dorada (hito)");
 }
 
+// ---------- Sprint 3: Team Bonding (sube la Moral, cuesta energía) ----------
+{
+  const run = E.newRun("BRA");
+  const bonding = E.DAY_ACTIONS.find(a => a.id === "bonding");
+  assert(!!bonding, "existe la acción Team Bonding");
+  assert(!bonding.group, "Bonding es una acción suelta (no del grupo entrenar)");
+  run.moral = 40;
+  const energiaAntes = run.squad.map(p => p.energia);
+  const res = E.applyDayAction(run, "bonding");
+  assert(res && res.id === "bonding", "la acción se aplica");
+  assert(run.moral === 40 + E.BONDING_MORAL, "sube la moral en BONDING_MORAL", `40→${run.moral}`);
+  assert(run.squad.every((p, i) => p.energia === energiaAntes[i] - E.BONDING_FATIGUE), "cuesta BONDING_FATIGUE de energía a TODO el plantel");
+  assert(!run.actionPending, "consume la Acción del Día");
+}
+{
+  // Clamps: la moral no pasa de 100 ni la energía baja de 5
+  const run = E.newRun("BRA");
+  run.moral = 96;
+  run.squad.forEach(p => p.energia = 6);
+  E.applyDayAction(run, "bonding");
+  assert(run.moral === 100, "la moral se topa en 100", run.moral);
+  assert(run.squad.every(p => p.energia === 5), "la energía se topa en 5", run.squad[0].energia);
+}
+
+// ---------- Sprint 3: descanso dirigido (oportunidad rara con protagonista elegido) ----------
+{
+  const desc = E.OPPORTUNITIES.find(o => o.id === "descanso_dirigido");
+  assert(!!desc, "existe la oportunidad descanso_dirigido");
+  assert(desc.rareza === "rara", "es RARA (decisión PO: evento raro, no acción del día)", desc.rareza);
+  assert(!!desc.choose, "el DT elige al protagonista");
+
+  const run = E.newRun("BRA");
+  const p = run.squad[0];
+  p.energia = 40;
+  const otros = run.squad.filter(x => x !== p).map(x => x.energia);
+  run.dayOpp = { id: "descanso_dirigido" };
+  const res = E.applyDayAction(run, "descanso_dirigido", p.name);
+  assert(res && res.desc.includes(p.name), "el resultado protagoniza al elegido", res && res.desc);
+  assert(p.energia === 65, "recupera +25 al elegido (40→65)", p.energia);
+  assert(run.squad.filter(x => x !== p).every((x, i) => x.energia === otros[i]), "NO toca la energía del resto (es dirigido)");
+  assert(!run.actionPending, "tomarla consume la Acción del Día");
+}
+{
+  // Tope de energía en 100 y candidatos = todo el plantel
+  const run = E.newRun("BRA");
+  const desc = E.OPPORTUNITIES.find(o => o.id === "descanso_dirigido");
+  assert(desc.choose.candidates(run).length === run.squad.length, "cualquiera del plantel puede recibir el descanso");
+  const p = run.squad[0];
+  p.energia = 90;
+  run.dayOpp = { id: "descanso_dirigido" };
+  E.applyDayAction(run, "descanso_dirigido", p.name);
+  assert(p.energia === 100, "la energía se topa en 100", p.energia);
+}
+
 console.log(`day-action.test: ${checks} checks · fallos: ${fails}`);
 console.log(fails ? "❌ day-action con fallos" : "✅ day-action OK");
 process.exit(fails ? 1 : 0);

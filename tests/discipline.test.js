@@ -111,15 +111,19 @@ function setup() {
   t(j("lesionado").length === 1, "lesión: entrada en el diario");
 }
 
-// 8. Energía: jugar CANSA (−10 cada 30' → −30 los 90'), descansar recupera (+30, tope 100)
+// 8. Energía: jugar CANSA (−FATIGUE_PER_30 cada 30' → los 90' cuestan el triple),
+//    descansar recupera (+30, tope 100). Los números salen de las constantes de medical
+//    para que el rebalance de la economía de energía no obligue a reescribir el test.
 {
   const { run, match } = setup();
   const jugador = match.my.lineup[0];
   const banca = run.squad[9];
   jugador.energia = 50;
   banca.energia = 50;
+  const costo90 = E.matchFatigue(90); // 3 × FATIGUE_PER_30
   E.postMatchUpdate(run, match);
-  t(jugador.energia === 20, `energía del titular que jugó 90': 50→20 (−30) (quedó ${jugador.energia})`);
+  t(costo90 === 3 * E.FATIGUE_PER_30, `los 90' cuestan 3× la unidad de cansancio (${costo90})`);
+  t(jugador.energia === 50 - costo90, `energía del titular que jugó 90': 50→${50 - costo90} (−${costo90}) (quedó ${jugador.energia})`);
   t(banca.energia === 80, `energía del suplente que descansó: 50→80 (+30) (quedó ${banca.energia})`);
 }
 

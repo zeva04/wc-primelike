@@ -82,7 +82,7 @@ for (const a of DAY_ACTIONS) {
 
 // ---------- OPPORTUNITIES: esquema y efectos ----------
 // Sin `tema` ni `teaser` a propósito: ni el calendario ni el Daily las anticipan.
-assert(OPPORTUNITIES.length === 19, `hay 19 oportunidades (hay ${OPPORTUNITIES.length})`);
+assert(OPPORTUNITIES.length === 20, `hay 20 oportunidades (hay ${OPPORTUNITIES.length})`);
 const perTierOpp = Object.fromEntries(tierIds.map(t => [t, 0]));
 for (const o of OPPORTUNITIES) {
   assert(!ids.has(o.id), "id de oportunidad único (tampoco choca con eventos)", o.id); ids.add(o.id);
@@ -110,8 +110,8 @@ for (const o of OPPORTUNITIES) {
   for (const [k, v] of Object.entries(run.buffs)) assert(typeof v === "boolean" || Number.isFinite(v), "buff numérico finito (o flag)", `${o.id}: ${k}=${v}`);
   perTierOpp[o.rareza]++;
 }
-assert(perTierOpp.comun === 5 && perTierOpp.infrecuente === 7 && perTierOpp.rara === 5 && perTierOpp.legendaria === 2,
-  "distribución 5/7/5/2 por rareza (elección del PO)", JSON.stringify(perTierOpp));
+assert(perTierOpp.comun === 5 && perTierOpp.infrecuente === 7 && perTierOpp.rara === 6 && perTierOpp.legendaria === 2,
+  "distribución 5/7/6/2 por rareza (el Sprint 3 sumó el descanso dirigido)", JSON.stringify(perTierOpp));
 
 // ---------- ciclo de vida de la Oportunidad (H1, decisiones PO 16-jul) ----------
 {

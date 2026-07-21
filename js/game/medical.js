@@ -16,15 +16,19 @@ export function rollInjury() {
   return INJURY_TYPES[0];
 }
 
-// Cansancio por jugar: −10 de energía cada 30' disputados (decisión PO 18-jul).
-export const FATIGUE_PER_30 = 10;
+// Cansancio por jugar: −14 de energía cada 30' disputados. Subió de 10 a 14 en el
+// rebalance del PO (20-jul-2026), acoplado a bajar el peso de la energía en el
+// rendimiento (match/powers.effStat: 20% en vez de 35%). La idea: el partido vacía más
+// rápido (rotar importa) pero estar cansado no te deja inservible — así Entrenar deja de
+// ser una trampa sin regalar dificultad. Ver CORE §4 y §Energía.
+export const FATIGUE_PER_30 = 14;
 // Recuperación del que descansó todo el partido.
 export const REST_RECOVERY = 30;
 // Recuperación pasiva: cada día de preparación el plantel descansa un poco (sin esto, el
-// cansancio de −30/partido entra en espiral y no hay forma de reponer a un titular fijo).
+// cansancio de −42/partido entra en espiral y no hay forma de reponer a un titular fijo).
 export const DAILY_RECOVERY = 8;
 
-/** Energía perdida por disputar `minutos` (proporcional: −10 cada 30'). */
+/** Energía perdida por disputar `minutos` (proporcional: −14 cada 30'). */
 export function matchFatigue(minutos) { return Math.round(minutos / 30 * FATIGUE_PER_30); }
 
 /** Descanso pasivo de un día de preparación: +DAILY_RECOVERY de energía a todo el plantel. */

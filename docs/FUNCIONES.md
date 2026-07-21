@@ -261,7 +261,7 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 | `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, goles del rival a la tabla de goleadores (`assignScorers`) y sus asistidores (`assignAssists`), resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced, momentum}` (`momentum` = resumen anímico por jugador para el análisis del post-partido). |
 | `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario/anímico por jugador (delega en `applyMedicalPostMatch` con los **minutos** de `match.minutesByName()`, `applyDisciplinePostMatch` y `applyMomentumPostMatch` — este ANTES de resetear flags: lee `p.sustituido`), cierra la moral (`applyMoralePostMatch`), limpia buffs y **re-agenda**. "Jugó" = está en el once final, entró del banco (`usado`) o **salió por un cambio** (`sustituido`). **Devuelve** `{momentum, morale}` (resúmenes para el análisis del post-partido). |
 | `advanceStage(run,advanced)` | **flow**: avanza el torneo y devuelve `{type: "next-matchday"\|"qualified"\|"eliminated"\|"next-round"\|"champion"}`; dispara `clearAmarillas` al cerrar grupos y tras 4tos, y `bumpMorale(+5)` al pasar de ronda. La UI solo rutea. |
-| `applyMedicalPostMatch(run,p,played,minutos)` / `matchFatigue(minutos)` / `applyDailyRecovery(run)` | **medical**: energía — jugar **cansa** (`matchFatigue`: −10 cada 30' disputados), descansar recupera +30; **recuperación pasiva** +8 por día de preparación (`applyDailyRecovery`, la llama `calendar.advanceDay`). Además descuenta la baja por lesión y anota el diario. `minutos` los calcula `Match.minutesByName`. |
+| `applyMedicalPostMatch(run,p,played,minutos)` / `matchFatigue(minutos)` / `applyDailyRecovery(run)` | **medical**: energía — jugar **cansa** (`matchFatigue`: −14 cada 30' disputados), descansar recupera +30; **recuperación pasiva** +8 por día de preparación (`applyDailyRecovery`, la llama `calendar.advanceDay`). Además descuenta la baja por lesión y anota el diario. `minutos` los calcula `Match.minutesByName`. |
 | `applyDisciplinePostMatch(run,p)` | **discipline**: roja→suspensión; **acumulación de amarillas** (2 en el torneo = 1 partido fuera, contador a 0; doble amarilla = roja y NO acumula). |
 | `momentoPct(p)` / `momentoMult(p)` | **momentum**: efecto % del Momento 1..7 sobre las stats (±2% por paso desde el neutro 4, tope ±4%; CORE §2c). Sin campo `momento` (rivales) → 0 / ×1: la asimetría vive en los datos. |
 | `momentoLabel(p)` / `MOMENTO_LABELS` | **momentum**: etiqueta cualitativa del nivel (Paupérrimo/Apagado/Malo/Normal/Bueno/Encendido/Inspirado). La UI muestra la palabra, no el número. |
@@ -279,10 +279,12 @@ inevitables con `rareza` — 10/10/8/5 por nivel, magnitud creciente; 3 interact
 Forma y Ánimo mutando `p.momento`/`r.moral` con primitivas + clamp, sin importar
 `game/` — y `mod` opcional
 que modifica las Acciones del Día vía `run.dayMod`), `RANDOM_EVENTS` (6 conflictos con
-decisión, también con `tema`) y `DAY_ACTIONS` (5 Acciones del Día en
-`content/day-actions.js`: 3 focos de entrenamiento con `group:"entrenar"`, recuperación
-y sesión táctica; los `effect(run, mult)` escalan su recompensa — no el costo — por el
-modificador; exporta también `TRAIN_BUFF` (+1), `TRAIN_FATIGUE`, `TACTICS_BONUS` y las
+decisión, también con `tema`) y `DAY_ACTIONS` (6 Acciones del Día en
+`content/day-actions.js`: 3 focos de entrenamiento con `group:"entrenar"`, recuperación,
+sesión táctica y **Team Bonding** (+Moral, −energía; muta `run.moral` con clamp sin importar
+`game/`); los `effect(run, mult)` escalan su recompensa — no el costo — por el
+modificador; exporta también `TRAIN_BUFF` (+1), `TRAIN_FATIGUE`, `BONDING_MORAL`,
+`BONDING_FATIGUE`, `TACTICS_BONUS` y las
 constantes del canje `CANJE_THRESHOLD` (+4), `CANJE_PERMANENT` (+1), `CANJEABLE_STATS` y
 `STAT_LABELS`).
 También `DAILY_FLAVOR` (12 titulares de color `{icon, text}` para el World Cup Daily,
@@ -417,6 +419,7 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 | `renderSquadScreen()` / `moraleBadge()` | **Gestión de Plantilla**: cancha con el once, selector de formación, ficha del jugador y los 4 suplentes; el encabezado muestra la barra de Moral (`moraleBadge`) a la izquierda de la media. Las reglas son de `game/lineup`; aquí solo viven las coordenadas (`ROW_Y`, `spreadX`), que son presentación. |
 | `renderPitch()` / `pitchToken(p,…)` | Dibuja el once sobre el césped. Las filas salen del once REAL, no de la formación elegida: así una alineación improvisada también se pinta bien. |
 | `renderFormationPicker(available)` | Selector con las 6 formaciones y su diagrama de puntos; desactiva las que el plantel no cubre (Brasil no puede 3-1-1: tiene 2 DEF). |
+| `renderEnergyPanel()` | **Vista de energía del plantel** (Sprint 3): todas las barras de un vistazo, ordenadas del más cansado al más entero — el insumo para decidir la rotación. Negrita = titular del once actual; atenuados = suspendidos/lesionados; clic en una fila abre esa ficha. |
 | `renderPlayerCard()` / `renderBench()` / `statRow(p,key)` | Ficha del seleccionado y las 4 fichas del banco. Cada `statRow` pinta la **barra del stat base** (`baseStatAt`, colores de siempre) y aparte el **boost/nerf del Momento** (dorado si suma, celeste si resta). La fila del Momento muestra la **etiqueta cualitativa** (`momentoLabel`) + su icono, sin el número 1..7. |
 | `partnersFor(p)` / `onPick(name)` | Recambios válidos (solo misma posición: la posición ES la formación) y clic sobre una ficha: permuta si es recambio, si no abre su ficha. |
 | `showRandomEvent(ev)` | Modal de un conflicto con decisión y aplicación del efecto elegido. |
@@ -468,6 +471,13 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 - **`smoke.js`** — simula runs completas sin UI con decisiones al azar y verifica invariantes
   (disciplina, diario, energía, límites de loop). `--team=BRA --runs=1500` es el árbitro de
   deriva de balance; `--all` tabula las 18 jugables. (Modo `--smart` pendiente de recrear.)
+  **`--action=<id|grupo>`** fija la Acción del Día (`entrenar`, `recuperar`, `tactica`…) para
+  **comparar estrategias** y auditar el "no dominant strategy" del Bible (con el flag no se
+  toman oportunidades). `--nocanje` apaga el canje para aislar su efecto.
+  OJO — el smoke **decide como decidiría alguien**, no al bulto: el **Team Bonding** solo entra
+  al menú con la moral ≤40 (vestuario caldeado). Ofrecerlo siempre modelaba a un DT que quema
+  días subiendo moral que ya estaba bien y hundía la medición −2.5pp aun siendo gratis (mismo
+  criterio que el canje greedy: si el árbitro no juega como una persona, miente).
 - **`teams.validate.js`** — LA LEY del esquema de datos: ids/banderas/48 clasificados,
   stats 1–99, dorsales únicos (el 1 solo POR), look válido, ≥1 por posición (distribución
   libre por decisión del PO); sprites duplicados = advertencia.

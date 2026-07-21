@@ -25,6 +25,10 @@ const args = Object.fromEntries(process.argv.slice(2).map(a => {
 const ALL = !!args.all;
 const RUNS = +args.runs || (ALL ? 100 : 300);
 const TEAM = args.team || null;
+// --action=<id|grupo>: fija la Acción del Día (p. ej. `entrenar`, `recuperar`, `tactica`)
+// para COMPARAR ESTRATEGIAS y comprobar que ninguna domina (Bible §4.7: no dominant
+// strategy). Con el flag no se toman oportunidades: la comparación es entre acciones.
+const ACTION = args.action || null;
 
 let fails = 0;
 const assert = (cond, msg, ctx) => { if (!cond) { fails++; console.error("FAIL:", msg, ctx || ""); } };
@@ -101,12 +105,20 @@ function playRun(teamId) {
       // La Oportunidad viva compite como una opción más (Bible §4.5).
       if (run.actionPending) {
         const opp = E.dayOpportunity(run);
-        const opts = E.DAY_ACTIONS.filter(a => E.actionMult(run, a) > 0);
+        // El Team Bonding es SITUACIONAL: solo vale la pena con el vestuario caldeado
+        // (moral ≤40 = bandas baja/suelo, la misma condición que avisa el hub). Ofrecerlo
+        // SIEMPRE modelaría a un DT que quema días subiendo una moral que ya está bien:
+        // medido, eso solo por dilución hundía a BRA −2.5pp aunque el Bonding fuera gratis.
+        // Mismo criterio que el canje greedy: el smoke debe decidir como decidiría alguien.
+        const opts = E.DAY_ACTIONS.filter(a => E.actionMult(run, a) > 0 && (a.id !== "bonding" || (run.moral ?? 50) <= 40));
         assert(opts.length > 0, "ningún modificador puede bloquear TODAS las acciones");
         if (opp) opts.push(opp);
         const blocked = E.DAY_ACTIONS.find(a => E.actionMult(run, a) === 0);
         if (blocked) assert(E.applyDayAction(run, blocked.id) === null, "una acción bloqueada no debe aplicarse", blocked.id);
-        const a = opts[Math.floor(Math.random() * opts.length)];
+        // Con --action se juega SIEMPRE esa estrategia (si hoy está disponible); si no, al azar.
+        const forced = ACTION ? opts.filter(x => x.id === ACTION || x.group === ACTION) : [];
+        const pool = forced.length ? forced : opts;
+        const a = pool[Math.floor(Math.random() * pool.length)];
         let res;
         if (opp && a.id === opp.id && opp.choose) {
           // La oportunidad con elección exige objetivo: sin él no se aplica, y un

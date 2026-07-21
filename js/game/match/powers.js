@@ -12,12 +12,19 @@ export const MENT_MOD = { defensiva: { atk: -0.5, def: +0.6 }, normal: { atk: 0,
  * Stat efectiva normalizada a ~0-5 (stat 1-99 ÷ 20), con buffs (escala 1-99) y castigo por energía.
  * Parte de `effectiveStat`, así que el castigo por jugar fuera de puesto entra al partido
  * por el mismo caño que ve el DT en la ficha (docs/CORE.md §2b).
+ *
+ * PESO DE LA ENERGÍA (rebalance del PO, 20-jul-2026): la energía vale **20%** del
+ * rendimiento (antes 35%). Iba acoplado a subir el cansancio del partido
+ * (`medical.FATIGUE_PER_30`: −14 cada 30'): un jugador cansado ya no queda inservible,
+ * pero los partidos vacían más rápido — la rotación sigue importando y Entrenar deja de
+ * ser una trampa. Medido: Entrenar pasó de 12.0% a 22.5% de campeón como estrategia fija
+ * (−16.9pp → −4.9pp respecto del juego mixto) con la dificultad intacta. Ver CORE §4.
  */
 export function effStat(p, key, buffs = {}) {
   let v = effectiveStat(p, key);
   if (buffs[key]) v += buffs[key];
   const en = p.energia !== undefined ? p.energia : 100;
-  return clamp(v / 20, 0.05, 5.5) * (0.65 + 0.35 * (en / 100));
+  return clamp(v / 20, 0.05, 5.5) * (0.80 + 0.20 * (en / 100));
 }
 
 /** Calidad global del arquero: atajadas manda (60%), reflejos (25%) y salidas (15%) complementan. */

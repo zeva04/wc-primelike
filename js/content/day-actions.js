@@ -30,6 +30,12 @@ import { clamp } from "../core/math.js";
 export const TRAIN_BUFF = 1;
 export const TRAIN_FATIGUE = 5;
 const RECOVER_ENERGY = 10;
+// Team Bonding (Sprint 3, decisión PO 20-jul-2026): sube la Moral del equipo pero CUESTA
+// energía — la integración es una jornada más, no un descanso. Es la palanca para gestionar
+// la moral a voluntad, que desde el Sprint 2 tiene efecto real (menos conflictos de
+// vestuario). Situacional a propósito: con la moral arriba conviene entrenar o recuperar.
+export const BONDING_MORAL = 10;
+export const BONDING_FATIGUE = 5;
 
 // El canje de entrenamiento (game/day-action.js): un buff de +CANJE_THRESHOLD en una
 // stat se convierte en +CANJE_PERMANENT PERMANENTE a esa stat para todo el plantel.
@@ -81,5 +87,16 @@ export const DAY_ACTIONS = [
     title: "Sesión táctica",
     desc: "El equipo llega mejor plantado al próximo partido (bonus de ataque y defensa)",
     effect: (r, m = 1) => { r.buffs.tactica = +((r.buffs.tactica || 0) + TACTICS_BONUS * m).toFixed(2); },
+  },
+  {
+    // El contenido muta la moral con primitivas + clamp, SIN importar game/ (ARQUITECTURA §4):
+    // mismo patrón que los eventos anímicos de prep-events (pais_ilusionado / critica_demoledora).
+    id: "bonding", icon: "🤝", label: "Team Bonding",
+    title: "Jornada de integración",
+    desc: `+${BONDING_MORAL} de Moral del equipo · −${BONDING_FATIGUE} de energía`,
+    effect: (r, m = 1) => {
+      r.moral = clamp((r.moral ?? 50) + Math.round(BONDING_MORAL * m), 1, 100);
+      r.squad.forEach(p => p.energia = clamp(p.energia - BONDING_FATIGUE, 5, 100));
+    },
   },
 ];

@@ -83,6 +83,11 @@ function renderSquadScreen() {
           </div>
           <div id="bench" class="grid grid-cols-4 gap-1.5"></div>
         </div>
+        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+          <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-0.5">⚡ Energía del plantel</div>
+          <p class="text-[10px] text-slate-500 mb-2">Del más cansado al más entero — para decidir a quién rotar o descansar.</p>
+          <div id="energy-panel" class="space-y-0.5"></div>
+        </div>
       </div>
     </div>
     <button id="btn-confirm" class="btn-primary w-full mt-4">✔ Confirmar y volver</button>
@@ -141,7 +146,32 @@ function renderAll() {
     onSelect: p => { selName = p.name; renderAll(); },
   });
   renderPlayerCard();
+  renderEnergyPanel();
   renderStatus(available);
+}
+
+/**
+ * Vista de energía del plantel (Sprint 3): TODAS las barras de un vistazo, ordenadas del
+ * más cansado al más entero — es el insumo para decidir la rotación (jugar cansa −10 cada
+ * 30', docs/CORE.md §Energía). Marca en negrita a los titulares del once actual y atenúa a
+ * los no disponibles (suspendidos/lesionados). Clic en una fila abre esa ficha.
+ */
+function renderEnergyPanel() {
+  const el = $("#energy-panel");
+  if (!el) return;
+  const rows = [...S.run.squad].sort((a, b) => a.energia - b.energia || a.name.localeCompare(b.name));
+  el.innerHTML = rows.map(p => {
+    const titular = S.selectedLineup.includes(p);
+    const cls = p.energia > 65 ? "text-emerald-400" : p.energia > 35 ? "text-amber-400" : "text-red-400";
+    return `<button data-name="${p.name}" title="${titular ? "Titular" : "Suplente"}${isAvailable(p) ? "" : p.suspendido ? " · suspendido" : " · lesionado"}" class="ep-row w-full flex items-center gap-1.5 px-1 py-0.5 rounded-lg text-left transition-colors cursor-pointer ${
+      p.name === selName ? "bg-slate-700/60" : "hover:bg-slate-700/40"} ${isAvailable(p) ? "" : "opacity-40"}">
+      ${posBadge(playedPos(p))}
+      <span class="flex-1 min-w-0 truncate text-[11px] ${titular ? "font-bold" : "text-slate-400"}">${p.name}</span>
+      <span class="w-10 shrink-0">${energyBar(p.energia)}</span>
+      <b class="w-8 text-right text-[10px] ${cls}">${p.energia}%</b>
+    </button>`;
+  }).join("");
+  el.querySelectorAll(".ep-row").forEach(b => b.onclick = () => { selName = b.dataset.name; renderAll(); });
 }
 
 /* ---------- Formación ---------- */

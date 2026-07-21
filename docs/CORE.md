@@ -206,13 +206,27 @@ Dentro de un partido las stats 1–99 se **normalizan a una escala ~0–5** para
 de probabilidad, y se les aplica el desgaste físico:
 
 ```
-effStat = (stat + buff) / 20  ×  (0.65 + 0.35 × energía/100)
+effStat = (stat + buff) / 20  ×  (0.80 + 0.20 × energía/100)
 ```
 
 - **÷20** lleva 1–99 al rango ~0–5 donde están calibradas todas las fórmulas.
 - **buff**: bonus temporal (entrenamiento, evento) en la misma escala 1–99.
 - **factor energía**: un jugador a 100 de energía rinde al 100%; a 0 de energía rinde al
-  **65%**. Nunca cae a cero — un crack cansado sigue siendo peligroso.
+  **80%**. Nunca cae a cero — un crack cansado sigue siendo peligroso.
+
+> **Rebalance del 20-jul-2026 (decisión PO).** El factor de energía pesaba **35%**
+> (`0.65 + 0.35`) y bajó a **20%**, acoplado a subir el cansancio del partido de −10 a
+> **−14 cada 30'** (`medical.FATIGUE_PER_30`). Los dos cambios van JUNTOS y se compensan:
+> el partido vacía más rápido (rotar sigue importando, incluso más) pero estar cansado ya
+> no te deja inservible. Motivo: con la energía al 35% era la palanca dominante del juego y
+> **Entrenar era una opción muerta** — costaba −5 de energía a los 10 jugadores para ganar
+> +1 en una stat, un cambio pésimo. Efecto medido (BRA n=1500, estrategias fijas): Entrenar
+> pasó de **12.0% → 21.5%** de campeón (de −16.9pp a −6.4pp respecto del juego mixto), sin
+> mover la dificultad (BRA 27.3% n=4000 vs 28.9% de baseline) ni derivar el resto de las
+> selecciones (**−0.36pp de media sobre las 20 jugables**). Residual conocido: "siempre
+> Recuperar" sigue siendo la estrategia más fuerte (+13.2pp) — descansar cuando estás
+> cansado ES lo correcto, así que se acepta; lo que se eliminó fue la opción que NUNCA
+> convenía, que es lo que prohíbe el Bible.
 
 > Este es el único punto donde se mezcla "escala 1–99" (datos) con "escala 0–5" (fórmulas).
 > Todo lo demás del partido razona en 0–5.
@@ -447,7 +461,7 @@ historia; un botón bloqueado no.
 Además del suceso que le toca, **cada día sin partido el DT elige exactamente UNA
 acción** (Core Gameplay Bible §4.7: un día = una inversión, con opportunity cost).
 El orden dentro del día es el del Bible: primero el evento cambia el contexto,
-después el DT decide. No se puede pasar el día sin elegir. Las 5 acciones
+después el DT decide. No se puede pasar el día sin elegir. Las 6 acciones
 (`content/day-actions.js`):
 
 | Acción | Efecto | Trade-off |
@@ -455,6 +469,13 @@ después el DT decide. No se puede pasar el día sin elegir. Las 5 acciones
 | 🎯/🛡️/🎩 **Entrenar** (foco ataque, defensa o pases) | +1 al buff de la stat elegida (`TRAIN_BUFF`) | **−5 de energía** a todo el plantel |
 | 🧘 **Recuperar** | +10 de energía a todo el plantel | No mejora ninguna stat |
 | 📋 **Sesión táctica** | +0.1 a **atk y def** (escala de poder §5) para el próximo partido, vía `buffs.tactica` | No recupera ni sube stats individuales |
+| 🤝 **Team Bonding** (Sprint 3) | +10 a la **Moral del equipo** (`BONDING_MORAL`) | **−5 de energía** a todo el plantel (`BONDING_FATIGUE`) |
+
+**Team Bonding** (decisión PO 20-jul-2026) es la palanca para gestionar la Moral a voluntad,
+ahora que la Moral **muerde** (Sprint 2: modula los conflictos de vestuario). Es
+**situacional a propósito**: solo conviene con el vestuario caldeado — con la moral arriba
+es un día tirado, y el hub avisa cuándo hace falta ("🎭 Vestuario caldeado"). El contenido
+muta `run.moral` con primitivas + clamp, sin importar `game/` (ARQUITECTURA §4).
 
 Calibración: el foco de entrenamiento es **+1 y no +4** (el PO lo bajó el 17-jul: con +4
 el buff dominaba la preparación y el canje —ver abajo— se conseguía en un solo día).
@@ -465,6 +486,38 @@ partido pero no apunta a una stat concreta: ninguna acción domina, como pide el
 bonus táctico solo alcanza al equipo del usuario (el rival calcula sus poderes con
 `buffs = {}`) y se limpia con el resto de los buffs al terminar el partido. La sesión
 táctica es además el gancho donde se enchufará la **Filosofía**.
+
+> ✅ **RESUELTO (20-jul-2026) — Entrenar estaba dominado; se arregló con el rebalance del
+> factor de energía (§4).** Se deja abajo el diagnóstico completo porque la metodología es
+> reutilizable: así se audita una acción sospechosa de estar muerta. Tras el arreglo,
+> Entrenar rinde 21.5% como estrategia fija (−6.4pp vs el mixto, antes −16.9pp).
+>
+> ⚠️ **DIAGNÓSTICO ORIGINAL: Entrenar estaba dominado.** El smoke
+> gana un flag `--action=<id|grupo>` para comparar ESTRATEGIAS FIJAS y auditar el "no
+> dominant strategy" del Bible. Medido con BRA (n=1500, canje activo):
+>
+> | Estrategia fija | Campeón |
+> |---|---|
+> | Siempre Recuperar | 39.5% |
+> | Siempre Sesión táctica | 36.1% |
+> | Siempre Entrenar (foco único) | **12.0%** |
+>
+> No es que Entrenar "no domine": **nunca conviene**. Causa medida: el −5 de energía a los
+> 10 jugadores cada día se acumula, y la energía es la palanca más fuerte del juego (entra
+> como factor multiplicativo en `effStat`, §4). Con `TRAIN_FATIGUE = 0` la misma estrategia
+> rinde **36.3%** — el costo explica el 100% del problema, no el premio.
+>
+> **Ningún dial barato lo arregla** (todo medido): bajar la fatiga a 3 sube Entrenar a 18.9%
+> pero dispara el juego mixto a 33.0% (fuera del gate ±2pp); subir `TRAIN_BUFF` a 2-3 casi no
+> mueve Entrenar (12→14%) y sí infla el mixto; bajar `CANJE_THRESHOLD` a 3 tampoco (12→12.9%);
+> y recortar `RECOVER_ENERGY` de 10 a 6 **no toca** a "siempre Recuperar" (39.5→39.1%) porque
+> esa estrategia ya vive con la energía al tope — lo que gana no es el +10, es **no pagar
+> costos**. El arreglo real exige rebalancear la economía de energía o su curva de impacto en
+> `effStat`, que cambia la dificultad del juego entero. **El PO eligió exactamente eso**
+> (20-jul-2026) sobre las otras dos alternativas medidas: un "piso de energía" al entrenar
+> (arreglaba poco — 15.7%) y abaratar Entrenar subiendo el cansancio del partido (que
+> derrumbaba la Sesión táctica, 36→29%: cambiaba una acción rota por otra). Las constantes
+> de `day-actions.js` quedaron intactas — el arreglo vive en el factor de energía de §4.
 
 #### El canje de entrenamiento (`canjeBuff`, Bible cap.6 "Permanent Growth")
 
@@ -496,15 +549,22 @@ BRA 32.1%, CAN 35.8%, CPV 8.9% — la baja leve es la asimetría deliberada desc
 
 Las palancas de la economía:
 
-- **Energía** (0–100): **jugar CANSA** — cada partido resta **−10 cada 30' disputados**
-  (`matchFatigue`: un titular de 90' pierde −30; un suplente que entra a los 30' del final,
-  −10). El que **descansó** recupera **+30**. Entre partidos hay **recuperación pasiva**:
+- **Energía** (0–100): **jugar CANSA** — cada partido resta **−14 cada 30' disputados**
+  (`matchFatigue`: un titular de 90' pierde −42; un suplente que entra a los 30' del final,
+  −14). Subió de −10 a −14 en el rebalance del 20-jul-2026, acoplado a bajar el peso de la
+  energía en el rendimiento (§4): el partido vacía más rápido, pero cada punto pesa menos. El que **descansó** recupera **+30**. Entre partidos hay **recuperación pasiva**:
   **+8 por día de preparación** (`applyDailyRecovery`, en `advanceDay`), más la acción
   Recuperar y varios eventos. Sin la pasiva, el cansancio entra en espiral (no hay forma de
   reponer a un titular fijo) — medido: BRA se hunde a 5.9%; con la pasiva vuelve a 28.8%
   (decisión PO 18-jul: el cansancio se siente como dificultad extra). Alimenta el factor de
   `effStat` (§4), así que descuidar la energía castiga de verdad; obliga a **rotar y
   recuperar**. Los rivales siempre están al 100% (asimetría en contra del DT humano).
+  Para poder decidir la rotación, la **Gestión de Plantilla muestra la energía de TODO el
+  plantel** ordenada del más cansado al más entero (Sprint 3). Y la oportunidad rara
+  **🛌 Plan de descanso a medida** (`descanso_dirigido`) recupera **+25 a UN jugador que
+  elige el DT** — el PO la quiso como evento raro y no como Acción del Día, para que la
+  rotación fina sea un premio ocasional y no una herramienta permanente (que habría
+  inflado la ventaja de energía del humano).
 - **Buffs de stat** (±5 por evento): se **acumulan** día a día hasta el próximo
   partido y se limpian al terminarlo. Son ±5 y no ±10 porque con 4-5 días de eventos
   por ventana el apilamiento esperado equivale al antiguo evento único de ±10.

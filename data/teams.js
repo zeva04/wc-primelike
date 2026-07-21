@@ -358,7 +358,7 @@ export const WC_DATA = {
         { name: "Brice Samba",         pos: "POR", num: 1, stats: { atajadas: 82, reflejos: 84, salidas: 78, pase: 72, aura: 74 }, look: { skin: "#F1C27D", hair: "#4A331F", style: "short", beard: false } },
         { name: "William Saliba",      pos: "DEF", num: 17, stats: { tiro: 45, defensa: 89, cabezazo: 84, pase: 80, aura: 82 }, look: { skin: "#8D5524", hair: "#0E0C0A", style: "short", beard: false } },
         { name: "Dayot Upamecano",     pos: "DEF", num:  4, stats: { tiro: 48, defensa: 88, cabezazo: 85, pase: 76, aura: 78 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "buzz", beard: false } },
-        { name: "AurélienTchouaméni",  pos: "MED", num:  8, stats: { tiro: 68, defensa: 84, cabezazo: 78, pase: 84, aura: 80 }, look: { skin: "#8D5524", hair: "#17130F", style: "short", beard: false } },
+        { name: "Aurélien Tchouaméni",  pos: "MED", num:  8, stats: { tiro: 68, defensa: 84, cabezazo: 78, pase: 84, aura: 80 }, look: { skin: "#8D5524", hair: "#17130F", style: "short", beard: false } },
         { name: "Manu Koné",           pos: "MED", num: 6, stats: { tiro: 76, defensa: 82, cabezazo: 70, pase: 84, aura: 84 }, look: { skin: "#6B4226", hair: "#17130F", style: "short", beard: false } },
         { name: "Adrien Rabiot",       pos: "MED", num: 14, stats: { tiro: 78, defensa: 78, cabezazo: 76, pase: 86, aura: 86 }, look: { skin: "#E0AC69", hair: "#4A331F", style: "short", beard: true } },
         { name: "Michael Olise",       pos: "MED", num:  11, stats: { tiro: 92, defensa: 56, cabezazo: 70, pase: 91, aura: 91 }, look: { skin: "#A0663A", hair: "#17130F", style: "short", beard: false } },
@@ -372,7 +372,7 @@ export const WC_DATA = {
       colors: { primary: "#FFFFFF", secondary: "#CE1124", text: "#0f172a" },
       kits: { field: { shirt: "#FFFFFF", accent: "#CE1124" }, gk: { shirt: "#7CB518", accent: "#0B0F19" } },
       players: [
-        { name: "JordanPickford",      pos: "POR", num:  1, stats: { atajadas: 84, reflejos: 86, salidas: 80, pase: 76, aura: 82 }, look: { skin: "#F1C27D", hair: "#4A331F", style: "short", beard: true } },
+        { name: "Jordan Pickford",      pos: "POR", num:  1, stats: { atajadas: 84, reflejos: 86, salidas: 80, pase: 76, aura: 82 }, look: { skin: "#F1C27D", hair: "#4A331F", style: "short", beard: true } },
         { name: "Dean Henderson",      pos: "POR", num: 13, stats: { atajadas: 78, reflejos: 80, salidas: 76, pase: 70, aura: 72 }, look: { skin: "#F1C27D", hair: "#2A1D12", style: "short", beard: false } },
         { name: "John Stones",         pos: "DEF", num:  5, stats: { tiro: 55, defensa: 85, cabezazo: 80, pase: 84, aura: 80 }, look: { skin: "#F1C27D", hair: "#6B4F2A", style: "short", beard: false } },
         { name: "Marc Guéhi",          pos: "DEF", num:  6, stats: { tiro: 46, defensa: 85, cabezazo: 78, pase: 76, aura: 78 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "buzz", beard: false } },

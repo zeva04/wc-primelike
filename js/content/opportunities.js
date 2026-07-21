@@ -16,8 +16,8 @@
    corte — el trade-off no está en el efecto sino en el costo de
    oportunidad: tomarla es renunciar a entrenar/recuperar/táctica.
    A mayor rareza, mayor premio (misma escala que prep-events).
-   Pool de 19 elegido por el PO: 5 comunes · 7 infrecuentes ·
-   5 raras · 2 legendarias (la distribución es LEY en el validador).
+   Pool de 20 elegido por el PO: 5 comunes · 7 infrecuentes ·
+   6 raras · 2 legendarias (la distribución es LEY en el validador).
 
    `choose` (opcional) convierte la oportunidad en una DECISIÓN con
    protagonista: el DT elige a qué jugador apunta el premio.
@@ -32,6 +32,11 @@
    Agregar una oportunidad = agregar una fila con su `rareza`.
    ============================================================ */
 import { clamp } from "../core/math.js";
+
+// Descanso dirigido (Sprint 3, decisión PO 20-jul-2026): el PO lo quiso como EVENTO RARO
+// con protagonista elegido, no como Acción del Día — así la rotación fina es un premio
+// ocasional y no una herramienta permanente (que habría inflado la ventaja de energía).
+const DESCANSO_ENERGIA = 25;
 
 const buff = (r, k, v) => { r.buffs[k] = (r.buffs[k] || 0) + v; };
 const energia = (r, v) => r.squad.forEach(p => p.energia = clamp(p.energia + v, 5, 100));
@@ -101,7 +106,12 @@ export const OPPORTUNITIES = [
     desc: "Décadas de apuntes sobre tu próximo rival, sin pedir nada a cambio: el equipo llega mejor plantado al próximo partido.",
     effect: r => { r.buffs.tactica = +((r.buffs.tactica || 0) + 0.12).toFixed(2); } },
 
-  // ---------- RARAS (calidad permanente: el DT elige al protagonista) ----------
+  // ---------- RARAS (el DT elige al protagonista: calidad permanente o descanso a medida) ----------
+  { id: "descanso_dirigido", rareza: "rara", icon: "🛌", title: "Plan de descanso a medida",
+    desc: `El cuerpo médico arma una jornada de recuperación exclusiva para UN jugador que elijas: +${DESCANSO_ENERGIA} de energía.`,
+    choose: { label: "¿A quién le das el día de descanso?", candidates: r => [...r.squad] },
+    effect: (r, p) => { p.energia = clamp(p.energia + DESCANSO_ENERGIA, 5, 100); return `${p.name} tuvo su jornada de descanso a medida: +${DESCANSO_ENERGIA} de energía (ahora ${p.energia}%).`; } },
+
   { id: "mentor_leyenda", rareza: "rara", icon: "🎖️", title: "Un campeón del mundo, de visita",
     desc: "Una leyenda se ofrece a trabajar el día entero con UN jugador que elijas: +3 de Aura PERMANENTE.",
     choose: { label: "¿Quién pasa el día con la leyenda?", candidates: r => [...r.squad] },
