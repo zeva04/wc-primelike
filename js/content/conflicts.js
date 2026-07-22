@@ -12,6 +12,7 @@
    ============================================================ */
 import { rnd, shuffle } from "../core/rng.js";
 import { clamp } from "../core/math.js";
+import { addFiloProgress } from "./philosophies.js";
 
 /** Los dos jugadores de la pelea, resueltos por nombre desde `run.peleaEntre` (§3.1). */
 const peleadores = r => (r.peleaEntre || []).map(n => r.squad.find(p => p.name === n)).filter(Boolean);
@@ -75,7 +76,7 @@ export const RANDOM_EVENTS = [
     teaser: "El cuerpo físico y el técnico discuten a los gritos junto al campo.",
     text: "El preparador quiere una doble sesión de carga antes del partido. El plantel viene fundido y algunos referentes ya pusieron cara.",
     options: [
-      { label: "Cargar la pierna", effect: r => { r.squad.forEach(p => p.energia = clamp(p.energia - 18, 5, 100)); r.buffs.tactica = +((r.buffs.tactica || 0) + 0.15).toFixed(2); return "Doble sesión a fondo: −18 de energía para todos, pero el equipo llega mucho mejor plantado."; } },
+      { label: "Cargar la pierna", effect: r => { r.squad.forEach(p => p.energia = clamp(p.energia - 18, 5, 100)); const a = addFiloProgress(r, 1); return `Doble sesión a fondo: −18 de energía para todos, pero la identidad progresa${a ? ` (+1 de ${a.label})` : ""}.`; } },
       { label: "Bajar la carga", effect: r => { r.squad.forEach(p => p.energia = clamp(p.energia + 8, 5, 100)); r.buffs.aura = (r.buffs.aura || 0) - 5; return "Se levanta la segunda sesión: +8 de energía, pero el grupo llega blando de cabeza (−5 de Aura el próximo partido)."; } },
     ],
   },

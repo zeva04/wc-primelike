@@ -15,6 +15,7 @@ import { applyMedicalPostMatch } from "./medical.js";
 import { applyDisciplinePostMatch, clearAmarillas } from "./discipline.js";
 import { applyMomentumPostMatch } from "./momentum.js";
 import { applyMoralePostMatch, bumpMorale } from "./morale.js";
+import { applyFiloExecution } from "./philosophy.js";
 import { assignScorers } from "./scorers.js";
 import { assignAssists } from "./assists.js";
 import { qualifyRound32, computeTable } from "./tournament/groups.js";
@@ -72,8 +73,8 @@ export function closeMatch(run, match) {
     advanced = won;
   }
 
-  const { momentum, morale } = postMatchUpdate(run, match);
-  return { res, otherResults, advanced, momentum, morale };
+  const { momentum, morale, filoExec } = postMatchUpdate(run, match);
+  return { res, otherResults, advanced, momentum, morale, filoExec };
 }
 
 /**
@@ -98,10 +99,14 @@ export function postMatchUpdate(run, match) {
     p.enCancha = false;
   }
   const morale = applyMoralePostMatch(run, match);
+  // Progresión por ejecución (F1): los aciertos del tipo firma que contó el Match
+  // (match.filoHits) se vuelven progreso de la arista firma, con tope por partido.
+  // `filoExec` viaja en el retorno para que el post-partido lo narre (F3).
+  const filoExec = applyFiloExecution(run, match);
   run.buffs = {};
   // El partido consumió el día: se agenda el siguiente a 5-6 días con sus eventos diarios
   scheduleNextMatch(run);
-  return { momentum, morale };
+  return { momentum, morale, filoExec };
 }
 
 /**

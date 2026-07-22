@@ -10,6 +10,7 @@ import { teamRating, currentAura, playedPos } from "../ratings.js";
 import { momentoMult } from "../momentum.js";
 import { ASSIST_CHANCE, POS_ASSIST_WEIGHT } from "../assists.js";
 import { effStat } from "./powers.js";
+import { noteFiloHit } from "./sequences.js"; // ciclo benigno (como en sequence-acts): solo se llama en runtime
 
 /**
  * Protagonista rival de una ocasión: un DEL/MED en cancha (o cualquiera si no queda ninguno).
@@ -275,9 +276,11 @@ export function goalMine(m, p, flavor, assist, varOffside = true) {
       return;
     }
     m.log("goal", `✅ ¡GOL CONFIRMADO! ${flavor} ${p.name}.${assistTxt} (${m.gMy}-${m.gOpp})`);
+    noteFiloHit(m); // el gol que corona una secuencia firma también es ejecución (F1)
     return;
   }
   m.log("goal", `min ${m.min}' — ⚽ ¡GOOOOL DE ${p.name.toUpperCase()}! ${flavor}${assistTxt} (${m.gMy}-${m.gOpp})`);
+  noteFiloHit(m); // ídem: solo si el gol quedó en pie (el anulado por VAR no cuenta)
 }
 
 /** Anota gol rival (el VAR te salva el 10%×35% de las veces). */

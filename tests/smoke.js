@@ -48,8 +48,9 @@ function playMatch(run, oppId) {
     `[${val.msg}] once: ${lineup.map(p => `${p.pos}:${p.name}`).join(", ")} · fuera: ${run.squad.filter(p => p.suspendido || p.lesionadoPartidos > 0).map(p => `${p.name}(${p.pos}${p.suspendido ? " susp" : " les" + p.lesionadoPartidos})`).join(", ") || "nadie"}`);
   assert(lineup.every(p => E.outOfPosPenalty(p) === 0), "el once automático no debe castigar a nadie");
   const bench = available.filter(p => !lineup.includes(p));
-  // matchCtx homólogo al de screens/match.js (la moral entra al generador por acá — A3)
-  const ctx = { team: me, lineup, bench, mentalidad: "normal", buffs: { ...run.buffs }, moral: run.moral };
+  // matchCtx homólogo al de screens/match.js (la moral entra al generador por acá — A3;
+  // la filosofía viaja igual desde F1: {id, nivel}, el Match no conoce la run)
+  const ctx = { team: me, lineup, bench, mentalidad: "normal", buffs: { ...run.buffs }, moral: run.moral, filo: E.filoCtx(run) };
   const banned = run.rivalBans[oppId] || [];
   const match = new E.Match(ctx, opp, run.stage !== "groups", banned);
   // La suspensión por roja ajena es real: el suspendido no puede estar en el once rival
@@ -101,6 +102,10 @@ function playMatch(run, oppId) {
 function playRun(teamId) {
   const run = E.newRun(teamId);
   assert(run.journal.length === 1, "el diario debe abrir con el sorteo");
+  // Filosofía AL AZAR (F1): el smoke mide el PISO de la mecánica — un DT real elige
+  // mirando su grupo y sus focos; acá nadie optimiza. No calibrar el techo con esto.
+  const filoElegida = E.choosePhilosophy(run, E.PHILOSOPHIES[Math.floor(Math.random() * E.PHILOSOPHIES.length)].id);
+  assert(filoElegida && run.filoId === filoElegida.id, "la elección de filosofía queda en la run");
   let alive = true, champion = false, guard = 0;
   let oppSeen = 0, oppTaken = 0; // contabilidad paralela de oportunidades (audita run.stats)
   const dailySeen = new Map();   // texto de titular → último día en portada (bug PO 22-jul: sin repetirse en la semana)
@@ -118,7 +123,13 @@ function playRun(teamId) {
         // SIEMPRE modelaría a un DT que quema días subiendo una moral que ya está bien:
         // medido, eso solo por dilución hundía a BRA −2.5pp aunque el Bonding fuera gratis.
         // Mismo criterio que el canje greedy: el smoke debe decidir como decidiría alguien.
-        const opts = E.DAY_ACTIONS.filter(a => E.actionMult(run, a) > 0 && (a.id !== "bonding" || (run.moral ?? 50) <= 40));
+        let opts = E.DAY_ACTIONS.filter(a => E.actionMult(run, a) > 0 && (a.id !== "bonding" || (run.moral ?? 50) <= 40));
+        // Los 5 focos de la Sesión Táctica (F1) se COLAPSAN a uno al azar por día: si
+        // entraran los 5 al sorteo uniforme, la táctica pasaría de ~1/5 a ~5/9 de los
+        // días y la comparación con el baseline pre-F1 quedaría envenenada. El foco
+        // al azar dentro del grupo es justamente el PISO que este smoke mide.
+        const tacRows = opts.filter(a => a.group === "tactica");
+        if (tacRows.length) opts = opts.filter(a => a.group !== "tactica").concat(tacRows[Math.floor(Math.random() * tacRows.length)]);
         assert(opts.length > 0, "ningún modificador puede bloquear TODAS las acciones");
         if (opp) opts.push(opp);
         const blocked = E.DAY_ACTIONS.find(a => E.actionMult(run, a) === 0);
@@ -211,6 +222,8 @@ function playRun(teamId) {
       assert(Number.isInteger(p.momento) && p.momento >= 1 && p.momento <= 7, "momento en rango 1..7", `${p.name}=${p.momento}`);
     }
     assert(Number.isInteger(run.moral) && run.moral >= 1 && run.moral <= 100, "moral en rango 1..100", run.moral);
+    assert(Object.values(run.aristas).every(v => typeof v === "number" && v >= 0), "aristas numéricas y no negativas", JSON.stringify(run.aristas));
+    assert(E.filoLevel(run) >= 0 && E.filoLevel(run) <= 2, "nivel de filosofía en rango 0..2");
     assert(run.journal.length >= journalBefore + 1, "el diario debe crecer con el partido");
 
     const adv = E.advanceStage(run, out.advanced);

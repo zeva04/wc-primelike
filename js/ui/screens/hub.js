@@ -10,7 +10,9 @@ import { currentLineup, validateLineup, getFormation, assignPositions, maxLineup
 import { dayLabel, advanceDay } from "../../game/calendar.js";
 import { buildDaily } from "../../game/daily.js";
 import { applyDayAction, actionMult, multLabel, dayOpportunity, canjeableBuffs, canjeBuff } from "../../game/day-action.js";
-import { DAY_ACTIONS, TACTICS_BONUS, TRAIN_BUFF, TRAIN_FATIGUE, CANJE_THRESHOLD, CANJE_PERMANENT, STAT_LABELS } from "../../content/day-actions.js";
+import { DAY_ACTIONS, ARISTA_FOCUS, TRAIN_BUFF, TRAIN_FATIGUE, CANJE_THRESHOLD, CANJE_PERMANENT, STAT_LABELS } from "../../content/day-actions.js";
+import { PHILOSOPHIES, getPhilosophy, aristaById, FILO_LEVELS } from "../../content/philosophies.js";
+import { filoPoints, filoLevel, changePhilosophy } from "../../game/philosophy.js";
 import { RARITIES } from "../../content/rarities.js";
 import { addJournal } from "../../game/journal.js";
 import { moraleBand } from "../../game/morale.js";
@@ -92,10 +94,7 @@ function buffChips() {
   for (const [k, v] of Object.entries(S.run.buffs)) {
     if (k === "antiLesion") { if (v) chips.push(`<span class="px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/10 text-emerald-400">🧑‍⚕️ Sin lesiones</span>`); continue; }
     if (k === "penales") { if (v) chips.push(`<span class="px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/10 text-emerald-400">🥅 Penales +</span>`); continue; }
-    if (k === "tactica") {
-      if (!v) continue;
-      const n = Math.round(v / TACTICS_BONUS);
-      chips.push(`<span class="px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/10 text-emerald-400">📋 Preparación táctica${n > 1 ? ` ×${n}` : ""}</span>`);
+    if (k === "tactica") { // reliquia pre-F1: el buff táctico murió con el arco de Filosofía
       continue;
     }
     if (!v || !STAT_LABELS[k]) continue;
@@ -274,6 +273,7 @@ function actionCard() {
   const chosenId = chosen ? run.lastAction.id : null;
   const chosenGroup = chosen ? run.lastAction.group : null;
   const training = DAY_ACTIONS.filter(a => a.group === "entrenar");
+  const tacRows = DAY_ACTIONS.filter(a => a.group === "tactica");
   const rest = DAY_ACTIONS.filter(a => !a.group);
   // Badge del modificador del día sobre una acción: bloqueada / ×2 / ×½
   const modBadge = m => m === 0
@@ -286,6 +286,13 @@ function actionCard() {
   const stOf = id => !chosen ? "active" : (id === chosenId ? "chosen" : "muted");
   const tMult = actionMult(run, training[0]);
   const trainState = !chosen ? "active" : (chosenGroup === "entrenar" ? "chosen" : "muted");
+  // Sesión Táctica reformada (F1): panel de FOCOS de arista, calcado del de Entrenar.
+  // Las 2 aristas de la filosofía se destacan (tu identidad); las otras 3 quedan
+  // disponibles — pre-entrenar otra filosofía es legal (demolición orgánica, PO #1).
+  const filo = getPhilosophy(run.filoId);
+  const nivel = FILO_LEVELS[filoLevel(run)];
+  const tacMult = actionMult(run, tacRows[0]);
+  const tacState = !chosen ? "active" : (chosenGroup === "tactica" ? "chosen" : "muted");
   return `<div class="bg-slate-800/60 border tp-border rounded-2xl p-4 flex-1 flex flex-col">
     <h3 class="font-bold shrink-0">🧭 ${chosen ? "Tu acción de hoy" : "Acción del día"}</h3>
     <p class="text-[10px] text-slate-500 mt-0.5 mb-3">${chosen
@@ -314,12 +321,39 @@ function actionCard() {
         }).join("")}
       </div>
     </div>
+    <div class="rounded-xl border p-3 mb-2 transition-all ${
+      tacState === "chosen" ? "tp-border ring-2 ring-emerald-400/40 bg-slate-800/80"
+      : tacState === "muted" ? "border-slate-700 bg-slate-900/40 opacity-40"
+      : `border-slate-700 bg-slate-900/50 ${tacMult === 0 ? "opacity-50" : ""}`}">
+      <div class="flex items-center justify-between">
+        <span class="font-semibold text-sm">📋 Sesión táctica</span>
+        ${tacState === "chosen" ? chosenBadge : tacState === "muted" ? "" : (modBadge(tacMult) || `<span class="text-[10px] font-bold text-slate-500">construye identidad</span>`)}
+      </div>
+      <p class="text-[10px] text-slate-500 mt-0.5 mb-2">+${ARISTA_FOCUS} a la arista del foco elegido — tu fútbol sale más seguido en la cancha${opp ? ` (próximo examen: vs ${opp.name})` : ""}.</p>
+      <div class="grid grid-cols-3 gap-2">
+        ${tacRows.map(a => {
+          const k = a.id.replace("tactica_", "");
+          const own = !!filo && filo.aristas.includes(k);
+          const pts = run.aristas?.[k] || 0;
+          const foco = chosen && a.id === chosenId;
+          const active = !chosen && tacMult !== 0;
+          return `<button data-action="${a.id}" ${active ? "" : "disabled"} class="${active ? "da-opt " : ""}px-2 py-2 rounded-lg border text-xs font-semibold transition-all ${
+            foco ? "tp-border tp-text bg-slate-700"
+            : chosen ? "border-slate-700 text-slate-500 opacity-60 cursor-not-allowed"
+            : tacMult === 0 ? "border-slate-700 text-slate-500 cursor-not-allowed"
+            : own ? "tp-border tp-text bg-slate-800/80 hover:bg-slate-700 cursor-pointer"
+            : "border-slate-600 bg-slate-700/60 hover:border-amber-400 hover:bg-slate-700 cursor-pointer"}" title="${a.desc}${own ? " · arista de TU filosofía" : ""}">${a.icon} ${a.label}${pts ? ` <span class="text-[9px] opacity-80">· ${pts}</span>` : ""}${foco ? " ✓" : ""}</button>`;
+        }).join("")}
+      </div>
+      ${filo ? `<div class="flex items-center justify-between gap-2 mt-2">
+        <span class="text-[10px] text-slate-400">${filo.icon} <b class="tp-text">${filo.name}</b> · ${nivel.label} <span class="text-slate-500">(${filoPoints(run)} pts)</span></span>
+        ${!chosen ? `<button id="btn-filo-change" class="text-[10px] text-slate-500 hover:text-amber-400 cursor-pointer underline underline-offset-2" title="Cuesta la Acción del Día; las aristas entrenadas quedan">🔄 Cambiar identidad</button>` : ""}
+      </div>` : ""}
+    </div>
     ${rest.map(a => {
       const m = actionMult(run, a);
       const st = stOf(a.id);
       const active = st === "active" && m !== 0;
-      // La Sesión Táctica se prepara contra ALGUIEN: el informe del rival (card VS) es su insumo
-      const desc = a.id === "tactica" && opp ? `Preparar el partido vs ${opp.name}: el equipo llega mejor plantado (bonus de ataque y defensa)` : a.desc;
       return `<button data-action="${a.id}" ${active ? "" : "disabled"} class="${active ? "da-opt " : ""}w-full text-left rounded-xl border p-3 mb-2 transition-all ${
         st === "chosen" ? "tp-border ring-2 ring-emerald-400/40 bg-slate-800/80"
         : st === "muted" ? "border-slate-700 bg-slate-900/40 opacity-40 cursor-not-allowed"
@@ -329,7 +363,7 @@ function actionCard() {
           <span class="font-semibold text-sm">${a.icon} ${a.title}</span>
           ${st === "chosen" ? chosenBadge : st === "muted" ? "" : modBadge(m)}
         </div>
-        <div class="text-[10px] text-slate-500 mt-0.5">${desc}.</div>
+        <div class="text-[10px] text-slate-500 mt-0.5">${a.desc}.</div>
       </button>`;
     }).join("")}
   </div>`;
@@ -387,6 +421,7 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
     <div class="flex gap-2 mb-3 shrink-0">
       ${stateChip(mb.icon, "Moral", mb.label, moralCls)}
       ${stateChip("⚡", "Energía", avgEnergy + "%", enCls)}
+      ${run.filoId ? stateChip(getPhilosophy(run.filoId).icon, "Identidad", FILO_LEVELS[filoLevel(run)].label, "tp-text") : ""}
     </div>
     <div class="mb-3 shrink-0">
       <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">✨ Efectos próximo partido</div>
@@ -585,6 +620,8 @@ function renderHub(opts = {}) {
       toast(`${a.icon} ${a.title}${a.mult !== 1 ? ` (${multLabel(a.mult)} hoy)` : ""}: ${a.desc}.`);
       renderHub();
     });
+    const filoBtn = $("#btn-filo-change");
+    if (filoBtn) filoBtn.onclick = showFiloChange;
     const oppBtn = $("#da-opp");
     if (oppBtn) oppBtn.onclick = () => {
       const o = dayOpportunity(S.run);
@@ -597,6 +634,43 @@ function renderHub(opts = {}) {
     };
     if (!S.run.actionPending) $("#btn-nextday").onclick = pasarDia;
   }
+}
+
+/**
+ * Modal de cambio de filosofía (F1, decisión PO #1): cuesta la Acción del Día y
+ * la demolición es ORGÁNICA — las aristas entrenadas quedan, pero cada card
+ * muestra cuánto de lo tuyo le sirve a la identidad nueva (el costo hundido, a
+ * la vista antes de firmar).
+ */
+function showFiloChange() {
+  const run = S.run;
+  const others = PHILOSOPHIES.filter(p => p.id !== run.filoId);
+  const m = modal(`
+    <h3 class="text-lg font-black">🔄 Cambio de identidad</h3>
+    <p class="text-xs text-slate-400 mt-1 mb-3">Cuesta la <b class="text-amber-400">Acción del Día</b>. Lo entrenado no se borra — pero la filosofía nueva vive de otras aristas.</p>
+    <div class="space-y-2">
+      ${others.map(p => {
+        const pts = p.aristas.reduce((s, k) => s + (run.aristas?.[k] || 0), 0);
+        return `<button data-filo="${p.id}" class="w-full text-left rounded-xl border border-slate-600 bg-slate-800/70 hover:border-amber-400 p-3 cursor-pointer transition-all">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sm">${p.icon} ${p.name}</span>
+            <span class="text-[10px] font-bold ${pts ? "text-emerald-400" : "text-slate-500"}">${pts ? `arranca con ${+pts.toFixed(2)} pts` : "arranca de cero"}</span>
+          </div>
+          <div class="text-[10px] text-slate-400 mt-0.5">${p.aristas.map(k => `${aristaById(k).icon} ${aristaById(k).label}`).join(" + ")}</div>
+          <div class="text-[10px] text-amber-400/90 mt-0.5">⚠️ ${p.advertencia}</div>
+        </button>`;
+      }).join("")}
+    </div>
+    <button id="filo-cancel" class="mt-3 w-full text-xs font-bold py-2 rounded-lg border border-slate-600 text-slate-400 hover:bg-slate-800 cursor-pointer">Mejor seguimos como estamos</button>
+  `, "max-w-md");
+  m.querySelectorAll("[data-filo]").forEach(b => b.onclick = () => {
+    const f = changePhilosophy(S.run, b.dataset.filo);
+    if (!f) return;
+    closeModal();
+    toast(`${f.icon} Nueva identidad: ${f.name} — el día entero se fue en reinstalar ideas.`);
+    renderHub();
+  });
+  m.querySelector("#filo-cancel").onclick = closeModal;
 }
 
 /**

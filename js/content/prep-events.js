@@ -32,6 +32,7 @@
    ============================================================ */
 import { clamp } from "../core/math.js";
 import { pick } from "../core/rng.js";
+import { addFiloProgress } from "./philosophies.js";
 
 const buff = (r, k, v) => { r.buffs[k] = (r.buffs[k] || 0) + v; };
 const energia = (r, v) => r.squad.forEach(p => p.energia = clamp(p.energia + v, 5, 100));
@@ -115,8 +116,8 @@ export const PREP_EVENTS = [
     teaser: "Se rumorea que hoy habrá un ensayo de altísimo nivel.",                     effect: r => { buff(r, "tiro", 8); buff(r, "defensa", 8); } },
   { id: "leyenda",       rareza: "rara", tema: "vestuario",     icon: "👑", title: "Visita de una leyenda",      tipo: "buff",   desc: "+12 de Aura para el próximo partido.",
     teaser: "Hay movimiento raro en recepción: se espera una visita ilustre.",           effect: r => buff(r, "aura", 12) },
-  { id: "video_premium", rareza: "rara", tema: "vestuario",     icon: "🎥", title: "Sesión de video reveladora", tipo: "buff",   desc: "El equipo llega mucho mejor plantado al próximo partido.",
-    teaser: "El analista no durmió: dice que encontró algo grande.",                     effect: r => { r.buffs.tactica = +((r.buffs.tactica || 0) + 0.2).toFixed(2); } },
+  { id: "video_premium", rareza: "rara", tema: "vestuario",     icon: "🎥", title: "Sesión de video reveladora", tipo: "buff",   desc: "La identidad del equipo da un salto (+1 a una arista de tu filosofía).",
+    teaser: "El analista no durmió: dice que encontró algo grande.",                     effect: r => { const a = addFiloProgress(r, 1); return !a ? undefined : `El video muestra exactamente dónde crecer: +1 de ${a.label} — la identidad da un salto.`; } },
   { id: "crisis_prensa", rareza: "rara", tema: "entorno",       icon: "🎙️", title: "Crisis con la prensa",       tipo: "debuff", desc: "−10 de Aura y −6 de Pase para el próximo partido.",
     teaser: "Un rumor feo empieza a circular en los portales deportivos.",               effect: r => { buff(r, "aura", -10); buff(r, "pase", -6); } },
   { id: "ola_calor",     rareza: "rara", tema: "fisico",        icon: "🥵", title: "Ola de calor", tipo: "debuff",

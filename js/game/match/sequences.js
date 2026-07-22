@@ -34,6 +34,7 @@ import { clamp } from "../../core/math.js";
 import { playedPos } from "../ratings.js";
 import { moraleBand } from "../morale.js";
 import { SEQUENCE_TYPES } from "../../content/sequences.js";
+import { FIRMA_TYPE, FILO_LEVELS } from "../../content/philosophies.js";
 import { buildActDecision } from "./sequence-acts.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
@@ -110,9 +111,30 @@ function typeWeights(m, side, prof) {
     salida_fondo: (0.8 + 2.5 * prof.def) * (tired ? 1.4 : 1),
     balon_parado_def: 0.8 + 1 * prof.cab,
   };
+  // [FILOSOFÍA → POOL] (F1, decisión PO #6): el tipo firma pesa ×1.35/×1.7/×2.1 según
+  // el nivel (Aprendiendo/Desarrollo/Consolidada). Llega por matchCtx como la moral
+  // ({id, nivel}: el Match no conoce la run) y se lee EN VIVO — el nivel es fijo en el
+  // partido, pero el multiplicador convive con marcador/fatiga/moral sin cachearse.
+  // Sesga UN tipo, no el reparto: el contexto dinámico de A3 sigue visible en el resto.
+  const filo = m.my.filo;
+  if (filo) {
+    const t = FIRMA_TYPE[filo.id];
+    if (w[t] !== undefined && w[t] > 0) w[t] *= FILO_LEVELS[filo.nivel]?.mult || 1;
+  }
   // Memoria de secuencias: no repetir el mismo tipo dos veces seguidas (el partido varía).
   if (m._lastSeqType && w[m._lastSeqType] !== undefined) w[m._lastSeqType] = 0;
   return w;
+}
+
+/**
+ * Acierto de un acto en una secuencia del TIPO FIRMA de mi filosofía (F1, "successful
+ * execution" del Bible §5): lo cuentan sequence-acts (cada acto que progresa) y
+ * chances.goalMine (el gol que corona). El contador vive en el Match; la conversión a
+ * progreso de arista (con tope) la hace game/philosophy del lado run de la frontera.
+ */
+export function noteFiloHit(m) {
+  const f = m.my.filo, s = m.seq;
+  if (f && s && s.type.id === FIRMA_TYPE[f.id]) m.filoHits = (m.filoHits || 0) + 1;
 }
 
 /**

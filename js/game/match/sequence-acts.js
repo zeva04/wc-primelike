@@ -14,7 +14,7 @@
 import { rnd, pick } from "../../core/rng.js";
 import { playedPos } from "../ratings.js";
 import { sequenceType } from "../../content/sequences.js";
-import { protMomentum } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
+import { protMomentum, noteFiloHit } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
 import * as A from "./actions.js";
 import { goalMine, goalOpp, myPenalty, lastManChance } from "./chances.js";
 
@@ -308,6 +308,11 @@ const AUTO_ACTS = new Set(["clear"]);
  */
 function escalate(m) {
   const s = m.seq;
+  // Escalar ES acertar el acto (los fallos cierran o encadenan, nunca escalan… salvo la
+  // contención rota, que escala al remate rival — pero el repliegue no es tipo firma de
+  // nadie: las 4 firmas son del lado mine). Si la secuencia es de MI tipo firma, el
+  // acierto alimenta la progresión por ejecución (F1).
+  noteFiloHit(m);
   s.actIdx++;
   if (s.actIdx >= s.type.plan.length) return closeSilent(m);
   if (AUTO_ACTS.has(s.type.plan[s.actIdx])) return resolveSequenceAct(m, null);

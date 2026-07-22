@@ -360,7 +360,21 @@ pelota) · **cab** (su juego aéreo). `typeWeights` convierte ese perfil + la **
 VIVA: se lee al generar, cambiarla a mitad de partido cambia el fútbol que sale) en pesos por tipo:
 un rival que ataca te deja contras; un bloque invita al pelotazo; uno que quiere la pelota, a
 presionarle la salida; su intensidad te presiona a ti (salida_fondo) y su juego aéreo vive del
-córner. Cuando llegue Filosofía, la filosofía real del rival reemplaza este proxy.
+córner. En F2, la filosofía real del rival reemplaza este proxy en el lado `opp`.
+
+**[FILOSOFÍA → POOL] (arco F1, decisión PO #6).** MI filosofía multiplica su **tipo firma**
+en `typeWeights`: **×1.35 / ×1.7 / ×2.1** según el nivel (Aprendiendo / En desarrollo /
+Consolidada — `FILO_LEVELS` en `content/philosophies`). Llega por `matchCtx.filo = {id, nivel}`
+(la frontera run→Match, como la moral: el Match no conoce la run; lo arman `screens/match.js`
+y el smoke). Sesga UN tipo, no el reparto — medido (diag, 400 partidos/celda): la firma sube
+~+5-7pp de share en Consolidada (contra 17→24% transición, bloque 8→14% pelotazo), el resto
+del contexto dinámico de A3 sigue visible y los goles no se mueven (~1.7): **cambia el fútbol
+que sale, no compra goles** (Bible §5 regla 3). La **progresión por ejecución** cierra el
+círculo: cada acierto de acto en una secuencia firma (`noteFiloHit` — escalar es acertar, más
+el gol que corona si el VAR no lo anula) suma `match.filoHits`, y `flow.postMatchUpdate` lo
+convierte en arista vía `applyFiloExecution` (+0.25 por acierto, tope 2 por partido). Ritmos
+medidos con decisiones al azar: Posesión ~1.5 aciertos/partido, Contragolpe ~1.1, Press ~0.7,
+Bloque ~0.5 — la circulación multi-acto consolida más rápido; se vigila en F2.
 
 **Generación** (`sequences.seqPlan` + `maybeStartSequence`): **2-6 por partido**, objetivo modulado
 por la **preparación** (ventaja atk+def sobre el rival) y la mentalidad. El favorito recibe más
@@ -644,14 +658,14 @@ historia; un botón bloqueado no.
 Además del suceso que le toca, **cada día sin partido el DT elige exactamente UNA
 acción** (Core Gameplay Bible §4.7: un día = una inversión, con opportunity cost).
 El orden dentro del día es el del Bible: primero el evento cambia el contexto,
-después el DT decide. No se puede pasar el día sin elegir. Las 6 acciones
+después el DT decide. No se puede pasar el día sin elegir. Las acciones
 (`content/day-actions.js`):
 
 | Acción | Efecto | Trade-off |
 |---|---|---|
 | 🎯/🛡️/🎩 **Entrenar** (foco ataque, defensa o pases) | +1 al buff de la stat elegida (`TRAIN_BUFF`) | **−5 de energía** a todo el plantel |
 | 🧘 **Recuperar** | +10 de energía a todo el plantel | No mejora ninguna stat |
-| 📋 **Sesión táctica** | +0.1 a **atk y def** (escala de poder §5) para el próximo partido, vía `buffs.tactica` | No recupera ni sube stats individuales |
+| 📋 **Sesión táctica** (reformada en F1) | **+1 a la arista del foco elegido** (`ARISTA_FOCUS`, 5 focos = las 5 aristas de `content/philosophies`) — construye la identidad, que sesga el pool de secuencias por nivel | **Sin retorno inmediato**: no recupera, no sube stats y el viejo buff atk/def MURIÓ (decisión PO, arco de Filosofía) |
 | 🤝 **Team Bonding** (Sprint 3) | +10 a la **Moral del equipo** (`BONDING_MORAL`) | **−5 de energía** a todo el plantel (`BONDING_FATIGUE`) |
 
 **Team Bonding** (decisión PO 20-jul-2026) es la palanca para gestionar la Moral a voluntad,
@@ -664,11 +678,20 @@ Calibración: el foco de entrenamiento es **+1 y no +4** (el PO lo bajó el 17-j
 el buff dominaba la preparación y el canje —ver abajo— se conseguía en un solo día).
 Un +1 mueve el poder del equipo apenas ~+0.02 (§5), pero es **elegible** (siempre apunta
 a la stat que quieres), mientras que los eventos de ±5 caen donde caen — a igual magnitud,
-elegible gana. La sesión táctica (+0.1 en ambas fases, sin costo de energía) pesa más por
-partido pero no apunta a una stat concreta: ninguna acción domina, como pide el Bible. El
-bonus táctico solo alcanza al equipo del usuario (el rival calcula sus poderes con
-`buffs = {}`) y se limpia con el resto de los buffs al terminar el partido. La sesión
-táctica es además el gancho donde se enchufará la **Filosofía**.
+elegible gana.
+
+**La muerte del buff táctico (arco de Filosofía F1, 22-jul-2026).** La Sesión Táctica era
+la acción más fuerte como estrategia fija (41.7% de campeón con BRA vs 34.0% del mixto,
+n=4000/1500) porque +0.1 a atk y def sin costo de energía pagaba todos los días. El PO
+decidió que su valor ya no sea poder inmediato sino **identidad**: elige un FOCO entre las
+5 aristas (como Entrenar elige stat) y suma +1 a esa arista (`run.aristas`; los focos con
+las 2 aristas de tu filosofía se destacan en el hub). Medido en dos etapas (ley del arco):
+la reforma AISLADA derivó el mixto a 31.5/31.8% (−2.3pp — el valor del buff muerto) y
+solo-táctica cayó a 32.2% (ya no domina, pero no gastar energía la sostiene); con el
+sesgo del pool enchufado el mixto volvió a 32.9/33.x% (dentro del gate ±2pp) — con focos
+AL AZAR, que es el PISO: un DT que entrena SUS aristas rinde más. El cambio de filosofía
+a mitad de run también pasa por acá: **cuesta la Acción del Día** (modal en el panel) y
+las aristas persisten (demolición orgánica, decisión PO #1).
 
 > ✅ **RESUELTO (20-jul-2026) — Entrenar estaba dominado; se arregló con el rebalance del
 > factor de energía (§4).** Se deja abajo el diagnóstico completo porque la metodología es

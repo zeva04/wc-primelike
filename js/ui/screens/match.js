@@ -10,6 +10,7 @@ import { statLine, playedPos, outOfPosPenalty } from "../../game/ratings.js";
 import { swapAssignments, canPlayAt } from "../../game/lineup.js";
 import { STAGE_LABEL } from "../../game/tournament/knockout.js";
 import { Match } from "../../game/match/Match.js";
+import { filoCtx } from "../../game/philosophy.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, modal, closeModal, toast, numTag, posBadge, energyBar, momentoChip } from "../components.js";
@@ -21,7 +22,8 @@ function startMatch(oppId) {
   const me = getTeam(S.run.teamId);
   const opp = getTeam(oppId);
   const bench = S.run.squad.filter(p => !S.selectedLineup.includes(p) && !p.suspendido && p.lesionadoPartidos === 0);
-  S.matchCtx = { team: me, lineup: S.selectedLineup.slice(), bench, mentalidad: "normal", buffs: { ...S.run.buffs }, moral: S.run.moral };
+  // La filosofía cruza la frontera run→Match como la moral: {id, nivel}, nada más (F1).
+  S.matchCtx = { team: me, lineup: S.selectedLineup.slice(), bench, mentalidad: "normal", buffs: { ...S.run.buffs }, moral: S.run.moral, filo: filoCtx(S.run) };
   S.match = new Match(S.matchCtx, opp, S.run.stage !== "groups", S.run.rivalBans[oppId] || []);
   S.feedRendered = 0;
   S.paused = false;

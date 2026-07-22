@@ -156,7 +156,10 @@ de las acciones de HOY: `{icon, title, desc, mods}`, dura exactamente un día),
 `lastNight` (partidos ajenos "de anoche", escribe `tournament/world`), `koPlayed`
 (`{idx: resultado}` de cruces ajenos ya jugados; resetea flow al armar cada ronda) y
 `rivalBans` (`{teamId: [nombres]}` suspendidos por roja ajena para SU próximo partido;
-escribe world, limpia flow cuando lo cumplen ante mí).
+escribe world, limpia flow cuando lo cumplen ante mí). Desde F1: `filoId` (filosofía
+elegida tras el sorteo, escribe `game/philosophy`) y `aristas` (`{presion: 3, ...}` —
+progreso por arista, PERSISTE al cambiar de filosofía; mutan `content/day-actions`,
+`game/philosophy` y el contenido vía `addFiloProgress`).
 
 ### 5. Simulación IA — `js/game/tournament/sim.js`
 | Función | Qué hace |
@@ -191,7 +194,7 @@ sobrevive a cualquier re-agendado.
 |---|---|
 | `effStat(p,key,buffs)` | Stat efectiva ~0–5 (stat÷20) con buffs y castigo por energía. |
 | `gkQuality(por,buffs)` | Calidad global del arquero (atajadas 60% · reflejos 25% · salidas 15%). |
-| `teamPowers(lineup,ment,buffs)` | Ataque y defensa (~0–5) de una alineación, con mentalidad, inferioridad numérica y el bonus parejo de `buffs.tactica` (Sesión táctica; solo llega por los buffs propios). |
+| `teamPowers(lineup,ment,buffs)` | Ataque y defensa (~0–5) de una alineación, con mentalidad e inferioridad numérica. El bonus de `buffs.tactica` MURIÓ en F1 (la táctica ya no compra poder: construye identidad). |
 
 ### 8. Partido interactivo — clase `Match` (`js/game/match/Match.js` + `sequences.js` / `actions.js` / `chances.js` / `incidents.js` / `shootout.js`)
 La UI la maneja así: `tick()` cada ~600 ms → si hay `decision`, muestra modal y llama al
@@ -289,12 +292,17 @@ con su resolución **intacta**; los remates no interactivos pasaron a `chances.a
 | `applyDayAction(run,actionId,targetName?)` | **day-action**: aplica la Acción del Día elegida (`DAY_ACTIONS` o la Oportunidad viva hoy) escalada por el modificador del día — la Oportunidad NO se escala (decisión PO: premio externo) —, baja `actionPending`, escribe `lastAction` y anota el diario (la oportunidad con tono por rareza). Si la oportunidad trae `choose`, exige `targetName` válido entre sus candidatos (por nombre, §3.1); sin él no aplica NI consume el turno. Devuelve `{...accion, mult, desc}` (`desc` puede traer protagonista) o `null` si no había acción pendiente, el id no existe, la acción está bloqueada hoy o faltó el objetivo. |
 | `actionMult(run,action)` | **day-action**: multiplicador de una acción HOY según `run.dayMod` (1 sin modificador; 0 = bloqueada). |
 | `dayOpportunity(run)` | **day-action**: la Oportunidad viva HOY (fila completa de `content/opportunities`) o `null`. |
-| `canjeableBuffs(run)` | **day-action**: stats cuyo buff para el próximo partido ya llega al umbral (`CANJE_THRESHOLD`): `[{key, buff, label, alcance}]` (`alcance` = jugadores del plantel con esa stat). Solo stats reales (`CANJEABLE_STATS`); tactica/penales/antiLesion nunca. Vacío si ninguna llegó. |
+| `canjeableBuffs(run)` | **day-action**: stats cuyo buff para el próximo partido ya llega al umbral (`CANJE_THRESHOLD`): `[{key, buff, label, alcance}]` (`alcance` = jugadores del plantel con esa stat). Solo stats reales (`CANJEABLE_STATS`); penales/antiLesion nunca. Vacío si ninguna llegó. |
 | `canjeBuff(run,key)` | **day-action** (Bible cap.6): canjea el buff de una stat por crecimiento PERMANENTE — descuenta `CANJE_THRESHOLD` del buff y suma `+CANJE_PERMANENT` (hoy +1) a esa stat en cada jugador que la tenga (clamp 1..99, nunca decrece). Gratis (no consume la Acción del Día) y anota el diario (tono gold). Devuelve `{key, label, permanent, alcance, jugadores}` o `null` si no llegaba al umbral / no es stat real. Escribe `squad[].stats` (ARQUITECTURA §3.1). |
+| `choosePhilosophy(run,filoId)` | **philosophy** (arco F1): elección post-sorteo, gratis (antes del día 1). Escribe `run.filoId` y el diario (tono gold). Devuelve la filosofía o `null` si el id no existe. |
+| `changePhilosophy(run,filoId)` | **philosophy**: cambio a mitad de run — CUESTA la Acción del Día (decisión PO #1) y las aristas PERSISTEN (demolición orgánica). Devuelve la nueva o `null` (sin acción pendiente / id inválido / la actual). |
+| `filoPoints(run)` / `filoLevel(run)` / `filoCtx(run)` | **philosophy**: suma de las 2 aristas propias / índice del nivel en `FILO_LEVELS` (0 Aprendiendo · 1 En desarrollo ≥4 · 2 Consolidada ≥9) / el `{id, nivel}` que viaja en `matchCtx.filo` (frontera run→Match, como la moral) — `null` sin filosofía. |
+| `applyFiloExecution(run,match)` | **philosophy** (Bible §5 "successful execution"): convierte `match.filoHits` (aciertos de actos del tipo firma, cuenta el Match vía `noteFiloHit`) en progreso de la arista firma: +`FILO_EXEC_GAIN` (0.25) por acierto, tope `FILO_EXEC_CAP` (2) por partido. La llama `flow.postMatchUpdate`; devuelve `{arista, add, hits}` o `null`. |
+| `PHILOSOPHIES` / `ARISTAS` / `FILO_LEVELS` / `FIRMA_TYPE` / `addFiloProgress(r,pts)` | **content/philosophies**: las 4 filosofías (2 aristas, firma, lema, fuerte/advertencia, rasgo consolidado) · las 5 aristas (cada una mapea a UN tipo de secuencia, mismo icono) · niveles con umbral y multiplicador (×1.35/×1.7/×2.1) · tipo firma por filosofía (derivado) · progreso desde contenido: suma a la arista MÁS BAJA de la filosofía (empate → firma), para eventos/oportunidades que antes regalaban `buffs.tactica`. |
 | `buildDaily(run)` | **daily**: arma la edición del World Cup Daily — `{day, isMatchDay, items}` con 1-5 titulares `{icon, tag, text}` ordenados por prioridad (PORTADA/PLANTEL/GRUPO/RIVAL/MUNDIAL/HOY/COLOR, ver CORE §9); el primero es la nota de tapa. GRUPO marca al próximo rival si jugó anoche; RIVAL avisa sus suspendidos (`rivalBans`) y da el framing por paridad solo en la previa (≤2 días); MUNDIAL puntúa `run.lastNight` (batacazos por tier, goleadas, festivales, grandes, rojas); HOY es el `teaser` del evento/conflicto que trae el día (anticipa sin revelar). **Sin repetirse en la semana** (22-jul): un titular con el MISMO texto que ya salió en los últimos 7 días se suprime (`run._dailySeen`, texto → último día; la PORTADA no se toca; re-armar la edición del mismo día es idempotente). Solo lectura salvo `_dailySeen` y el rng del flavor. |
 | `multLabel(mult)` | **day-action**: etiqueta corta para la UI ("×2", "×½"); `""` si es 1 o bloqueo. |
-| `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, goles del rival a la tabla de goleadores (`assignScorers`) y sus asistidores (`assignAssists`), resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced, momentum}` (`momentum` = resumen anímico por jugador para el análisis del post-partido). |
-| `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario/anímico por jugador (delega en `applyMedicalPostMatch` con los **minutos** de `match.minutesByName()`, `applyDisciplinePostMatch` y `applyMomentumPostMatch` — este ANTES de resetear flags: lee `p.sustituido`), cierra la moral (`applyMoralePostMatch`), limpia buffs y **re-agenda**. "Jugó" = está en el once final, entró del banco (`usado`) o **salió por un cambio** (`sustituido`). **Devuelve** `{momentum, morale}` (resúmenes para el análisis del post-partido). |
+| `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, goles del rival a la tabla de goleadores (`assignScorers`) y sus asistidores (`assignAssists`), resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced, momentum, filoExec}` (`momentum` = resumen anímico por jugador; `filoExec` = progreso por ejecución de F1, para narrarlo en F3). |
+| `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario/anímico por jugador (delega en `applyMedicalPostMatch` con los **minutos** de `match.minutesByName()`, `applyDisciplinePostMatch` y `applyMomentumPostMatch` — este ANTES de resetear flags: lee `p.sustituido`), cierra la moral (`applyMoralePostMatch`), aplica la **progresión por ejecución** de la filosofía (`applyFiloExecution`, F1), limpia buffs y **re-agenda**. "Jugó" = está en el once final, entró del banco (`usado`) o **salió por un cambio** (`sustituido`). **Devuelve** `{momentum, morale, filoExec}`. |
 | `advanceStage(run,advanced)` | **flow**: avanza el torneo y devuelve `{type: "next-matchday"\|"qualified"\|"eliminated"\|"next-round"\|"champion"}`; dispara `clearAmarillas` al cerrar grupos y tras 4tos, y `bumpMorale(+5)` al pasar de ronda. La UI solo rutea. |
 | `applyMedicalPostMatch(run,p,played,minutos)` / `matchFatigue(minutos)` / `applyDailyRecovery(run,esDiaDePartido)` | **medical**: energía — jugar **cansa** (`matchFatigue`: −14 cada 30' disputados), descansar recupera +30; **recuperación pasiva** en TODO día nuevo (`applyDailyRecovery`, la llama `calendar.advanceDay`): `DAILY_RECOVERY`=+8 en día de preparación, `MATCHDAY_RECOVERY`=+2 la víspera del partido (Sprint 4: antes el día de partido no cobraba nada). Además descuenta la baja por lesión y anota el diario. `minutos` los calcula `Match.minutesByName`. |
 | `fatigueInjuryMult(energia)` | **medical** (Sprint 4, cruce Energía→Lesión): multiplicador de **gravedad** de lesión según la energía — 1.0 desde `FATIGUE_INJURY_FROM` (50) hacia arriba, creciendo lineal hasta `FATIGUE_INJURY_MAX` (1.8) en el piso de energía. Lo aplica `match/incidents.injuryEvent` sobre la probabilidad de que el golpe sea grave. Sin campo `energia` devuelve 1 (la asimetría vive en los datos). |
@@ -420,7 +428,7 @@ equipo y posiciona el carrusel sin iniciar la partida.
 | Función | Qué hace |
 |---|---|
 | `startRun(teamId)` | Crea la run, aplica colores y muestra el sorteo. |
-| `renderDraw()` | Pantalla de sorteo con los 12 grupos. |
+| `renderDraw()` | Pantalla de sorteo con los 12 grupos **+ la elección de identidad** (F1, decisión PO #1: se elige DESPUÉS de ver el grupo): 4 cards con aristas, lema, fortaleza, advertencia de counter y el rasgo de Consolidada. "Comenzar la aventura" queda deshabilitado hasta elegir; confirma con `choosePhilosophy`. |
 
 ### 6b. La cancha reutilizable — `ui/pitch.js`
 | Función | Qué hace |
@@ -446,7 +454,8 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 | `moraleRow()` | Fila de la Moral del equipo (banda + barra) embebida en el bloque de plantilla del hub. |
 | `renderScorersCard()` / `wireScorersCard(rootEl)` (en `scorers.js`) | **Carrusel** top-5 del torneo para el hub con 2 pestañas — ⚽ **Goleadores** (`tournamentScorers`) / 🅰️ **Asistidores** (`tournamentAssists`) — que se togglean con los iconos del encabezado; llena su columna (`h-full flex flex-col`). El hub lo envuelve en un contenedor clickeable que va a la pantalla completa; `wireScorersCard` cablea el toggle **cortando la propagación** para no navegar al cambiar de pestaña. |
 | `renderScorers()` (pantalla `scorers`) | Tabla completa del torneo con **toggle** Goleadores / Asistidores (mismo componente de fila, `col` = G/A): puesto, bandera, jugador, selección y el valor; mi equipo resaltado. |
-| `buffChips()` | Chips con los efectos acumulados para el próximo partido (incluye el de `tactica` con su multiplicador de sesiones; usa `STAT_LABELS` de `content/day-actions`). Un buff de stat que ya llega a `CANJE_THRESHOLD` se resalta con ✨ y colores del equipo (es canjeable). |
+| `buffChips()` | Chips con los efectos acumulados para el próximo partido (usa `STAT_LABELS` de `content/day-actions`; el chip de `tactica` murió con el buff en F1). Un buff de stat que ya llega a `CANJE_THRESHOLD` se resalta con ✨ y colores del equipo (es canjeable). |
+| `showFiloChange()` | Modal del **cambio de filosofía** (F1, decisión PO #1): las otras 3 con sus aristas, cuántos puntos tuyos le sirven a cada una ("arranca con N pts" — el costo hundido a la vista) y su advertencia; confirma con `changePhilosophy` (cuesta la Acción del Día) y re-renderiza. El botón vive en el panel de la Sesión Táctica, solo con acción pendiente. |
 | `showCanje(key)` | Modal de confirmación del **canje de entrenamiento** (Bible cap.6): explica que renuncias a +`CANJE_THRESHOLD` del boost por +`CANJE_PERMANENT` PERMANENTE a esa stat para todos los que la tienen; confirma con `canjeBuff` y re-renderiza. |
 | `themeHeader(tema)` | Cabecera de temática (icono/color fijos) de los modales de evento/conflicto. |
 | `showDayEvent(ev)` | Modal del evento inevitable del día (ya aplicado por el motor), con su badge de rareza coloreado (`RARITIES`). |
@@ -510,6 +519,10 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
   **`--action=<id|grupo>`** fija la Acción del Día (`entrenar`, `recuperar`, `tactica`…) para
   **comparar estrategias** y auditar el "no dominant strategy" del Bible (con el flag no se
   toman oportunidades). `--nocanje` apaga el canje para aislar su efecto.
+  Desde F1 elige la **filosofía al azar** al nacer la run y el foco de la Sesión Táctica
+  también al azar — mide el **PISO** de la mecánica, no el techo. Los 5 focos se **colapsan a
+  uno por día** en el sorteo de acciones: si entraran los 5, la táctica pasaría de ~1/5 a ~5/9
+  de los días y la comparación con los baselines quedaría envenenada.
   OJO — el smoke **decide como decidiría alguien**, no al bulto: el **Team Bonding** solo entra
   al menú con la moral ≤40 (vestuario caldeado). Ofrecerlo siempre modelaba a un DT que quema
   días subiendo moral que ya estaba bien y hundía la medición −2.5pp aun siendo gratis (mismo

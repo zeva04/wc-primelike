@@ -7,9 +7,11 @@
    - Entrenar sube una stat (+1 hasta el próximo partido) pero
      CANSA (−5 de energía a todo el plantel).
    - Recuperar devuelve energía pero no mejora a nadie.
-   - La Sesión Táctica da un bonus de equipo (atk y def) solo
-     para el próximo partido — es el gancho donde después se
-     enchufa la Filosofía.
+   - La Sesión Táctica elige un FOCO de arista (como Entrenar
+     elige stat) y suma +1 a esa arista de la identidad (arco de
+     Filosofía F1; el viejo buff atk/def MURIÓ por decisión PO:
+     la táctica ya no compra poder inmediato — construye la
+     filosofía, que sesga qué fútbol genera el partido).
 
    El CANJE (regla en game/day-action.js) cierra el círculo: un
    boost de entrenamiento acumulado hasta +CANJE_THRESHOLD en una
@@ -23,6 +25,7 @@
    `group: "entrenar"` agrupa los focos de entrenamiento en la UI.
    ============================================================ */
 import { clamp } from "../core/math.js";
+import { ARISTAS } from "./philosophies.js";
 
 // +1 y no +5: el entrenamiento es elegible (siempre apunta donde quieres),
 // los eventos de ±5 no. Elegible > aleatorio a igual magnitud. El PO lo bajó
@@ -42,14 +45,14 @@ export const BONDING_FATIGUE = 5;
 export const CANJE_THRESHOLD = 4;
 export const CANJE_PERMANENT = 1;
 // Stats reales que admiten canje: las de campo + las de arquero. Los buffs que NO son
-// stats (tactica, penales, antiLesion) nunca se canjean.
+// stats (penales, antiLesion) nunca se canjean.
 export const CANJEABLE_STATS = ["tiro", "defensa", "cabezazo", "pase", "aura", "atajadas", "reflejos", "salidas"];
 // Etiquetas de stat para la UI y el diario (fuente única; la UI del hub las reusa).
 export const STAT_LABELS = { tiro: "Tiro", defensa: "Defensa", cabezazo: "Cabezazo", pase: "Pase", aura: "Aura", atajadas: "Atajadas", reflejos: "Reflejos", salidas: "Salidas" };
-// Bonus táctico en escala de poder ~0-5 (docs/CORE.md §5): +0.1 a atk y def.
-// Un foco de entrenamiento (+1 de stat) mueve el poder ~+0.02: la táctica pesa más
-// por partido, pero se reparte en ambas fases y sin costo de energía — ninguna domina.
-export const TACTICS_BONUS = 0.1;
+// Sesión Táctica reformada (F1): +1 a la arista del foco elegido. Sin costo de
+// energía — su costo es el de siempre: el día no fue ni a entrenar ni a recuperar,
+// y el retorno ya no es inmediato (el sesgo del pool crece con el nivel).
+export const ARISTA_FOCUS = 1;
 
 const tire = r => r.squad.forEach(p => p.energia = clamp(p.energia - TRAIN_FATIGUE, 5, 100));
 
@@ -82,12 +85,16 @@ export const DAY_ACTIONS = [
     desc: `+${RECOVER_ENERGY} de energía para todo el plantel`,
     effect: (r, m = 1) => r.squad.forEach(p => p.energia = clamp(p.energia + Math.round(RECOVER_ENERGY * m), 5, 100)),
   },
-  {
-    id: "tactica", icon: "📋", label: "Sesión táctica",
-    title: "Sesión táctica",
-    desc: "El equipo llega mejor plantado al próximo partido (bonus de ataque y defensa)",
-    effect: (r, m = 1) => { r.buffs.tactica = +((r.buffs.tactica || 0) + TACTICS_BONUS * m).toFixed(2); },
-  },
+  // Los 5 focos de la Sesión Táctica (F1): uno por arista, generados desde el
+  // catálogo de content/philosophies. Muta run.aristas con primitivas (§4, como
+  // la moral); acepta fracciones (los modificadores del día ×2/×½ escalan igual
+  // que siempre, y la progresión por ejecución también suma en decimales).
+  ...ARISTAS.map(a => ({
+    id: `tactica_${a.id}`, group: "tactica", icon: a.icon, label: a.label,
+    title: `Sesión táctica: ${a.label}`,
+    desc: `+${ARISTA_FOCUS} a ${a.label} (${a.desc}) — la identidad del equipo progresa`,
+    effect: (r, m = 1) => { r.aristas = r.aristas || {}; r.aristas[a.id] = +((r.aristas[a.id] || 0) + ARISTA_FOCUS * m).toFixed(2); },
+  })),
   {
     // El contenido muta la moral con primitivas + clamp, SIN importar game/ (ARQUITECTURA §4):
     // mismo patrón que los eventos anímicos de prep-events (pais_ilusionado / critica_demoledora).
