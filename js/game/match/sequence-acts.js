@@ -14,14 +14,18 @@
 import { rnd, pick } from "../../core/rng.js";
 import { playedPos } from "../ratings.js";
 import { sequenceType } from "../../content/sequences.js";
-import { protMomentum, noteFiloHit } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
+import { protMomentum, noteFiloHit, filoRasgo } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
+
+// El plan de actos de la secuencia: el propio si lo tiene (rasgo de Posesión:
+// un acto más de circulación, lo arma startSequence) o el del catálogo.
+const planOf = s => s.plan || s.type.plan;
 import * as A from "./actions.js";
 import { goalMine, goalOpp, myPenalty, lastManChance } from "./chances.js";
 
 /** Crea la decisión del acto actual según su `kind`. Las opciones son reglas (mapean a
  *  Football Actions); el flavor viene del tipo. */
 export function buildActDecision(m) {
-  const s = m.seq, kind = s.type.plan[s.actIdx];
+  const s = m.seq, kind = planOf(s)[s.actIdx];
   const opts = {
     build: () => ({
       title: `⚡ min ${m.min}' — Circulación: ${s.prot.name} tiene la pelota`,
@@ -131,7 +135,7 @@ function passTo(m, s) {
 export function resolveSequenceAct(m, key) {
   const s = m.seq;
   m.decision = null;
-  const kind = s.type.plan[s.actIdx];
+  const kind = planOf(s)[s.actIdx];
   const f = s.type.flavor;
 
   if (kind === "build") {
@@ -176,7 +180,8 @@ export function resolveSequenceAct(m, key) {
     const total = key === "total";
     const r = A.actContain(m, mine, { press: total, bonus: 0.10 });
     if (!r.ok) return maybeCounter(m, `min ${m.min}' — ${f.pressFail}`, total);
-    s.bonus += total ? 0.15 : 0.05;
+    // Rasgo del High Press consolidado (F2): la presión total roba en zona AÚN más letal.
+    s.bonus += (total ? 0.15 : 0.05) + (total && filoRasgo(m, "press") ? 0.05 : 0);
     m.log("event", `min ${m.min}' — ${f.pressOk}`);
     if (total) dtOk(m);
     return escalate(m);
@@ -269,15 +274,17 @@ export function resolveSequenceAct(m, key) {
     const t = sequenceType("transicion");
     const cands = m.activeMine().filter(p => p.pos !== "POR");
     const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
-    // misma secuencia, ahora es MI contra; el que rompió la presión asiste si esto termina en gol
-    m.seq = { type: t, prot, actIdx: 0, bonus: 0.04, assistFrom: s.prot };
+    // misma secuencia, ahora es MI contra; el que rompió la presión asiste si esto termina
+    // en gol. La conversión también es una transición: el rasgo del Contra aplica (F2).
+    m.seq = { type: t, prot, actIdx: 0, bonus: 0.04 + (filoRasgo(m, "contra") ? 0.04 : 0), assistFrom: s.prot };
     buildActDecision(m);
     return false;
   }
 
   if (kind === "contain") {
     const { mine } = m.powers();
-    const r = A.actContain(m, mine, { press: key === "presionar" });
+    // Rasgo del Bloque bajo consolidado (F2): el repliegue contiene mejor — la muralla.
+    const r = A.actContain(m, mine, { press: key === "presionar", bonus: filoRasgo(m, "bloque") ? 0.05 : 0 });
     if (r.ok) { const out = closeSeq(m, "event", `min ${m.min}' — 🧱 ${f.containOk}`); if (r.press) dtOk(m); return out; }
     if (r.press) s.bonus = 0.05; // presión fallida: el rival queda mejor perfilado
     m.log("chance", `min ${m.min}' — ${f.containFail(m.oppTeam)}`);
@@ -314,8 +321,8 @@ function escalate(m) {
   // acierto alimenta la progresión por ejecución (F1).
   noteFiloHit(m);
   s.actIdx++;
-  if (s.actIdx >= s.type.plan.length) return closeSilent(m);
-  if (AUTO_ACTS.has(s.type.plan[s.actIdx])) return resolveSequenceAct(m, null);
+  if (s.actIdx >= planOf(s).length) return closeSilent(m);
+  if (AUTO_ACTS.has(planOf(s)[s.actIdx])) return resolveSequenceAct(m, null);
   buildActDecision(m);
   return false;
 }

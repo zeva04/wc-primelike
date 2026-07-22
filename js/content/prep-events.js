@@ -32,7 +32,8 @@
    ============================================================ */
 import { clamp } from "../core/math.js";
 import { pick } from "../core/rng.js";
-import { addFiloProgress } from "./philosophies.js";
+import { addFiloProgress, addFirmaProgress, getPhilosophy, filoLevelOf } from "./philosophies.js";
+import { STAT_LABELS } from "./day-actions.js";
 
 const buff = (r, k, v) => { r.buffs[k] = (r.buffs[k] || 0) + v; };
 const energia = (r, v) => r.squad.forEach(p => p.energia = clamp(p.energia + v, 5, 100));
@@ -50,7 +51,14 @@ export const PREP_EVENTS = [
   { id: "descanso",   rareza: "comun", tema: "fisico",        icon: "😴", title: "Jornada de recuperación",       tipo: "buff",   desc: "+20 de energía para todo el plantel.",
     teaser: "El plan del día huele a siesta, pileta y masajes.",                         effect: r => energia(r, 20) },
   { id: "lluvia",     rareza: "comun", tema: "fisico",        icon: "🌧️", title: "Entrenamiento pasado por agua", tipo: "debuff", desc: "−10 de energía para todo el plantel.",
-    teaser: "El pronóstico no pinta bien: nubes negras sobre la concentración.",         effect: r => energia(r, -10) },
+    teaser: "El pronóstico no pinta bien: nubes negras sobre la concentración.",
+    // Evento × filosofía (F3, Bible §4.5): la lluvia castiga distinto según tu fútbol —
+    // el Press corre en el barro y la cancha pesada le corta el toque a la Posesión.
+    effect: r => {
+      energia(r, -10);
+      if (r.filoId === "press") { energia(r, -5); return "El barro castiga doble al que presiona: −15 de energía para el plantel."; }
+      if (r.filoId === "posesion") { buff(r, "pase", -3); return "−10 de energía, y la cancha pesada le corta el toque a tu idea: −3 de Pase el próximo partido."; }
+    } },
   { id: "molestias",  rareza: "comun", tema: "fisico",        icon: "🤕", title: "Molestias en la zaga",          tipo: "debuff", desc: "−5 de Defensa para el próximo partido.",
     teaser: "Se ven vendas y bolsas de hielo saliendo de la enfermería.",                effect: r => buff(r, "defensa", -5) },
   { id: "nervios",    rareza: "comun", tema: "vestuario",     icon: "😰", title: "Nervios previos",               tipo: "debuff", desc: "−5 de Aura para el próximo partido.",
@@ -88,6 +96,25 @@ export const PREP_EVENTS = [
     desc: "El cambio de huso horario desarmó el sueño del plantel: hoy Recuperar rinde la mitad.",
     teaser: "Media concentración amaneció mirando el techo a las cuatro de la mañana.",
     mod: { mods: { recuperar: 0.5 }, desc: "Recuperar rinde la mitad hoy" }, effect: () => {} },
+  // ---------- F3: eventos de FILOSOFÍA (leen la identidad de la run) ----------
+  { id: "prensa_bautiza", rareza: "infrecuente", tema: "entorno", icon: "📰", title: "La prensa bautiza tu estilo", tipo: "buff",
+    desc: "Los medios le ponen nombre a tu fútbol: si la idea ya camina, el grupo se agranda (+8 de Moral); si aún no se nota, se burlan (−5 de Aura).",
+    teaser: "Un columnista prepara una nota grande sobre la identidad del equipo.",
+    effect: r => {
+      const f = getPhilosophy(r.filoId);
+      if (f && filoLevelOf(r) >= 1) { r.moral = clamp((r.moral ?? 50) + 8, 1, 100); return `"${f.name}" ya es marca registrada: la prensa aplaude la idea y el grupo se agranda (+8 de Moral).`; }
+      buff(r, "aura", -5);
+      return "La nota salió con sorna: el proyecto todavía no se ve en la cancha (−5 de Aura el próximo partido).";
+    } },
+  { id: "ensayo_firma", rareza: "infrecuente", tema: "entrenamiento", icon: "🎬", title: "Ensayo de la jugada firma", tipo: "buff",
+    desc: "La mañana entera dedicada a TU fútbol: +0.5 a la arista firma y un plus en la stat que ese fútbol trabaja.",
+    teaser: "El cuerpo técnico montó la práctica de hoy alrededor de una sola jugada.",
+    effect: r => {
+      const a = addFirmaProgress(r, 0.5);
+      if (!a) { buff(r, "pase", 3); return "Sin una idea instalada, el ensayo quedó en fundamentos: +3 de Pase el próximo partido."; }
+      buff(r, a.stat, 3);
+      return `Cien repeticiones de lo nuestro: +0.5 de ${a.label} y +3 de ${STAT_LABELS[a.stat]} para el próximo partido.`;
+    } },
   { id: "toque_seda",  rareza: "infrecuente", tema: "entrenamiento", icon: "🎩", title: "Toque de seda",            tipo: "buff",   desc: "+8 de Pase para el próximo partido.",
     teaser: "Los ayudantes arman circuitos de pases en espacios reducidos.",             effect: r => buff(r, "pase", 8) },
   { id: "banderazo",   rareza: "infrecuente", tema: "entorno",       icon: "🥁", title: "Banderazo de la hinchada", tipo: "buff",   desc: "+8 de Aura para el próximo partido.",
@@ -123,7 +150,20 @@ export const PREP_EVENTS = [
   { id: "ola_calor",     rareza: "rara", tema: "fisico",        icon: "🥵", title: "Ola de calor", tipo: "debuff",
     desc: "−15 de energía para todo el plantel, y hoy Recuperar rinde la mitad.",
     teaser: "El termómetro amenaza con romper récords hoy.",
-    mod: { mods: { recuperar: 0.5 }, desc: "Recuperar rinde la mitad hoy" }, effect: r => energia(r, -15) },
+    mod: { mods: { recuperar: 0.5 }, desc: "Recuperar rinde la mitad hoy" },
+    // Evento × filosofía (F3): correr arriba con 40 grados es doble castigo para el Press.
+    effect: r => {
+      energia(r, -15);
+      if (r.filoId === "press") { energia(r, -5); return "−20 de energía para el plantel: presionar bajo este sol es un suplicio."; }
+    } },
+  { id: "visita_maestro", rareza: "rara", tema: "entrenamiento", icon: "🎓", title: "Visita del maestro de tu escuela", tipo: "buff",
+    desc: "Un ídolo de tu filosofía pasa el día con el equipo: +1 a la arista firma de tu identidad.",
+    teaser: "Corre el rumor de que hoy llega una eminencia del fútbol que juega el equipo.",
+    effect: r => {
+      const a = addFirmaProgress(r, 1);
+      if (!a) { buff(r, "aura", 5); return "Sin una idea declarada, la visita quedó en anécdota inspiradora: +5 de Aura el próximo partido."; }
+      return `El maestro habló el idioma de la casa: +1 de ${a.label} — la identidad se profundiza.`;
+    } },
   { id: "critica_demoledora", rareza: "rara", tema: "entorno", icon: "🗞️", title: "Crítica demoledora", tipo: "debuff",
     desc: "−8 de Moral, y la presión alcanza a tu figura del momento.",
     teaser: "Una pluma famosa prepara una columna venenosa sobre el equipo.",

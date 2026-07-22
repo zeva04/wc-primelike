@@ -34,7 +34,8 @@ import { clamp } from "../../core/math.js";
 import { playedPos } from "../ratings.js";
 import { moraleBand } from "../morale.js";
 import { SEQUENCE_TYPES } from "../../content/sequences.js";
-import { FIRMA_TYPE, FILO_LEVELS } from "../../content/philosophies.js";
+import { FIRMA_TYPE, FILO_LEVELS, getPhilosophy } from "../../content/philosophies.js";
+import { rivalFilo } from "../philosophy.js";
 import { buildActDecision } from "./sequence-acts.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
@@ -72,7 +73,11 @@ function seqPlan(m) {
   const { mine, opp } = m.powers();
   const edge = (mine.atk - opp.atk) + (mine.def - opp.def); // ~[-6, 6]
   const target = clamp(Math.round(4 + edge * 0.32 + ri(-1, 1) * 0.5), SEQ_MIN, SEQ_MAX);
-  m._seqPlan = { target, edge, prof: rivalProfile(m) };
+  // La identidad del RIVAL (F2, decisión PO #4): curada o derivada, es fija por
+  // partido — se cachea con el plan. El proxy de stats (prof) queda como BASE:
+  // la filosofía multiplica encima, no lo reemplaza (un bloque de élite sigue
+  // siendo más sólido que un bloque débil).
+  m._seqPlan = { target, edge, prof: rivalProfile(m), oppFilo: rivalFilo(m.oppTeam) };
   return m._seqPlan;
 }
 
@@ -85,7 +90,8 @@ function seqPlan(m) {
  * presionarle la salida. Lado opp (su iniciativa): su ataque genera repliegues, su intensidad
  * te presiona la salida, su juego aéreo vive del córner.
  */
-function typeWeights(m, side, prof) {
+function typeWeights(m, side, plan) {
+  const prof = plan.prof;
   const ment = m.my.mentalidad;
   // Contexto dinámico (A3, decisión #9): TODO se lee EN VIVO al generar, nunca se cachea
   // (seqPlan cachea target/edge/perfil; el partido —marcador, minuto, fatiga— cambia).
@@ -111,19 +117,82 @@ function typeWeights(m, side, prof) {
     salida_fondo: (0.8 + 2.5 * prof.def) * (tired ? 1.4 : 1),
     balon_parado_def: 0.8 + 1 * prof.cab,
   };
-  // [FILOSOFÍA → POOL] (F1, decisión PO #6): el tipo firma pesa ×1.35/×1.7/×2.1 según
-  // el nivel (Aprendiendo/Desarrollo/Consolidada). Llega por matchCtx como la moral
-  // ({id, nivel}: el Match no conoce la run) y se lee EN VIVO — el nivel es fijo en el
-  // partido, pero el multiplicador convive con marcador/fatiga/moral sin cachearse.
-  // Sesga UN tipo, no el reparto: el contexto dinámico de A3 sigue visible en el resto.
+  applyFiloWeights(m, side, w, plan.oppFilo);
+  // Memoria de secuencias: no repetir el mismo tipo dos veces seguidas (el partido varía).
+  if (m._lastSeqType && w[m._lastSeqType] !== undefined) w[m._lastSeqType] = 0;
+  return w;
+}
+
+/* [MATRIZ DE COUNTERS] (F2, decisión PO #7 — celdas aprobadas 22-jul): "mi filo|su filo"
+   → multiplicadores sobre el pool del lado indicado. Direccionales del roadmap: mi Press
+   brilla contra Posesión · mi Posesión se estrella contra Bloque (pelotazo forzado) · mi
+   Contra vive del rival con iniciativa y muere contra el que también espera · mi Bloque
+   sufre al que elabora (te sitian: más repliegues en tu área). */
+const MATRIX = {
+  mine: {
+    "press|posesion": { recuperacion: 1.4 },
+    "posesion|bloque": { circulacion: 0.65, pelotazo: 1.3 },
+    "contra|press": { transicion: 1.35 }, "contra|posesion": { transicion: 1.35 },
+    "contra|contra": { transicion: 0.6 }, "contra|bloque": { transicion: 0.6 },
+  },
+  opp: {
+    "bloque|posesion": { repliegue: 1.35 },
+  },
+};
+// La firma del RIVAL en el lado opp (su iniciativa, con SU nivel como magnitud): el que
+// presiona te asfixia la salida; el que quiere la pelota te sitia. Contra y Bloque no
+// suman tipos: CEDEN pelota (filoShareShift) — y el Bloque vive del córner (celda fija).
+const RIVAL_FIRMA_OPP = { press: "salida_fondo", posesion: "repliegue" };
+
+/**
+ * Todo el sesgo de FILOSOFÍA sobre el pool en un solo lugar (F1 + F2; extraído para que
+ * typeWeights no se vuelva sopa — riesgo registrado del arco): mi firma por nivel
+ * (×1.35/×1.7/×2.1, F1) · la matriz de counters mía×rival · la firma rival por SU nivel.
+ * Muta `w` in place. Todo se lee EN VIVO al generar (nada cacheado salvo oppFilo, fijo).
+ */
+function applyFiloWeights(m, side, w, oppFilo) {
   const filo = m.my.filo;
+  // F1 — mi tipo firma pesa por mi nivel (llega por matchCtx, como la moral)
   if (filo) {
     const t = FIRMA_TYPE[filo.id];
     if (w[t] !== undefined && w[t] > 0) w[t] *= FILO_LEVELS[filo.nivel]?.mult || 1;
   }
-  // Memoria de secuencias: no repetir el mismo tipo dos veces seguidas (el partido varía).
-  if (m._lastSeqType && w[m._lastSeqType] !== undefined) w[m._lastSeqType] = 0;
-  return w;
+  // F2 — matriz de counters (solo si ambos tienen identidad; el rival siempre tiene)
+  if (filo && oppFilo) {
+    const cell = MATRIX[side][`${filo.id}|${oppFilo.id}`];
+    if (cell) for (const k of Object.keys(cell)) { if (w[k] !== undefined) w[k] *= cell[k]; }
+  }
+  // F2 (ajuste PO tras el gate: el Bloque medía −5.5pp con puros palos) — el arma
+  // propia del Bloque: el balón parado ES su gol (el scouting ya lo decía). No es
+  // celda de matriz: es su fortaleza incondicional, como la firma.
+  if (filo?.id === "bloque" && side === "mine") w.balon_parado *= 1.3;
+  // F2 — la firma rival sesga SU lado, con su nivel como magnitud
+  if (oppFilo && side === "opp") {
+    const t = RIVAL_FIRMA_OPP[oppFilo.id];
+    if (t && w[t] !== undefined) w[t] *= FILO_LEVELS[oppFilo.nivel]?.mult || 1;
+    if (oppFilo.id === "bloque") { w.balon_parado_def *= 1.3; w.salida_fondo *= 0.6; }
+  }
+}
+
+/**
+ * Cuánto inclina la FILOSOFÍA el reparto de iniciativa (F2, costos de identidad):
+ * mi Contra cede posesión (−0.05) y mi Bloque cede volumen ofensivo (−0.08 — era
+ * −0.10, ajuste PO tras medir el gate: el Bloque cargaba −5.5pp de piso); el
+ * rival que espera me la cede a mí (contra +0.04 · bloque +0.06). Posesión y
+ * Press no tocan el reparto (sus costos son la matriz y la energía). Puro.
+ */
+export function filoShareShift(myFilo, oppFilo) {
+  let d = 0;
+  if (myFilo?.id === "contra") d -= 0.05;
+  if (myFilo?.id === "bloque") d -= 0.08;
+  if (oppFilo?.id === "contra") d += 0.04;
+  if (oppFilo?.id === "bloque") d += 0.06;
+  return d;
+}
+
+/** ¿Tengo el RASGO de esta filosofía activo? (F2: Consolidada = nivel 2, decisión PO #6). */
+export function filoRasgo(m, filoId) {
+  return m.my.filo?.id === filoId && m.my.filo.nivel >= 2;
 }
 
 /**
@@ -157,10 +226,11 @@ export function maybeStartSequence(m) {
   // repliega (−0.05, el rival empuja), y cada expulsado inclina la cancha (±0.06).
   const late = m.min >= 75 ? (m.gMy < m.gOpp ? 0.07 : m.gMy > m.gOpp ? -0.05 : 0) : 0;
   const reds = 0.06 * (m.oppLineup.filter(p => p.expulsado).length - m.my.lineup.filter(p => p.expulsado).length);
-  const mineShare = clamp(0.5 + plan.edge * 0.045 + mentShift + late + reds, 0.3, 0.72);
+  // F2: las identidades que esperan CEDEN iniciativa (mi Contra/Bloque; el rival igual)
+  const mineShare = clamp(0.5 + plan.edge * 0.045 + mentShift + late + reds + filoShareShift(m.my.filo, plan.oppFilo), 0.3, 0.72);
   const side = rnd() < mineShare ? "mine" : "opp";
   const pool = SEQUENCE_TYPES.filter(t => t.side === side);
-  const w = typeWeights(m, side, plan.prof);
+  const w = typeWeights(m, side, plan);
   startSequence(m, m._weightedPick(pool, pool.map(t => w[t.id] ?? 1)));
   return true;
 }
@@ -176,7 +246,15 @@ export function startSequence(m, type) {
     // Momento → protagonista (decisión #15): ver protMomentum.
     const prot = m._weightedPick(cands, cands.map(p => (type.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
     m.seq = { type, prot, actIdx: 0, bonus: 0 };
-    m.log("event", `${type.icon} min ${m.min}' — ${type.flavor.intro(prot)}`);
+    // RASGOS de Consolidada (F2, decisión PO #6): el Contra saca transiciones con mejor
+    // perfil de remate; la Posesión gana UN acto más de circulación (plan propio de la
+    // secuencia — sequence-acts lee s.plan || s.type.plan). Chicos y visibles jugando.
+    if (type.id === "transicion" && filoRasgo(m, "contra")) m.seq.bonus += 0.04;
+    if (type.id === "circulacion" && filoRasgo(m, "posesion")) m.seq.plan = ["build", ...type.plan];
+    // [RELATO CON IDENTIDAD] (F3): cuando la secuencia es MI tipo firma, la narra la
+    // filosofía ("el pressing que entrenamos toda la semana") en vez del intro genérico.
+    const filoIntros = m.my.filo && FIRMA_TYPE[m.my.filo.id] === type.id ? getPhilosophy(m.my.filo.id).firmaIntros : null;
+    m.log("event", `${type.icon} min ${m.min}' — ${filoIntros ? pick(filoIntros)(prot) : type.flavor.intro(prot)}`);
   } else {
     // El atacante rival: en un córner en contra manda su mejor cabeceador; si no, un DEL/MED.
     const alive = m.oppLineup.filter(p => !p.expulsado);

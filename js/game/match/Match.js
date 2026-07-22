@@ -195,6 +195,9 @@ export class Match {
       tired: act.reduce((s, p) => s + p.energia, 0) / Math.max(1, act.length) < 55,
       band: moraleBand(this.my.moral ?? 50).id,
       net: this.flow().net,
+      // El ambiente lee la FILOSOFÍA (F3): id y nivel de matchCtx.filo, null sin identidad
+      filo: this.my.filo?.id ?? null,
+      filoLvl: this.my.filo?.nivel ?? 0,
     };
     const pool = AMBIENT_LINES.filter(l => l.when(ctx));
     return this._weightedPick(pool, pool.map(l => l.w)).text(this);

@@ -29,10 +29,10 @@ function finishMatch() {
   avanzando = false;
   closeModal();
   stopTimer();
-  const { res, advanced, momentum, morale } = closeMatch(S.run, S.match);
+  const { res, advanced, momentum, morale, filoExec, filoCost } = closeMatch(S.run, S.match);
   // Tras la FINAL no hay más ronda que mostrar: directo al desenlace (campeón o eliminado).
   if (S.run.stage === "final") { routeAdvance(advanced); return; }
-  renderPostMatch(res, advanced, momentum, morale);
+  renderPostMatch(res, advanced, momentum, morale, { filoExec, filoCost });
 }
 
 /**
@@ -50,7 +50,26 @@ function finishMatch() {
  */
 const esDecaimiento = m => m.reasons.length > 0 && m.reasons.every(r => r.text.startsWith("No sumó minutos"));
 
-function analisisCard(momentum, morale) {
+/**
+ * El bloque de IDENTIDAD del análisis (F3): la progresión por ejecución que reportó el
+ * cierre (jugar tu fútbol y que salga te consolida — Bible §5) y el costo físico del
+ * Press si lo hubo. Nada que reportar → "" (sin ruido: el bloque solo habla si pasó algo).
+ */
+function filoBlock(filo) {
+  if (!filo || (!filo.filoExec && !filo.filoCost)) return "";
+  const exec = filo.filoExec
+    ? `<div class="text-[11px] text-slate-300">⚽ Jugaste tu fútbol y salió: <b class="text-emerald-400">+${filo.filoExec.add} de ${filo.filoExec.arista.label}</b> <span class="text-slate-500">(${filo.filoExec.hits} acierto${filo.filoExec.hits > 1 ? "s" : ""} de tu jugada firma)</span></div>`
+    : `<div class="text-[11px] text-slate-500">La jugada firma no salió hoy: la identidad no progresó en la cancha.</div>`;
+  const cost = filo.filoCost
+    ? `<div class="text-[11px] text-amber-400/90 mt-0.5">🏃 El pressing pasó factura: −${-filo.filoCost.press} de energía extra a los ${filo.filoCost.jugadores} que corrieron.</div>`
+    : "";
+  return `<div class="rounded-xl border border-slate-700 bg-slate-900/60 p-3 mb-3">
+    <div class="text-sm font-semibold mb-1">🧭 Identidad</div>
+    ${exec}${cost}
+  </div>`;
+}
+
+function analisisCard(momentum, morale, filo) {
   const all = (momentum || []).filter(m => m.delta !== 0 || m.reasons.length);
   const moved = all.filter(m => !esDecaimiento(m));
   const frios = all.filter(esDecaimiento);
@@ -69,6 +88,7 @@ function analisisCard(momentum, morale) {
   return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
     <h3 class="font-bold flex items-center gap-2">🧠 Análisis del cuerpo técnico</h3>
     <p class="text-[11px] text-slate-500 mt-0.5 mb-3">Cómo movió el partido el ánimo del plantel.</p>
+    ${filoBlock(filo)}
     ${moraleBlock}
     <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">Momento de los jugadores</div>
     ${moved.length ? `<div class="space-y-2.5">${moved.map(m => `
@@ -112,14 +132,14 @@ function friosBlock(frios) {
  * Momento). En fase de grupos va a 2 columnas (tabla del grupo + análisis); en
  * eliminatorias, a UNA columna centrada — sin celdas vacías ocupando espacio.
  */
-function renderPostMatch(res, advanced, momentum, morale) {
+function renderPostMatch(res, advanced, momentum, morale, filo) {
   const run = S.run, match = S.match;
   const me = getTeam(run.teamId), opp = match.oppTeam;
   const won = res.winner === "my";
   const pensTxt = res.pens ? ` (${res.pens.myGoals}-${res.pens.oppGoals} en penales)` : "";
   const headline = won ? "🎉 ¡VICTORIA!" : res.winner === "opp" ? "😞 Derrota" : "🤝 Empate";
   const myScorers = match.scorers.map(s => `⚽ ${s.name} ${s.min}'`).join(" · ") || "Sin goles propios";
-  const analysis = analisisCard(momentum, morale);
+  const analysis = analisisCard(momentum, morale, filo);
 
   screenShell(`
     <div class="text-center mb-6 mt-4">

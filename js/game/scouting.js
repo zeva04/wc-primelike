@@ -21,6 +21,17 @@ import { getTeam } from "../data/teams-repo.js";
 import { playerOverall, teamFigure } from "./ratings.js";
 import { bestSix, expectedOpponentLineup } from "./opponents.js";
 import { teamPowers, gkQuality } from "./match/powers.js";
+import { rivalFilo } from "./philosophy.js";
+import { getPhilosophy, FILO_LEVELS } from "../content/philosophies.js";
+
+// La lectura táctica de cada identidad rival (F2): qué te propone y por dónde
+// se le entra — el "España quiere la pelota: presiónala o enciérrate" del roadmap.
+const FILO_SCOUT = {
+  posesion: "Quiere la pelota y te va a hacer correr detrás de ella: presiónale la salida o enciérrate y espera tu momento.",
+  press: "Te va a asfixiar la salida desde el minuto uno: salir jugando contra ellos es jugar con fuego — el pelotazo no es cobardía.",
+  contra: "Espera agazapado y vive de tus pérdidas: cada pelota regalada en campo rival vuelve convertida en puñalada.",
+  bloque: "Se encierra y revienta la pelota: derribar la muralla exige paciencia, y sus balones parados son su gol de vestuario.",
+};
 
 // Umbral en escala de poder (~0-5): ±0.25 ≈ 5 puntos de rating de diferencia
 const THRESHOLD = 0.25;
@@ -98,9 +109,16 @@ export function buildOpponentReport(run, oppId) {
   const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0).map(shadow);
   const myP = teamPowers(bestSix(available), "normal", {});
 
+  // La identidad del rival (F2): curada para los 16, derivada para el resto. El nivel
+  // sale de su jerarquía (los grandes llegan Consolidados) — el informe la NOMBRA
+  // porque es accionable: la matriz de counters premia elegir bien contra qué juegas.
+  const rf = rivalFilo(opp);
+  const rfData = getPhilosophy(rf.id);
+
   return {
     oppId,
     name: opp.name,
+    filosofia: { id: rf.id, name: rfData.name, icon: rfData.icon, nivel: FILO_LEVELS[rf.nivel].label, consolidada: rf.nivel === 2, detalle: FILO_SCOUT[rf.id] },
     lineas: {
       ataque: { nivel: nivel(oppP.atk - myP.def), detalle: DETALLE.ataque[nivel(oppP.atk - myP.def)] },
       defensa: { nivel: nivel(oppP.def - myP.atk), detalle: DETALLE.defensa[nivel(oppP.def - myP.atk)] },

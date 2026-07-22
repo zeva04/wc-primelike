@@ -49,6 +49,7 @@ export async function loadEngine() {
     import("../js/content/prep-events.js"),
     import("../js/content/sequences.js"),
     import("../js/content/philosophies.js"),
+    import("../js/content/team-philosophies.js"),
     import("../js/content/ambient.js"),
     import("../js/content/day-actions.js"),
     import("../js/content/daily-flavor.js"),

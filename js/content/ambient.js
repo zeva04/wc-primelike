@@ -9,7 +9,8 @@
 
    ctx: { min, late (>=75'), diff (gMy−gOpp), myReds, oppReds,
           tired (energía media <55), band (banda de Moral),
-          net (momentum últimos 15': mío − rival) }
+          net (momentum últimos 15': mío − rival),
+          filo (id de mi filosofía o null), filoLvl (0..2) — F3 }
 
    Agregar una línea = agregar una fila (cero lógica de sistema).
    ============================================================ */
@@ -39,4 +40,12 @@ export const AMBIENT_LINES = [
   // --- moral (los extremos se notan hasta en el trote) ---
   { when: c => c.band === "nubes", w: 2, text: () => "Se nota la confianza: la pelota corre sola." },
   { when: c => c.band === "suelo", w: 2, text: () => "Hay nervios en tu equipo: los pases no llegan al pie." },
+  // --- filosofía (F3): el ambiente lee la identidad — ctx.filo/filoLvl vía matchCtx ---
+  { when: c => c.filo === "press", w: 2, text: () => "Tu equipo achica en bloque: el rival no puede armar dos pases seguidos." },
+  { when: c => c.filo === "press" && c.tired, w: 3, text: () => "La presión pide piernas que ya no están: el bloque achica cada vez más abajo." },
+  { when: c => c.filo === "posesion", w: 2, text: () => "La pelota es tuya y el rival lo sabe: corre detrás de tu sombra." },
+  { when: c => c.filo === "contra", w: 2, text: () => "Tu equipo espera ordenado: cada pelota recuperada huele a contra." },
+  { when: c => c.filo === "bloque", w: 2, text: m => `${m.oppTeam.name} estrella olas contra tu área: la muralla aguanta.` },
+  { when: c => c.filoLvl === 2, w: 2, text: () => "El estilo ya es identidad: se nota en cada pelota dividida." },
+  { when: c => c.filoLvl === 0 && c.filo, w: 1, text: () => "La idea nueva todavía se piensa: al equipo le falta que salga sola." },
 ];

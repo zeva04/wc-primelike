@@ -29,6 +29,10 @@ const TEAM = args.team || null;
 // para COMPARAR ESTRATEGIAS y comprobar que ninguna domina (Bible §4.7: no dominant
 // strategy). Con el flag no se toman oportunidades: la comparación es entre acciones.
 const ACTION = args.action || null;
+// --filo=<id>: fija la FILOSOFÍA de todas las runs (press|posesion|contra|bloque) para
+// fotografiar cada identidad por separado (F2): separa el costo de una identidad del
+// ruido del azar. Sin el flag, se elige al azar (el PISO de siempre).
+const FILO = args.filo || null;
 
 let fails = 0;
 const assert = (cond, msg, ctx) => { if (!cond) { fails++; console.error("FAIL:", msg, ctx || ""); } };
@@ -104,7 +108,7 @@ function playRun(teamId) {
   assert(run.journal.length === 1, "el diario debe abrir con el sorteo");
   // Filosofía AL AZAR (F1): el smoke mide el PISO de la mecánica — un DT real elige
   // mirando su grupo y sus focos; acá nadie optimiza. No calibrar el techo con esto.
-  const filoElegida = E.choosePhilosophy(run, E.PHILOSOPHIES[Math.floor(Math.random() * E.PHILOSOPHIES.length)].id);
+  const filoElegida = E.choosePhilosophy(run, FILO || E.PHILOSOPHIES[Math.floor(Math.random() * E.PHILOSOPHIES.length)].id);
   assert(filoElegida && run.filoId === filoElegida.id, "la elección de filosofía queda en la run");
   let alive = true, champion = false, guard = 0;
   let oppSeen = 0, oppTaken = 0; // contabilidad paralela de oportunidades (audita run.stats)

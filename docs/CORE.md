@@ -360,7 +360,30 @@ pelota) · **cab** (su juego aéreo). `typeWeights` convierte ese perfil + la **
 VIVA: se lee al generar, cambiarla a mitad de partido cambia el fútbol que sale) en pesos por tipo:
 un rival que ataca te deja contras; un bloque invita al pelotazo; uno que quiere la pelota, a
 presionarle la salida; su intensidad te presiona a ti (salida_fondo) y su juego aéreo vive del
-córner. En F2, la filosofía real del rival reemplaza este proxy en el lado `opp`.
+córner. Desde F2 el proxy es la BASE y la **filosofía real del rival** multiplica encima
+(`rivalFilo`: curada para los 16 del roadmap — `content/team-philosophies`, con formación
+acorde vía `bestSixShaped` — y derivada determinista para el resto: débiles → bloque ·
+mediocampo con jerarquía → posesión · resto → contra; el Press no se infiere, solo curado.
+Nivel por jerarquía: r≥84 Consolidada · r≥78 En desarrollo · resto Aprendiendo).
+
+**[MATRIZ DE COUNTERS] (F2, decisión PO #7 — regla 4: sin build ganadora).** Celdas
+mía×rival sobre el pool (`MATRIX` + `applyFiloWeights`, extraída para que typeWeights no
+sea sopa): mi Press vs Posesión → recuperación ×1.4 · mi Posesión vs Bloque → circulación
+×0.65 y pelotazo ×1.3 (forzado) · mi Contra vs Press/Posesión → transición ×1.35, vs
+Contra/Bloque → ×0.6 (partido muerto) · mi Bloque vs Posesión → repliegue ×1.35 (te
+sitian). La firma rival sesga SU lado con SU nivel (press→salida_fondo ·
+posesión→repliegue · bloque→balón parado ×1.3 + salida ×0.6). Los **costos de identidad**:
+Press −6 de energía post-partido (`applyFiloCosts`) · Contra cede posesión (mineShare
+−0.05) · Bloque cede volumen ofensivo (−0.08) · el rival que espera te la cede a ti
+(contra +0.04 · bloque +0.06) · Posesión sin costo físico (su costo ES la matriz). El
+Bloque además tiene su ARMA propia: balón parado ×1.3 (ajuste PO tras el primer gate —
+medía −5.5pp de piso con puros palos; el córner es el gol del bloque). Los
+**rasgos de Consolidada** (míos; el rival consolidado ya muerde vía ×2.1 + matriz): Press
++0.05 al robo total · Posesión +1 acto de circulación (plan propio de la secuencia) ·
+Contra +0.04 al perfil de transición · Bloque +0.05 a la contención del repliegue.
+Verificado en diag (250 partidos/celda, nivel 2): cada celda mueve el share en su
+dirección sin tocar los goles (~1.4-1.8) — el caso extremo es Contra consolidado vs press
+rival: 58% de transiciones (vigilar si el relato se vuelve monotemático).
 
 **[FILOSOFÍA → POOL] (arco F1, decisión PO #6).** MI filosofía multiplica su **tipo firma**
 en `typeWeights`: **×1.35 / ×1.7 / ×2.1** según el nivel (Aprendiendo / En desarrollo /

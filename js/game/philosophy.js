@@ -17,7 +17,10 @@
    {id, nivel} (se arma en screens/match.js Y tests/smoke.js);
    el Match no conoce la run (ARQUITECTURA §3.2).
    ============================================================ */
-import { getPhilosophy, aristaById, FILO_LEVELS } from "../content/philosophies.js";
+import { getPhilosophy, aristaById, filoPointsOf, filoLevelOf } from "../content/philosophies.js";
+import { TEAM_PHILOSOPHIES } from "../content/team-philosophies.js";
+import { teamRating } from "./ratings.js";
+import { clamp } from "../core/math.js";
 import { addJournal } from "./journal.js";
 
 // Progresión por ejecución: cada ACIERTO de acto en una secuencia del tipo firma
@@ -28,20 +31,12 @@ import { addJournal } from "./journal.js";
 export const FILO_EXEC_GAIN = 0.25;
 export const FILO_EXEC_CAP = 2;
 
-/** Suma de las 2 aristas propias de la filosofía activa (0 sin filosofía). */
-export function filoPoints(run) {
-  const f = getPhilosophy(run.filoId);
-  if (!f) return 0;
-  return +f.aristas.reduce((s, k) => s + (run.aristas?.[k] || 0), 0).toFixed(2);
-}
+/** Suma de las 2 aristas propias de la filosofía activa (0 sin filosofía).
+ *  Delegado en content/philosophies desde F3 (el contenido también lo lee). */
+export const filoPoints = filoPointsOf;
 
 /** Índice del nivel actual en FILO_LEVELS (0 Aprendiendo · 1 En desarrollo · 2 Consolidada). */
-export function filoLevel(run) {
-  const pts = filoPoints(run);
-  let lvl = 0;
-  FILO_LEVELS.forEach((l, i) => { if (pts >= l.min) lvl = i; });
-  return lvl;
-}
+export const filoLevel = filoLevelOf;
 
 /** La filosofía para matchCtx: `{id, nivel}` o null — la frontera run→Match, como la moral. */
 export function filoCtx(run) {
@@ -85,6 +80,58 @@ export function changePhilosophy(run, filoId) {
     desc: `El día entero se fue en reinstalar ideas. Lo entrenado no se borra, pero la nueva identidad vive de ${f.aristas.map(k => aristaById(k).label).join(" y ")}.`,
   });
   return f;
+}
+
+/* ---------- El rival tiene identidad (F2, decisión PO #4) ---------- */
+
+/**
+ * Filosofía de un equipo RIVAL: los 16 curados por su fútbol real
+ * (content/team-philosophies) y el resto DERIVADA de sus datos, determinista y
+ * sin rng: los débiles se encierran (bloque), los equipos de mediocampo con
+ * jerarquía tocan (posesion), el resto espera y sale (contra — el fútbol
+ * default del que no manda). El Press derivado no existe: presionar 90' es una
+ * identidad demasiado específica para inferirla de stats — solo curado.
+ */
+export function derivePhilosophy(team) {
+  if (TEAM_PHILOSOPHIES[team.id]) return TEAM_PHILOSOPHIES[team.id];
+  const r = teamRating(team);
+  if (r <= 70) return "bloque";
+  const figs = team.players || team.figures || [];
+  if (r >= 78 && figs.filter(f => f.pos === "MED").length >= 2) return "posesion";
+  return "contra";
+}
+
+/**
+ * Nivel de identidad del rival, por jerarquía: los grandes llegan CONSOLIDADOS
+ * a su idea (decisión PO F2), los del medio en desarrollo, los chicos
+ * aprendiendo. Misma escala 0..2 que FILO_LEVELS (y mismos multiplicadores).
+ */
+export function rivalFiloLevel(team) {
+  const r = teamRating(team);
+  return r >= 84 ? 2 : r >= 78 ? 1 : 0;
+}
+
+/** La identidad rival completa para el Match y el scouting: {id, nivel, curated}. */
+export function rivalFilo(team) {
+  return { id: derivePhilosophy(team), nivel: rivalFiloLevel(team), curated: !!TEAM_PHILOSOPHIES[team.id] };
+}
+
+/**
+ * El costo físico de MI identidad (F2, decisión PO #7): el Press paga −6 de
+ * energía extra post-partido a los que jugaron (Bible lo exige: correr arriba
+ * los 90' pasa factura). Contra y Bloque pagan EN el partido (ceden posesión /
+ * volumen ofensivo, match/sequences.filoShareShift); Posesión no paga costo
+ * físico — su costo es la matriz. Lo llama flow.postMatchUpdate ANTES de su
+ * loop por jugador ("jugó" = la misma regla, pero los flags usado/sustituido
+ * se resetean en ese loop — cobrar después contaría mal a los suplentes).
+ * Devuelve {press: -6, jugadores} o null para el análisis del post-partido.
+ */
+export const PRESS_FATIGUE = 6;
+export function applyFiloCosts(run, match) {
+  if (run.filoId !== "press") return null;
+  const jugaron = run.squad.filter(p => match.my.lineup.includes(p) || p.usado || p.sustituido);
+  for (const p of jugaron) p.energia = clamp(p.energia - PRESS_FATIGUE, 5, 100);
+  return { press: -PRESS_FATIGUE, jugadores: jugaron.length };
 }
 
 /**

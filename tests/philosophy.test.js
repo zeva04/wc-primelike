@@ -98,15 +98,88 @@ assert(E.filoCtx(run).id === "press" && E.filoCtx(run).nivel === 2, "filoCtx via
   assert(E.applyFiloExecution({ ...r, filoId: null }, { filoHits: 5 }) === null, "sin filosofía no hay ejecución que contar");
 }
 
-// ---------- addFiloProgress (contenido) ----------
+// ---------- addFiloProgress / addFirmaProgress (contenido) ----------
 {
   const r = E.newRun("BRA");
   assert(E.addFiloProgress(r, 1) === null, "sin filosofía el contenido no regala progreso");
+  assert(E.addFirmaProgress(r, 1) === null, "tampoco a la firma (F3)");
   E.choosePhilosophy(r, "bloque");
   const a = E.addFiloProgress(r, 1);
   assert(a && a.id === "directo" && r.aristas.directo === 1, "en empate refuerza la arista firma", a?.id);
   const b = E.addFiloProgress(r, 0.5);
   assert(b && b.id === "solidez" && r.aristas.solidez === 0.5, "refuerza la arista más baja de la filosofía", b?.id);
+  const c = E.addFirmaProgress(r, 1);
+  assert(c && c.id === "directo" && r.aristas.directo === 2, "addFirmaProgress va DIRECTO a la firma aunque no sea la más baja (F3)", c?.id);
+}
+
+// ---------- F3: una sola fuente para puntos/nivel (content delega en game) ----------
+{
+  const r = E.newRun("BRA");
+  E.choosePhilosophy(r, "press");
+  r.aristas.presion = 3; r.aristas.verticalidad = 2;
+  assert(E.filoPointsOf(r) === E.filoPoints(r) && E.filoLevelOf(r) === E.filoLevel(r), "filoPointsOf/filoLevelOf (content) ≡ filoPoints/filoLevel (game)");
+  // los datos F3 del catálogo: counters y voces de la firma para el relato
+  for (const p of E.PHILOSOPHIES) {
+    assert(p.counters && p.counters.brilla.length > 15 && p.counters.sufre.length > 15, "counters cualitativos visibles (pantalla de identidad)", p.id);
+    assert(Array.isArray(p.firmaIntros) && p.firmaIntros.length >= 2 && p.firmaIntros.every(fn => typeof fn({ name: "X" }) === "string"), "voces de la firma para el relato", p.id);
+  }
+  for (const a of E.ARISTAS) assert(E.STAT_LABELS[a.stat], "cada arista trabaja una stat real (evento Ensayo de la firma)", a.id);
+}
+
+// ---------- F2: la identidad del rival (curación + derivación) ----------
+{
+  const IDS = Object.keys(E.TEAM_PHILOSOPHIES);
+  assert(IDS.length === 16, "los 16 curados del roadmap, ni uno más", IDS.length);
+  for (const id of IDS) {
+    const team = E.getTeam(id);
+    assert(team, "todo curado existe en la base de datos", id);
+    assert(E.PHILOSOPHIES.some(p => p.id === E.TEAM_PHILOSOPHIES[id]), "filosofía curada válida", id);
+    assert(E.getFormation(E.FILO_FORMATION[E.TEAM_PHILOSOPHIES[id]]), "formación curada válida", id);
+  }
+  assert(E.derivePhilosophy(E.getTeam("BRA")) === "contra", "el curado manda sobre la derivación (BRA)");
+  const rf = E.rivalFilo(E.getTeam("ESP"));
+  assert(rf.id === "posesion" && rf.nivel === 2 && rf.curated, "ESP: posesión consolidada curada", JSON.stringify(rf));
+  // Derivación determinista para los 48: siempre una filosofía válida, sin rng
+  for (const t of E.allTeams()) {
+    const d = E.derivePhilosophy(t);
+    assert(E.PHILOSOPHIES.some(p => p.id === d), "derivación válida para todos", `${t.id}=${d}`);
+    assert(E.rivalFiloLevel(t) >= 0 && E.rivalFiloLevel(t) <= 2, "nivel rival en rango", t.id);
+  }
+  // Los grandes llegan consolidados; los chicos, aprendiendo (decisión PO F2)
+  assert(E.rivalFiloLevel(E.getTeam("FRA")) === 2, "FRA consolidado");
+  assert(E.rivalFiloLevel(E.getTeam("CUW")) === 0, "Curazao aprendiendo");
+  // El Press derivado no existe: solo curado (presionar 90' no se infiere de stats)
+  for (const t of E.allTeams()) {
+    if (!E.TEAM_PHILOSOPHIES[t.id]) assert(E.derivePhilosophy(t) !== "press", "press solo curado", t.id);
+  }
+}
+
+// ---------- F2: formación curada en el once rival ----------
+{
+  const lineup = E.genOpponentLineup(E.getTeam("SWE"));
+  const defs = lineup.filter(p => p.pos === "DEF").length;
+  assert(lineup.length === 6, "SWE forma 6");
+  assert(defs >= 2, "el bloque de SWE presenta una zaga poblada (3-1-1, con fallback si el plantel no da)", `DEF=${defs}`);
+  const esp = E.genOpponentLineup(E.getTeam("ESP"));
+  assert(esp.filter(p => p.pos === "MED").length >= 2, "la posesión de ESP puebla el medio (1-3-1)", esp.map(p => p.pos).join(","));
+}
+
+// ---------- F2: costos de identidad ----------
+{
+  const r = E.newRun("BRA");
+  E.choosePhilosophy(r, "press");
+  const lineup = r.squad.slice(0, 6);
+  const antesE = lineup.map(p => p.energia);
+  const res = E.applyFiloCosts(r, { my: { lineup } });
+  assert(res && res.press === -E.PRESS_FATIGUE && lineup.every((p, i) => p.energia === antesE[i] - E.PRESS_FATIGUE), "el Press paga −6 post-partido a los que jugaron");
+  assert(r.squad.slice(6).every(p => p.energia === 100), "los que no jugaron no pagan");
+  r.filoId = "posesion";
+  assert(E.applyFiloCosts(r, { my: { lineup } }) === null, "solo el Press paga energía");
+  // Contra/Bloque ceden posesión; el rival que espera me la cede a mí
+  assert(E.filoShareShift({ id: "contra" }, null) === -0.05, "mi Contra cede posesión");
+  assert(E.filoShareShift({ id: "bloque" }, { id: "posesion" }) === -0.08, "mi Bloque cede volumen (−0.08, ajuste PO post-gate)");
+  assert(E.filoShareShift(null, { id: "bloque" }) === 0.06, "el bloque rival me cede la pelota");
+  assert(E.filoShareShift({ id: "press" }, { id: "press" }) === 0, "el Press no toca el reparto (paga energía)");
 }
 
 console.log(`\nphilosophy: ${checks} checks · fallos: ${fails}`);

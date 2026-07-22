@@ -23,7 +23,7 @@ for (const [id, t] of Object.entries(RARITIES)) {
 }
 
 // ---------- PREP_EVENTS: esquema ----------
-assert(PREP_EVENTS.length === 34, `hay 34 eventos (hay ${PREP_EVENTS.length})`);
+assert(PREP_EVENTS.length === 37, `hay 37 eventos (hay ${PREP_EVENTS.length})`);
 const ids = new Set();
 const perTier = Object.fromEntries(tierIds.map(t => [t, 0]));
 const MOD_KEYS = new Set(["entrenar", "recuperar", "tactica"]);
@@ -47,8 +47,8 @@ for (const ev of PREP_EVENTS) {
   perTier[ev.rareza]++;
 }
 for (const t of tierIds) assert(perTier[t] > 0, "cada rareza tiene al menos un evento", t);
-assert(perTier.comun === 10 && perTier.infrecuente === 11 && perTier.rara === 8 && perTier.legendaria === 5,
-  "distribución 10/11/8/5 por rareza (el Sprint 4 sumó el jet lag)", JSON.stringify(perTier));
+assert(perTier.comun === 10 && perTier.infrecuente === 13 && perTier.rara === 9 && perTier.legendaria === 5,
+  "distribución 10/13/9/5 por rareza (F3 sumó los 3 eventos de filosofía)", JSON.stringify(perTier));
 
 // ---------- PREP_EVENTS: aplicar cada efecto contra una run fresca ----------
 const anyPlayable = "BRA";

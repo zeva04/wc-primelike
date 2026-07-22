@@ -115,7 +115,33 @@ del Día; las aristas persisten).
   pool → mide SOLO el rebalance de acciones (va a moverse: la táctica era la acción más
   fuerte, 33.3% del mixto); (b) + sesgo del pool → mide la filosofía. NO mezclar.
 
-### F2 — "El espejo" (el rival tiene identidad y la mecánica muerde)
+### F2 — "El espejo" (el rival tiene identidad y la mecánica muerde) ✅ CERRADO 22-jul-2026
+
+**Entregado completo** con las 4 decisiones del PO (matriz tal cual la propuesta · costos
+planos −6/−0.05/−0.08 · rasgos míos mecánicos + rival narrativo · los 16 curados
+aprobados). La curación vive en `content/team-philosophies.js` (BRA quedó Contragolpe: el
+de Ancelotti, no el del mito); la derivación es determinista (débiles→bloque · medio con
+jerarquía→posesión · resto→contra; el Press no se infiere) y el nivel va por jerarquía
+(r≥84 Consolidada). Formación acorde SOLO curados (`bestSixShaped`). El informe nombra la
+identidad rival y su nivel, con lectura táctica accionable.
+
+**Medición (gate vs 31.6 ±2pp):**
+- Primer gate: 28.8/29.1/30.9 → **29.6** (n=12000), clavado EN el límite. Con `--filo`
+  (flag nuevo del smoke) se aisló el lastre: **Bloque 26.1%** (−5.5pp) vs Posesión 34.4 ·
+  Contra 30.9 · Press 30.1 — el Bloque tenía puros palos (cesión −0.10, firma de peor EV,
+  su celda de matriz es su debilidad, rasgo recién en Consolidada) y ninguna fortaleza
+  mecánica propia.
+- **Ajuste PO**: su arma que faltaba — balón parado ×1.3 (el córner ES el gol del bloque,
+  el scouting ya lo decía) + cesión −0.10→−0.08.
+- **Gate final: 30.9/30.3 → 30.6 (n=8000), ADENTRO con holgura** (deriva −1.0pp). Bloque
+  27.6 (+1.5). Vigilancias obligadas: siempre-Recuperar 46.0 (estable) · spread BRA−CPV
+  25.4pp (baseline 25.6: la curación NO abrió la brecha) · KOR 23.7 (estable).
+- Diag de matriz (250 partidos/celda, nivel 2): cada celda mueve el share en su dirección
+  con goles estables — Press vs ESP dispara recuperaciones 21→39% · la circulación se seca
+  contra SWE (31→28%, pelotazo forzado 15%) · Contra vs GER 58% de transiciones (el caso
+  extremo del riesgo "×2.1 ahoga el contexto": vigilar en F3 si el relato monotematiza) ·
+  Bloque cede posesión real (45-49% mías).
+
 - `content/team-philosophies.js`: los 16 curados (filosofía + formación real) +
   `derivePhilosophy(team)` para el resto (reemplaza el rol del proxy en el lado opp;
   `rivalProfile` puede quedar como insumo de la derivación).
@@ -127,7 +153,25 @@ del Día; las aristas persisten).
   palanca de energía) y del spread favorito/underdog (los 16 curados son los tier altos:
   si la curación los infla, la brecha se abre).
 
-### F3 — "La vitrina" (se ve, se narra, se siente)
+### F3 — "La vitrina" (se ve, se narra, se siente) ✅ CERRADO 22-jul-2026 — ARCO COMPLETO
+
+**Entregado** con las 4 decisiones del PO (card compacta clickeable · mi fila de la matriz
+en cualitativo · los 4 eventos tal cual · lluvia + ola de calor):
+- `screens/philosophy.js` (nivel con barra, 5 aristas con la jugada que genera cada una,
+  firma con su ×mult, rasgo 🔒/✅, counters) + `filoCard()` en el hub.
+- Relato: la firma narra con identidad (`firmaIntros`, 3 voces por filosofía — "el pressing
+  que entrenamos toda la semana"), la transición ganó 3 voces (herencia del 58% de F2), el
+  ambiente lee filo/nivel (7 líneas) y el post-partido reporta ejecución + costo del Press
+  (bug pescado en navegador: `closeMatch` soltaba `filoCost` en el destructure).
+- El Daily de la previa nombra la identidad rival (la deuda de F2).
+- Eventos: visita_maestro (rara) · prensa_bautiza · ensayo_firma (infrecuentes) + conflicto
+  referente_cuestiona; pool 34→37 (ley del validador actualizada). Interacciones: la lluvia
+  castiga al Press (−5 extra) y le corta el toque a la Posesión (−3 Pase); la ola de calor
+  castiga al Press (−5 extra). `filoPointsOf/filoLevelOf` se movieron a content (el
+  contenido lee el nivel; game delega — una sola fuente del umbral).
+- **Verificación final del arco: 30.8%** (F2 cerró en 30.6 — F3 no tocó el balance, como
+  debía). Batería verde completa; verificado en navegador (pantalla, card, relato firma en
+  el feed real, ambos branches del bloque Identidad, móvil 375, consola limpia).
 - `screens/philosophy.js`: pantalla de identidad y progreso de aristas + **chip en el
   estado del equipo del hub** (la imagen de referencia que el PO ya mandó).
 - Relato: las secuencias del tipo firma narran CON identidad ("el pressing que
@@ -154,9 +198,24 @@ del Día; las aristas persisten).
 ---
 
 ## Apéndice: estado del documento
+- **22-jul-2026 (noche, 3ª entrada)** — **F3 cerrado: EL ARCO DE FILOSOFÍA ESTÁ COMPLETO.**
+  El core del proyecto quedó en el juego: identidad que se elige mirando el grupo, se
+  entrena por aristas, se ejecuta en la cancha, se countea contra el rival, se paga con su
+  costo y se VE (pantalla, chip, relato, post-partido, eventos). Deudas menores que quedan
+  para futuros sprints de contenido: el ritmo de ejecución asimétrico entre filosofías
+  (Posesión ~3× Bloque, medido en F1) y más interacciones evento×filosofía si el clima
+  crece. Balance del arco completo: 34.0 (pre-arco) → 30.8 (con el buff táctico muerto y
+  la identidad viva) — el re-baseline de F1 fue decisión PO con datos.
 - **22-jul-2026** — Creado tras las 8 decisiones del PO (2 rondas). Se revisa al cerrar
   cada sprint; si una decisión contradice lo escrito, gana el mejor argumento y queda
   registrado.
+- **22-jul-2026 (noche, 2ª entrada)** — **F2 cerrado.** La matriz, los costos, los rasgos
+  míos, los 16 curados y la derivación entraron según las 4 decisiones del PO; el único
+  ajuste post-medición fue la zanahoria del Bloque (balón parado ×1.3 + cesión −0.08),
+  aprobada tras aislarlo con `--filo`. Gate final 30.6 vs 31.6 (adentro). Pendientes que
+  hereda F3: el relato monotemático del Contra consolidado vs press (58% transiciones) ·
+  el ritmo asimétrico de ejecución (de F1) · narrar la matriz y los costos (el jugador
+  aún los siente sin que nadie se los cuente).
 - **22-jul-2026 (noche)** — **F1 cerrado.** Ajuste al plan: el tipo firma del Bloque bajo
   es el **pelotazo** (arista Juego directo), no el repliegue — las 4 firmas son del lado
   `mine` para que la progresión por ejecución dependa de MI fútbol y no de cuánto ataque

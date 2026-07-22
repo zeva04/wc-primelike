@@ -12,7 +12,7 @@
    ============================================================ */
 import { rnd, shuffle } from "../core/rng.js";
 import { clamp } from "../core/math.js";
-import { addFiloProgress } from "./philosophies.js";
+import { addFiloProgress, addFirmaProgress, getPhilosophy } from "./philosophies.js";
 
 /** Los dos jugadores de la pelea, resueltos por nombre desde `run.peleaEntre` (§3.1). */
 const peleadores = r => (r.peleaEntre || []).map(n => r.squad.find(p => p.name === n)).filter(Boolean);
@@ -71,6 +71,23 @@ export const RANDOM_EVENTS = [
   // ---------- SPRINT 4: conflictos-PROBLEMA (Bible §4.5) ----------
   // No reparten premios: las dos ramas cobran algo. Usan los recursos que el juego ya
   // tiene escasos (energía y moral) en vez de mover aura como casi todo lo anterior.
+  // F3: el conflicto de FILOSOFÍA — la identidad también se defiende puertas adentro.
+  {
+    id: "referente_cuestiona", tema: "vestuario", icon: "🗣️", title: "El referente cuestiona la idea",
+    teaser: "Se escuchó una discusión táctica subida de tono en la sala de video.",
+    text: r => { const f = getPhilosophy(r.filoId); return f
+      ? `Tu referente duda en voz alta: "¿y si esto del ${f.name} no es para nosotros?". Media plantilla lo escuchó. El proyecto te mira a los ojos.`
+      : `Tu referente cuestiona el rumbo táctico delante de media plantilla. El proyecto te mira a los ojos.`; },
+    options: [
+      { label: "Reafirmar la idea", effect: r => {
+        const a = addFirmaProgress(r, 1);
+        r.moral = clamp((r.moral ?? 50) - 5, 1, 100);
+        return a ? `Doblas la apuesta: sesión extra de lo nuestro (+1 de ${a.label}). El referente se traga el gesto: −5 de Moral.`
+          : "Doblas la apuesta por el proyecto. El referente se traga el gesto: −5 de Moral.";
+      } },
+      { label: "Ceder y aflojar", effect: r => { r.moral = clamp((r.moral ?? 50) + 8, 1, 100); return "Le das la razón a medias y aflojas la mano: +8 de Moral… pero la idea no avanzó esta semana."; } },
+    ],
+  },
   {
     id: "carga_fisica", tema: "fisico", icon: "🏋️", title: "El preparador físico pide más",
     teaser: "El cuerpo físico y el técnico discuten a los gritos junto al campo.",

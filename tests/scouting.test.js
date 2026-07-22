@@ -31,6 +31,12 @@ const byRating = [...qualified].sort((a, b) => E.teamRating(b) - E.teamRating(a)
   assert(rep.figura.name && rep.figura.pos && rep.figura.por_que, "figura con nombre, puesto y por qué duele");
   assert(rep.forma.length === 0, "sin partidos jugados no hay forma");
   assert(rep.bajas.length === 0 && rep.enEliminatorias === false, "sin bajas y en grupos");
+  // F2: el informe NOMBRA la filosofía rival y su nivel (roadmap del arco)
+  assert(rep.filosofia && rep.filosofia.name && rep.filosofia.icon && rep.filosofia.detalle.length > 20,
+    "el informe trae la identidad del rival", JSON.stringify(rep.filosofia));
+  assert(["Aprendiendo", "En desarrollo", "Consolidada"].includes(rep.filosofia.nivel), "nivel de identidad legible");
+  const espRep = E.buildOpponentReport(run, "ESP");
+  assert(espRep.filosofia.id === "posesion" && espRep.filosofia.consolidada, "ESP llega como posesión consolidada (curación F2)");
 }
 
 // ---------- niveles relativos: el más fuerte del torneo visto por el jugable más débil ----------
@@ -87,13 +93,13 @@ const byRating = [...qualified].sort((a, b) => E.teamRating(b) - E.teamRating(a)
   assert(JSON.stringify({ squad: run.squad, buffs: run.buffs, dayPlan: run.dayPlan }) === antes, "el informe no muta la run");
 }
 
-// ---------- el hint del Daily (H6) cita el informe en la previa ----------
+// ---------- el hint del Daily (H6 + F3) nombra la identidad rival y cita el informe ----------
 {
   const run = E.newRun("BRA");
   run.day = run.nextMatchDay - 1; // previa: a 1 día del partido
   const daily = E.buildDaily(run);
-  const rival = daily.items.find(i => i.tag === "RIVAL" && i.text.includes("informe del cuerpo técnico"));
-  assert(!!rival, "la previa cita el informe del cuerpo técnico", JSON.stringify(daily.items.map(i => i.tag)));
+  const rival = daily.items.find(i => i.tag === "RIVAL" && i.text.includes("Juegan al") && i.text.includes("El informe"));
+  assert(!!rival, "la previa nombra la identidad rival y cita el informe (F3)", JSON.stringify(daily.items.filter(i => i.tag === "RIVAL").map(i => i.text)));
 }
 
 console.log(`scouting.test: ${checks} checks`);

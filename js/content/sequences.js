@@ -39,6 +39,7 @@
 
    Agregar un tipo nuevo = agregar una fila.
    ============================================================ */
+import { pick } from "../core/rng.js";
 
 export const SEQUENCE_TYPES = [
   {
@@ -62,7 +63,13 @@ export const SEQUENCE_TYPES = [
     protWeight: { DEL: 3, MED: 2, DEF: 1 },
     plan: ["carry", "finish"],
     flavor: {
-      intro: p => `¡Recuperación y salida rápida! ${p.name} conduce al espacio.`,
+      // Varias voces (F3, herencia de F2: con Contra consolidado vs press la transición
+      // llega al 58% del pool — un solo intro se leía repetido tres veces por partido).
+      intro: p => pick([
+        `¡Recuperación y salida rápida! ${p.name} conduce al espacio.`,
+        `¡Se rompe el partido! ${p.name} recibe con campo por delante.`,
+        `Robo en el medio y a correr: ${p.name} encara con ventaja.`,
+      ]),
       carryOk: p => `${p.name} gana metros antes de que el rival se acomode.`,
       carryFail: "La defensa rival cierra el espacio a tiempo.",
       finishStat: "tiro", finishBonus: 0.18,

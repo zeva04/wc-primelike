@@ -15,7 +15,7 @@ import { applyMedicalPostMatch } from "./medical.js";
 import { applyDisciplinePostMatch, clearAmarillas } from "./discipline.js";
 import { applyMomentumPostMatch } from "./momentum.js";
 import { applyMoralePostMatch, bumpMorale } from "./morale.js";
-import { applyFiloExecution } from "./philosophy.js";
+import { applyFiloExecution, applyFiloCosts } from "./philosophy.js";
 import { assignScorers } from "./scorers.js";
 import { assignAssists } from "./assists.js";
 import { qualifyRound32, computeTable } from "./tournament/groups.js";
@@ -73,8 +73,8 @@ export function closeMatch(run, match) {
     advanced = won;
   }
 
-  const { momentum, morale, filoExec } = postMatchUpdate(run, match);
-  return { res, otherResults, advanced, momentum, morale, filoExec };
+  const { momentum, morale, filoExec, filoCost } = postMatchUpdate(run, match);
+  return { res, otherResults, advanced, momentum, morale, filoExec, filoCost };
 }
 
 /**
@@ -84,6 +84,9 @@ export function closeMatch(run, match) {
  */
 export function postMatchUpdate(run, match) {
   const minutos = match.minutesByName ? match.minutesByName() : {}; // duck-typed en algunos tests
+  // El costo físico de la identidad (F2: el Press corre y lo paga) se cobra ANTES
+  // del loop por jugador: usa los flags usado/sustituido que ese loop resetea.
+  const filoCost = applyFiloCosts(run, match);
   const momentum = [];
   for (const p of run.squad) {
     // Jugó = está en el once final, entró desde el banco (`usado`) o SALIÓ por un cambio
@@ -106,7 +109,7 @@ export function postMatchUpdate(run, match) {
   run.buffs = {};
   // El partido consumió el día: se agenda el siguiente a 5-6 días con sus eventos diarios
   scheduleNextMatch(run);
-  return { momentum, morale, filoExec };
+  return { momentum, morale, filoExec, filoCost };
 }
 
 /**

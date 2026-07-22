@@ -5,6 +5,8 @@
 import { rnd } from "../core/rng.js";
 import { clamp } from "../core/math.js";
 import { STAT_KEYS, GK_STAT_KEYS, playerOverall, teamRating } from "./ratings.js";
+import { TEAM_PHILOSOPHIES, FILO_FORMATION } from "../content/team-philosophies.js";
+import { getFormation } from "./lineup.js";
 
 // Desvíos por posición al derivar stats desde el rating del equipo
 export const POS_MODS = {
@@ -58,14 +60,41 @@ export function bestSix(pool) {
 }
 
 /**
+ * Mejor seis CON FORMA (F2, decisión PO #4 "formación acorde"): mejor POR + los
+ * mejores por línea que pide la formación curada; si una línea no alcanza
+ * (bajas, plantel sin esa cantidad), completa por nota como bestSix de siempre.
+ */
+export function bestSixShaped(pool, formation) {
+  const byOvr = (a, b) => playerOverall(b) - playerOverall(a);
+  const need = { POR: 1, DEF: formation.def, MED: formation.med, DEL: formation.del };
+  const lineup = [];
+  for (const pos of ["POR", "DEF", "MED", "DEL"]) {
+    lineup.push(...pool.filter(p => p.pos === pos).sort(byOvr).slice(0, need[pos]));
+  }
+  for (const p of pool.filter(p => p.pos !== "POR").sort(byOvr)) {
+    if (lineup.length >= 6) break;
+    if (!lineup.includes(p)) lineup.push(p);
+  }
+  return lineup;
+}
+
+/** La formación curada de un rival (los 16 con filosofía a mano) o null (bestSix normal). */
+function curatedShape(team) {
+  const filo = TEAM_PHILOSOPHIES[team.id];
+  return filo ? getFormation(FILO_FORMATION[filo]) : null;
+}
+
+/**
  * Alineación de 6 titulares del rival (Game Vision: formato 6v6), excluyendo a
  * los suspendidos (`banned`: nombres en `run.rivalBans`, las rojas del mundo
  * vivo). Jugables usan sus mejores 6 disponibles; el resto arma su mejor seis
- * del plantel de 10 (figuras + genéricos).
+ * del plantel de 10 (figuras + genéricos). Los 16 CURADOS (F2) forman con la
+ * formación de su filosofía (el bloque de SWE presenta 3 DEF de verdad).
  */
 export function genOpponentLineup(team, banned = []) {
   const pool = (team.players || genOpponentSquad(team)).filter(p => !banned.includes(p.name));
-  return bestSix(pool).map(p => ({ name: p.name, pos: p.pos, num: p.num, stats: { ...p.stats }, look: p.look, energia: 100, amarilla: false, expulsado: false, lesionado: false }));
+  const shape = curatedShape(team);
+  return (shape ? bestSixShaped(pool, shape) : bestSix(pool)).map(p => ({ name: p.name, pos: p.pos, num: p.num, stats: { ...p.stats }, look: p.look, energia: 100, amarilla: false, expulsado: false, lesionado: false }));
 }
 
 /**
@@ -75,5 +104,6 @@ export function genOpponentLineup(team, banned = []) {
  */
 export function expectedOpponentLineup(team, banned = []) {
   const pool = (team.players || genOpponentSquad(team, false)).filter(p => !banned.includes(p.name));
-  return bestSix(pool).map(p => ({ name: p.name, pos: p.pos, num: p.num, stats: { ...p.stats }, look: p.look, energia: 100 }));
+  const shape = curatedShape(team); // el informe estima el once REAL: misma forma curada (F2)
+  return (shape ? bestSixShaped(pool, shape) : bestSix(pool)).map(p => ({ name: p.name, pos: p.pos, num: p.num, stats: { ...p.stats }, look: p.look, energia: 100 }));
 }

@@ -24,13 +24,14 @@
    ============================================================ */
 
 // Las 5 aristas transversales (decisión PO #5). `tipo` = el tipo de secuencia
-// del catálogo (content/sequences.js) que ese fútbol genera.
+// del catálogo (content/sequences.js) que ese fútbol genera. `stat` = la stat
+// que ese fútbol trabaja (la usa el evento "Ensayo de la firma", F3).
 export const ARISTAS = [
-  { id: "presion",      icon: "🦁", label: "Presión",      desc: "cazar arriba",          tipo: "recuperacion" },
-  { id: "elaboracion",  icon: "🎼", label: "Elaboración",  desc: "tener y circular",      tipo: "circulacion" },
-  { id: "verticalidad", icon: "⚡", label: "Verticalidad", desc: "atacar el espacio",     tipo: "transicion" },
-  { id: "solidez",      icon: "🧱", label: "Solidez",      desc: "orden y bloque",        tipo: "repliegue" },
-  { id: "directo",      icon: "🌩️", label: "Juego directo", desc: "el pelotazo y el duelo", tipo: "pelotazo" },
+  { id: "presion",      icon: "🦁", label: "Presión",      desc: "cazar arriba",          tipo: "recuperacion", stat: "defensa" },
+  { id: "elaboracion",  icon: "🎼", label: "Elaboración",  desc: "tener y circular",      tipo: "circulacion",  stat: "pase" },
+  { id: "verticalidad", icon: "⚡", label: "Verticalidad", desc: "atacar el espacio",     tipo: "transicion",   stat: "tiro" },
+  { id: "solidez",      icon: "🧱", label: "Solidez",      desc: "orden y bloque",        tipo: "repliegue",    stat: "defensa" },
+  { id: "directo",      icon: "🌩️", label: "Juego directo", desc: "el pelotazo y el duelo", tipo: "pelotazo",    stat: "cabezazo" },
 ];
 
 export const aristaById = id => ARISTAS.find(a => a.id === id);
@@ -61,6 +62,14 @@ export const PHILOSOPHIES = [
     fuerte: "Brilla contra los que quieren la pelota: más robos en salida rival.",
     advertencia: "Correr arriba los 90' pasa factura física, y un pelotazo sobre la presión te parte.",
     rasgo: "La presión roba en zona más letal.",
+    // Mi fila de la matriz en cualitativo (F3, pantalla de identidad — regla 4: visible)
+    counters: { brilla: "contra los que quieren la pelota (Posesión): su salida es tu festín", sufre: "el costo es físico: −6 de energía extra cada partido, y el pelotazo por arriba te parte" },
+    // El relato de MI firma cuando la identidad es mía (F3): el pressing tiene nombre
+    firmaIntros: [
+      p => `¡El pressing que entrenamos toda la semana! ${p.name} salta a cazar la salida rival.`,
+      p => `La jauría otra vez arriba: ${p.name} lidera la presión como pide la idea.`,
+      p => `El plan es este: asfixiar. ${p.name} achica sobre la pelota.`,
+    ],
   },
   {
     id: "posesion", icon: "🎼", name: "Posesión",
@@ -69,6 +78,12 @@ export const PHILOSOPHIES = [
     fuerte: "Domina los partidos: más circulación, y el contrapressing sostiene el control.",
     advertencia: "Se estrella contra un bloque bajo bien plantado: circular sin morder no gana partidos.",
     rasgo: "Un acto más de circulación: las jugadas largas maduran mejor.",
+    counters: { brilla: "cuando el partido se juega con la pelota: tu circulación manda y el control es tuyo", sufre: "contra un Bloque bajo cerrado: la circulación rinde menos y terminas reventando pelotazos" },
+    firmaIntros: [
+      p => `El fútbol que ensayamos: ${p.name} baja a recibir y la pelota empieza a caminar.`,
+      p => `Paciencia de manual: ${p.name} le pone el pie a la pelota y el equipo teje.`,
+      p => `La idea en su salsa: toque, toque y ${p.name} pidiéndola siempre.`,
+    ],
   },
   {
     id: "contra", icon: "⚡", name: "Contragolpe",
@@ -77,6 +92,12 @@ export const PHILOSOPHIES = [
     fuerte: "Vive del rival que ataca: cada avance suyo es una contra tuya en potencia.",
     advertencia: "Cede la iniciativa: contra otro que también espera, el partido se muere.",
     rasgo: "Las transiciones salen con mejor perfil de remate.",
+    counters: { brilla: "contra el que toma la iniciativa (Press y Posesión): su espalda es tu autopista", sufre: "cedes posesión por identidad, y contra otro que espera (Contra/Bloque) el partido se muere" },
+    firmaIntros: [
+      p => `¡La puñalada que entrenamos! ${p.name} pica al espacio con el rival partido.`,
+      p => `Robo y vértigo, como pide la idea: ${p.name} arranca la contra.`,
+      p => `El equipo salta la trampa: ${p.name} corre solo hacia el área rival.`,
+    ],
   },
   {
     id: "bloque", icon: "🧱", name: "Bloque bajo",
@@ -85,10 +106,34 @@ export const PHILOSOPHIES = [
     fuerte: "Dificilísimo de romper: invita al rival y lo seca en el bloque.",
     advertencia: "Sufre al que elabora con paciencia, y renuncia a generar volumen ofensivo.",
     rasgo: "El repliegue contiene mejor: la muralla de verdad.",
+    counters: { brilla: "en la trinchera: el balón parado es tu gol (×1.3) y el que se te viene encima se seca", sufre: "cedes volumen ofensivo por identidad, y el que elabora con paciencia (Posesión) te sitia" },
+    firmaIntros: [
+      p => `El plan de siempre: pelotazo a la guerra y a correr. ${p.name} va al duelo.`,
+      p => `Fútbol de trinchera, como lo entrenamos: bombazo largo buscando a ${p.name}.`,
+      p => `Sin vueltas: la pelota cruza el cielo y ${p.name} la espera de cabeza.`,
+    ],
   },
 ];
 
 export const getPhilosophy = id => PHILOSOPHIES.find(p => p.id === id) || null;
+
+/**
+ * Puntos y nivel de la identidad de una run, PUROS y solo sobre datos de este
+ * archivo (F3: el contenido también los necesita — "La prensa bautiza tu estilo"
+ * lee el nivel — y content/ no importa game/). game/philosophy delega acá:
+ * una sola fuente para el umbral, cero divergencia.
+ */
+export function filoPointsOf(r) {
+  const f = getPhilosophy(r.filoId);
+  if (!f) return 0;
+  return +f.aristas.reduce((s, k) => s + (r.aristas?.[k] || 0), 0).toFixed(2);
+}
+export function filoLevelOf(r) {
+  const pts = filoPointsOf(r);
+  let lvl = 0;
+  FILO_LEVELS.forEach((l, i) => { if (pts >= l.min) lvl = i; });
+  return lvl;
+}
 
 // Tipo firma por filosofía ({press: "recuperacion", ...}): lo que el pool sesga
 // (match/sequences) y lo que la ejecución cuenta (game/philosophy). Derivado de
@@ -109,4 +154,17 @@ export function addFiloProgress(r, pts) {
   const [a] = [...f.aristas].sort((x, y) => (r.aristas[x] || 0) - (r.aristas[y] || 0) || (x === f.firma ? -1 : 1));
   r.aristas[a] = +((r.aristas[a] || 0) + pts).toFixed(2);
   return aristaById(a);
+}
+
+/**
+ * Progreso DIRECTO a la arista firma (F3: los eventos de filosofía trabajan la
+ * identidad, no el hueco — "Visita del maestro", "Ensayo de la firma"). Misma
+ * primitiva de mutación que addFiloProgress; null sin filosofía.
+ */
+export function addFirmaProgress(r, pts) {
+  const f = getPhilosophy(r.filoId);
+  if (!f) return null;
+  r.aristas = r.aristas || {};
+  r.aristas[f.firma] = +((r.aristas[f.firma] || 0) + pts).toFixed(2);
+  return aristaById(f.firma);
 }

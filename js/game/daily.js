@@ -37,12 +37,15 @@ import { buildOpponentReport } from "./scouting.js";
 // Informe del Rival — la debilidad si la hay (accionable), si no la amenaza.
 const LINEA_TXT = { ataque: "su ataque", defensa: "su defensa", arquero: "su arquero" };
 function scoutHint(run, oppId) {
-  const lineas = Object.entries(buildOpponentReport(run, oppId).lineas);
+  const rep = buildOpponentReport(run, oppId);
+  // F3 (deuda de F2): la previa NOMBRA la identidad rival — el informe completo da la lectura
+  const filo = ` Juegan al ${rep.filosofia.name}${rep.filosofia.consolidada ? " y llegan consolidados en su idea" : ""}.`;
+  const lineas = Object.entries(rep.lineas);
   const debil = lineas.find(([, l]) => l.nivel === "Bajo");
-  if (debil) return ` El informe del cuerpo técnico marca su punto débil: ${LINEA_TXT[debil[0]]}.`;
+  if (debil) return `${filo} El informe marca su punto débil: ${LINEA_TXT[debil[0]]}.`;
   const fuerte = lineas.find(([, l]) => l.nivel === "Alto");
-  if (fuerte) return ` El informe del cuerpo técnico advierte: ${LINEA_TXT[fuerte[0]]} es superior.`;
-  return " El informe del cuerpo técnico no encuentra grietas: partido de igual a igual.";
+  if (fuerte) return `${filo} El informe advierte: ${LINEA_TXT[fuerte[0]]} es superior.`;
+  return `${filo} El informe no encuentra grietas: partido de igual a igual.`;
 }
 
 const ORD = ["", "1º", "2º", "3º", "4º"];

@@ -162,6 +162,13 @@ function showScoutReport(oppId) {
         </div>
       </div>
       <div class="space-y-2 mt-4">
+        <div class="rounded-xl border tp-border tp-bg-soft p-3">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-sm">${rep.filosofia.icon} Su idea: ${rep.filosofia.name}</span>
+            <span class="px-2 py-0.5 rounded-full border ${rep.filosofia.consolidada ? "border-amber-500/60 bg-amber-500/10 text-amber-300" : "border-slate-600 bg-slate-800/60 text-slate-300"} text-[10px] font-black uppercase tracking-widest">${rep.filosofia.nivel}</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">${rep.filosofia.detalle}</p>
+        </div>
         ${Object.entries(rep.lineas).map(([k, l]) => `
           <div class="rounded-xl border border-slate-700 bg-slate-900/50 p-3">
             <div class="flex items-center justify-between">
@@ -369,6 +376,29 @@ function actionCard() {
   </div>`;
 }
 
+/**
+ * Card de IDENTIDAD del estado del equipo (F3, "La vitrina"): filosofía, nivel y la
+ * barra de progreso al próximo umbral. Clic → pantalla de identidad. Compacta a
+ * propósito: el despliegue completo (aristas, rasgo, counters) vive en la pantalla.
+ */
+function filoCard() {
+  const run = S.run;
+  const f = getPhilosophy(run.filoId);
+  if (!f) return "";
+  const pts = filoPoints(run);
+  const lvl = filoLevel(run);
+  const nivel = FILO_LEVELS[lvl];
+  const next = FILO_LEVELS[lvl + 1] || null;
+  const pct = next ? Math.min(100, (100 * (pts - nivel.min)) / (next.min - nivel.min)) : 100;
+  return `<div id="btn-filo" class="rounded-xl border tp-border tp-bg-soft px-3 py-2 mb-3 shrink-0 cursor-pointer transition-all hover:brightness-125" title="Ver la identidad del equipo">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-xs font-bold ${lvl === 2 ? "text-amber-300" : "tp-text"}">${f.icon} ${f.name}</span>
+      <span class="text-[9px] uppercase tracking-wider font-black text-slate-400">${nivel.label}${next ? ` · ${pts}/${next.min}` : ""}</span>
+    </div>
+    <div class="h-1 rounded-full bg-slate-900/80 overflow-hidden mt-1.5"><div class="h-full rounded-full ${lvl === 2 ? "bg-amber-400" : "tp-gradient"}" style="width:${pct}%"></div></div>
+  </div>`;
+}
+
 /** Chip de un indicador del estado del equipo (icono + label + valor coloreado). */
 function stateChip(icon, label, value, cls) {
   return `<div class="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900/50 px-2 py-1.5 flex-1 min-w-0">
@@ -418,11 +448,11 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
       <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Formación <b class="tp-text">${formationLabel}</b></span>
     </div>
     <div id="hub-pitch" class="pitch relative w-full flex-1 min-h-[22rem] rounded-xl overflow-hidden border-2 border-slate-900 mb-3 cursor-pointer" title="Ir a Gestión de Plantilla"></div>
-    <div class="flex gap-2 mb-3 shrink-0">
+    <div class="flex gap-2 mb-2 shrink-0">
       ${stateChip(mb.icon, "Moral", mb.label, moralCls)}
       ${stateChip("⚡", "Energía", avgEnergy + "%", enCls)}
-      ${run.filoId ? stateChip(getPhilosophy(run.filoId).icon, "Identidad", FILO_LEVELS[filoLevel(run)].label, "tp-text") : ""}
     </div>
+    ${filoCard()}
     <div class="mb-3 shrink-0">
       <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">✨ Efectos próximo partido</div>
       ${chips || `<div class="text-[10px] text-slate-500">Sin efectos aún — los días del calendario los irán sumando.</div>`}
@@ -599,6 +629,8 @@ function renderHub(opts = {}) {
   wireScorersCard($("#btn-scorers")); // carrusel Goleadores↔Asistidores (corta la navegación al togglear)
   $("#btn-journal").onclick = () => go("journal", "hub");
   $("#btn-squad").onclick = () => go("squad");
+  const filoBtn2 = $("#btn-filo");
+  if (filoBtn2) filoBtn2.onclick = () => go("philosophy");
   // El canje está disponible siempre que un buff llegue al umbral (también el día de
   // partido: renunciar al boost de hoy por crecimiento permanente es una decisión válida).
   document.querySelectorAll(".canje-opt").forEach(b => b.onclick = () => showCanje(b.dataset.key));
