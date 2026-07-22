@@ -6,7 +6,7 @@
    ============================================================ */
 import { getTeam } from "../../data/teams-repo.js";
 import { teamRating, teamStars, playerOverall, outOfPosPenalty } from "../../game/ratings.js";
-import { currentLineup, validateLineup, getFormation } from "../../game/lineup.js";
+import { currentLineup, validateLineup, getFormation, assignPositions, maxLineupSize } from "../../game/lineup.js";
 import { dayLabel, advanceDay } from "../../game/calendar.js";
 import { buildDaily } from "../../game/daily.js";
 import { applyDayAction, actionMult, multLabel, dayOpportunity, canjeableBuffs, canjeBuff } from "../../game/day-action.js";
@@ -366,6 +366,8 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
   const chips = buffChips();
   const canjeables = canjeableBuffs(run);
   const avisos = [];
+  const bajasOnce = S.selectedLineup.filter(p => p.suspendido || p.lesionadoPartidos > 0);
+  if (bajasOnce.length) avisos.push(`<div class="text-red-400">🚑 Baja en el once: ${bajasOnce.map(p => p.name).join(", ")} — elige su reemplazo en Gestión de Plantilla</div>`);
   if (!v.ok) avisos.push(`<div class="text-amber-400">⚠️ ${v.msg}</div>`);
   else if (v.short) avisos.push(`<div class="text-orange-400">🆘 Plantel diezmado: presentas ${S.selectedLineup.length} — jugarás en inferioridad</div>`);
   if (fueraDePuesto.length) avisos.push(`<div class="text-orange-400" title="Sus stats bajan mientras jueguen ahí">❗ Fuera de puesto: ${fueraDePuesto.map(p => p.name).join(", ")}</div>`);
@@ -420,14 +422,16 @@ function pasarDia() {
   // cierra el suyo antes de navegar); si hay uno abierto es porque la cadena Daily→evento
   // de este día ya está en curso y el disparo es repetido (doble clic).
   if (modalOpen()) return;
+  const bajasPre = bajasDelOnce().length; // para detectar si el evento de HOY tumba a un titular
   const res = advanceDay(S.run);
   if (!res) { renderHub(); return; }
   renderHub(); // el hub del día nuevo queda detrás de la portada
   // Bible §4.4: el día arranca con el Daily (informa); el evento llega después (transforma)
   showDaily(buildDaily(S.run), () => {
     if (res.type === "match") { closeModal(); toast(`⚽ ${dayLabel(S.run.day)} — ¡Día de partido!`); }
-    else if (res.type === "evento") showDayEvent(res);
-    else showRandomEvent(res);
+    else if (res.type === "evento") showDayEvent(res, bajasPre);
+    else if (res.type === "conflicto") showRandomEvent(res);
+    else closeModal(); // día tranquilo (el de la Oportunidad): sin evento — la oferta espera en el hub
   });
 }
 
@@ -445,7 +449,14 @@ function renderHub(opts = {}) {
     : STAGE_LABEL[run.stage]) + ` · ${dayLabel(run.day)}`;
 
   const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
-  ({ lineup: S.selectedLineup, formationId: S.formation } = currentLineup(run.squad, S.selectedLineup, S.formation));
+  // Las BAJAS del once NO se auto-reemplazan (PO 22-jul): el caído queda a la vista (🚑/🟥)
+  // y el DT arma el reemplazo a mano en Gestión de Plantilla — la formación tampoco cambia
+  // sola. La válvula automática queda SOLO para el plantel diezmado (no llega a 6 en pie:
+  // ahí no hay decisión que tomar y sin ella la run moría en softlock).
+  const conBaja = (S.selectedLineup || []).some(p => p.suspendido || p.lesionadoPartidos > 0);
+  if (conBaja && maxLineupSize(available) >= 6) assignPositions(run.squad, S.selectedLineup, S.formation);
+  else ({ lineup: S.selectedLineup, formationId: S.formation } = currentLineup(run.squad, S.selectedLineup, S.formation));
+  const bajasOnce = S.selectedLineup.filter(p => p.suspendido || p.lesionadoPartidos > 0);
   const v = validateLineup(available, S.selectedLineup);
   const discipline = { susp: run.squad.filter(p => p.suspendido), aperc: run.squad.filter(p => p.amarillas > 0 && !p.suspendido) };
   const fueraDePuesto = S.selectedLineup.filter(p => outOfPosPenalty(p) > 0);
@@ -558,10 +569,15 @@ function renderHub(opts = {}) {
   document.querySelectorAll(".canje-opt").forEach(b => b.onclick = () => showCanje(b.dataset.key));
   if (isMatchDay) {
     const play = $("#btn-play");
-    play.disabled = !v.ok;
-    play.classList.toggle("opacity-40", !v.ok);
-    play.classList.toggle("cursor-not-allowed", !v.ok);
-    play.onclick = () => { if (validateLineup(available, S.selectedLineup).ok) go("start-match", oppId); };
+    // validateLineup no mira disponibilidad (eso lo hacía el auto-reemplazo retirado):
+    // con una baja en el once no se juega — el DT la resuelve en Gestión de Plantilla.
+    const listo = v.ok && !bajasOnce.length;
+    play.disabled = !listo;
+    play.classList.toggle("opacity-40", !listo);
+    play.classList.toggle("cursor-not-allowed", !listo);
+    play.onclick = () => {
+      if (validateLineup(available, S.selectedLineup).ok && !S.selectedLineup.some(p => p.suspendido || p.lesionadoPartidos > 0)) go("start-match", oppId);
+    };
   } else {
     document.querySelectorAll(".da-opt").forEach(b => b.onclick = () => {
       const a = applyDayAction(S.run, b.dataset.action);
@@ -623,8 +639,26 @@ function themeHeader(tema) {
   return `<div class="text-[10px] uppercase tracking-widest font-bold ${th.color} mb-1">${th.icon} ${th.name} · ${dayLabel(S.run.day)}</div>`;
 }
 
+/** Bajas actuales del once (suspendidos + lesionados). */
+const bajasDelOnce = () => (S.selectedLineup || []).filter(p => p.suspendido || p.lesionadoPartidos > 0);
+
+/**
+ * Si el evento recién cerrado tumbó a un TITULAR (lesión), el DT lo resuelve AHORA:
+ * se navega directo a Gestión de Plantilla con el caído a la vista (PO 22-jul — nada
+ * se reemplaza solo). Solo dispara ante una baja NUEVA (`prev` = cuántas había antes
+ * del evento): una baja vieja pendiente ya tiene su aviso fijo en el hub, no secuestra
+ * la navegación cada mañana. Devuelve true si navegó (el caller no repinta el hub).
+ */
+function irASquadSiBaja(prev) {
+  const bajas = bajasDelOnce();
+  if (bajas.length <= prev) return false;
+  toast(`🚑 ${bajas[bajas.length - 1].name} es baja: elige su reemplazo.`);
+  go("squad");
+  return true;
+}
+
 /** Muestra el evento inevitable del día (ya aplicado por el motor) y vuelve al hub. */
-function showDayEvent(ev) {
+function showDayEvent(ev, bajasPre = 0) {
   S.run.stats.eventos++;
   const rar = RARITIES[ev.rareza];
   const m = modal(`
@@ -638,7 +672,7 @@ function showDayEvent(ev) {
       <button id="ev-ok" class="btn-primary">Continuar</button>
     </div>
   `);
-  m.querySelector("#ev-ok").onclick = () => { closeModal(); renderHub(); };
+  m.querySelector("#ev-ok").onclick = () => { closeModal(); if (!irASquadSiBaja(bajasPre)) renderHub(); };
 }
 
 /** Muestra el modal de un conflicto con decisión y aplica el efecto de la opción elegida. */
@@ -656,12 +690,13 @@ function showRandomEvent(ev) {
   `);
   m.querySelectorAll(".ev-opt").forEach(b => b.onclick = () => {
     const opt = ev.options[+b.dataset.opt];
+    const bajasPre = bajasDelOnce().length; // el efecto del conflicto puede lesionar a un titular
     const res = opt.effect(S.run);
     S.run.stats.eventos++;
     addJournal(S.run, { icon: ev.icon, tone: "neutral", title: ev.title, desc: `Elegiste "${opt.label}". ${res}` });
     closeModal();
     toast(res);
-    renderHub();
+    if (!irASquadSiBaja(bajasPre)) renderHub();
   });
 }
 

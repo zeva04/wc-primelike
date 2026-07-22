@@ -21,7 +21,7 @@ function startMatch(oppId) {
   const me = getTeam(S.run.teamId);
   const opp = getTeam(oppId);
   const bench = S.run.squad.filter(p => !S.selectedLineup.includes(p) && !p.suspendido && p.lesionadoPartidos === 0);
-  S.matchCtx = { team: me, lineup: S.selectedLineup.slice(), bench, mentalidad: "normal", buffs: { ...S.run.buffs } };
+  S.matchCtx = { team: me, lineup: S.selectedLineup.slice(), bench, mentalidad: "normal", buffs: { ...S.run.buffs }, moral: S.run.moral };
   S.match = new Match(S.matchCtx, opp, S.run.stage !== "groups", S.run.rivalBans[oppId] || []);
   S.feedRendered = 0;
   S.paused = false;
@@ -43,6 +43,11 @@ function renderMatchScreen() {
           <div id="minute" class="text-amber-400 font-bold text-sm">0'</div>
         </div>
         <div class="flex items-center gap-2.5 text-lg font-black"><span class="hidden sm:inline">${opp.name}</span>${flagImg(opp, "w-10 h-7", true)}</div>
+      </div>
+      <div class="flex items-center justify-center gap-2 mt-2 text-xs" title="Posesión y momentum, derivados del juego generado">
+        <span id="mom-chip" class="w-6 text-center font-black text-slate-500">·</span>
+        <div class="w-40 sm:w-64 h-1.5 rounded-full overflow-hidden bg-red-400/60"><div id="poss-bar" class="h-full bg-emerald-400 transition-all duration-500" style="width:50%"></div></div>
+        <span id="poss-pct" class="tabular-nums font-bold text-slate-300 w-9 text-left">50%</span>
       </div>
       <div class="flex items-center justify-center gap-2 mt-3 flex-wrap">
         <div class="flex rounded-lg overflow-hidden border border-slate-600 text-xs">
@@ -74,7 +79,7 @@ function renderMatchScreen() {
     updateMatchUI();
   });
   $("#btn-pause").onclick = togglePause;
-  $("#btn-subs").onclick = openSquadModal;
+  $("#btn-subs").onclick = () => openSquadModal(); // sin args: el onclick pasaría el MouseEvent como "caído"
   $("#btn-speed").onclick = () => {
     // El reloj lee CRUISE() en cada paso, así que cambiar la velocidad tiene efecto solo: no
     // hace falta reiniciar el timer (reiniciar duplicaría el auto-agendado).
@@ -87,8 +92,13 @@ function renderMatchScreen() {
 // —el relato de ambiente pasa rápido, da la sensación de partido vivo— y FRENA en seco al
 // llegar una secuencia (que es una decisión, congela sola). Un gol hace una pausa breve para
 // que se registre. El reloj se auto-agenda con setTimeout para poder variar el ritmo por paso.
-const CRUISE = () => (S.speed === 1 ? 360 : 150);
-const GOAL_HOLD = 1150;
+// Ajuste PO 22-jul ("no asfixiar"): todo más lento, y AIRE entre actos encadenados — el
+// desenlace de un acto se LEE antes de que el modal siguiente lo tape.
+const CRUISE = () => (S.speed === 1 ? 600 : 260);
+const GOAL_HOLD = 1600;
+const SEQ_INTRO_HOLD = 900; // la intro de la secuencia se lee antes de abrir su primer modal
+const ACT_HOLD = 1300;      // entre actos encadenados: el resultado del acto respira
+const SEQ_END_HOLD = 900;   // tras el desenlace, antes de que el reloj retome
 
 /** Un paso del reloj: avanza el partido, reacciona, y agenda el siguiente al ritmo que toque. */
 function step() {
@@ -96,7 +106,7 @@ function step() {
   const before = S.match.feed.length;
   const r = S.match.tick();
   updateMatchUI();
-  if (r === true && S.match.decision) { stopTimer(); showDecision(); return; }
+  if (r === true && S.match.decision) { stopTimer(); S.timer = setTimeout(presentDecision, SEQ_INTRO_HOLD); return; }
   if (r === "halftime") { stopTimer(); showHalftime(); return; }
   if (r === "pens") { stopTimer(); go("shootout"); return; }
   if (r === "end") { stopTimer(); go("finish-match"); return; }
@@ -134,6 +144,17 @@ export function updateMatchUI() {
   $("#score").textContent = `${match.gMy} - ${match.gOpp}`;
   $("#minute").textContent = `${match.min}'${match.phase === "extra" ? " (prórroga)" : ""}`;
   $("#subs-left").textContent = match.subsLeft;
+  // Posesión y momentum (A3): el Match los deriva de lo generado (flow); acá solo se pintan.
+  const fl = match.flow();
+  const bar = $("#poss-bar"); if (bar) bar.style.width = `${fl.pos}%`;
+  const pct = $("#poss-pct"); if (pct) pct.textContent = `${fl.pos}%`;
+  const mom = $("#mom-chip");
+  if (mom) {
+    const [sym, cls] = fl.net > 4 ? ["▲▲", "text-emerald-400"] : fl.net > 1 ? ["▲", "text-emerald-400"]
+      : fl.net < -4 ? ["▼▼", "text-red-400"] : fl.net < -1 ? ["▼", "text-red-400"] : ["·", "text-slate-500"];
+    mom.textContent = sym;
+    mom.className = `w-6 text-center font-black ${cls}`;
+  }
   const feed = $("#feed");
   while (S.feedRendered < match.feed.length) {
     const f = match.feed[S.feedRendered++];
@@ -170,7 +191,26 @@ export function updateMatchUI() {
 
 // --- Decisiones en partido ---
 
-/** Muestra el modal de la decisión pendiente (ocasión, penal, cambio, protección). */
+/**
+ * Presenta la decisión pendiente: el modal genérico, o —si es una lesión (`injury_sub`)—
+ * la Gestión de plantilla en vivo con el caído marcado (PO 22-jul: el reemplazo es manual,
+ * sin lista de recomendados). Se llama con delay para que el relato previo se lea.
+ */
+function presentDecision() {
+  const match = S.match;
+  if (!match || match.finished) return;
+  if (!match.decision) { startTimer(); return; }
+  if (match.decision.id === "injury_sub") {
+    const caido = match.decision.player;
+    match.decision = null;
+    updateMatchUI();
+    openSquadModal(caido);
+    return;
+  }
+  showDecision();
+}
+
+/** Muestra el modal de la decisión pendiente (ocasión, penal, cambio forzado del arquero). */
 function showDecision() {
   const d = S.match.decision;
   const m = modal(`
@@ -214,8 +254,11 @@ function handleDecision(d, key) {
     }
   }
   updateMatchUI();
-  if (match.decision) { showDecision(); return; }
-  startTimer();
+  // Aire entre actos (PO 22-jul): el desenlace del acto se lee ANTES de que el próximo
+  // modal lo tape; y al cerrar una secuencia, el reloj retoma con un respiro.
+  stopTimer();
+  if (match.decision) { S.timer = setTimeout(presentDecision, ACT_HOLD); return; }
+  S.timer = setTimeout(step, SEQ_END_HOLD);
 }
 
 /** Pausa de entretiempo: botón para reanudar (permite ajustar cambios y mentalidad). */
@@ -237,7 +280,7 @@ function showHalftime() {
  * juntos. Las reubicaciones sí mutan `posJugada` en el momento — es lo que la cancha lee
  * para previsualizar — y por eso se guarda el estado previo y se restaura al salir.
  */
-function openSquadModal() {
+function openSquadModal(caido = null) {
   const match = S.match;
   if (match.finished) return;
   const wasPaused = S.paused;
@@ -251,6 +294,9 @@ function openSquadModal() {
   const enOnce = p => once.includes(p);
   /** En el once previsualizado y en condiciones de jugar: un expulsado o lesionado no se mueve. */
   const activo = p => enOnce(p) && !p.expulsado && !p.lesionado;
+  /** Puede SALIR en un cambio: los activos y el lesionado aún en cancha (PO 22-jul: el
+   *  caído se reemplaza acá, arrastrando un suplente sobre su ficha — no se reubica). */
+  const puedeSalir = p => activo(p) || (enOnce(p) && p.lesionado && !p.sustituido);
   const restantes = () => match.subsLeft - pendientes.length;
   const hayPlan = () => pendientes.length > 0 || once.some(p => (p.posJugada || null) !== previo.get(p));
 
@@ -276,7 +322,7 @@ function openSquadModal() {
       // El arco no se permuta: solo un arquero puede ocuparlo (game/lineup.canPlayAt).
       return canPlayAt(a, playedPos(b)) && canPlayAt(b, playedPos(a)) ? { tone: "sky", kind: "mover" } : null;
     }
-    const sale = activo(a) ? a : activo(b) ? b : null;
+    const sale = puedeSalir(a) ? a : puedeSalir(b) ? b : null;
     const entra = sale === a ? b : a;
     if (!sale || enOnce(entra)) return null;
     const plan = pendienteDe(sale);
@@ -300,6 +346,7 @@ function openSquadModal() {
       <h2 class="text-lg font-black">🔄 Gestión de plantilla</h2>
       <span class="text-xs text-slate-400">Cambios restantes: <b id="modal-subs" class="text-amber-300">${match.subsLeft}</b> de 3</span>
     </div>
+    ${caido ? `<div class="p-2.5 rounded-lg border border-red-400/60 bg-red-500/10 text-sm text-red-300 font-bold mb-3">🚑 ${caido.name} no puede continuar: arrastra un suplente sobre su ficha y confirma el cambio (o sal y juegan con uno menos).</div>` : ""}
     <div class="grid sm:grid-cols-[minmax(0,1fr)_11rem] gap-3 items-start">
       <div id="match-pitch" class="pitch relative w-full h-[22rem] rounded-xl overflow-hidden border-2 border-slate-900"></div>
       <div>
@@ -405,13 +452,18 @@ function openSquadModal() {
     S.paused = wasPaused;
     updateMatchUI();
     if (fallidos) toast(`${fallidos} cambio(s) no se pudieron aplicar.`);
-  };
+    reanudar();
+  }
+
+  /** El reloj retoma al cerrar (el flujo de la lesión llega con el timer detenido). */
+  const reanudar = () => { if (!match.finished && !match.decision) startTimer(); };;
 
   /** Sale sin tocar el partido: deshace las reubicaciones y tira el plan. */
   const cancelar = () => {
     for (const [p, pos] of previo) p.posJugada = pos;
     closeModal();
     S.paused = wasPaused;
+    reanudar();
   };
 
   paint();

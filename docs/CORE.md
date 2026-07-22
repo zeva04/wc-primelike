@@ -370,12 +370,57 @@ restantes) para que el **Sprint A3** pueda meter contexto dinámico (marcador, m
 expulsados) sin reescribir el generador.
 
 **Ritmo** (`screens/match.js`, decisión PO "ráfaga"): entre secuencias la simulación **corre**
-(~360 ms/tick, el relato de ambiente pasa rápido) y **frena en seco** al llegar una secuencia; un
+(~600 ms/tick — 22-jul: era 360 y asfixiaba; ~260 en Rápido) y **frena en seco** al llegar una secuencia; un
 gol hace una pausa breve. El reloj se auto-agenda con `setTimeout` para variar el paso.
 
 > **La ventaja del DT humano.** El favorito recibe más y mejores secuencias, pero **ejecutarlas**
 > es del jugador: elegir bien el riesgo de cada acto rinde por encima del rating puro. El smoke,
 > que decide al azar, mide el piso; el humano que decide bien saca la diferencia.
+
+### El partido vivo (A3, decisiones #9, #10, #11 y #15)
+
+**Contexto dinámico en la generación** — todo se lee **EN VIVO** al generar (seqPlan cachea
+target/edge/perfil; el partido no se cachea):
+
+- **Marcador+minuto (umbral 75')**: perder tarde vuelca el reparto (+0.07 al `mineShare`) y el
+  fútbol se hace directo (transición/pelotazo ×1.5); ganar tarde entrega iniciativa (−0.05) y
+  crecen los repliegues (×1.4).
+- **Expulsados**: cada roja inclina la cancha (±0.06 por diferencia de expulsados).
+- **Fatiga** (energía media de los míos <55): solo sesga TIPOS — el equipo fundido no presiona
+  (recuperación ×0.6), revienta (pelotazo ×1.4) y el rival le asfixia la salida (salida_fondo
+  ×1.4). No toca la cantidad, para limitar el refuerzo a la palanca de energía.
+- **Memoria**: nunca sale el mismo tipo dos veces seguidas (`m._lastSeqType` → peso 0).
+
+**`[MORAL → OCASIONES]`** (por fin retirado el hook comentado de `Match.tick`): la Moral sesga el
+**TIPO, nunca el número**, y llega por `matchCtx` (el Match no conoce la run; se arma en
+`screens/match.js` Y en el smoke). Extremos fuertes + leves: nubes → valientes ×1.5
+(recuperación/transición), alta ×1.2; suelo → pelotazo ×1.5 y recuperación ×0.6, baja la versión
+leve; estable neutra.
+
+**Momento → protagonista** (`protMomentum`): el encendido (7) pide la pelota (~1.36×), el apagado
+(1) se esconde (~0.64×) — factor `1 + 0.12·(momento−4)` sobre `protWeight`, también en la
+conversión def→of. **Nunca toca una probabilidad de éxito** (el Momento ya escala stats).
+
+**Posesión y momentum DERIVADOS** (`Match.flow()`): todo lo generado se acumula en `m._flow`
+(secuencia peso 3 · penal/mano a mano 2 · remate ambiente 1). Posesión = % mío con prior neutral
+(arranca 50/50); momentum = neto de los últimos 15'. La UI los pinta bajo el marcador (barra +
+chip ▲▲/▲/·/▼/▼▼); el Match solo deriva.
+
+**Relato ambiente contextual** (`content/ambient.js`): ~19 líneas con predicado sobre un ctx que
+arma `Match._ambientLine` (marcador tardío, rojas, fatiga, momentum, bandas de Moral); las
+contextuales pesan 2-3× sobre las genéricas cuando aplican. El ambiente anticipa en el relato lo
+que el contexto ya hace en el motor.
+
+### ⚠️ Balance del Sprint A3
+
+Baseline fresco **33.2% n=4000**. Por etapas: contexto dinámico **~35.0** (+1.8, dos corridas
+35.2/34.7) → moral+momento **34.3** (+1.1, no acumula) → integrado final **35.7/36.0 (+2.5,
+FUERA del gate)**: el contexto favorece al que mejor explota las secuencias extra — el favorito.
+Recorte con el dial pactado más fino: **`BREAKAWAY_TICK` 0.018 → 0.025** (el canal plano es el
+arma del underdog; sensibilidad A2 ~−0.2pp por +0.001) → **34.0% n=4000 = +0.8, dentro del
+gate**. Exposición del último hombre 0.86/partido (histórico ~0.9). Siempre-Recuperar: 47.3 →
+48.3 n=1500 (+1.0 = ruido; el refuerzo temido de la fatiga→generación no apareció con fuerza —
+vigilado, reportado, no arreglado: es de otro sprint).
 
 ### ⚠️ Balance del Sprint A2
 

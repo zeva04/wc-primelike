@@ -9,15 +9,16 @@
      1. creador en chances.js/incidents.js (setea m.decision)
      2. resolver aquí o en el módulo hermano
      3. ruteo en ui.js handleDecision()
-   | id           | la crea       | la resuelve            |
-   |--------------|---------------|------------------------|
-   | sequence     | sequences.js  | resolveSequenceAct     |
-   | penalty_mine | chances.js    | resolvePenaltyMine     |
-   | penalty_opp  | chances.js    | resolvePenaltyOpp      |
-   | last_man     | chances.js    | resolveLastMan         |
-   | protect      | incidents.js  | ruteo UI → makeSub     |
-   | forced_sub   | incidents.js  | ruteo UI → makeSub     |
-   | gk_red       | incidents.js  | ruteo UI → makeSub     |
+   | id           | la crea       | la resuelve                          |
+   |--------------|---------------|--------------------------------------|
+   | sequence     | sequences.js  | resolveSequenceAct                   |
+   | penalty_mine | chances.js    | resolvePenaltyMine                   |
+   | penalty_opp  | chances.js    | resolvePenaltyOpp                    |
+   | last_man     | chances.js    | resolveLastMan                       |
+   | injury_sub   | incidents.js  | UI: abre la Gestión en vivo → makeSub |
+   | gk_red       | incidents.js  | ruteo UI → makeSub                   |
+   (protect y forced_sub se retiraron el 22-jul: la amarilla solo narra
+   y el reemplazo del lesionado es manual en la Gestión de plantilla.)
    (`sequence` es multi-acto: resolver un acto puede dejar OTRA
    decisión `sequence` —el acto siguiente—; los loops de UI y smoke
    la reprocesan solos porque tick() corta con decisión pendiente.)
@@ -28,10 +29,12 @@
      3. En "pens": startShootout() + shootMyPen()/shootOppPen() hasta shootoutStatus().done
      4. Al final: result()
    ============================================================ */
-import { rnd, pick } from "../../core/rng.js";
+import { rnd } from "../../core/rng.js";
 import { genOpponentLineup } from "../opponents.js";
 import { canPlayAt } from "../lineup.js";
 import { playedPos } from "../ratings.js";
+import { moraleBand } from "../morale.js";
+import { AMBIENT_LINES } from "../../content/ambient.js";
 import { teamPowers } from "./powers.js";
 import * as Chances from "./chances.js";
 import * as Sequences from "./sequences.js";
@@ -51,13 +54,16 @@ const PEN_OPP_TICK = 0.010;    // ≈0.18/partido, como cuando vivía en oppChan
 // canal ambiente CHICO — el pelotazo a la espalda que no nace de ninguna pérdida mía — y es
 // deliberadamente PLANO: es el arma del underdog (medido: sin él, los débiles no le generan
 // NINGÚN susto al favorito y BRA derivaba +3.7pp). La resolución del Sprint 1 sigue intacta.
-const BREAKAWAY_TICK = 0.018;
+// A3 lo subió 0.018 → 0.025: el contexto dinámico (marcador/rojas/fatiga en la generación)
+// derivó +2.3..+2.7pp hacia el favorito —quien mejor explota las secuencias extra— y este
+// canal PLANO es el contrapeso pactado (sensibilidad A2: ~−0.2pp por +0.001).
+const BREAKAWAY_TICK = 0.025;
 const AMBIENT_MINE = 0.85;     // el remate simulado propio cede algo de terreno a las secuencias
 const AMBIENT_OPP = 0.70;
 
 export class Match {
   /**
-   * @param my        { team, lineup: [6 refs al plantel], bench: [refs], mentalidad, buffs }
+   * @param my        { team, lineup: [6 refs al plantel], bench: [refs], mentalidad, buffs, moral }
    * @param oppTeam   equipo rival (jugable o no)
    * @param knockout  true = eliminatoria (empate → prórroga → penales)
    * @param oppBanned nombres del rival suspendidos (rojas del mundo vivo: run.rivalBans)
@@ -85,6 +91,7 @@ export class Match {
     this.lastManStops = [];    // MIS centrales que cortaron un gol como último hombre (+Momento)
     this.lastManFouls = [];    // MIS centrales que se ganaron tarjeta/penal como último hombre (−Momento)
     this.seq = null;           // secuencia en curso {type, prot/shooter, actIdx, bonus} o null (sequences.js)
+    this._flow = [];           // todo lo GENERADO {min, side, w}: secuencia 3 · penal/mano a mano 2 · ambiente 1 (A3, #11)
     // Minutos jugados por jugador (para el cansancio post-partido, medical): los titulares
     // entran al minuto 0; un cambio cierra los del que sale y arranca los del que entra.
     this._minutes = new Map();                              // jugador → minutos ya acumulados (los que salieron)
@@ -137,39 +144,60 @@ export class Match {
     if (this.min === 45) { this.log("info", "⏸️ Entretiempo. Ajusta tu equipo si quieres."); return "halftime"; }
     if (this.phase === "extra" && this.min === 105) { this.log("info", "⏸️ Fin del primer tiempo extra."); return "halftime"; }
 
-    // [MORAL → OCASIONES] SPRINT A3: la Moral del equipo sesgará AQUÍ el TIPO de secuencia
-    // (no el número — decisión PO), pasando la moral por matchCtx (el Match no conoce la run).
-    // El hook ya no vive suelto: entra por sequences.js cuando A3 lo enchufe.
-
     // Key Sequences (Bible §7): la columna interactiva del partido. Reemplazan a las
     // ocasiones sueltas de myChance/oppChance; 2-6 por partido moduladas por la preparación.
     if (Sequences.maybeStartSequence(this)) return true;
 
     // Eventos interactivos INDEPENDIENTES de las secuencias (penal y último hombre, intactos
     // del calibrado previo; A1 no toca su matemática, solo cada cuánto asoman como evento suelto).
-    if (rnd() < PEN_MINE_TICK) return Chances.myPenaltyChance(this);
-    if (rnd() < BREAKAWAY_TICK && Chances.lastManChance(this)) return true;
-    if (rnd() < PEN_OPP_TICK) return Chances.oppPenaltyChance(this);
+    if (rnd() < PEN_MINE_TICK) { this._flow.push({ min: this.min, side: "mine", w: 2 }); return Chances.myPenaltyChance(this); }
+    if (rnd() < BREAKAWAY_TICK && Chances.lastManChance(this)) { this._flow.push({ min: this.min, side: "opp", w: 2 }); return true; }
+    if (rnd() < PEN_OPP_TICK) { this._flow.push({ min: this.min, side: "opp", w: 2 }); return Chances.oppPenaltyChance(this); }
 
     // Ocasiones SIMULADAS (no interactivas): la parte "el resto se simula" del Bible §7.
     const ratioMy = mine.atk / (mine.atk + opp.def);
-    if (rnd() < (0.12 + 0.22 * ratioMy) * AMBIENT_MINE) Chances.ambientShotMine(this);
+    if (rnd() < (0.12 + 0.22 * ratioMy) * AMBIENT_MINE) { this._flow.push({ min: this.min, side: "mine", w: 1 }); Chances.ambientShotMine(this); }
     const ratioOpp = opp.atk / (opp.atk + mine.def);
-    if (rnd() < (0.09 + 0.24 * ratioOpp) * AMBIENT_OPP) Chances.ambientShotOpp(this, mine);
+    if (rnd() < (0.09 + 0.24 * ratioOpp) * AMBIENT_OPP) { this._flow.push({ min: this.min, side: "opp", w: 1 }); Chances.ambientShotOpp(this, mine); }
 
     // Faltas / tarjetas / lesiones
     if (rnd() < 0.10) return this._foulEvent();
     if (rnd() < 0.028) return this._injuryEvent();
 
-    // Relato ambiente
-    if (rnd() < 0.35) this.log("plain", pick([
-      "El partido se juega en el mediocampo.",
-      "La hinchada alienta sin parar.",
-      `${this.oppTeam.name} mueve la pelota con paciencia.`,
-      "Tu equipo presiona la salida rival.",
-      "Pelota dividida, nadie cede.",
-    ]));
+    // Relato ambiente contextual (A3): el pool vive en content/ambient.js y LEE el partido.
+    if (rnd() < 0.35) this.log("plain", this._ambientLine());
     return false;
+  }
+
+  /**
+   * Posesión y momentum DERIVADOS de lo generado (A3, decisión #11): quién generó qué, no
+   * números inventados. `pos` = % mío sobre el peso acumulado (con prior neutral: arranca
+   * 50/50 y una sola jugada no lo dispara); `net` = mi peso − el suyo en los últimos 15'
+   * (el momentum visible). La UI lo pinta; acá solo se deriva.
+   */
+  flow() {
+    const K = 5;
+    let mine = 0, opp = 0, net = 0;
+    for (const f of this._flow) {
+      if (f.side === "mine") mine += f.w; else opp += f.w;
+      if (f.min > this.min - 15) net += f.side === "mine" ? f.w : -f.w;
+    }
+    return { pos: Math.round(100 * (K + mine) / (2 * K + mine + opp)), net };
+  }
+
+  /** Elige la línea de ambiente: arma el ctx del partido y deja que el pool (content) decida el flavor. */
+  _ambientLine() {
+    const act = this.activeMine();
+    const ctx = {
+      min: this.min, late: this.min >= 75, diff: this.gMy - this.gOpp,
+      myReds: this.my.lineup.filter(p => p.expulsado).length,
+      oppReds: this.oppLineup.filter(p => p.expulsado).length,
+      tired: act.reduce((s, p) => s + p.energia, 0) / Math.max(1, act.length) < 55,
+      band: moraleBand(this.my.moral ?? 50).id,
+      net: this.flow().net,
+    };
+    const pool = AMBIENT_LINES.filter(l => l.when(ctx));
+    return this._weightedPick(pool, pool.map(l => l.w)).text(this);
   }
 
   // ---------- Delegación a los módulos de jugadas ----------

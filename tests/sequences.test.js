@@ -168,6 +168,155 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
   assert(m.seq === null && m.gOpp === golesAntes, "reventarla cierra la secuencia sin riesgo");
 }
 
+// ---------- A3: contexto dinámico en la generación ----------
+// Muestrea la generación bajo un estado dado: fuerza el plan a target infinito (pStart ≥ 1)
+// y cuenta lados y tipos. La memoria "no repetir" se resetea por muestra para no sesgar.
+function genSample(oppId, mut, n = 4000) {
+  const m = makeMatch(oppId);
+  m.min = 50;
+  E.maybeStartSequence(m); // primera llamada: crea m._seqPlan (target/edge/prof cacheados)
+  m._seqPlan.target = 1e9;
+  mut?.(m);
+  const out = { mine: 0, total: 0, types: {} };
+  for (let i = 0; i < n; i++) {
+    m.seq = null; m.decision = null; m._lastSeqType = null;
+    if (!E.maybeStartSequence(m)) continue;
+    out.total++;
+    out.types[m._lastSeqType] = (out.types[m._lastSeqType] || 0) + 1;
+    if (E.sequenceType(m._lastSeqType).side === "mine") out.mine++;
+  }
+  out.mineShare = out.mine / out.total;
+  out.share = id => (out.types[id] || 0) / out.total;
+  return out;
+}
+
+{
+  const neutral = genSample("ARG");
+  // Perder tarde: empuja el reparto (+0.07) y el fútbol se hace directo (transición/pelotazo ×1.5)
+  const losing = genSample("ARG", m => { m.min = 80; m.gOpp = 1; });
+  assert(losing.mineShare - neutral.mineShare > 0.03, "perder a los 80' vuelca el reparto hacia mí (+0.07)",
+    `${neutral.mineShare.toFixed(3)} → ${losing.mineShare.toFixed(3)}`);
+  const directo = s => s.share("transicion") + s.share("pelotazo");
+  assert(directo(losing) > directo(neutral), "perder tarde sesga hacia el fútbol directo (×1.5)",
+    `${directo(neutral).toFixed(3)} → ${directo(losing).toFixed(3)}`);
+  // Ganar tarde: el rival empuja (−0.05) y crecen los repliegues (×1.4)
+  const winning = genSample("ARG", m => { m.min = 80; m.gMy = 1; });
+  assert(winning.mineShare - neutral.mineShare < -0.02, "ganar a los 80' le entrega iniciativa al rival (−0.05)",
+    `${neutral.mineShare.toFixed(3)} → ${winning.mineShare.toFixed(3)}`);
+  // Expulsados: cada roja inclina la cancha (±0.06)
+  const oppDown = genSample("ARG", m => { m.oppLineup.filter(p => p.pos !== "POR").slice(0, 2).forEach(p => p.expulsado = true); });
+  assert(oppDown.mineShare - neutral.mineShare > 0.06, "dos rojas rivales inclinan la cancha hacia mí (+0.12)",
+    `${neutral.mineShare.toFixed(3)} → ${oppDown.mineShare.toFixed(3)}`);
+  // Fatiga: el equipo fundido no presiona (recuperación ×0.6) y revienta (pelotazo ×1.4)
+  const tired = genSample("ARG", m => m.my.lineup.forEach(p => p.energia = 30));
+  assert(tired.share("pelotazo") > neutral.share("pelotazo"), "la fatiga empuja al pelotazo (×1.4)",
+    `${neutral.share("pelotazo").toFixed(3)} → ${tired.share("pelotazo").toFixed(3)}`);
+  assert(tired.share("recuperacion") < neutral.share("recuperacion"), "el equipo fundido no presiona (×0.6)",
+    `${neutral.share("recuperacion").toFixed(3)} → ${tired.share("recuperacion").toFixed(3)}`);
+}
+
+// Memoria de secuencias: el generador nunca repite tipo dos veces seguidas
+{
+  const m = makeMatch("ARG");
+  m.min = 50;
+  E.maybeStartSequence(m);
+  m._seqPlan.target = 1e9;
+  let prev = null, repeats = 0, gen = 0;
+  for (let i = 0; i < 800; i++) {
+    m.seq = null; m.decision = null;
+    if (!E.maybeStartSequence(m)) continue;
+    gen++;
+    if (m._lastSeqType === prev) repeats++;
+    prev = m._lastSeqType;
+  }
+  assert(gen > 500, "la muestra de generación es real", gen);
+  assert(repeats === 0, "nunca sale el mismo tipo dos veces seguidas", `${repeats}/${gen}`);
+}
+
+// ---------- A3: [MORAL → OCASIONES] — la Moral sesga el TIPO, no el número ----------
+{
+  const moralVal = band => { for (let v = 1; v <= 100; v++) if (E.moraleBand(v).id === band) return v; };
+  const withMoral = band => genSample("ARG", m => { m.my.moral = moralVal(band); });
+  const estable = withMoral("estable"), nubes = withMoral("nubes"), suelo = withMoral("suelo");
+  const valiente = s => s.share("recuperacion") + s.share("transicion");
+  assert(valiente(nubes) > valiente(estable), "en las nubes el equipo se anima (recuperación/transición ×1.5)",
+    `${valiente(estable).toFixed(3)} → ${valiente(nubes).toFixed(3)}`);
+  assert(suelo.share("pelotazo") > estable.share("pelotazo"), "por el suelo el equipo revienta (pelotazo ×1.5)",
+    `${estable.share("pelotazo").toFixed(3)} → ${suelo.share("pelotazo").toFixed(3)}`);
+  assert(suelo.share("recuperacion") < estable.share("recuperacion"), "por el suelo no presiona (recuperación ×0.6)",
+    `${estable.share("recuperacion").toFixed(3)} → ${suelo.share("recuperacion").toFixed(3)}`);
+}
+
+// ---------- A3: Momento → protagonista (pondera QUIÉN, nunca el éxito) ----------
+{
+  assert(Math.abs(E.protMomentum({ momento: 7 }) - 1.36) < 1e-9 && Math.abs(E.protMomentum({ momento: 1 }) - 0.64) < 1e-9,
+    "protMomentum: 7 → 1.36× · 1 → 0.64×");
+  assert(E.protMomentum({}) === 1, "sin Momento (rivales) el factor es neutro");
+  const m = makeMatch();
+  const cands = m.activeMine().filter(p => p.pos !== "POR");
+  const star = cands[0];
+  const count = n => { let c = 0; for (let i = 0; i < n; i++) { E.startSequence(m, E.sequenceType("circulacion")); if (m.seq.prot === star) c++; m.seq = null; m.decision = null; } return c; };
+  cands.forEach(p => p.momento = 4);
+  const base = count(3000);
+  star.momento = 7; cands.slice(1).forEach(p => p.momento = 1);
+  const hot = count(3000);
+  assert(hot > base * 1.2, "el encendido protagoniza más que en la base (y los apagados se esconden)",
+    `base=${base} hot=${hot}`);
+}
+
+// ---------- A3: posesión y momentum DERIVADOS (flow) + relato ambiente contextual ----------
+{
+  const m = makeMatch();
+  assert(m.flow().pos === 50 && m.flow().net === 0, "sin nada generado, la posesión arranca 50/50 y sin momentum");
+  m.min = 20;
+  m._flow.push({ min: 10, side: "mine", w: 3 }, { min: 20, side: "mine", w: 3 });
+  const f1 = m.flow();
+  assert(f1.pos > 50 && f1.net === 6, "lo generado mío empuja posesión y momentum", JSON.stringify(f1));
+  m.min = 40; // la ventana de momentum son los últimos 15': lo viejo pesa en posesión, no en net
+  const f2 = m.flow();
+  assert(f2.pos === f1.pos && f2.net === 0, "el momentum olvida (ventana 15'), la posesión no", JSON.stringify(f2));
+  m._flow.push({ min: 40, side: "opp", w: 3 });
+  assert(m.flow().net === -3, "lo generado del rival resta momentum", m.flow().net);
+
+  // El pool ambiente: esquema sano y líneas que siempre devuelven texto
+  assert(E.AMBIENT_LINES.length >= 15, "el pool ambiente tiene volumen (≥15 líneas)", E.AMBIENT_LINES.length);
+  for (const l of E.AMBIENT_LINES) assert(typeof l.when === "function" && l.w > 0 && typeof l.text === "function", "línea ambiente bien formada");
+  const states = [m2 => {}, m2 => { m2.min = 80; m2.gOpp = 2; }, m2 => { m2.min = 80; m2.gMy = 1; }, m2 => { m2.my.lineup[3].expulsado = true; }, m2 => m2.my.lineup.forEach(p => p.energia = 20)];
+  for (const setup of states) {
+    const m2 = makeMatch(); m2.min = 50; setup(m2);
+    for (let i = 0; i < 40; i++) {
+      const line = m2._ambientLine();
+      assert(typeof line === "string" && line.length > 0, "el ambiente siempre narra algo", line);
+    }
+  }
+  // Perdiendo tarde, el relato contextual domina: alguna línea de urgencia tiene que salir
+  const m3 = makeMatch(); m3.min = 80; m3.gOpp = 1;
+  let urgent = false;
+  for (let i = 0; i < 120 && !urgent; i++) {
+    const line = m3._ambientLine();
+    if (line.includes("vuelca al ataque") || line.includes("ahora o nunca")) urgent = true;
+  }
+  assert(urgent, "perdiendo a los 80' el relato lee el partido (línea de urgencia)");
+}
+
+// ---------- Mejoras 22-jul: el que pasa SE DESPRENDE de la pelota ----------
+{
+  const m = makeMatch();
+  m.min = 20;
+  E.startSequence(m, E.sequenceType("circulacion"));
+  const p0 = m.seq.prot;
+  m.resolveSequenceAct("seguro"); // el pase seguro siempre progresa
+  assert(m.seq && m.seq.prot !== p0, "tras un pase la pelota cambia de protagonista", m.seq?.prot?.name);
+  assert(m.seq.assistFrom === p0, "el pasador queda como asistidor potencial del que sigue");
+
+  const m2 = makeMatch();
+  m2.min = 20;
+  E.startSequence(m2, E.sequenceType("transicion"));
+  const q0 = m2.seq.prot;
+  m2.resolveSequenceAct("pase"); // pase al pie: seguro, también se desprende
+  assert(m2.seq && m2.seq.prot !== q0, "el pase al pie también cambia de pies la pelota");
+}
+
 console.log(`sequences.test: ${checks} checks · fallos: ${fails}`);
 console.log(fails ? "❌ sequences con fallos" : "✅ sequences OK");
 process.exit(fails ? 1 : 0);

@@ -14,6 +14,7 @@
 import { rnd, pick } from "../../core/rng.js";
 import { playedPos } from "../ratings.js";
 import { sequenceType } from "../../content/sequences.js";
+import { protMomentum } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
 import * as A from "./actions.js";
 import { goalMine, goalOpp, myPenalty, lastManChance } from "./chances.js";
 
@@ -102,6 +103,26 @@ export function buildActDecision(m) {
   m.decision = { id: "sequence", ...opts };
 }
 
+// Feedback del DT (PO 22-jul): solo las decisiones con RIESGO real generan comentario —
+// el relato celebra el acierto de la arriesgada y cobra su fallo. La opción segura no
+// opina: no hay mérito en lo seguro.
+const dtOk = m => m.log("info", `min ${m.min}' — 🎯 ${pick(["La decisión del DT fue la correcta.", "La apuesta del banco sale perfecta.", "El riesgo del DT paga."])}`);
+const dtFail = m => m.log("info", `min ${m.min}' — 💢 ${pick(["La apuesta del DT salió cara.", "El riesgo no pagó esta vez.", "Decisión valiente, castigo inmediato."])}`);
+
+/**
+ * El que pasa SE DESPRENDE de la pelota (bug PO 22-jul): la recibe un compañero, que pasa a
+ * ser el protagonista del acto siguiente (ponderado por el puesto que pide el tipo y su
+ * Momento, como en el arranque). El pasador queda como asistidor si el receptor convierte.
+ * Devuelve false si no hay a quién pasársela (equipo diezmado): el prot no cambia.
+ */
+function passTo(m, s) {
+  const cands = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
+  if (!cands.length) return false;
+  s.assistFrom = s.prot;
+  s.prot = m._weightedPick(cands, cands.map(p => (s.type.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
+  return true;
+}
+
 /**
  * Resuelve el acto actual con la opción elegida. Narra, y ESCALA (deja la decisión del acto
  * siguiente) o CIERRA la secuencia (desenlace: gol, erra, corte). Devuelve false (el tick
@@ -121,10 +142,12 @@ export function resolveSequenceAct(m, key) {
     // fallo y el scoring se derrumba (medido en A1).
     if (key === "filtrado") {
       const r = A.actPass(m, s.prot, { hard: true });
-      if (!r.ok) return maybeCounter(m, `min ${m.min}' — ${f.buildFail}`);
+      if (!r.ok) return maybeCounter(m, `min ${m.min}' — ${f.buildFail}`, true);
       s.bonus += 0.07;
     }
-    m.log("plain", `min ${m.min}' — ${f.buildOk}`);
+    const recibe = passTo(m, s); // seguro o filtrado: el pase cambia la pelota de pies
+    m.log("plain", `min ${m.min}' — ${f.buildOk}${recibe ? ` La recibe ${s.prot.name}.` : ""}`);
+    if (key === "filtrado") dtOk(m);
     return escalate(m);
   }
 
@@ -132,12 +155,17 @@ export function resolveSequenceAct(m, key) {
     if (key === "conducir") {
       const r = A.actDribble(m, s.prot);
       if (r.foul) { m.log("event", `min ${m.min}' — ¡Derriban a ${s.prot.name}! ¡PENAL!`); closeSilent(m); return myPenalty(m); }
-      if (!r.ok) return maybeCounter(m, `min ${m.min}' — ${f.carryFail}`);
+      if (!r.ok) return maybeCounter(m, `min ${m.min}' — ${f.carryFail}`, true);
       s.bonus += 0.05;
+      m.log("plain", `min ${m.min}' — ${f.carryOk(s.prot)}`);
+      dtOk(m);
     } else {
       s.bonus += 0.02; // pase al pie: seguro, siempre progresa
+      const pasador = s.prot;
+      m.log("plain", passTo(m, s) // el pase al pie también se desprende de la pelota
+        ? `min ${m.min}' — ${pasador.name} la juega al pie y ${s.prot.name} toma la posta.`
+        : `min ${m.min}' — ${f.carryOk(s.prot)}`);
     }
-    m.log("plain", `min ${m.min}' — ${f.carryOk(s.prot)}`);
     return escalate(m);
   }
 
@@ -147,9 +175,10 @@ export function resolveSequenceAct(m, key) {
     const { mine } = m.powers();
     const total = key === "total";
     const r = A.actContain(m, mine, { press: total, bonus: 0.10 });
-    if (!r.ok) return maybeCounter(m, `min ${m.min}' — ${f.pressFail}`);
+    if (!r.ok) return maybeCounter(m, `min ${m.min}' — ${f.pressFail}`, total);
     s.bonus += total ? 0.15 : 0.05;
     m.log("event", `min ${m.min}' — ${f.pressOk}`);
+    if (total) dtOk(m);
     return escalate(m);
   }
 
@@ -158,13 +187,18 @@ export function resolveSequenceAct(m, key) {
     // letal, más difícil de ganar). El Cabezazo por fin decide jugadas.
     const winner = s.prot;
     const r = A.actAerial(m, s.prot, { handicap: key === "peinar" ? 0.08 : 0 });
-    if (!r.ok) return closeSeq(m, "chance", `min ${m.min}' — ${f.duelFail}`);
+    if (!r.ok) {
+      const out = closeSeq(m, "chance", `min ${m.min}' — ${f.duelFail}`);
+      if (key === "peinar") dtFail(m);
+      return out;
+    }
     m.log("event", `min ${m.min}' — ${f.duelOk(winner)}`);
     if (key === "peinar") {
       const runners = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
       if (runners.length) s.prot = m._weightedPick(runners, runners.map(p => playedPos(p) === "DEL" ? 3 : 1));
       s.assistFrom = winner; // la peinada es la asistencia si el lanzado convierte
       s.bonus += 0.10;
+      dtOk(m);
     } else {
       s.finishStat = "cabezazo"; // ganó por arriba: define de cabeza
       s.bonus += 0.05;
@@ -178,7 +212,7 @@ export function resolveSequenceAct(m, key) {
       const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
       const mate = mates.length ? m._weightedPick(mates, mates.map(p => playedPos(p) === "DEL" ? 3 : 1)) : s.prot;
       const pass = A.actPass(m, s.prot);
-      if (!pass.ok) return maybeCounter(m, `min ${m.min}' — el pase de ${s.prot.name} no encuentra a nadie.`);
+      if (!pass.ok) return maybeCounter(m, `min ${m.min}' — el pase de ${s.prot.name} no encuentra a nadie.`, true);
       const shot = A.actShot(m, mate, { stat: "tiro", bonus: s.bonus + f.finishBonus + 0.04 });
       if (shot.ok) { goalMine(m, mate, "¡Definición tras la asistencia!", s.prot); return closeSilent(m); }
       return maybeRebound(m, `min ${m.min}' — ${mate.name} no logra conectar el remate.`);
@@ -206,7 +240,8 @@ export function resolveSequenceAct(m, key) {
     const { mine } = m.powers();
     if (key === "salir") {
       const r = A.actContain(m, mine, { press: true, bonus: 0.06 });
-      if (r.ok) return closeSeq(m, "event", `min ${m.min}' — 🥊 ¡La zaga sale con todo y despeja el córner de una!`);
+      if (r.ok) { const out = closeSeq(m, "event", `min ${m.min}' — 🥊 ¡La zaga sale con todo y despeja el córner de una!`); dtOk(m); return out; }
+      dtFail(m);
       const shot = A.actOppShot(m, s.shooter, mine, { stat: "cabezazo", bonus: 0.08 });
       if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
       return closeSeq(m, "chance", `min ${m.min}' — ¡${s.shooter.name} cabecea SOLO pero ${mine.por ? mine.por.name : "el arquero"} la saca de milagro!`);
@@ -223,16 +258,19 @@ export function resolveSequenceAct(m, key) {
     const r = A.actPass(m, s.prot, { hard: true });
     if (!r.ok) {
       m.log("chance", `min ${m.min}' — ${f.playoutFail(s.prot)}`);
+      dtFail(m);
       const { mine } = m.powers();
       const shot = A.actOppShot(m, s.shooter, mine, { bonus: 0.12 });
       if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
       return closeSeq(m, "chance", `min ${m.min}' — ${s.shooter.name} remata el regalo pero ${mine.por ? mine.por.name : "el arquero"} responde. Se salvaron.`);
     }
     m.log("event", `min ${m.min}' — ${f.playoutOk(s.prot)}`);
+    dtOk(m);
     const t = sequenceType("transicion");
     const cands = m.activeMine().filter(p => p.pos !== "POR");
-    const prot = m._weightedPick(cands, cands.map(p => t.protWeight[playedPos(p)] ?? 1));
-    m.seq = { type: t, prot, actIdx: 0, bonus: 0.04 }; // misma secuencia, ahora es MI contra
+    const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
+    // misma secuencia, ahora es MI contra; el que rompió la presión asiste si esto termina en gol
+    m.seq = { type: t, prot, actIdx: 0, bonus: 0.04, assistFrom: s.prot };
     buildActDecision(m);
     return false;
   }
@@ -240,9 +278,10 @@ export function resolveSequenceAct(m, key) {
   if (kind === "contain") {
     const { mine } = m.powers();
     const r = A.actContain(m, mine, { press: key === "presionar" });
-    if (r.ok) return closeSeq(m, "event", `min ${m.min}' — 🧱 ${f.containOk}`);
+    if (r.ok) { const out = closeSeq(m, "event", `min ${m.min}' — 🧱 ${f.containOk}`); if (r.press) dtOk(m); return out; }
     if (r.press) s.bonus = 0.05; // presión fallida: el rival queda mejor perfilado
     m.log("chance", `min ${m.min}' — ${f.containFail(m.oppTeam)}`);
+    if (r.press) dtFail(m);
     // ABSORCIÓN DEL ÚLTIMO HOMBRE (Sprint A2, decisión PO #7): buena parte de las
     // contenciones rotas terminan en el mano a mano con MI central — la decisión
     // `last_man` del Sprint 1, con su calibración INTACTA (lastManChance/resolveLastMan
@@ -309,9 +348,14 @@ function maybeRebound(m, failText) {
  * a veces el rival sale de contra con el equipo partido. Elegir la opción de riesgo tiene
  * que poder DOLER — es la mordida que le faltaba al riesgo/recompensa de los actos.
  */
-function maybeCounter(m, failText) {
-  if (rnd() >= COUNTER_CHANCE) return closeSeq(m, "chance", failText);
+function maybeCounter(m, failText, risky = false) {
+  if (rnd() >= COUNTER_CHANCE) {
+    const out = closeSeq(m, "chance", failText);
+    if (risky) dtFail(m);
+    return out;
+  }
   m.log("chance", failText);
+  if (risky) dtFail(m);
   m.log("event", `min ${m.min}' — ¡${m.oppTeam.name} sale de CONTRA con el equipo partido!`);
   // La mitad de las contras terminan en el mano a mano del último hombre (absorción A2,
   // calibración del Sprint 1 intacta); la otra mitad, en remate directo del que se escapó.

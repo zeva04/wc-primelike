@@ -89,7 +89,10 @@ export function scheduleNextMatch(run) {
   for (let d = run.day + 1; d < run.nextMatchDay; d++) {
     if (rnd() >= OPPORTUNITY_CHANCE) continue;
     const opp = drawByRarity(oppPools);
-    if (opp) run.dayPlan[d].opp = opp.id;
+    // La Oportunidad MANDA su día (PO 22-jul, "cada día trae UNA sola cosa"): reemplaza al
+    // evento planificado. El día amanece 🧘 tranquilo en el calendario — la temática ya no
+    // delata nada y la oferta sorprende sola (refuerza el "sin aviso previo").
+    if (opp) run.dayPlan[d] = { opp: opp.id };
     break; // tope: 1 oportunidad por ventana
   }
 }
@@ -123,6 +126,7 @@ export function advanceDay(run) {
   const plan = run.dayPlan[run.day];
   if (!plan) { run.actionPending = false; return { type: "match" }; } // no debería ocurrir: todo día intermedio tiene plan
   if (plan.opp) { run.dayOpp = { id: plan.opp }; run.stats.oppOfrecidas++; } // la cuenta final revela las que dejaste pasar
+  if (!plan.kind) return { type: "tranquilo" }; // día de Oportunidad: sin evento (un solo estímulo por día)
   if (plan.kind === "evento") {
     const ev = PREP_EVENTS.find(e => e.id === plan.id);
     const desc = ev.effect(run) || ev.desc; // el efecto puede devolver un desc con protagonista

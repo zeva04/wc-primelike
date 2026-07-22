@@ -48,7 +48,8 @@ function playMatch(run, oppId) {
     `[${val.msg}] once: ${lineup.map(p => `${p.pos}:${p.name}`).join(", ")} · fuera: ${run.squad.filter(p => p.suspendido || p.lesionadoPartidos > 0).map(p => `${p.name}(${p.pos}${p.suspendido ? " susp" : " les" + p.lesionadoPartidos})`).join(", ") || "nadie"}`);
   assert(lineup.every(p => E.outOfPosPenalty(p) === 0), "el once automático no debe castigar a nadie");
   const bench = available.filter(p => !lineup.includes(p));
-  const ctx = { team: me, lineup, bench, mentalidad: "normal", buffs: { ...run.buffs } };
+  // matchCtx homólogo al de screens/match.js (la moral entra al generador por acá — A3)
+  const ctx = { team: me, lineup, bench, mentalidad: "normal", buffs: { ...run.buffs }, moral: run.moral };
   const banned = run.rivalBans[oppId] || [];
   const match = new E.Match(ctx, opp, run.stage !== "groups", banned);
   // La suspensión por roja ajena es real: el suspendido no puede estar en el once rival
@@ -67,9 +68,15 @@ function playMatch(run, oppId) {
       else if (d.id === "penalty_mine") match.resolvePenaltyMine(opt.key);
       else if (d.id === "penalty_opp") match.resolvePenaltyOpp(opt.key);
       else if (d.id === "last_man") match.resolveLastMan(opt.key);
-      else if (d.id === "forced_sub") { match.decision = null; match.makeSub(d.out, opt.key); }
+      else if (d.id === "injury_sub") {
+        // En la UI el reemplazo del lesionado es manual (Gestión en vivo); acá se emula
+        // con un elegible al azar — mismo efecto que la lista vieja para el balance.
+        match.decision = null;
+        const elig = match.eligibleFor(d.player);
+        if (elig.length) match.makeSub(d.player, elig[Math.floor(Math.random() * elig.length)].name);
+      }
       else if (d.id === "gk_red") { match.decision = null; match.makeSub(match.my.lineup.find(p => p.name === opt.key), d.gkIn, true); }
-      else match.decision = null; // protect: lo deja en cancha
+      else match.decision = null;
     } else if (r === "pens") {
       match.startShootout();
       // Guard anti-loop-infinito, NO una afirmación sobre cuánto dura una tanda: con 60
@@ -96,6 +103,7 @@ function playRun(teamId) {
   assert(run.journal.length === 1, "el diario debe abrir con el sorteo");
   let alive = true, champion = false, guard = 0;
   let oppSeen = 0, oppTaken = 0; // contabilidad paralela de oportunidades (audita run.stats)
+  const dailySeen = new Map();   // texto de titular → último día en portada (bug PO 22-jul: sin repetirse en la semana)
 
   while (alive && guard++ < 60) {
     let dayGuard = 0, oppDays = 0;
@@ -153,6 +161,8 @@ function playRun(teamId) {
         oppDays++; oppSeen++;
         assert(oppDays <= 1, "máx 1 oportunidad por ventana entre partidos");
         assert(E.dayOpportunity(run), "la oportunidad viva debe existir en el pool", run.dayOpp.id);
+        // Un solo estímulo por día (bug PO 22-jul): el día de la Oportunidad no trae evento
+        assert(ev && ev.type === "tranquilo", "el día de la Oportunidad amanece tranquilo", ev && ev.type);
       }
       // El mundo jugó "anoche": las entradas de lastNight deben estar completas
       for (const n of run.lastNight) {
@@ -162,7 +172,13 @@ function playRun(teamId) {
       // El World Cup Daily se lee al llegar al día nuevo (mismo orden que la UI)
       const daily = E.buildDaily(run);
       assert(daily.items.length >= 1 && daily.items.length <= 5, "el Daily trae 1-5 titulares", daily.items.length);
-      for (const it of daily.items) assert(it.icon && it.text && it.tag, "titular completo (icon/text/tag)", JSON.stringify(it));
+      for (const it of daily.items) {
+        assert(it.icon && it.text && it.tag, "titular completo (icon/text/tag)", JSON.stringify(it));
+        if (it.tag === "PORTADA") continue;
+        const prev = dailySeen.get(it.text);
+        assert(!(prev >= run.day - 6 && prev < run.day), "titular repetido en la misma semana", it.text);
+        dailySeen.set(it.text, run.day);
+      }
       if (ev && ev.type === "conflicto") {
         const opt = ev.options[Math.floor(Math.random() * ev.options.length)];
         const res = opt.effect(run);

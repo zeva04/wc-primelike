@@ -18,8 +18,9 @@
                    contar son deliberados (§4.4: contraste)
 
    El Daily INFORMA; el evento del día TRANSFORMA (llega después).
-   Nada de acá muta la run: es una consulta de solo lectura
-   (salvo el pick() del flavor, que consume rng).
+   Casi nada de acá muta la run: es una consulta de solo lectura
+   (salvo el pick() del flavor, que consume rng, y `_dailySeen`,
+   la memoria anti-repetición: texto → último día en portada).
    ============================================================ */
 import { pick } from "../core/rng.js";
 import { getTeam } from "../data/teams-repo.js";
@@ -221,8 +222,20 @@ export function buildDaily(run) {
     if (src?.teaser) items.push({ icon: "🔭", tag: "HOY", text: src.teaser });
   }
 
-  // P4 — color, solo si el día viene tranquilo (máximo 1)
-  if (items.length < 3) items.push({ ...pick(DAILY_FLAVOR), tag: "COLOR" });
+  // Sin repetirse en la semana (bug PO 22-jul): un titular con EXACTAMENTE el mismo texto
+  // que ya salió en los últimos 7 días se suprime — si el estado cambió (otro marcador,
+  // otro lesionado), el texto cambia y vuelve a ser noticia. La PORTADA de día de partido
+  // no se toca. Re-armar la edición del MISMO día no se suprime a sí misma (seen == hoy).
+  run._dailySeen = run._dailySeen || {};
+  const repetido = text => run._dailySeen[text] >= run.day - 6 && run._dailySeen[text] < run.day;
+  let final = items.filter(it => it.tag === "PORTADA" || !repetido(it.text));
 
-  return { day: run.day, isMatchDay, items: items.slice(0, 5) };
+  // P4 — color, solo si el día viene tranquilo (máximo 1) — y sin repetir la nota de color
+  if (final.length < 3) {
+    const pool = DAILY_FLAVOR.filter(fl => !repetido(fl.text));
+    final.push({ ...pick(pool.length ? pool : DAILY_FLAVOR), tag: "COLOR" });
+  }
+  final = final.slice(0, 5);
+  for (const it of final) run._dailySeen[it.text] = Math.max(run._dailySeen[it.text] ?? -1, run.day);
+  return { day: run.day, isMatchDay, items: final };
 }

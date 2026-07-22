@@ -20,7 +20,7 @@ import { momentoPct, momentoLabel } from "../../game/momentum.js";
 import { moraleBand } from "../../game/morale.js";
 import {
   currentLineup, autoLineup, validateLineup, assignPositions, canPlayAt,
-  formationSlots, FORMATIONS, getFormation, canUseFormation,
+  formationSlots, FORMATIONS, getFormation, canUseFormation, maxLineupSize,
 } from "../../game/lineup.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
@@ -117,8 +117,18 @@ function moraleBadge() {
   </div>`;
 }
 
-/** Trae el once vigente del motor (lo rearma si hay bajas nuevas) y deja los puestos asignados. */
+/**
+ * Trae el once vigente y deja los puestos asignados. Las BAJAS no se auto-reemplazan
+ * (PO 22-jul): el caído queda a la vista en su slot (muted 🚑/🟥) y el DT arma el cambio
+ * a mano — arrastrando un suplente sobre él o desde su ficha. La válvula automática queda
+ * solo para el plantel diezmado (no llega a 6: sin decisión que tomar, evita el softlock).
+ */
 function refreshLineup() {
+  const bajas = (S.selectedLineup || []).filter(p => !isAvailable(p));
+  if (bajas.length && maxLineupSize(availables()) >= 6) {
+    assignPositions(S.run.squad, S.selectedLineup, S.formation);
+    return;
+  }
   ({ lineup: S.selectedLineup, formationId: S.formation } = currentLineup(S.run.squad, S.selectedLineup, S.formation));
 }
 
@@ -342,6 +352,15 @@ function renderStatus(available) {
   const v = validateLineup(available, S.selectedLineup);
   const f = getFormation(S.formation);
   const fuera = S.selectedLineup.filter(p => outOfPosPenalty(p) > 0);
+  // Baja en el once (validateLineup no mira disponibilidad): la instrucción manda, y si el
+  // plantel ya no cubre la formación actual, se LEE que hay que cambiarla (PO 22-jul).
+  const bajas = S.selectedLineup.filter(p => !isAvailable(p));
+  if (bajas.length) {
+    const sinFormacion = !canUseFormation(available, S.formation);
+    st.innerHTML = `<span class="text-red-400">🚑 Baja en el once: ${bajas.map(p => p.name).join(" y ")}. Arrastra un suplente sobre su ficha (o entra a su ficha) para reemplazarlo.</span>${
+      sinFormacion ? `<span class="text-orange-400"> · ❗ Ya no te quedan jugadores para sostener la ${S.formation}: elige otra formación en el selector.</span>` : ""}`;
+    return;
+  }
   if (!v.ok) { st.innerHTML = `<span class="text-amber-400">⚠️ ${v.msg}</span>`; return; }
   st.innerHTML = `<span class="tp-text font-semibold">✅ ${f ? `Formación ${f.id} · ${f.hint}` : "Alineación improvisada"}</span>
     ${fuera.length
@@ -370,8 +389,13 @@ const slotPos = (i) => formationSlots(S.formation)[i] || S.selectedLineup[i].pos
  * ocupar los arqueros porque sus stats son otro juego (game/lineup.canPlayAt).
  */
 function swapCandidates(p) {
-  if (!isAvailable(p)) return [];
   const i = idxOf(p);
+  // El titular DE BAJA (🚑/🟥) no juega ni se mueve, pero SÍ se reemplaza: puede entrar en
+  // su slot cualquier disponible del banco (PO 22-jul: el reemplazo es manual, acá).
+  if (!isAvailable(p)) {
+    if (i < 0) return [];
+    return S.run.squad.filter(q => q !== p && idxOf(q) < 0 && isAvailable(q) && canPlayAt(q, slotPos(i)));
+  }
   if (i >= 0) {
     return S.run.squad.filter(q => {
       if (q === p || !isAvailable(q)) return false;

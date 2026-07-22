@@ -32,11 +32,20 @@
 import { rnd, ri, pick } from "../../core/rng.js";
 import { clamp } from "../../core/math.js";
 import { playedPos } from "../ratings.js";
+import { moraleBand } from "../morale.js";
 import { SEQUENCE_TYPES } from "../../content/sequences.js";
 import { buildActDecision } from "./sequence-acts.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
 export const SEQ_MIN = 2, SEQ_MAX = 6;
+
+/**
+ * Factor de presencia por Momento (A3, decisión #15): el encendido (7) pide la pelota
+ * (~1.36×), el apagado (1) se esconde (~0.64×). Pondera QUIÉN protagoniza — nunca toca una
+ * probabilidad de éxito: el Momento ya escala stats por statAt (sería contarlo dos veces).
+ * Lo usan startSequence y la conversión def→of de sequence-acts (el mismo pick).
+ */
+export function protMomentum(p) { return 1 + 0.12 * ((p.momento ?? 4) - 4); }
 
 /**
  * Perfil del rival DERIVADO de sus stats (decisión PO A2, #14): sin datos nuevos, cada
@@ -77,18 +86,33 @@ function seqPlan(m) {
  */
 function typeWeights(m, side, prof) {
   const ment = m.my.mentalidad;
-  if (side === "mine") return {
+  // Contexto dinámico (A3, decisión #9): TODO se lee EN VIVO al generar, nunca se cachea
+  // (seqPlan cachea target/edge/perfil; el partido —marcador, minuto, fatiga— cambia).
+  const losingLate = m.min >= 75 && m.gMy < m.gOpp;   // perder tarde → fútbol directo
+  const winningLate = m.min >= 75 && m.gMy > m.gOpp;  // ganar tarde → el rival te empuja
+  const act = m.activeMine();
+  const tired = act.reduce((s, p) => s + p.energia, 0) / Math.max(1, act.length) < 55;
+  // [MORAL → OCASIONES] (A3, decisión #10): la Moral sesga el TIPO, nunca el número. Llega
+  // por matchCtx (el Match no conoce la run). Extremos fuertes + leves: en las nubes el
+  // equipo se anima (presiona y corre); por el suelo, se asusta (revienta, no presiona).
+  const band = moraleBand(m.my.moral ?? 50).id;
+  const brave = band === "nubes" ? 1.5 : band === "alta" ? 1.2 : 1;
+  const scared = band === "suelo" ? 1.5 : band === "baja" ? 1.2 : 1;
+  const noPress = band === "suelo" ? 0.6 : band === "baja" ? 0.8 : 1;
+  const w = side === "mine" ? {
     circulacion: 3,
-    transicion: 2.5 + 2 * prof.atk,
-    recuperacion: (2 + 1.5 * prof.pase) * (ment === "ofensiva" ? 1.6 : 1),
-    pelotazo: (1.3 + 1.8 * prof.def) * (ment === "defensiva" ? 1.5 : 1),
+    transicion: (2.5 + 2 * prof.atk) * (losingLate ? 1.5 : 1) * brave,
+    recuperacion: (2 + 1.5 * prof.pase) * (ment === "ofensiva" ? 1.6 : 1) * (tired ? 0.6 : 1) * brave * noPress,
+    pelotazo: (1.3 + 1.8 * prof.def) * (ment === "defensiva" ? 1.5 : 1) * (losingLate ? 1.5 : 1) * (tired ? 1.4 : 1) * scared,
     balon_parado: 1.5,
-  };
-  return {
-    repliegue: 2 + 3 * prof.atk,
-    salida_fondo: 0.8 + 2.5 * prof.def,
+  } : {
+    repliegue: (2 + 3 * prof.atk) * (winningLate ? 1.4 : 1),
+    salida_fondo: (0.8 + 2.5 * prof.def) * (tired ? 1.4 : 1),
     balon_parado_def: 0.8 + 1 * prof.cab,
   };
+  // Memoria de secuencias: no repetir el mismo tipo dos veces seguidas (el partido varía).
+  if (m._lastSeqType && w[m._lastSeqType] !== undefined) w[m._lastSeqType] = 0;
+  return w;
 }
 
 /**
@@ -106,7 +130,12 @@ export function maybeStartSequence(m) {
   const pStart = (plan.target - done) / ticksLeft;
   if (rnd() >= pStart) return false;
   const mentShift = m.my.mentalidad === "ofensiva" ? 0.10 : m.my.mentalidad === "defensiva" ? -0.10 : 0;
-  const mineShare = clamp(0.5 + plan.edge * 0.045 + mentShift, 0.3, 0.72);
+  // Contexto dinámico (A3): el partido inclina el reparto EN VIVO — perder tarde te vuelca
+  // al ataque (+0.07, y te expones: el rival gana repliegues/contras), ganar tarde te
+  // repliega (−0.05, el rival empuja), y cada expulsado inclina la cancha (±0.06).
+  const late = m.min >= 75 ? (m.gMy < m.gOpp ? 0.07 : m.gMy > m.gOpp ? -0.05 : 0) : 0;
+  const reds = 0.06 * (m.oppLineup.filter(p => p.expulsado).length - m.my.lineup.filter(p => p.expulsado).length);
+  const mineShare = clamp(0.5 + plan.edge * 0.045 + mentShift + late + reds, 0.3, 0.72);
   const side = rnd() < mineShare ? "mine" : "opp";
   const pool = SEQUENCE_TYPES.filter(t => t.side === side);
   const w = typeWeights(m, side, plan.prof);
@@ -117,10 +146,13 @@ export function maybeStartSequence(m) {
 /** Arranca una secuencia de un tipo dado: elige protagonista(s) y crea la decisión del acto 1. */
 export function startSequence(m, type) {
   m._seqCount = (m._seqCount || 0) + 1;
+  m._lastSeqType = type.id; // memoria del contexto dinámico: no repetir tipo dos veces seguidas
+  m._flow.push({ min: m.min, side: type.side, w: 3 }); // posesión/momentum derivados (A3, #11)
   m.stats.decisiones++;
   if (type.side === "mine") {
     const cands = m.activeMine().filter(p => p.pos !== "POR");
-    const prot = m._weightedPick(cands, cands.map(p => type.protWeight[playedPos(p)] ?? 1));
+    // Momento → protagonista (decisión #15): ver protMomentum.
+    const prot = m._weightedPick(cands, cands.map(p => (type.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
     m.seq = { type, prot, actIdx: 0, bonus: 0 };
     m.log("event", `${type.icon} min ${m.min}' — ${type.flavor.intro(prot)}`);
   } else {

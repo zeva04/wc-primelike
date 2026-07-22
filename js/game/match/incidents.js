@@ -1,7 +1,7 @@
 /* ============================================================
    game/match/incidents — faltas, tarjetas y lesiones EN juego.
    Funciones que operan sobre una instancia de Match (`m`).
-   Crea las decisiones: protect | forced_sub | gk_red
+   Crea las decisiones: injury_sub | gk_red
    (contrato de decisiones: ver Match.js).
    (Lo que trasciende el partido — acumulación, suspensiones —
    vive en game/discipline.js y game/flow.js.)
@@ -39,24 +39,12 @@ export function foulEvent(m) {
       m.log("card", `min ${m.min}' — 🟥 Segunda amarilla y EXPULSIÓN de ${p.name}.`);
       return p.pos === "POR" ? forceGkReplacement(m) : false;
     }
-    m.log("card", `min ${m.min}' — 🟨 Amarilla para ${p.name}.`);
+    // La amarilla solo NARRA (PO 22-jul: el popup de "protegerlo" se eliminó — cambiar al
+    // amonestado es una decisión que el DT toma solo, desde la Gestión de plantilla en vivo).
+    m.log("card", `min ${m.min}' — 🟨 Amarilla para ${p.name}. Queda condicionado: otra falta y se va.`);
     // Si venía apercibido del torneo, esta amarilla lo suspende para el próximo partido
     if ((p.amarillas || 0) >= 1) {
       m.log("card", `⚠️ ${p.name} estaba apercibido: acumula su segunda amarilla del torneo y se perderá el PRÓXIMO partido.`);
-    }
-    // Decisión: ¿lo cambio para protegerlo?
-    if (m.subsLeft > 0 && m.eligibleFor(p).length > 0) {
-      m.decision = {
-        id: "protect", player: p,
-        title: `🟨 ${p.name} está amonestado`,
-        text: "Si comete otra falta, se va expulsado. ¿Qué haces?",
-        options: [
-          { label: "Sigue en cancha", hint: "Confías en él", key: "keep" },
-          { label: `Cambiarlo (${m.subsLeft} cambios restantes)`, hint: "Elegirás el reemplazo", key: "sub" },
-        ],
-      };
-      m.stats.decisiones++;
-      return true;
     }
   } else {
     m.log("plain", `min ${m.min}' — Falta de ${p.name}, el árbitro cobra pero no amonesta.`);
@@ -113,11 +101,14 @@ export function injuryEvent(m) {
     : `${inj.partidos} partido${inj.partidos > 1 ? "s" : ""} de baja`;
   m.log("event", `min ${m.min}' — 🚑 ¡${p.name} sufre ${inj.name} (${inj.severidad})! No puede continuar — ${baja}.`);
   if (m.subsLeft > 0 && m.eligibleFor(p).length > 0) {
+    // El reemplazo es MANUAL (PO 22-jul): nada de lista de recomendados — la UI abre la
+    // Gestión de plantilla en vivo con el caído marcado y el DT arma el cambio a mano.
+    // El smoke lo emula con makeSub directo (mismo efecto que la lista vieja).
     m.decision = {
-      id: "forced_sub", out: p,
+      id: "injury_sub", player: p,
       title: `🚑 ${p.name}: ${inj.name}`,
-      text: "Debes reemplazarlo. Elige quién entra:",
-      options: m.eligibleFor(p).map(b => ({ label: `#${b.num} ${b.name} (${b.pos})`, hint: statLine(b), key: b.name })),
+      text: "Debes reemplazarlo en la Gestión de plantilla.",
+      options: [],
     };
     m.stats.decisiones++;
     return true;

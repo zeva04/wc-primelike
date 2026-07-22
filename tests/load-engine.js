@@ -47,6 +47,7 @@ export async function loadEngine() {
     import("../js/content/rarities.js"),
     import("../js/content/prep-events.js"),
     import("../js/content/sequences.js"),
+    import("../js/content/ambient.js"),
     import("../js/content/day-actions.js"),
     import("../js/content/daily-flavor.js"),
     import("../js/content/opportunities.js"),

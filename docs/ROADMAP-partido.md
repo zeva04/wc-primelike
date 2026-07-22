@@ -253,10 +253,20 @@ comparte cada tipo; cómo se deriva la identidad del rival de sus stats.
 
 ---
 
-## SPRINT A3 — El partido vivo
+## SPRINT A3 — El partido vivo ✅ CERRADO (22-jul-2026)
 
 **Objetivo:** que la generación respire con lo que pasa en el partido, y saldar los dos pendientes
 que llevan meses esperando este rework.
+
+**Cierre.** Decisiones PO (AskUserQuestion, todas las recomendadas): marcador+minuto con umbral
+único 75' sesgando tipo Y reparto · rojas al reparto y fatiga solo al tipo · Moral con extremos
+fuertes + leves · Momento→protagonista medio (±36%) · posesión en barra bajo el marcador
+(seq ×3 + ambiente ×1, prior neutral, momentum últimos 15') · pool ambiente contextual (~19
+líneas en `content/ambient.js`). El hook `[MORAL → OCASIONES]` quedó retirado de `Match.tick`:
+la moral viaja por `matchCtx` (armado en `screens/match.js` Y el smoke) y sesga en
+`typeWeights`. `protMomentum` exportado y aplicado también a la conversión def→of. Detalle de
+implementación y **balance** (deriva +2.5 → `BREAKAWAY_TICK` 0.018→0.025 → **34.0% vs baseline
+33.2 n=4000**) en CORE §6. El arco A1-A3 queda completo: **sigue Filosofía**.
 
 ### Alcance
 
@@ -330,5 +340,8 @@ piso se asiente:
 
 - **21-jul-2026** — Creado tras 15 decisiones de diseño del PO (AskUserQuestion, 4 rondas). El PO
   aceptó partir el arco en 3 sprints tras el diagnóstico de que el cap. 7 no entra en uno solo.
+- **22-jul-2026** — A3 cerrado: el arco A1-A3 queda completo. Los tres pendientes congelados
+  siguen congelados (siempre-Recuperar quedó en 48.3 n=1500, +1.0 = ruido; la fatiga→generación
+  no lo disparó). Próximo: el sprint de Filosofía.
 - Se revisa al cerrar cada sprint y cada vez que una decisión contradiga lo escrito acá (gana el
   que tenga mejor argumento, pero queda registrado).
