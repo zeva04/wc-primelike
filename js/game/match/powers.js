@@ -35,16 +35,45 @@ export function energyMult(en) {
   return 1 - (1 - ENERGY_FLOOR_MULT) * x * x;
 }
 
+// OXIDACIÓN (arco del Rebalance R1, decisión PO 22-jul-2026): el ESPEJO de la banda
+// verde — un plantel que no trabaja pierde filo. La racha de días de preparación sin
+// Entrenar ni Sesión Táctica (game/oxidation la trackea en run.diasSinEntrenar y la
+// estampa como `p.oxid` en el plantel) enciende un multiplicador < 1 sobre effStat.
+// JUGAR TAMBIÉN RESETEA ("jugar es ritmo", decisión PO): por eso la curva entera vive
+// comprimida entre racha 3 y 5 — las ventanas son de 4-5 días de preparación (calendar,
+// ri(5,6)) y la racha máxima real ES la ventana. La oxidación no es un estado crónico:
+// es CÓMO LLEGAS al partido. El siempre-recuperador llega SIEMPRE oxidado (racha 4-5,
+// ×0.93/×0.85); el mixto azar casi nunca (P(racha≥3)≈0.8%); el smart jamás (nunca
+// encadena 3 días sin entrenar). Es la respuesta a la tesis del arco: no nerfear el
+// botón de Recuperar — hacer que NO CONSTRUIR deje de ser gratis (ROADMAP-rebalance §A).
+export const OXID_THRESHOLD = 3;   // días seguidos sin entrenar que encienden el óxido
+export const OXID_FLOOR_AT = 5;    // racha donde toca el piso (= ventana larga completa)
+export const OXID_FLOOR_MULT = 0.85;
+/** Multiplicador de rendimiento por oxidación: ×1.0 bajo el umbral (racha < 3), cayendo
+ *  CONVEXO (cuadrático, como la banda: el 3er día casi gratis ×0.983, el 5º duele ×0.85)
+ *  hasta ×OXID_FLOOR_MULT en racha 5+. El piso combinado banda×oxidación es
+ *  0.75 × 0.85 = ×0.6375 — fijado en unitario (tests/oxidation.test.js). */
+export function oxidMult(racha) {
+  const r = racha || 0;
+  if (r < OXID_THRESHOLD) return 1;
+  const x = Math.min(1, (r - (OXID_THRESHOLD - 1)) / (OXID_FLOOR_AT - (OXID_THRESHOLD - 1)));
+  return 1 - (1 - OXID_FLOOR_MULT) * x * x;
+}
+
 /**
  * Stat efectiva normalizada a ~0-5 (stat 1-99 ÷ 20), con buffs (escala 1-99) y castigo por energía.
  * Parte de `effectiveStat`, así que el castigo por jugar fuera de puesto entra al partido
  * por el mismo caño que ve el DT en la ficha (docs/CORE.md §2b).
  * El castigo por energía es la banda verde (`energyMult`): plano arriba, lineal abajo.
+ * La oxidación (R1) entra por el MISMO patrón que la banda — un campo del jugador
+ * (`p.oxid`, estampa game/oxidation al cambiar la racha): así llega a TODOS los duelos
+ * (secuencias, penales, ocasiones) sin tocar cada llamada. El rival nunca lo tiene (×1):
+ * la asimetría vive en los datos, igual que `energia`.
  */
 export function effStat(p, key, buffs = {}) {
   let v = effectiveStat(p, key);
   if (buffs[key]) v += buffs[key];
-  return clamp(v / 20, 0.05, 5.5) * energyMult(p.energia);
+  return clamp(v / 20, 0.05, 5.5) * energyMult(p.energia) * (p.oxid || 1);
 }
 
 /** Calidad global del arquero: atajadas manda (60%), reflejos (25%) y salidas (15%) complementan. */

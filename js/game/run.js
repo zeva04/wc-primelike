@@ -71,6 +71,7 @@ export function newRun(myTeamId) {
     lastAction: null,          // {day, icon, title} de la última acción (escribe day-action)
     dayMod: null,              // modificador de las acciones de HOY: {icon,title,desc,mods} (escribe calendar)
     dayOpp: null,              // Oportunidad viva HOY: {id} o null (escribe calendar; day-action la consume)
+    diasSinEntrenar: 0,        // racha de días de prep sin Entrenar/Táctica → oxidación R1 (escribe game/oxidation; flow resetea al jugar)
     moral: 50,                 // Moral del equipo 1..100 (escribe game/morale; content/ la muta con clamp)
     filoId: null,              // filosofía elegida tras el sorteo (escribe game/philosophy)
     aristas: {},               // progreso por arista {presion: 3, ...} — PERSISTE al cambiar de filosofía (mutan content/day-actions y game/philosophy)

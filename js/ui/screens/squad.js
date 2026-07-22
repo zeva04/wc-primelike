@@ -24,7 +24,8 @@ import {
 } from "../../game/lineup.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, energyCls, momentoChip, toast, modal, closeModal } from "../components.js";
+import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, energyCls, oxidCls, momentoChip, toast, modal, closeModal } from "../components.js";
+import { oxidState } from "../../game/oxidation.js";
 import { mountPitch, POS_NAME } from "../pitch.js";
 import { spriteSvg } from "../sprites.js";
 
@@ -32,6 +33,15 @@ const STAT_NAME = {
   tiro: "Tiro", defensa: "Defensa", cabezazo: "Cabezazo", pase: "Pase", aura: "Aura",
   atajadas: "Atajadas", reflejos: "Reflejos", salidas: "Salidas",
 };
+
+/** Línea de RITMO (oxidación R1) en la card de energía: misma constante de color que el hub. */
+function ritmoLine() {
+  const ox = oxidState(S.run);
+  const txt = ox.oxidado
+    ? `Oxidado: ${ox.racha} días sin entrenar — el plantel rinde un ${Math.round((1 - ox.mult) * 100)}% menos`
+    : ox.racha ? `${ox.racha} día${ox.racha > 1 ? "s" : ""} sin entrenar` : "Ritmo al día";
+  return `<div class="text-[10px] font-bold ${oxidCls(ox.racha)} mb-2" title="Entrenar o la Sesión Táctica recuperan el ritmo; jugar también (el partido lo devuelve)">⚙️ ${txt}</div>`;
+}
 
 let selName = null; // jugador con la ficha abierta (solo estado visual de esta pantalla)
 
@@ -86,6 +96,7 @@ function renderSquadScreen() {
         <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
           <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-0.5">⚡ Energía del plantel</div>
           <p class="text-[10px] text-slate-500 mb-2">Del más cansado al más entero — para decidir a quién rotar o descansar.</p>
+          ${ritmoLine()}
           <div id="energy-panel" class="space-y-0.5"></div>
         </div>
       </div>

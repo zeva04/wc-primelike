@@ -12,6 +12,7 @@
 import { addJournal } from "./journal.js";
 import { scheduleNextMatch } from "./calendar.js";
 import { applyMedicalPostMatch } from "./medical.js";
+import { resetOxidacion } from "./oxidation.js";
 import { applyDisciplinePostMatch, clearAmarillas } from "./discipline.js";
 import { applyMomentumPostMatch } from "./momentum.js";
 import { applyMoralePostMatch, bumpMorale } from "./morale.js";
@@ -108,6 +109,9 @@ export function postMatchUpdate(run, match) {
   const filoExec = applyFiloExecution(run, match);
   noteFiloMilestones(run); // la cancha pudo consolidar el umbral: la conquista se narra (M2)
   run.buffs = {};
+  // Oxidación (R1): JUGAR devuelve el ritmo ("jugar es ritmo", decisión PO). El reset va
+  // acá, en el cierre físico — el partido ya se jugó con la racha que traía el plantel.
+  resetOxidacion(run);
   // El partido consumió el día: se agenda el siguiente a 5-6 días con sus eventos diarios
   scheduleNextMatch(run);
   return { momentum, morale, filoExec, filoCost };

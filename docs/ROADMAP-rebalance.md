@@ -61,17 +61,28 @@ la tesis de M1).
 
 ## Los 2 sprints
 
-### R1 — "La oxidación"
-1. Baseline FRESCO (protocolo del arco anterior: mixto n=4000, acciones n=1500-4000,
-   `--smart` n=4000, filos n=2000, KOR/CPV n=1500 — el cierre del Meta es la referencia
-   pero se re-corre: código nuevo, vara nueva).
-2. AskUserQuestion de arranque: umbral de la racha (¿3-4 días?) · qué resetea (¿entrenar
-   y táctica; bonding?) · curva y piso (¿convexa como la banda? ¿×0.85?) · el tope del
-   nerf C (¿Recuperar no sube sobre 70-75?) · cómo se VE (hub/plantilla).
-3. Implementar oxidación + nerf C, medir AISLADO por etapas (primero oxidación sola).
-4. **Gate R1**: siempre-Recuperar cae a ~**30-35** · mixto azar casi intacto (tolerancia
-   −2pp) · `--smart` intacto (±2pp) · unitario de la curva de oxidación (no solo smoke).
-   Todo 2×n=4000. Si la oxidación sola no muerde, se presenta ANTES de compensar.
+### R1 — "La oxidación" — ✅ CERRADO (22-jul-2026)
+Decisiones del PO al arrancar: umbral **3** días sin Entrenar/Táctica · **el partido
+RESETEA** ("jugar es ritmo" — la decisión que comprimió la curva: la racha máxima real
+es la ventana de 4-5 días y la oxidación pasó de estado crónico a *cómo llegas al
+partido*) · nada más resetea (Bonding y Oportunidades suman; el cambio de identidad SÍ
+resetea: reinstalar ideas es trabajo táctico) · curva **convexa espejo de la banda**,
+racha 3 ×0.983 · 4 ×0.933 · 5+ ×0.85 (`powers.oxidMult`, estampada como `p.oxid` — el
+mismo caño que la energía) · **nerf C DIFERIDO** ("que el descanso se borre no es
+realista", PO — se retoma solo si R2 lo pide, con variante realista) · UI: chip ⚙️ Ritmo
+en hub + línea en plantilla (constante única `oxidCls`) + primer episodio narrado en el
+Diario.
+
+Medido (baseline fresco → post-oxidación, BRA): siempre-Recuperar **46.4 → 22.7/22.7**
+(2×n=4000, clavado) · mixto 41.8 → 40.5/40.2 (−2pp máx ✓) · smart 50.5 → 50.7/49.6 (±2 ✓)
+· entrenar 27.2 → 25.9 n=4000 (ruido; no pisa la mecánica) · KOR 32.3→32.9 · CPV 8.9→8.6.
+Quirúrgica como se diseñó — pero el interés compuesto (−11% medio × 6 jugadores × 7
+partidos) mordió el doble de lo estimado: **overshoot del gate original (~30-35)**.
+**El PO re-pactó el gate a ~20-25 y CERRÓ**: 22.7 ya produce el orden final de la
+escalera abajo (recuperar < entrenar-solo). Consecuencia asumida: R2 arranca con el
+peldaño de abajo cerca de su meta final (10-15) — la escalada de rivales se dosifica
+mirando ESO. Unitario: `tests/oxidation.test.js` (curva exacta + piso combinado
+banda×óxido ×0.6375 + la regla de la racha sobre el motor real).
 
 ### R2 — "El Mundial de verdad"
 1. Decisión de diseño al arrancar: el mecanismo de escalada (forma / identidad que
@@ -102,3 +113,7 @@ la tesis de M1).
 - **22-jul-2026** — Creado con las direcciones aprobadas por el PO en sesión (A oxidación,
   B escalada en KO, C nerfs de coherencia; escalera completa como gate final). Los
   números finos de cada mecánica = AskUserQuestion al arrancar su sprint.
+- **22-jul-2026 (bis)** — **R1 CERRADO** con gate re-pactado (recuperador ~20-25 en vez
+  de ~30-35: overshoot quirúrgico aceptado por el PO). Nerf C diferido. La escalera hoy:
+  recuperar 22.7 · entrenar ~26 · mixto ~40.3 · smart ~50 · CPV 8.6 — a R2 le queda
+  comprimir la mitad de arriba (mixto→~25, smart→~40) SIN perforar el 10-15 de abajo.

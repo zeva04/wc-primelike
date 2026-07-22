@@ -193,7 +193,8 @@ sobrevive a cualquier re-agendado.
 | Función | Qué hace |
 |---|---|
 | `energyMult(en)` | La **banda verde** (M1): ×1.0 con energía ≥`ENERGY_OK` (65); bajo el umbral cae convexo (cuadrático) hasta `ENERGY_FLOOR_MULT` (×0.75) en el piso (5). La UI colorea con la misma constante (`components.energyCls`). |
-| `effStat(p,key,buffs)` | Stat efectiva ~0–5 (stat÷20) con buffs, castigada por energía vía `energyMult`. |
+| `oxidMult(racha)` | La **oxidación** (R1): ×1.0 con racha <`OXID_THRESHOLD` (3 días sin Entrenar/Táctica); convexa hasta `OXID_FLOOR_MULT` (×0.85) en racha `OXID_FLOOR_AT` (5). El espejo de la banda, comprimido a 3→5 porque jugar resetea. La UI colorea con la misma constante (`components.oxidCls`). |
+| `effStat(p,key,buffs)` | Stat efectiva ~0–5 (stat÷20) con buffs, castigada por energía vía `energyMult` y por oxidación vía `p.oxid` (lo estampa `game/oxidation`; el rival no lo tiene → ×1). |
 | `gkQuality(por,buffs)` | Calidad global del arquero (atajadas 60% · reflejos 25% · salidas 15%). |
 | `teamPowers(lineup,ment,buffs)` | Ataque y defensa (~0–5) de una alineación, con mentalidad e inferioridad numérica. El bonus de `buffs.tactica` MURIÓ en F1 (la táctica ya no compra poder: construye identidad). |
 
@@ -311,6 +312,9 @@ con su resolución **intacta**; los remates no interactivos pasaron a `chances.a
 | `filoPointsOf(r)` / `filoLevelOf(r)` / `addFirmaProgress(r,pts)` | **content/philosophies** (F3): puntos/nivel PUROS sobre datos del propio archivo (el contenido los necesita — "La prensa bautiza tu estilo" lee el nivel — y content/ no importa game/; `game/philosophy.filoPoints/filoLevel` DELEGAN acá: una sola fuente del umbral) / progreso DIRECTO a la arista firma (eventos "Visita del maestro", "Ensayo de la firma", conflicto del referente). Cada filosofía trae además `counters` (mi fila de la matriz, cualitativa) y `firmaIntros` (las voces del relato con identidad); cada arista, la `stat` que trabaja. |
 | `buildDaily(run)` | **daily**: arma la edición del World Cup Daily — `{day, isMatchDay, items}` con 1-5 titulares `{icon, tag, text}` ordenados por prioridad (PORTADA/PLANTEL/GRUPO/RIVAL/MUNDIAL/HOY/COLOR, ver CORE §9); el primero es la nota de tapa. GRUPO marca al próximo rival si jugó anoche; RIVAL avisa sus suspendidos (`rivalBans`) y da el framing por paridad solo en la previa (≤2 días); MUNDIAL puntúa `run.lastNight` (batacazos por tier, goleadas, festivales, grandes, rojas); HOY es el `teaser` del evento/conflicto que trae el día (anticipa sin revelar). **Sin repetirse en la semana** (22-jul): un titular con el MISMO texto que ya salió en los últimos 7 días se suprime (`run._dailySeen`, texto → último día; la PORTADA no se toca; re-armar la edición del mismo día es idempotente). Solo lectura salvo `_dailySeen` y el rng del flavor. |
 | `multLabel(mult)` | **day-action**: etiqueta corta para la UI ("×2", "×½"); `""` si es 1 o bloqueo. |
+| `trackOxidacion(run,trabaja)` | **oxidation** (R1): registra el día para la racha — `trabaja` (Entrenar/Táctica desde `applyDayAction`, o el cambio de identidad desde `changePhilosophy`) la resetea; lo demás suma `run.diasSinEntrenar` y estampa `p.oxid` (=`oxidMult(racha)`) en TODO el plantel. La 1ª vez que cruza el umbral en la run, narra el episodio en el diario (`run.oxidNarrada`). |
+| `resetOxidacion(run)` | **oxidation**: "jugar es ritmo" — resetea racha y estampado; lo llama `flow.postMatchUpdate` al cierre (el partido ya se jugó con la racha que traía el plantel). |
+| `oxidState(run)` | **oxidation**: `{racha, mult, oxidado}` para la UI (chip del hub, línea de plantilla). |
 | `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, goles del rival a la tabla de goleadores (`assignScorers`) y sus asistidores (`assignAssists`), resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced, momentum, filoExec}` (`momentum` = resumen anímico por jugador; `filoExec` = progreso por ejecución de F1, para narrarlo en F3). |
 | `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario/anímico por jugador (delega en `applyMedicalPostMatch` con los **minutos** de `match.minutesByName()`, `applyDisciplinePostMatch` y `applyMomentumPostMatch` — este ANTES de resetear flags: lee `p.sustituido`), cierra la moral (`applyMoralePostMatch`), aplica la **progresión por ejecución** de la filosofía (`applyFiloExecution`, F1), limpia buffs y **re-agenda**. "Jugó" = está en el once final, entró del banco (`usado`) o **salió por un cambio** (`sustituido`). **Devuelve** `{momentum, morale, filoExec}`. |
 | `advanceStage(run,advanced)` | **flow**: avanza el torneo y devuelve `{type: "next-matchday"\|"qualified"\|"eliminated"\|"next-round"\|"champion"}`; dispara `clearAmarillas` al cerrar grupos y tras 4tos, y `bumpMorale(+5)` al pasar de ronda. La UI solo rutea. |
@@ -565,6 +569,12 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
   mitad de rampa, un cuarto del castigo), piso exacto `ENERGY_FLOOR_MULT`, monotonía sin
   saltos, sin castigo para el rival duck-typed, la banda avisa antes que el riesgo de
   lesión (`ENERGY_OK > FATIGUE_INJURY_FROM`), y `effStat` monta la banda (75 juega como 100).
+- **`oxidation.test.js`** (R1) — la **oxidación** en unitario (ley del arco): la curva
+  comprimida racha 3→5 (tabla exacta ×0.983/×0.933/×0.85, convexidad, monotonía, clamp),
+  el **piso combinado** banda×óxido sobre `effStat` (×0.6375 exacto, el riesgo declarado
+  de apilar dos multiplicadores), y la regla de la racha sobre el motor real: Recuperar y
+  Bonding suman, Entrenar/Táctica/cambio de identidad resetean, el cierre de partido
+  resetea, el primer episodio se narra UNA vez por run y `oxidState` cumple su contrato.
 - **`sequences.test.js`** (Sprints A1-A2) — la capa de secuencias: el catálogo (8 tipos, esquema,
   sides, los 6 del roadmap presentes), las Football Actions (bien formadas y **monótonas** en la stat
   que las rige; contener corta más que presionar), y la máquina sobre un Match real: arranca, avanza

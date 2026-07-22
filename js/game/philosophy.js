@@ -23,6 +23,7 @@ import { TEAM_PHILOSOPHIES } from "../content/team-philosophies.js";
 import { teamRating } from "./ratings.js";
 import { clamp } from "../core/math.js";
 import { addJournal } from "./journal.js";
+import { trackOxidacion } from "./oxidation.js";
 
 // Progresión por ejecución: cada ACIERTO de acto en una secuencia del tipo firma
 // (los cuenta el Match en `match.filoHits`) vale FILO_EXEC_GAIN de la arista
@@ -84,6 +85,9 @@ export function changePhilosophy(run, filoId) {
     icon: "🔄", tone: "neutral", title: `Golpe de timón: de ${prev ? prev.name : "la nada"} a ${f.name}`,
     desc: `El día entero se fue en reinstalar ideas. Lo entrenado no se borra, pero la nueva identidad vive de ${f.aristas.map(k => aristaById(k).label).join(" y ")}.`,
   });
+  // Oxidación (R1): reinstalar ideas ES trabajo táctico — el día cuenta como entrenado
+  // (consume el turno por fuera de applyDayAction, así que registra su día acá).
+  trackOxidacion(run, true);
   return f;
 }
 

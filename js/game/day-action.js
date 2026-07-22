@@ -20,6 +20,7 @@ import { DAY_ACTIONS, CANJE_THRESHOLD, CANJE_PERMANENT, CANJEABLE_STATS, STAT_LA
 import { OPPORTUNITIES } from "../content/opportunities.js";
 import { addJournal } from "./journal.js";
 import { noteFiloMilestones } from "./philosophy.js";
+import { trackOxidacion } from "./oxidation.js";
 
 /** La Oportunidad viva HOY (fila completa de content/opportunities) o null. */
 export function dayOpportunity(run) {
@@ -108,5 +109,8 @@ export function applyDayAction(run, actionId, targetName) {
     ? { icon: a.icon, tone: a.rareza === "legendaria" ? "gold" : "good", title: a.title, desc: `Oportunidad única: ${desc}` }
     : { icon: a.icon, tone: "neutral", title: a.title, desc: `Acción del día: ${desc}${mult !== 1 ? ` (${multLabel(mult)} por "${run.dayMod.title}")` : ""}.` });
   noteFiloMilestones(run); // la Sesión Táctica pudo cruzar un umbral: la conquista se narra (M2)
+  // Oxidación (R1): solo el trabajo de cancha resetea la racha — Entrenar y Táctica.
+  // Todo lo demás (Recuperar, Bonding, Oportunidades) es un día sin entrenar (decisión PO).
+  trackOxidacion(run, a.group === "entrenar" || a.group === "tactica");
   return { ...a, mult, desc };
 }

@@ -21,7 +21,8 @@ import { buildOpponentReport } from "../../game/scouting.js";
 import { EVENT_THEMES } from "../../content/themes.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, starsHtml, modal, closeModal, modalOpen, toast, momentoChip, energyCls } from "../components.js";
+import { screenShell, $, flagImg, starsHtml, modal, closeModal, modalOpen, toast, momentoChip, energyCls, oxidCls } from "../components.js";
+import { oxidState } from "../../game/oxidation.js";
 import { spriteSvg } from "../sprites.js";
 import { mountPitch } from "../pitch.js";
 import { renderGroupTableCard, renderKoInfoCard } from "./worldcup.js";
@@ -426,6 +427,9 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
   const moralCls = moral >= 61 ? "text-emerald-400" : moral >= 41 ? "text-slate-300" : "text-red-400";
   const avgEnergy = Math.round(run.squad.reduce((s, p) => s + p.energia, 0) / run.squad.length);
   const enCls = energyCls(avgEnergy);
+  // Ritmo de trabajo (oxidación R1): el color ES la mecánica, misma constante que la banda
+  const ox = oxidState(run);
+  const oxVal = ox.oxidado ? `Oxidado −${Math.round((1 - ox.mult) * 100)}%` : ox.racha ? `${ox.racha} día${ox.racha > 1 ? "s" : ""} sin entrenar` : "Al día";
   const formationLabel = getFormation(S.formation) ? S.formation : "Improvisada";
   const chips = buffChips();
   const canjeables = canjeableBuffs(run);
@@ -439,6 +443,9 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
   if (discipline.aperc.length) avisos.push(`<div class="text-yellow-400" title="Con otra amarilla se pierde un partido">🟨 Apercibido${discipline.aperc.length > 1 ? "s" : ""}: ${discipline.aperc.map(p => p.name).join(", ")}</div>`);
   if (forma.racha.length) avisos.push(`<div class="text-emerald-400" title="Momento alto: rinden por encima">🔥 En racha: ${forma.racha.map(p => p.name).join(", ")}</div>`);
   if (forma.frios.length) avisos.push(`<div class="text-sky-400" title="Momento bajo: rinden por debajo">❄️ Fríos: ${forma.frios.map(p => p.name).join(", ")}</div>`);
+  // Plantel oxidado (R1): el aviso explica el CASTIGO y las dos salidas (riesgo declarado
+  // del arco: que el jugador nuevo entienda por qué rinde menos).
+  if (ox.oxidado) avisos.push(`<div class="${oxidCls(ox.racha)}" title="Cada día de preparación sin Entrenar ni Sesión Táctica suma; al 3º el plantel pierde filo">⚙️ Plantel oxidado: ${ox.racha} días sin entrenar — rinde un ${Math.round((1 - ox.mult) * 100)}% menos hasta entrenar (o jugar: el partido devuelve el ritmo)</div>`);
   // Clima de vestuario: la Moral modula la frecuencia de conflictos de la ventana (Sprint 2).
   if (mb.id === "suelo" || mb.id === "baja") avisos.push(`<div class="text-orange-400" title="La moral baja convulsiona el vestuario: más conflictos entre partidos">🎭 Vestuario caldeado: se vienen más conflictos</div>`);
   else if (mb.id === "nubes") avisos.push(`<div class="text-emerald-400" title="La moral alta serena el vestuario: menos conflictos entre partidos">🎭 Vestuario en paz: semana tranquila por delante</div>`);
@@ -451,6 +458,7 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
     <div class="flex gap-2 mb-2 shrink-0">
       ${stateChip(mb.icon, "Moral", mb.label, moralCls)}
       ${stateChip("⚡", "Energía", avgEnergy + "%", enCls)}
+      ${stateChip("⚙️", "Ritmo", oxVal, oxidCls(ox.racha))}
     </div>
     ${filoCard()}
     <div class="mb-3 shrink-0">

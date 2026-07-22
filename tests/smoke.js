@@ -239,6 +239,9 @@ function playRun(teamId) {
     const matchDaily = E.buildDaily(run);
     assert(matchDaily.isMatchDay && matchDaily.items[0].tag === "PORTADA", "el Daily de día de partido abre con la tapa del partido");
     const oppId = E.nextOpponentId(run);
+    // Oxidación (R1): al partido se llega con la racha de la ventana — el estampado del
+    // plantel tiene que ser coherente con ella (el rival jamás lleva el campo: nace sin él).
+    assert(run.squad.every(p => (p.oxid ?? 1) === E.oxidMult(run.diasSinEntrenar)), "p.oxid coherente con la racha al llegar al partido", run.diasSinEntrenar);
     const match = playMatch(run, oppId);
 
     // foto previa para validar la acumulación de amarillas del cierre
@@ -246,6 +249,7 @@ function playRun(teamId) {
     const journalBefore = run.journal.length;
 
     const out = E.closeMatch(run, match);
+    assert(run.diasSinEntrenar === 0 && run.squad.every(p => p.oxid === 1), "jugar devuelve el ritmo: la racha se resetea al cierre");
 
     for (const b of before) {
       const p = b.p;

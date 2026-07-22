@@ -15,13 +15,20 @@ export function starsHtml(rating, size = "text-base") {
   </span>`;
 }
 
-import { ENERGY_OK } from "../game/match/powers.js";
+import { ENERGY_OK, OXID_THRESHOLD, OXID_FLOOR_AT } from "../game/match/powers.js";
 
 /** Color de texto de la energía: verde = DENTRO de la banda verde (rinde pleno,
  *  match/powers.ENERGY_OK — M1: la UI muestra la banda por definición, no por
  *  coincidencia) · ámbar = paga peaje · rojo = fundido de verdad. */
 export function energyCls(en) {
   return en >= ENERGY_OK ? "text-emerald-400" : en > 35 ? "text-amber-400" : "text-red-400";
+}
+
+/** Color de texto de la racha de oxidación (R1 — mismo patrón que energyCls: la UI
+ *  muestra la mecánica por definición, una sola constante): gris = bajo el umbral
+ *  (todavía gratis) · ámbar = oxidado (racha 3-4) · rojo = en el piso (racha 5+). */
+export function oxidCls(racha) {
+  return racha >= OXID_FLOOR_AT ? "text-red-400" : racha >= OXID_THRESHOLD ? "text-amber-400" : "text-slate-400";
 }
 
 /** Barra de energía coloreada según nivel (verde = en banda / ámbar / rojo). */

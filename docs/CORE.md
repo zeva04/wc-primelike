@@ -226,9 +226,11 @@ Dentro de un partido las stats 1–99 se **normalizan a una escala ~0–5** para
 de probabilidad, y se les aplica el desgaste físico:
 
 ```
-effStat = (stat + buff) / 20  ×  energyMult(energía)
+effStat = (stat + buff) / 20  ×  energyMult(energía)  ×  oxidMult(racha)
 energyMult = 1                                  si energía ≥ 65   (la banda verde)
            = 1 − 0.25 × ((65−energía)/60)²      bajo el umbral    (convexa hasta ×0.75)
+oxidMult   = 1                                  si racha < 3      (días sin entrenar)
+           = 1 − 0.15 × ((racha−2)/3)²          racha 3-5         (convexa hasta ×0.85)
 ```
 
 - **÷20** lleva 1–99 al rango ~0–5 donde están calibradas todas las fórmulas.
@@ -239,6 +241,18 @@ energyMult = 1                                  si energía ≥ 65   (la banda v
   rozar la banda es casi gratis (60 → ×0.998), estar fundido de verdad duele (30 → ×0.91).
   Nunca cae a cero — un crack cansado sigue siendo peligroso. El verde de la UI de energía
   ES la banda (`components.energyCls`, misma constante).
+- **factor oxidación = el ESPEJO de la banda** (arco del Rebalance R1, 22-jul-2026): una
+  racha de **3+ días de preparación sin Entrenar ni Sesión Táctica** enciende un
+  multiplicador convexo que cae hasta **×0.85** en racha 5+. **Jugar también resetea**
+  ("jugar es ritmo", decisión PO), así que la curva entera vive comprimida en racha 3→5:
+  la ventana de preparación es de 4-5 días y la oxidación no es un estado crónico — es
+  **cómo llegas al partido** (racha 3 ×0.983 · 4 ×0.933 · 5+ ×0.85). También resetea el
+  cambio de identidad (reinstalar ideas es trabajo táctico); Bonding y Oportunidades NO.
+  La racha vive en `run.diasSinEntrenar` (`game/oxidation`) y se estampa como `p.oxid` en
+  el plantel — entra a effStat por el mismo caño que la energía, y el rival, que nunca
+  lleva el campo, queda en ×1. Piso combinado banda×óxido: **×0.6375**, fijado en
+  unitario (`tests/oxidation.test.js`). En la UI el color ES la mecánica
+  (`components.oxidCls`): gris bajo umbral · ámbar racha 3-4 · rojo 5+.
 
 > **Rebalance del 20-jul-2026 (decisión PO).** El factor de energía pesaba **35%**
 > (`0.65 + 0.35`) y bajó a **20%**, acoplado a subir el cansancio del partido de −10 a
@@ -272,6 +286,23 @@ energyMult = 1                                  si energía ≥ 65   (la banda v
 > También se probó y REVIRTIÓ subir la pasiva 8→9: no discrimina (cerró ~0.4pp/punto e
 > infló todo). El Press mantuvo su costo relativo exacto (−0.7 vs mixto, igual que
 > pre-arco): sin re-costeo.
+
+> **La oxidación (arco del Rebalance R1, 22-jul-2026, decisión PO).** La tesis del arco:
+> *si puedes ganar sin jugar, el juego no tiene sentido* — y el diagnóstico medido en el
+> Meta: el 46% del siempre-recuperador no vivía en el botón de Recuperar (su edge real
+> sobre el mixto era ~+6pp post-banda) sino en que **no construir era casi gratis**. En
+> vez de nerfear la acción se hizo letal no trabajar: el espejo de la banda. Umbral 3,
+> curva convexa comprimida a racha 3→5 porque el PO decidió que **el partido resetea**
+> (jugar es ritmo) y la racha máxima real ES la ventana (4-5 días de preparación). La
+> mecánica es quirúrgica por diseño y así midió: siempre-Recuperar **46.4 → 22.7** (dos
+> corridas n=4000 clavadas en 22.7) mientras el mixto azar apenas paga (41.8 → 40.5/40.2,
+> P(racha≥3 al partido) ≈ 0.8%) y `--smart` ni se entera (50.5 → 50.7/49.6): entrenar ~50%
+> de los días te hace inmune. El gate original del sprint (~30-35) quedó **re-pactado a
+> ~20-25 por el PO** al ver el overshoot: 22.7 ya produce el ORDEN final de la escalera
+> (recuperar < entrenar-solo 25.9) y se aceptó a sabiendas de que R2 (escalada de rivales)
+> arranca con el peldaño de abajo cerca de su meta final (10-15). El nerf C (Recuperar no
+> sube sobre la banda) quedó **DIFERIDO**: "que el descanso se borre" no es realista
+> (PO) — se retoma solo si los números de R2 lo piden, con una variante realista.
 
 > Este es el único punto donde se mezcla "escala 1–99" (datos) con "escala 0–5" (fórmulas).
 > Todo lo demás del partido razona en 0–5.
@@ -864,6 +895,15 @@ Las palancas de la economía:
   > rompe o restaura la espiral de fatiga en vez de sumar linealmente. Arreglar el bug con la
   > tasa completa (+8 el día de partido) valía **+6pp** — por eso el arreglo entró por una
   > constante propia y reducida, y no subiendo la recuperación de todos.
+- **Ritmo / Oxidación** (R1, 22-jul-2026): la contracara de descansar. Cada día de
+  preparación sin **Entrenar / Sesión Táctica / cambio de identidad** suma a
+  `run.diasSinEntrenar`; al 3º el plantel se **oxida** y rinde menos en el próximo
+  partido (§4, `oxidMult`: racha 3 −2% · 4 −7% · 5+ −15%). **Jugar devuelve el ritmo**
+  (el reset vive en `flow.postMatchUpdate` — el partido se juega con la racha que traías).
+  Visible en el hub (chip ⚙️ Ritmo + aviso si está oxidado), en la Gestión de Plantilla
+  (línea en la card de energía) y narrado en el Diario la primera vez que se enciende
+  (`game/oxidation`). Hace que "solo recuperar" deje de ser gratis sin tocarle un número
+  a Recuperar: el seguro sigue siendo seguro — lo letal es no construir.
 - **Buffs de stat** (±5 por evento): se **acumulan** día a día hasta el próximo
   partido y se limpian al terminarlo. Son ±5 y no ±10 porque con 4-5 días de eventos
   por ventana el apilamiento esperado equivale al antiguo evento único de ±10.
