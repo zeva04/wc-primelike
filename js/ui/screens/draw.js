@@ -10,6 +10,7 @@ import { getTeam } from "../../data/teams-repo.js";
 import { newRun } from "../../game/run.js";
 import { teamRating } from "../../game/ratings.js";
 import { PHILOSOPHIES, aristaById } from "../../content/philosophies.js";
+import { ADVANCED_BY_FILO } from "../../content/sequences.js";
 import { choosePhilosophy } from "../../game/philosophy.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
@@ -61,7 +62,7 @@ function renderDraw() {
           </div>
           <div class="text-[10px] text-emerald-400 leading-snug">✓ ${p.fuerte}</div>
           <div class="text-[10px] text-amber-400 leading-snug">⚠️ ${p.advertencia}</div>
-          <div class="text-[10px] text-slate-500 leading-snug mt-auto">🏆 Consolidada: ${p.rasgo}</div>
+          <div class="text-[10px] text-slate-500 leading-snug mt-auto">🔓 En desarrollo: ${ADVANCED_BY_FILO[p.id].icon} <b>${ADVANCED_BY_FILO[p.id].name}</b>, tu fútbol superior · 🏆 Consolidada lo profundiza</div>
         </button>`).join("")}
     </div>
     <div class="text-center mt-6">

@@ -26,10 +26,20 @@ function makeMatch(oppId = "MAR") {
 }
 
 // ---------- catálogo (A2: los 6 del roadmap + repliegue + la cara defensiva del córner) ----------
-assert(E.SEQUENCE_TYPES.length === 8, "A2 completa el catálogo: 8 tipos", E.SEQUENCE_TYPES.length);
+assert(E.SEQUENCE_TYPES.length === 12, "M2 completa el catálogo: 8 base + 4 avanzadas", E.SEQUENCE_TYPES.length);
 const sides = E.SEQUENCE_TYPES.map(t => t.side);
-assert(sides.filter(s => s === "mine").length === 5, "5 tipos ofensivos (mine)", sides.join(","));
-assert(sides.filter(s => s === "opp").length === 3, "3 tipos con iniciativa rival (opp)", sides.join(","));
+assert(sides.filter(s => s === "mine").length === 8, "8 tipos ofensivos (mine)", sides.join(","));
+assert(sides.filter(s => s === "opp").length === 4, "4 tipos con iniciativa rival (opp)", sides.join(","));
+// Las 4 AVANZADAS (M2): una por filosofía, con sus datos de desenlace
+{
+  const advs = E.SEQUENCE_TYPES.filter(t => t.advFor);
+  assert(advs.length === 4, "hay exactamente 4 secuencias avanzadas", advs.map(t => t.id).join(","));
+  for (const filo of ["press", "posesion", "contra", "bloque"]) {
+    assert(E.ADVANCED_BY_FILO[filo], `la filosofía ${filo} tiene su avanzada`);
+    assert(E.ADVANCED_BY_FILO[filo].adv, `la avanzada de ${filo} declara sus números en \`adv\` (datos, no lógica)`);
+  }
+  assert(E.ADVANCED_BY_FILO.bloque.side === "opp", "la fortaleza es la única avanzada DEFENSIVA (castiga desde la trinchera)");
+}
 for (const id of ["recuperacion", "circulacion", "transicion", "pelotazo", "balon_parado", "salida_fondo"]) {
   assert(E.sequenceType(id), `el tipo del roadmap existe: ${id}`);
 }
@@ -37,7 +47,9 @@ assert(E.sequenceType("repliegue")?.side === "opp", "el repliegue de A1 sigue en
 assert(E.sequenceType("balon_parado_def")?.side === "opp", "el balón parado tiene su cara defensiva");
 for (const t of E.SEQUENCE_TYPES) {
   assert(typeof t.id === "string" && t.name && t.icon, "tipo con id/name/icon", t.id);
-  assert(Array.isArray(t.plan) && t.plan.length >= 1 && t.plan.length <= 3, "plan de 1 a 3 actos", `${t.id}: ${t.plan}`);
+  // 1-3 actos para los tipos base (Bible §7); la sinfonía avanzada estira a 4 (M2, y su
+  // versión Consolidada monta el 5º por plan propio — mismo mecanismo del viejo rasgo).
+  assert(Array.isArray(t.plan) && t.plan.length >= 1 && t.plan.length <= (t.advFor ? 4 : 3), "plan con actos en rango", `${t.id}: ${t.plan}`);
   assert(t.protWeight && typeof t.protWeight === "object", "tipo con protWeight", t.id);
 }
 assert(E.sequenceType("circulacion")?.side === "mine", "sequenceType encuentra por id");
@@ -141,8 +153,108 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
   }
   assert(sawGen, "el partido genera secuencias por sí solo");
   assert(!overshoot, "nunca se pasa del objetivo de secuencias del partido");
-  for (const t of E.SEQUENCE_TYPES) assert(seen.has(t.id), `el tipo ${t.id} aparece jugando (pesos > 0)`, [...seen].join(","));
+  // Sin filosofía en el ctx, el catálogo BASE aparece entero — y las avanzadas JAMÁS
+  // (M2: su peso nace en 0 y solo applyFiloWeights se lo da al dueño con nivel ≥1).
+  for (const t of E.SEQUENCE_TYPES.filter(t => !t.advFor)) assert(seen.has(t.id), `el tipo ${t.id} aparece jugando (pesos > 0)`, [...seen].join(","));
+  for (const t of E.SEQUENCE_TYPES.filter(t => t.advFor)) assert(!seen.has(t.id), `la avanzada ${t.id} NO juega sin filosofía (gating)`);
   assert(sawLastMan, "el último hombre sigue apareciendo (absorbido en secuencias + pelotazo a la espalda)");
+}
+
+// ---------- M2: el gating por nivel de las avanzadas, y sus desenlaces nuevos ----------
+{
+  const withFilo = (filoId, nivel, oppId = "MAR") => {
+    const m = makeMatch(oppId);
+    m.my.filo = { id: filoId, nivel };
+    return m;
+  };
+  const playAll = (m, seen) => {
+    let guard = 0;
+    while (!m.finished && guard++ < 500) {
+      m.tick();
+      if (m.seq) seen.add(m.seq.type.id);
+      if (m.decision) {
+        const d = m.decision;
+        if (d.id === "sequence") m.resolveSequenceAct(d.options[Math.floor(Math.random() * d.options.length)].key);
+        else m.decision = null;
+      }
+    }
+  };
+  // Nivel 0 (Aprendiendo): la avanzada NO entra. Nivel 1 (En desarrollo): entra la PROPIA
+  // — y solo la propia (jugando muchos partidos, la ajena jamás asoma).
+  for (const filo of ["press", "posesion", "contra", "bloque"]) {
+    const advId = E.ADVANCED_BY_FILO[filo].id;
+    const seen0 = new Set();
+    for (let i = 0; i < 25; i++) playAll(withFilo(filo, 0), seen0);
+    assert(!seen0.has(advId), `${advId} no juega en Aprendiendo (nivel 0)`);
+    const seen1 = new Set();
+    for (let i = 0; i < 40 && !seen1.has(advId); i++) playAll(withFilo(filo, 1), seen1);
+    assert(seen1.has(advId), `${advId} aparece desde En desarrollo (nivel 1)`);
+    for (const other of E.SEQUENCE_TYPES.filter(t => t.advFor && t.advFor !== filo)) {
+      assert(!seen1.has(other.id), `la avanzada ajena ${other.id} nunca juega con ${filo}`);
+    }
+  }
+  // Desenlaces nuevos, forzando las secuencias directo (mismo patrón del test def→of):
+  // la cacería rota con falta deja amarilla rival + tiro libre encadenado (balon_parado)
+  {
+    let foulChain = false, cardSeen = false;
+    for (let i = 0; i < 400 && !foulChain; i++) {
+      const m = withFilo("press", 2, "ARG");
+      m.min = 30;
+      const cardsBefore = m.oppLineup.filter(p => p.amarillaPartido).length;
+      E.startSequence(m, E.sequenceType("caceria"));
+      let steps = 0;
+      while (m.seq && steps++ < 20) {
+        if (!m.decision) { m.resolveSequenceAct(null); continue; }
+        if (m.decision.id !== "sequence") break;
+        const wasCaceria = m.seq.type.id === "caceria";
+        m.resolveSequenceAct(m.decision.options[0].key);
+        if (wasCaceria && m.seq && m.seq.type.id === "balon_parado") {
+          foulChain = true;
+          if (m.oppLineup.filter(p => p.amarillaPartido).length > cardsBefore) cardSeen = true;
+          break;
+        }
+      }
+    }
+    assert(foulChain, "la cacería rota con falta ENCADENA un tiro libre (balon_parado mío)");
+    assert(cardSeen, "esa falta deja amarilla real en el once rival");
+  }
+  // La sinfonía con la desesperación llena puede terminar en PENAL (decisión penalty_mine)
+  {
+    let penal = false;
+    for (let i = 0; i < 400 && !penal; i++) {
+      const m = withFilo("posesion", 2, "MAR");
+      m.min = 30;
+      E.startSequence(m, E.sequenceType("sinfonia"));
+      let steps = 0;
+      while (m.seq && steps++ < 20) {
+        if (!m.decision) { m.resolveSequenceAct(null); continue; }
+        if (m.decision.id !== "sequence") break;
+        m.resolveSequenceAct(m.decision.options[0].key === "filtrado" ? "seguro" : m.decision.options[0].key);
+      }
+      if (m.decision?.id === "penalty_mine") penal = true;
+    }
+    assert(penal, "la sinfonía completa desespera: el penal llega (penalty_mine)");
+  }
+  // La fortaleza convierte: de contener al castigo (pelotazo mío en la MISMA jugada)
+  {
+    let converted = false, corner = false;
+    for (let i = 0; i < 400 && !(converted && corner); i++) {
+      const m = withFilo("bloque", 2, "ARG");
+      m.min = 30;
+      E.startSequence(m, E.sequenceType("fortaleza"));
+      let steps = 0;
+      while (m.seq && steps++ < 20) {
+        if (!m.decision) { m.resolveSequenceAct(null); continue; }
+        if (m.decision.id !== "sequence") break;
+        const was = m.seq.type.id;
+        m.resolveSequenceAct(m.decision.options[0].key);
+        if (was === "fortaleza" && m.seq?.type.id === "pelotazo") converted = true;
+        if (was === "pelotazo" && m.seq?.type.id === "balon_parado") corner = true;
+      }
+    }
+    assert(converted, "la fortaleza convierte la contención en pelotazo mío (def→of)");
+    assert(corner, "el duelo del castigo perdido puede morir en córner ganado encadenado");
+  }
 }
 
 // ---------- A2: la salida bajo presión CONVIERTE en transición mía (def→of) ----------

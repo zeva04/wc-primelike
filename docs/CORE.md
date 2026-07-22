@@ -402,13 +402,13 @@ Press −6 de energía post-partido (`applyFiloCosts`) · Contra cede posesión 
 −0.05) · Bloque cede volumen ofensivo (−0.08) · el rival que espera te la cede a ti
 (contra +0.04 · bloque +0.06) · Posesión sin costo físico (su costo ES la matriz). El
 Bloque además tiene su ARMA propia: balón parado ×1.3 (ajuste PO tras el primer gate —
-medía −5.5pp de piso con puros palos; el córner es el gol del bloque). Los
-**rasgos de Consolidada** (míos; el rival consolidado ya muerde vía ×2.1 + matriz): Press
-+0.05 al robo total · Posesión +1 acto de circulación (plan propio de la secuencia) ·
-Contra +0.04 al perfil de transición · Bloque +0.05 a la contención del repliegue.
-Verificado en diag (250 partidos/celda, nivel 2): cada celda mueve el share en su
-dirección sin tocar los goles (~1.4-1.8) — el caso extremo es Contra consolidado vs press
-rival: 58% de transiciones (vigilar si el relato se vuelve monotemático).
+medía −5.5pp de piso con puros palos; el córner es el gol del bloque). Los **rasgos de
+Consolidada de F2 se FUSIONARON en las secuencias avanzadas** (M2, decisión PO): ya no
+bufean los tipos base — profundizan la avanzada de cada identidad (ver [SECUENCIAS
+AVANZADAS] abajo). Verificado en diag (250 partidos/celda, nivel 2): cada celda de la
+matriz mueve el share en su dirección sin tocar los goles (~1.4-1.8) — el caso extremo es
+Contra consolidado vs press rival: 58% de transiciones (vigilar si el relato se vuelve
+monotemático).
 
 **[FILOSOFÍA → POOL] (arco F1, decisión PO #6).** MI filosofía multiplica su **tipo firma**
 en `typeWeights`: **×1.35 / ×1.7 / ×2.1** según el nivel (Aprendiendo / En desarrollo /
@@ -422,7 +422,38 @@ círculo: cada acierto de acto en una secuencia firma (`noteFiloHit` — escalar
 el gol que corona si el VAR no lo anula) suma `match.filoHits`, y `flow.postMatchUpdate` lo
 convierte en arista vía `applyFiloExecution` (+0.25 por acierto, tope 2 por partido). Ritmos
 medidos con decisiones al azar: Posesión ~1.5 aciertos/partido, Contragolpe ~1.1, Press ~0.7,
-Bloque ~0.5 — la circulación multi-acto consolida más rápido; se vigila en F2.
+Bloque ~0.5 — la circulación multi-acto consolida más rápido; se vigila en F2. Desde M2 la
+**avanzada también es firma**: sus aciertos cuentan igual (`noteFiloHit` mira `advFor`).
+
+**[SECUENCIAS AVANZADAS] (arco del Meta M2, diseños PO 22-jul).** Cada filosofía tiene su
+**fútbol superior** (`content/sequences` con `advFor`, números en `adv`): entra al pool desde
+**En desarrollo** (nivel 1) y Consolidada lo **profundiza** (la fusión: el rasgo de F2 vive
+adentro). El gating REPARTE el peso de la familia (nivel 1: 60% avanzada / 40% base; nivel 2:
+90/10) y va **al final** de `applyFiloWeights`: la avanzada hereda TODO lo que la matriz y
+las firmas le hicieron a su tipo base — medido: sumar en vez de repartir hundía a las
+identidades con jugadas de riesgo (Contra −5pp), y repartir antes de la matriz dejaba al
+letal sobre-jugado en sus peores cruces. Las 4:
+- 🦁 **Cacería total** (Press): `press→press→finish` — la trampa se cierra sobre el reseteo
+  (2º robo en zona letal, `trapBonus`); la rotura es falta el 35% (50% profunda): 🟨 amarilla
+  real (la 2ª expulsa — `teamPowers` ya castiga la inferioridad rival) + tiro libre encadenado.
+- 🎼 **La sinfonía** (Posesión): `build×3→finish` (×4 profunda, plan propio como el viejo
+  rasgo); con todos los compases, 22-30% de PENAL (el rival mareado te baja en el área); si
+  no, remate limpio (finishBonus 0.16).
+- ⚡ **Contragolpe letal** (Contra): `carry→carry→finish` con **geografía de la falta**: 1º
+  tramo = amarilla + tiro libre (freekickBonus 0.08); 2º tramo (rival desesperado) = 22% de
+  los fallos son falta: 30% ROJA por último hombre + tiro libre al borde (0.12), resto
+  amarilla + PENAL. El 2º tramo se conduce más fácil (`carryEase` +0.15 al dribble: la cancha
+  está ROTA) y perderla limpia ahí NO abre contra-contra (nadie quedó parado). Definición
+  regalada (0.21) y `carryBonus` [0.10, 0.14].
+- 🧱 **La fortaleza castiga** (Bloque, la única DEFENSIVA): nace del repliegue; la contención
+  exitosa CONVIERTE 55-75% en pelotazo mío con el rival desarmado (def→of, el patrón de la
+  salida bajo presión) y el duelo perdido muere 35% en córner ganado encadenado. El rasgo
+  viejo (+0.05 contención) vive en su versión profunda.
+La **conquista se narra** (`noteFiloMilestones`, llamada en los dos beats donde crecen las
+aristas: acción del día y post-partido): nivel 1 = "¡Conquista! ya es nuestro fútbol", nivel
+2 = "la idea es LEY". La vitrina la lista 🔒/✅ y el sorteo la vende desde la elección. Las
+tarjetas al rival de estos desenlaces son LOCALES al partido (rivalBans sigue siendo cosa
+del mundo vivo, como las lesiones rivales).
 
 **Generación** (`sequences.seqPlan` + `maybeStartSequence`): **2-6 por partido**, objetivo modulado
 por la **preparación** (ventaja atk+def sobre el rival) y la mentalidad. El favorito recibe más

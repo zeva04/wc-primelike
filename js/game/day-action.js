@@ -19,6 +19,7 @@ import { clamp } from "../core/math.js";
 import { DAY_ACTIONS, CANJE_THRESHOLD, CANJE_PERMANENT, CANJEABLE_STATS, STAT_LABELS } from "../content/day-actions.js";
 import { OPPORTUNITIES } from "../content/opportunities.js";
 import { addJournal } from "./journal.js";
+import { noteFiloMilestones } from "./philosophy.js";
 
 /** La Oportunidad viva HOY (fila completa de content/opportunities) o null. */
 export function dayOpportunity(run) {
@@ -106,5 +107,6 @@ export function applyDayAction(run, actionId, targetName) {
   addJournal(run, isOpp
     ? { icon: a.icon, tone: a.rareza === "legendaria" ? "gold" : "good", title: a.title, desc: `Oportunidad única: ${desc}` }
     : { icon: a.icon, tone: "neutral", title: a.title, desc: `Acción del día: ${desc}${mult !== 1 ? ` (${multLabel(mult)} por "${run.dayMod.title}")` : ""}.` });
+  noteFiloMilestones(run); // la Sesión Táctica pudo cruzar un umbral: la conquista se narra (M2)
   return { ...a, mult, desc };
 }

@@ -103,7 +103,7 @@ hace el greedy del canje, Bonding con moral baja (regla existente). Flags nuevos
   energía colorea con `ENERGY_OK` (una sola fuente, `components.energyCls`: verde = banda),
   `--smart` en el smoke (heurísticas acordadas, documentadas en FUNCIONES).
 
-### M2 — "El fútbol que se gana"
+### M2 — "El fútbol que se gana" ✅ CERRADO (22-jul-2026, gate global CUMPLIDO)
 1. Las 4 secuencias avanzadas como DATOS (content/sequences.js, gated por `filo.nivel`
    en el pool de typeWeights/applyFiloWeights) + desenlaces nuevos reusando mecánicas
    (myPenalty, balon_parado encadenado como hace playout, amarilla rival vía incidents).
@@ -114,6 +114,33 @@ hace el greedy del canje, Bonding con moral baja (regla existente). Flags nuevos
    primera vez mejorar al equipo le gana a descansarlo. El mixto debería recuperar parte
    de los 3.2pp del arco de Filosofía como poder GANADO. Spread vigilado (los grandes
    consolidan antes: riesgo de abrirla).
+
+**Cierre de M2 — lo decidido y lo medido (todo n=4000 × 2 corridas, BRA):**
+- **FUSIÓN aprobada**: la avanzada ES el rasgo (los 4 rasgos de F2 eran, temáticamente,
+  las 4 avanzadas — se mudaron adentro como su profundización de Consolidada). Diseños
+  finos aprobados uno a uno (cacería 3 actos con falta/amarilla · sinfonía con penal del
+  desesperado · letal con geografía de la falta + ROJA al último hombre [idea PO en
+  sesión] · fortaleza def→of con córner ganado).
+- **Gate redefinido en sesión** (la letra del roadmap ya se cumplía desde M1): (1) margen
+  smart−recuperar crece a ≥+5pp; (2) cada filo sube vs su techo smart pre-avanzadas
+  (vara re-medida n=4000 en worktree del commit de M1); spread vigilado.
+- **Gate 1 ✅: margen +5.8** (smart 51.8-52.0 vs recuperar 46.1; era +2.7 al cierre de
+  M1). El poder es GANADO: el techo smart subió de ~49.2 a ~51.9 con las avanzadas.
+- **Gate 2, por filo**: Press 48.8→51.6 (**+2.8 ✅**) · Bloque 45.5→51.05 (**+5.6 ✅**,
+  el colista eterno curado por su fortaleza) · Posesión 52.5→52.1 (plana: su +1.0
+  preliminar era en parte un bug — la sinfonía esquivaba la celda posesion|bloque) ·
+  **Contra 50.4→48.45 (−1.95 ❌, ACEPTADO Y DOCUMENTADO** tras 6 palancas: split del
+  pool, herencia de la matriz, sin contra-contra en el 2º tramo, carryBonus/passBonus,
+  carryEase, falta desesperada 0.28/roja 0.40. Causa estructural: su transición base era
+  el tipo más fuerte del juego — firma ×2.1 + matriz + 12% falta=penal — y la geografía
+  de la falta, que es diseño querido, paga peaje contra ese listón).
+- **Spread entre filos smart: 7.0 → 3.65** (se CERRÓ: ya no hay filo-lastre) · BRA−CPV
+  29.9 (≤ la deuda declarada ~30.8, no creció) · mixto 39.6 (estable: el azar casi no
+  alcanza nivel 1 — la zanahoria premia al que entrena, por diseño).
+- **Aprendizajes de implementación** (quedaron en comentarios del código): el gating
+  REPARTE el peso de la familia (sumar hundía a las identidades con riesgo −5pp) y va AL
+  FINAL de applyFiloWeights (la avanzada hereda matriz y firmas: repartir antes la
+  sobre-jugaba en sus peores cruces).
 
 ## Riesgos declarados
 
@@ -134,3 +161,10 @@ hace el greedy del canje, Bonding con moral baja (regla existente). Flags nuevos
   (mixto ~40). M2 hereda: el gate `--smart` filosófico > `--smart` recuperador debería
   además comerse parte del gap del piso (la zanahoria le da valor a los días que hoy el
   azar "malgasta").
+- **22-jul-2026 (noche)** — M2 cerrado y **ARCO COMPLETO**. La tesis quedó comprobada
+  con margen: mejorar al equipo (+filosofía) le gana a descansarlo por +5.8pp en el
+  techo. **Deudas del arco para el próximo rebalance global**: (1) dificultad — mixto
+  azar BRA ~39.6 vs ~30.8 pre-arco (la banda liberó poder y las avanzadas lo suman);
+  (2) spread BRA−CPV ~29.9 vs ~25.0 pre-arco (se abrió en M1, M2 no lo agravó);
+  (3) el Contra −1.95 bajo su techo pre-avanzadas (estructural, 6 palancas probadas).
+  Ninguna se esconde: las tres se atacan JUNTAS cuando se recalibre la dificultad.

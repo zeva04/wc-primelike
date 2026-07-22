@@ -148,7 +148,116 @@ export const SEQUENCE_TYPES = [
       containFail: opp => `${opp.name} progresa y encara el área.`,
     },
   },
+  /* ---------- Las 4 SECUENCIAS AVANZADAS (arco del Meta M2, diseños PO 22-jul) ----------
+     El fútbol superior de cada filosofía: entran al pool desde EN DESARROLLO (nivel 1)
+     y Consolidada las PROFUNDIZA (el rasgo de F2 se FUSIONÓ acá — decisión PO M2: la
+     avanzada ES el rasgo cumplido jugando). `advFor` es la filosofía dueña: la máquina
+     las gatea por `filo.nivel` (applyFiloWeights) y cuentan como ejecución de la firma
+     (noteFiloHit). Los números finos del castigo/desenlace viven en `adv` — datos, no
+     lógica: la máquina los lee. */
+  {
+    id: "caceria", side: "mine", icon: "🦁", name: "Cacería total", advFor: "press",
+    // Presión ENCADENADA (3 actos): cazar la salida, cerrar la trampa sobre el reseteo y
+    // definir en zona letal. Si el rival la rompe, un % de las veces la rompe CON FALTA:
+    // amarilla (acumula: la 2ª expulsa) + tiro libre encadenado — la jugada sigue.
+    protWeight: { DEL: 2, MED: 3, DEF: 1 },
+    plan: ["press", "press", "finish"],
+    // freekickBonus: la falta corta la cacería en la SALIDA rival — tiro libre lejano
+    // (modesto), a diferencia del contragolpe cortado al borde del área.
+    adv: { foulBreak: 0.35, foulBreakDeep: 0.5, trapBonus: 0.07, deepBonus: 0.05, freekickBonus: 0.04 },
+    vitrina: "Presión encadenada en 3 actos: cazar la salida, cerrar la trampa sobre el reseteo y definir en zona letal. Al rival que la rompe con falta: amarilla — y el tiro libre es tuyo.",
+    flavor: {
+      intro: p => pick([
+        `¡CACERÍA TOTAL! El equipo entero salta sobre la salida rival; ${p.name} guía la jauría.`,
+        `La presión que entrenamos hasta el hartazgo: ${p.name} ordena la cacería sobre el fondo rival.`,
+      ]),
+      pressOk: "¡Primer robo! El rival intenta resetear... y la jauría no lo suelta.",
+      press2Ok: "¡¡La trampa se cierra!! Segunda cacería y la pelota es nuestra en ZONA LETAL.",
+      pressFail: "El rival rompe la cacería con un pase entre líneas.",
+      foulText: p => `¡${p.name} no encuentra salida y DERRIBA para cortar la cacería! Amarilla y tiro libre.`,
+      finishStat: "tiro", finishBonus: 0.10,
+    },
+  },
+  {
+    id: "sinfonia", side: "mine", icon: "🎼", name: "La sinfonía", advFor: "posesion",
+    // Circulación LARGA (3 compases; 4 en Consolidada — el rasgo viejo vive acá): cada
+    // build acertado suma desesperación. Con la desesperación llena, un % de las veces el
+    // rival ya no llega y te baja DENTRO del área: penal. Si no, remate limpio de alta calidad.
+    protWeight: { DEL: 2, MED: 3, DEF: 1 },
+    plan: ["build", "build", "build", "finish"],
+    adv: { penaltyChance: 0.22, penaltyChanceDeep: 0.30 },
+    vitrina: "Circulación larga que desespera (3 compases): definición limpia de alta calidad… o el rival, mareado de correr, te baja dentro del área — PENAL.",
+    flavor: {
+      intro: p => pick([
+        `Arranca LA SINFONÍA: ${p.name} marca el tempo y el equipo entero se hace dueño de la pelota.`,
+        `${p.name} pide la batuta: circulación larga para desesperar al rival.`,
+      ]),
+      buildOk: "El rival corre detrás de la pelota. La sinfonía sigue.",
+      buildFail: "Se corta la sinfonía: la pelota se pierde en un pase.",
+      penaltyText: p => `¡El rival, mareado de correr, DERRIBA a ${p.name} dentro del área! ¡PENAL!`,
+      finishStat: "tiro", finishBonus: 0.16,
+    },
+  },
+  {
+    id: "contra_letal", side: "mine", icon: "⚡", name: "Contragolpe letal", advFor: "contra",
+    // Doble conducción con el rival partido. La falta tiene GEOGRAFÍA: en el primer tramo
+    // (lejos) es la falta desesperada — amarilla + tiro libre encadenado; en el segundo
+    // (zona letal) es PENAL, como la conducción de siempre.
+    protWeight: { DEL: 3, MED: 2, DEF: 1 },
+    plan: ["carry", "carry", "finish"],
+    // carryBonus por tramo: con el rival partido, cada conducción ganada vale MÁS que la
+    // de la transición simple (+0.05) — el doble riesgo de conducir dos veces debe pagar.
+    // freekickBonus: la falta desesperada del 1º tramo te corta lejos — tiro libre
+    // peligroso pero no letal. En el 2º TRAMO la desesperación escala (decisión PO M2):
+    // despFoul = % de los fallos del conducir que son FALTA del rival desesperado;
+    // despRed = de esas, cuántas son ROJA por último hombre (+ tiro libre al borde,
+    // despFreekickBonus); el resto es amarilla + PENAL. Devuelve el EV del penal que la
+    // geografía le quitó al 1º tramo — donde el fútbol lo pone.
+    // carryEase: el 2º tramo se conduce con la cancha ROTA — más fácil que driblear una
+    // defensa plantada (sin esto, la compuerta extra del 3er acto drenaba el EV: medido).
+    // passBonus: con el rival partido el PASE AL PIE también gana metros (la base solo
+    // premia conducir: +0.02 al pase — acá el pase corre con la cancha rota).
+    // despFoul/despRed subieron 0.22→0.28 / 0.30→0.40 en la calibración final (PO):
+    // el rival desesperado comete más faltas, y más veces es el último hombre.
+    adv: { carryBonus: [0.10, 0.14], passBonus: [0.06, 0.08], carryEase: 0.15, deepBonus: 0.05, freekickBonus: 0.08, despFoul: 0.28, despRed: 0.40, despFreekickBonus: 0.12 },
+    vitrina: "Doble conducción con el rival partido. Si te bajan lejos: amarilla y tiro libre. Si te bajan en zona letal: penal — o ROJA al último hombre que cortó la escapada.",
+    flavor: {
+      intro: p => pick([
+        `¡CONTRAGOLPE LETAL! El rival quedó partido y ${p.name} arranca con toda la pradera.`,
+        `Robo y a correr: ${p.name} lanza el contragolpe que ensayamos mil veces.`,
+      ]),
+      carryOk: p => `${p.name} devora metros: el rival retrocede sin poder acomodarse.`,
+      carryFail: "La defensa rival llega a cerrar el hueco a tiempo.",
+      foulText: p => `¡${p.name} corta el contragolpe con falta lejos del área! Amarilla y tiro libre.`,
+      penalFoulText: p => `¡${p.name}, desesperado, DERRIBA al contragolpe dentro del área! Amarilla... ¡y PENAL!`,
+      redText: p => `¡${p.name} era el ÚLTIMO HOMBRE y bajó al que se escapaba! ROJA DIRECTA — y tiro libre al borde del área.`,
+      // 0.21 > 0.18 de la transición simple: tras DOS conducciones el rival no existe —
+      // la definición del letal llega regalada (calibrado en M2 contra su baseline).
+      finishStat: "tiro", finishBonus: 0.21,
+    },
+  },
+  {
+    id: "fortaleza", side: "opp", icon: "🧱", name: "La fortaleza castiga", advFor: "bloque",
+    // La única avanzada DEFENSIVA: arranca como repliegue, pero la contención exitosa
+    // CONVIERTE (def→of, el patrón de la salida bajo presión): pelotazo inmediato con el
+    // rival desarmado. Si el duelo aéreo se pierde, % de córner ganado encadenado — la
+    // fortaleza casi siempre saca algo. El rasgo viejo (+contención) vive acá (Consolidada).
+    protWeight: { DEF: 3, MED: 1, DEL: 0 },
+    plan: ["contain", "clear"],
+    adv: { convert: 0.55, convertDeep: 0.75, counterBonus: 0.06, cornerOnDuelFail: 0.35, deepContain: 0.05 },
+    vitrina: "La contención CONVIERTE: pelotazo inmediato con el rival desarmado. Y si el duelo aéreo se pierde, la jugada puede morir en córner ganado — la fortaleza casi siempre saca algo.",
+    flavor: {
+      intro: opp => `${opp.name} ataca... pero esta muralla tiene dientes. El bloque espera su momento.`,
+      containOk: "¡La zaga corta la jugada antes del remate!",
+      containFail: opp => `${opp.name} progresa y encara el área.`,
+      convertText: opp => `🧱 ¡La muralla corta... y CASTIGA! Pelotazo inmediato con ${opp.name} desarmado.`,
+      cornerText: "la zaga rival, de espaldas a su arco, la manda al CÓRNER. ¡La fortaleza sigue castigando!",
+    },
+  },
 ];
 
 /** Un tipo por id (o undefined). */
 export function sequenceType(id) { return SEQUENCE_TYPES.find(t => t.id === id); }
+
+/** La secuencia avanzada de cada filosofía ({press: fila, ...}) — derivado de los datos. */
+export const ADVANCED_BY_FILO = Object.fromEntries(SEQUENCE_TYPES.filter(t => t.advFor).map(t => [t.advFor, t]));

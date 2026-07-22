@@ -37,9 +37,11 @@ export function actPass(m, from, { hard = false } = {}) {
 /**
  * Regate/individual de un mío. Puede salir (ok), terminar en falta a favor → penal
  * (foul), o perderse. Espejo de la rama "solo" de resolveChance (aura·0.075 + 12% penal).
+ * `bonus` (M2): conducir con la cancha ROTA es más fácil — el 2º tramo del Contragolpe
+ * letal lo usa (adv.carryEase): el rival partido y de espaldas no es una defensa plantada.
  */
-export function actDribble(m, p) {
-  const pr = clamp(0.05 + effStat(p, "aura", m.my.buffs) * 0.075, 0.05, 0.5);
+export function actDribble(m, p, { bonus = 0 } = {}) {
+  const pr = clamp(0.05 + effStat(p, "aura", m.my.buffs) * 0.075 + bonus, 0.05, 0.65);
   const roll = rnd();
   return { ok: roll < pr, foul: roll >= pr && roll < pr + 0.12 };
 }

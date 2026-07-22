@@ -10,7 +10,7 @@
    vulnerabilidades visibles).
    ============================================================ */
 import { getPhilosophy, aristaById, ARISTAS, FILO_LEVELS } from "../../content/philosophies.js";
-import { sequenceType } from "../../content/sequences.js";
+import { sequenceType, ADVANCED_BY_FILO } from "../../content/sequences.js";
 import { filoPoints, filoLevel } from "../../game/philosophy.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
@@ -33,6 +33,7 @@ function renderPhilosophy() {
   const next = FILO_LEVELS[lvl + 1] || null;
   const firma = aristaById(f.firma);
   const firmaType = sequenceType(firma.tipo);
+  const adv = ADVANCED_BY_FILO[f.id]; // la secuencia avanzada de mi identidad (M2)
   // Progreso hacia el próximo umbral, desde el piso del nivel actual (para que la barra
   // no nazca medio llena al subir de nivel).
   const nivelPct = next ? (100 * (pts - nivel.min)) / (next.min - nivel.min) : 100;
@@ -57,13 +58,18 @@ function renderPhilosophy() {
           <p class="text-[10px] text-slate-500 mt-2">Tu jugada firma sale <b class="text-slate-300">×${nivel.mult}</b> más seguido en el pool del partido${next ? ` (al consolidar: ×${FILO_LEVELS[2].mult})` : ""}.</p>
         </div>
 
-        <!-- La firma y el rasgo -->
+        <!-- La firma y la secuencia AVANZADA (M2: el rasgo se fusionó acá) -->
         <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
           <h3 class="font-bold text-sm mb-1">${firmaType.icon} Tu jugada firma: ${firmaType.name}</h3>
           <p class="text-[11px] text-slate-400">Acertar sus actos en partido también te consolida (+0.25 por acierto, tope +0.5 por partido): jugar tu fútbol y que salga ES entrenamiento.</p>
-          <div class="mt-3 rounded-xl border ${lvl === 2 ? "border-amber-500/50 bg-amber-500/10" : "border-slate-700 bg-slate-900/50"} p-3">
-            <div class="text-[11px] font-bold ${lvl === 2 ? "text-amber-300" : "text-slate-400"}">${lvl === 2 ? "✅ Rasgo desbloqueado" : "🔒 Rasgo de Consolidada"}</div>
-            <div class="text-[11px] ${lvl === 2 ? "text-slate-200" : "text-slate-500"} mt-0.5">${f.rasgo}</div>
+          <div class="mt-3 rounded-xl border ${lvl >= 1 ? "tp-border tp-bg-soft" : "border-slate-700 bg-slate-900/50"} p-3">
+            <div class="text-[11px] font-bold ${lvl >= 1 ? "tp-text" : "text-slate-400"}">${lvl >= 1 ? "✅ Fútbol superior desbloqueado" : `🔒 Fútbol superior — se conquista En desarrollo (${FILO_LEVELS[1].min} pts)`}</div>
+            <div class="text-[12px] font-black ${lvl >= 1 ? "text-slate-100" : "text-slate-500"} mt-1">${adv.icon} ${adv.name}</div>
+            <div class="text-[11px] ${lvl >= 1 ? "text-slate-200" : "text-slate-500"} mt-0.5">${adv.vitrina}</div>
+            <div class="mt-2 pt-2 border-t ${lvl === 2 ? "border-amber-500/40" : "border-slate-700/60"}">
+              <span class="text-[11px] font-bold ${lvl === 2 ? "text-amber-300" : "text-slate-500"}">${lvl === 2 ? "✅ Profunda (Consolidada)" : `🔒 Consolidada la profundiza (${FILO_LEVELS[2].min} pts)`}</span>
+              <div class="text-[11px] ${lvl === 2 ? "text-slate-200" : "text-slate-500"} mt-0.5">${f.rasgo}</div>
+            </div>
           </div>
         </div>
 

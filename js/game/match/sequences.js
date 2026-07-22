@@ -33,7 +33,7 @@ import { rnd, ri, pick } from "../../core/rng.js";
 import { clamp } from "../../core/math.js";
 import { playedPos } from "../ratings.js";
 import { moraleBand } from "../morale.js";
-import { SEQUENCE_TYPES } from "../../content/sequences.js";
+import { SEQUENCE_TYPES, ADVANCED_BY_FILO } from "../../content/sequences.js";
 import { FIRMA_TYPE, FILO_LEVELS, getPhilosophy } from "../../content/philosophies.js";
 import { rivalFilo } from "../philosophy.js";
 import { buildActDecision } from "./sequence-acts.js";
@@ -106,16 +106,21 @@ function typeWeights(m, side, plan) {
   const brave = band === "nubes" ? 1.5 : band === "alta" ? 1.2 : 1;
   const scared = band === "suelo" ? 1.5 : band === "baja" ? 1.2 : 1;
   const noPress = band === "suelo" ? 0.6 : band === "baja" ? 0.8 : 1;
+  // Las AVANZADAS (M2) arrancan en 0: el pool las contiene para todos, pero solo
+  // applyFiloWeights les da peso — al dueño de la filosofía, desde nivel 1. Un 0
+  // explícito, porque el pick usa `w[t.id] ?? 1`: sin esto jugarían gratis.
   const w = side === "mine" ? {
     circulacion: 3,
     transicion: (2.5 + 2 * prof.atk) * (losingLate ? 1.5 : 1) * brave,
     recuperacion: (2 + 1.5 * prof.pase) * (ment === "ofensiva" ? 1.6 : 1) * (tired ? 0.6 : 1) * brave * noPress,
     pelotazo: (1.3 + 1.8 * prof.def) * (ment === "defensiva" ? 1.5 : 1) * (losingLate ? 1.5 : 1) * (tired ? 1.4 : 1) * scared,
     balon_parado: 1.5,
+    caceria: 0, sinfonia: 0, contra_letal: 0,
   } : {
     repliegue: (2 + 3 * prof.atk) * (winningLate ? 1.4 : 1),
     salida_fondo: (0.8 + 2.5 * prof.def) * (tired ? 1.4 : 1),
     balon_parado_def: 0.8 + 1 * prof.cab,
+    fortaleza: 0,
   };
   applyFiloWeights(m, side, w, plan.oppFilo);
   // Memoria de secuencias: no repetir el mismo tipo dos veces seguidas (el partido varía).
@@ -150,6 +155,13 @@ const RIVAL_FIRMA_OPP = { press: "salida_fondo", posesion: "repliegue" };
  * (×1.35/×1.7/×2.1, F1) · la matriz de counters mía×rival · la firma rival por SU nivel.
  * Muta `w` in place. Todo se lee EN VIVO al generar (nada cacheado salvo oppFilo, fijo).
  */
+// M2 — de qué tipo BASE se desprende cada avanzada (su peso es una fracción del de la
+// familia, ya multiplicado por el nivel de la firma cuando es lado mine): a nivel 1 la
+// avanzada asoma (×0.6 de su base), en Consolidada casi lo iguala (×0.9). La fortaleza
+// vive del lado opp (nace del repliegue: el Bloque castiga desde su trinchera).
+const ADV_SOURCE = { caceria: "recuperacion", sinfonia: "circulacion", contra_letal: "transicion", fortaleza: "repliegue" };
+const ADV_SHARE = [0.6, 0.9]; // [nivel 1, nivel 2]
+
 function applyFiloWeights(m, side, w, oppFilo) {
   const filo = m.my.filo;
   // F1 — mi tipo firma pesa por mi nivel (llega por matchCtx, como la moral)
@@ -171,6 +183,24 @@ function applyFiloWeights(m, side, w, oppFilo) {
     const t = RIVAL_FIRMA_OPP[oppFilo.id];
     if (t && w[t] !== undefined) w[t] *= FILO_LEVELS[oppFilo.nivel]?.mult || 1;
     if (oppFilo.id === "bloque") { w.balon_parado_def *= 1.3; w.salida_fondo *= 0.6; }
+  }
+  // M2 — la secuencia AVANZADA de mi filosofía entra al pool desde En desarrollo
+  // (nivel 1) y en Consolidada casi desplaza a su tipo base. REPARTE el peso de la
+  // familia, no lo suma (medido: sumar inflaba el volumen de la familia y hundía a las
+  // identidades cuyas jugadas cargan riesgo — Contra −5pp). VA AL FINAL a propósito:
+  // la avanzada hereda TODO lo que la matriz y las firmas le hicieron a su familia —
+  // si tu transición vale ×0.6 contra un bloque, tu Contragolpe letal también (medido:
+  // repartir ANTES de la matriz dejaba al letal sobre-jugado justo en sus peores cruces).
+  // Bible regla 3: la progresión desbloquea GENERACIÓN — la avanzada REEMPLAZA a tu
+  // fútbol básico: quien no entrena su idea se queda en él.
+  if (filo && filo.nivel >= 1) {
+    const advId = ADVANCED_BY_FILO[filo.id]?.id;
+    if (advId && w[advId] !== undefined) {
+      const share = ADV_SHARE[Math.min(filo.nivel - 1, 1)];
+      const src = ADV_SOURCE[advId];
+      w[advId] = (w[src] || 1) * share;
+      if (w[src]) w[src] *= 1 - share;
+    }
   }
 }
 
@@ -203,7 +233,8 @@ export function filoRasgo(m, filoId) {
  */
 export function noteFiloHit(m) {
   const f = m.my.filo, s = m.seq;
-  if (f && s && s.type.id === FIRMA_TYPE[f.id]) m.filoHits = (m.filoHits || 0) + 1;
+  // La AVANZADA también es tu firma (M2): jugar tu fútbol superior consolida igual.
+  if (f && s && (s.type.id === FIRMA_TYPE[f.id] || s.type.advFor === f.id)) m.filoHits = (m.filoHits || 0) + 1;
 }
 
 /**
@@ -246,11 +277,11 @@ export function startSequence(m, type) {
     // Momento → protagonista (decisión #15): ver protMomentum.
     const prot = m._weightedPick(cands, cands.map(p => (type.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
     m.seq = { type, prot, actIdx: 0, bonus: 0 };
-    // RASGOS de Consolidada (F2, decisión PO #6): el Contra saca transiciones con mejor
-    // perfil de remate; la Posesión gana UN acto más de circulación (plan propio de la
-    // secuencia — sequence-acts lee s.plan || s.type.plan). Chicos y visibles jugando.
-    if (type.id === "transicion" && filoRasgo(m, "contra")) m.seq.bonus += 0.04;
-    if (type.id === "circulacion" && filoRasgo(m, "posesion")) m.seq.plan = ["build", ...type.plan];
+    // Los RASGOS de F2 se FUSIONARON en las secuencias avanzadas (M2, decisión PO):
+    // Consolidada ya no bufea los tipos base — PROFUNDIZA tu avanzada. El único que
+    // sigue usando el plan propio es la sinfonía profunda: 4º compás en Consolidada
+    // (el viejo rasgo de Posesión, ahora dentro de SU fútbol).
+    if (type.id === "sinfonia" && filoRasgo(m, "posesion")) m.seq.plan = ["build", ...type.plan];
     // [RELATO CON IDENTIDAD] (F3): cuando la secuencia es MI tipo firma, la narra la
     // filosofía ("el pressing que entrenamos toda la semana") en vez del intro genérico.
     const filoIntros = m.my.filo && FIRMA_TYPE[m.my.filo.id] === type.id ? getPhilosophy(m.my.filo.id).firmaIntros : null;

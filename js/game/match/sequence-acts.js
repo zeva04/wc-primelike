@@ -60,7 +60,11 @@ export function buildActDecision(m) {
       ],
     }),
     press: () => ({
-      title: `🦁 min ${m.min}' — ¡Presión alta! ${s.prot.name} achica sobre la salida rival`,
+      // El 2º acto de la Cacería total (M2) es la TRAMPA sobre el reseteo rival — mismo
+      // gesto (Football Action de presión), otro momento del fútbol.
+      title: s.type.id === "caceria" && s.actIdx === 1
+        ? `🦁 min ${m.min}' — ¡El rival intenta resetear y la trampa se cierra! ${s.prot.name} otra vez encima`
+        : `🦁 min ${m.min}' — ¡Presión alta! ${s.prot.name} achica sobre la salida rival`,
       text: "¿Cómo cazan la pelota?",
       options: [
         { label: "🔥 Presión total", hint: "Robo en zona letal (remate top)… pero si la rompen, duele", key: "total" },
@@ -149,6 +153,7 @@ export function resolveSequenceAct(m, key) {
       if (!r.ok) return maybeCounter(m, `min ${m.min}' — ${f.buildFail}`, true);
       s.bonus += 0.07;
     }
+    s.buildOks = (s.buildOks || 0) + 1; // la sinfonía (M2) cuenta la desesperación rival
     const recibe = passTo(m, s); // seguro o filtrado: el pase cambia la pelota de pies
     m.log("plain", `min ${m.min}' — ${f.buildOk}${recibe ? ` La recibe ${s.prot.name}.` : ""}`);
     if (key === "filtrado") dtOk(m);
@@ -157,14 +162,51 @@ export function resolveSequenceAct(m, key) {
 
   if (kind === "carry") {
     if (key === "conducir") {
-      const r = A.actDribble(m, s.prot);
-      if (r.foul) { m.log("event", `min ${m.min}' — ¡Derriban a ${s.prot.name}! ¡PENAL!`); closeSilent(m); return myPenalty(m); }
-      if (!r.ok) return maybeCounter(m, `min ${m.min}' — ${f.carryFail}`, true);
-      s.bonus += 0.05;
+      const r = A.actDribble(m, s.prot, { bonus: s.type.advFor === "contra" && s.actIdx === 1 ? s.type.adv.carryEase : 0 });
+      if (r.foul) {
+        // GEOGRAFÍA de la falta en el Contragolpe letal (M2): en el primer tramo (lejos
+        // del área) es la falta desesperada — amarilla + tiro libre encadenado; en el
+        // segundo (zona letal) es PENAL, como la conducción de siempre.
+        if (s.type.advFor === "contra" && s.actIdx === 0) return advFoulSetPiece(m, f.foulText, s.type.adv.freekickBonus);
+        m.log("event", `min ${m.min}' — ¡Derriban a ${s.prot.name}! ¡PENAL!`); closeSilent(m); return myPenalty(m);
+      }
+      if (!r.ok) {
+        // 2º tramo del letal (M2): el rival YA está partido, replegando a la desesperada.
+        // Un % de los "fallos" son en realidad FALTA DESESPERADA (decisión PO): ROJA por
+        // último hombre + tiro libre al borde (despRed), o amarilla + PENAL (el resto) —
+        // devuelve el EV del penal que la geografía le quitó al 1º tramo. Y perderla ahí
+        // limpio no abre contra-contra (nadie quedó parado para lanzarla): muere y punto.
+        if (s.type.advFor === "contra" && s.actIdx === 1) {
+          if (rnd() < s.type.adv.despFoul) {
+            const alive = m.oppLineup.filter(x => !x.expulsado && x.pos !== "POR");
+            const rival = alive.length ? pick(alive) : null;
+            if (rival && rnd() < s.type.adv.despRed) {
+              rival.expulsado = true;
+              m.log("card", `min ${m.min}' — 🟥 ${f.redText(rival)}`);
+              return chainSetPiece(m, s.type.adv.despFreekickBonus);
+            }
+            if (rival) {
+              rival.amarillaPartido = (rival.amarillaPartido || 0) + 1;
+              m.log("card", `min ${m.min}' — 🟨 ${f.penalFoulText(rival)}`);
+              if (rival.amarillaPartido >= 2) { rival.expulsado = true; m.log("card", `min ${m.min}' — 🟥 ¡Era su segunda amarilla! EXPULSADO.`); }
+            }
+            closeSilent(m);
+            return myPenalty(m);
+          }
+          m.log("chance", `min ${m.min}' — ${f.carryFail}`); dtFail(m); return closeSilent(m);
+        }
+        return maybeCounter(m, `min ${m.min}' — ${f.carryFail}`, true);
+      }
+      // El Contragolpe letal paga por tramo (adv.carryBonus: el rival partido vale más
+      // que la transición simple) y Consolidada profundiza el primero (rasgo F2 fusionado).
+      s.bonus += (s.type.advFor === "contra" ? s.type.adv.carryBonus[Math.min(s.actIdx, 1)] : 0.05)
+        + (s.type.advFor === "contra" && s.actIdx === 0 && filoRasgo(m, "contra") ? s.type.adv.deepBonus : 0);
       m.log("plain", `min ${m.min}' — ${f.carryOk(s.prot)}`);
       dtOk(m);
     } else {
-      s.bonus += 0.02; // pase al pie: seguro, siempre progresa
+      // Pase al pie: seguro, siempre progresa. En el Contragolpe letal (M2) TAMBIÉN gana
+      // metros de verdad (adv.passBonus): con el rival partido, el pase al pie es progreso.
+      s.bonus += s.type.advFor === "contra" ? s.type.adv.passBonus[Math.min(s.actIdx, 1)] : 0.02;
       const pasador = s.prot;
       m.log("plain", passTo(m, s) // el pase al pie también se desprende de la pelota
         ? `min ${m.min}' — ${pasador.name} la juega al pie y ${s.prot.name} toma la posta.`
@@ -178,11 +220,19 @@ export function resolveSequenceAct(m, key) {
     // El +0.10 es MI iniciativa: presionar una salida roba más que contener a un rival lanzado.
     const { mine } = m.powers();
     const total = key === "total";
+    const caza = s.type.id === "caceria"; // la avanzada del Press (M2)
     const r = A.actContain(m, mine, { press: total, bonus: 0.10 });
-    if (!r.ok) return maybeCounter(m, `min ${m.min}' — ${f.pressFail}`, total);
-    // Rasgo del High Press consolidado (F2): la presión total roba en zona AÚN más letal.
-    s.bonus += (total ? 0.15 : 0.05) + (total && filoRasgo(m, "press") ? 0.05 : 0);
-    m.log("event", `min ${m.min}' — ${f.pressOk}`);
+    if (!r.ok) {
+      // Cacería total: el rival que la rompe, un % de las veces la rompe CON FALTA —
+      // amarilla (acumula) + tiro libre encadenado. Consolidada sube ese % (el rival ya
+      // no sabe cómo pararte). El resto de las roturas siguen doliendo como siempre.
+      if (caza && rnd() < (filoRasgo(m, "press") ? s.type.adv.foulBreakDeep : s.type.adv.foulBreak)) return advFoulSetPiece(m, f.foulText, s.type.adv.freekickBonus);
+      return maybeCounter(m, `min ${m.min}' — ${f.pressFail}`, total);
+    }
+    // El 2º robo de la cacería es en ZONA LETAL (+trapBonus); Consolidada suma el rasgo
+    // F2 fusionado (+deepBonus). La Recuperación alta base ya no lleva el bonus del rasgo.
+    s.bonus += (total ? 0.15 : 0.05) + (caza && s.actIdx === 1 ? s.type.adv.trapBonus + (filoRasgo(m, "press") ? s.type.adv.deepBonus : 0) : 0);
+    m.log("event", `min ${m.min}' — ${caza && s.actIdx === 1 ? f.press2Ok : f.pressOk}`);
     if (total) dtOk(m);
     return escalate(m);
   }
@@ -193,6 +243,14 @@ export function resolveSequenceAct(m, key) {
     const winner = s.prot;
     const r = A.actAerial(m, s.prot, { handicap: key === "peinar" ? 0.08 : 0 });
     if (!r.ok) {
+      // La fortaleza castiga (M2): el pelotazo del castigo que la zaga rival despeja
+      // apurada, de espaldas a su arco, un % de las veces muere en CÓRNER ganado —
+      // balón parado encadenado. La fortaleza casi siempre saca algo.
+      if (s.cornerOnDuelFail && rnd() < s.cornerOnDuelFail) {
+        if (key === "peinar") dtFail(m);
+        m.log("chance", `min ${m.min}' — ${sequenceType("fortaleza").flavor.cornerText}`);
+        return chainSetPiece(m, 0.02);
+      }
       const out = closeSeq(m, "chance", `min ${m.min}' — ${f.duelFail}`);
       if (key === "peinar") dtFail(m);
       return out;
@@ -212,6 +270,15 @@ export function resolveSequenceAct(m, key) {
   }
 
   if (kind === "finish") {
+    // La sinfonía (M2): si TODOS los compases sonaron (desesperación llena), un % de las
+    // veces el rival ya no llega con las piernas y te baja DENTRO del área — penal.
+    // Consolidada (4 compases) desespera más. Si no hay penal, el remate llega limpio.
+    if (s.type.advFor === "posesion" && (s.buildOks || 0) >= planOf(s).filter(k => k === "build").length
+        && rnd() < (filoRasgo(m, "posesion") ? s.type.adv.penaltyChanceDeep : s.type.adv.penaltyChance)) {
+      m.log("event", `min ${m.min}' — ${f.penaltyText(s.prot)}`);
+      closeSilent(m);
+      return myPenalty(m);
+    }
     const stat = s.finishStat || f.finishStat;
     if (key === "asistir") {
       const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
@@ -274,18 +341,35 @@ export function resolveSequenceAct(m, key) {
     const t = sequenceType("transicion");
     const cands = m.activeMine().filter(p => p.pos !== "POR");
     const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
-    // misma secuencia, ahora es MI contra; el que rompió la presión asiste si esto termina
-    // en gol. La conversión también es una transición: el rasgo del Contra aplica (F2).
-    m.seq = { type: t, prot, actIdx: 0, bonus: 0.04 + (filoRasgo(m, "contra") ? 0.04 : 0), assistFrom: s.prot };
+    // misma secuencia, ahora es MI contra; el que rompió la presión asiste si esto
+    // termina en gol. (El bonus del rasgo F2 del Contra se fusionó en SU avanzada — M2.)
+    m.seq = { type: t, prot, actIdx: 0, bonus: 0.04, assistFrom: s.prot };
     buildActDecision(m);
     return false;
   }
 
   if (kind === "contain") {
     const { mine } = m.powers();
-    // Rasgo del Bloque bajo consolidado (F2): el repliegue contiene mejor — la muralla.
-    const r = A.actContain(m, mine, { press: key === "presionar", bonus: filoRasgo(m, "bloque") ? 0.05 : 0 });
-    if (r.ok) { const out = closeSeq(m, "event", `min ${m.min}' — 🧱 ${f.containOk}`); if (r.press) dtOk(m); return out; }
+    const fortaleza = s.type.advFor === "bloque"; // la avanzada del Bloque (M2)
+    // El rasgo F2 del Bloque (+contención) se FUSIONÓ en su avanzada: solo la fortaleza
+    // consolidada contiene mejor — el repliegue base volvió a su matemática original.
+    const r = A.actContain(m, mine, { press: key === "presionar", bonus: fortaleza && filoRasgo(m, "bloque") ? s.type.adv.deepContain : 0 });
+    if (r.ok) {
+      // La fortaleza CASTIGA (M2): la contención exitosa convierte — pelotazo inmediato
+      // con el rival desarmado (def→of, el patrón de la salida bajo presión). Consolidada
+      // convierte más. Si no convierte, la jugada muere cortada como siempre.
+      if (fortaleza && rnd() < (filoRasgo(m, "bloque") ? s.type.adv.convertDeep : s.type.adv.convert)) {
+        if (r.press) dtOk(m);
+        m.log("event", `min ${m.min}' — ${f.convertText(m.oppTeam)}`);
+        const t = sequenceType("pelotazo");
+        const cands = m.activeMine().filter(p => p.pos !== "POR");
+        const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
+        m.seq = { type: t, prot, actIdx: 0, bonus: s.type.adv.counterBonus, cornerOnDuelFail: s.type.adv.cornerOnDuelFail };
+        buildActDecision(m);
+        return false;
+      }
+      const out = closeSeq(m, "event", `min ${m.min}' — 🧱 ${f.containOk}`); if (r.press) dtOk(m); return out;
+    }
     if (r.press) s.bonus = 0.05; // presión fallida: el rival queda mejor perfilado
     m.log("chance", `min ${m.min}' — ${f.containFail(m.oppTeam)}`);
     if (r.press) dtFail(m);
@@ -379,6 +463,42 @@ function maybeCounter(m, failText, risky = false) {
   const shot = A.actOppShot(m, sh, mine, { bonus: 0.10 });
   if (shot.ok) { goalOpp(m, sh); return closeSilent(m); }
   return closeSeq(m, "chance", `min ${m.min}' — ${sh.name} remata la contra pero ${mine.por ? mine.por.name : "el arquero"} responde enorme.`);
+}
+
+// ---------- Desenlaces nuevos de las AVANZADAS (M2) ----------
+
+/**
+ * El balón parado ENCADENADO: la misma jugada sigue como balón parado mío (el patrón de
+ * conversión de la salida bajo presión). El lanzador sale por el protWeight del tipo,
+ * como en un balón parado que nace solo.
+ */
+function chainSetPiece(m, bonus = 0) {
+  const t = sequenceType("balon_parado");
+  const cands = m.activeMine().filter(p => p.pos !== "POR");
+  const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
+  m.seq = { type: t, prot, actIdx: 0, bonus };
+  buildActDecision(m);
+  return false;
+}
+
+/**
+ * El rival corta tu fútbol superior CON FALTA (Cacería total / Contragolpe letal): 🟨
+ * amarilla al infractor — que ACUMULA: la segunda lo expulsa, y teamPowers ya castiga la
+ * inferioridad rival — y tiro libre encadenado. El infractor es un rival de campo al azar
+ * (el que llegó tarde). Sin stats de tarjetas mías: es SU falta.
+ */
+function advFoulSetPiece(m, foulText, bonus = 0) {
+  const alive = m.oppLineup.filter(p => !p.expulsado && p.pos !== "POR");
+  if (alive.length) {
+    const p = pick(alive);
+    p.amarillaPartido = (p.amarillaPartido || 0) + 1;
+    m.log("card", `min ${m.min}' — 🟨 ${foulText(p)}`);
+    if (p.amarillaPartido >= 2) {
+      p.expulsado = true;
+      m.log("card", `min ${m.min}' — 🟥 ¡Segunda amarilla y EXPULSIÓN de ${p.name}! ${m.oppTeam.name} queda con uno menos.`);
+    }
+  }
+  return chainSetPiece(m, bonus);
 }
 
 /** Cierra la secuencia con una línea de relato. */

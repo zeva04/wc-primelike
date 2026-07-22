@@ -15,7 +15,7 @@ import { applyMedicalPostMatch } from "./medical.js";
 import { applyDisciplinePostMatch, clearAmarillas } from "./discipline.js";
 import { applyMomentumPostMatch } from "./momentum.js";
 import { applyMoralePostMatch, bumpMorale } from "./morale.js";
-import { applyFiloExecution, applyFiloCosts } from "./philosophy.js";
+import { applyFiloExecution, applyFiloCosts, noteFiloMilestones } from "./philosophy.js";
 import { assignScorers } from "./scorers.js";
 import { assignAssists } from "./assists.js";
 import { qualifyRound32, computeTable } from "./tournament/groups.js";
@@ -106,6 +106,7 @@ export function postMatchUpdate(run, match) {
   // (match.filoHits) se vuelven progreso de la arista firma, con tope por partido.
   // `filoExec` viaja en el retorno para que el post-partido lo narre (F3).
   const filoExec = applyFiloExecution(run, match);
+  noteFiloMilestones(run); // la cancha pudo consolidar el umbral: la conquista se narra (M2)
   run.buffs = {};
   // El partido consumió el día: se agenda el siguiente a 5-6 días con sus eventos diarios
   scheduleNextMatch(run);

@@ -18,6 +18,7 @@
    el Match no conoce la run (ARQUITECTURA §3.2).
    ============================================================ */
 import { getPhilosophy, aristaById, filoPointsOf, filoLevelOf } from "../content/philosophies.js";
+import { ADVANCED_BY_FILO } from "../content/sequences.js";
 import { TEAM_PHILOSOPHIES } from "../content/team-philosophies.js";
 import { teamRating } from "./ratings.js";
 import { clamp } from "../core/math.js";
@@ -53,6 +54,7 @@ export function choosePhilosophy(run, filoId) {
   const f = getPhilosophy(filoId);
   if (!f) return null;
   run.filoId = f.id;
+  run.filoNarrado = 0; // hito de nivel ya narrado (la CONQUISTA de M2 se cuenta una sola vez)
   const nombres = f.aristas.map(k => aristaById(k).label);
   addJournal(run, {
     icon: f.icon, tone: "gold", title: `El equipo abraza una identidad: ${f.name}`,
@@ -73,6 +75,9 @@ export function changePhilosophy(run, filoId) {
   if (!f || !run.actionPending || f.id === run.filoId) return null;
   const prev = getPhilosophy(run.filoId);
   run.filoId = f.id;
+  // Las aristas persisten: la identidad nueva puede NACER con nivel. Ese nivel heredado
+  // no se narra como conquista (no se conquistó hoy) — la base narrada arranca ahí.
+  run.filoNarrado = filoLevel(run);
   run.actionPending = false;
   run.lastAction = { day: run.day, id: `filo_${f.id}`, group: null, icon: f.icon, title: `Cambio de identidad: ${f.name}` };
   addJournal(run, {
@@ -80,6 +85,33 @@ export function changePhilosophy(run, filoId) {
     desc: `El día entero se fue en reinstalar ideas. Lo entrenado no se borra, pero la nueva identidad vive de ${f.aristas.map(k => aristaById(k).label).join(" y ")}.`,
   });
   return f;
+}
+
+/**
+ * La CONQUISTA narrada (M2): si el nivel de identidad cruzó un umbral desde la última
+ * vez que se contó, el diario lo celebra — nivel 1 desbloquea la secuencia AVANZADA
+ * (el fútbol superior ya sale en los partidos), nivel 2 la profundiza. Se llama en los
+ * dos beats donde las aristas crecen: la Acción del Día (day-action) y el post-partido
+ * (flow, la ejecución). Los eventos del calendario que sumen arista se narran en el
+ * siguiente beat — la conquista no se pierde, se cuenta apenas hay micrófono.
+ * Devuelve el nivel narrado o null.
+ */
+export function noteFiloMilestones(run) {
+  const f = getPhilosophy(run.filoId);
+  if (!f) return null;
+  const lvl = filoLevel(run);
+  if (lvl <= (run.filoNarrado ?? 0)) return null;
+  run.filoNarrado = lvl;
+  const adv = ADVANCED_BY_FILO[f.id];
+  if (lvl === 1) addJournal(run, {
+    icon: "🔓", tone: "gold", title: `¡Conquista! ${adv.icon} ${adv.name} ya es nuestro fútbol`,
+    desc: `La idea de ${f.name} entró: desde hoy la ${adv.name} sale en los partidos. El fútbol básico quedó atrás — esto se entrenó.`,
+  });
+  else addJournal(run, {
+    icon: "⭐", tone: "gold", title: `La idea es LEY: ${f.name} consolidada`,
+    desc: `${adv.icon} ${adv.name} se profundiza: ${f.rasgo}`,
+  });
+  return lvl;
 }
 
 /* ---------- El rival tiene identidad (F2, decisión PO #4) ---------- */

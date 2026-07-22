@@ -61,7 +61,7 @@ export const PHILOSOPHIES = [
     lema: "Cazar arriba y atacar el espacio antes de que el rival respire.",
     fuerte: "Brilla contra los que quieren la pelota: más robos en salida rival.",
     advertencia: "Correr arriba los 90' pasa factura física, y un pelotazo sobre la presión te parte.",
-    rasgo: "La presión roba en zona más letal.",
+    rasgo: "La cacería roba aún más letal, y al rival solo le queda la falta: más amarillas, más tiros libres tuyos.",
     // Mi fila de la matriz en cualitativo (F3, pantalla de identidad — regla 4: visible)
     counters: { brilla: "contra los que quieren la pelota (Posesión): su salida es tu festín", sufre: "el costo es físico: −6 de energía extra cada partido, y el pelotazo por arriba te parte" },
     // El relato de MI firma cuando la identidad es mía (F3): el pressing tiene nombre
@@ -77,7 +77,7 @@ export const PHILOSOPHIES = [
     lema: "Tener la pelota es atacar y defender a la vez; si se pierde, se caza al toque.",
     fuerte: "Domina los partidos: más circulación, y el contrapressing sostiene el control.",
     advertencia: "Se estrella contra un bloque bajo bien plantado: circular sin morder no gana partidos.",
-    rasgo: "Un acto más de circulación: las jugadas largas maduran mejor.",
+    rasgo: "La sinfonía gana su 4º compás: más desesperación acumulada, más penales.",
     counters: { brilla: "cuando el partido se juega con la pelota: tu circulación manda y el control es tuyo", sufre: "contra un Bloque bajo cerrado: la circulación rinde menos y terminas reventando pelotazos" },
     firmaIntros: [
       p => `El fútbol que ensayamos: ${p.name} baja a recibir y la pelota empieza a caminar.`,
@@ -91,7 +91,7 @@ export const PHILOSOPHIES = [
     lema: "Orden atrás, y a la que pierden la pelota: puñalada al espacio.",
     fuerte: "Vive del rival que ataca: cada avance suyo es una contra tuya en potencia.",
     advertencia: "Cede la iniciativa: contra otro que también espera, el partido se muere.",
-    rasgo: "Las transiciones salen con mejor perfil de remate.",
+    rasgo: "El primer tramo deja al rival AÚN más partido: el segundo llega lanzado.",
     counters: { brilla: "contra el que toma la iniciativa (Press y Posesión): su espalda es tu autopista", sufre: "cedes posesión por identidad, y contra otro que espera (Contra/Bloque) el partido se muere" },
     firmaIntros: [
       p => `¡La puñalada que entrenamos! ${p.name} pica al espacio con el rival partido.`,
@@ -105,7 +105,7 @@ export const PHILOSOPHIES = [
     lema: "Muralla atrás y pelotazo al duelo: fútbol de trinchera.",
     fuerte: "Dificilísimo de romper: invita al rival y lo seca en el bloque.",
     advertencia: "Sufre al que elabora con paciencia, y renuncia a generar volumen ofensivo.",
-    rasgo: "El repliegue contiene mejor: la muralla de verdad.",
+    rasgo: "La muralla contiene mejor — y castiga casi siempre.",
     counters: { brilla: "en la trinchera: el balón parado es tu gol (×1.3) y el que se te viene encima se seca", sufre: "cedes volumen ofensivo por identidad, y el que elabora con paciencia (Posesión) te sitia" },
     firmaIntros: [
       p => `El plan de siempre: pelotazo a la guerra y a correr. ${p.name} va al duelo.`,
