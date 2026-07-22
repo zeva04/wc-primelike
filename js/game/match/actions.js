@@ -59,24 +59,37 @@ export function actShot(m, p, { stat = "tiro", bonus = 0 } = {}) {
 }
 
 /**
- * Remate del rival ante mi defensa (secuencia de repliegue). `ok` = gol rival. Espejo
- * EXACTO del remate automático de oppChance (arquero + zaga pesan). Recibe los poderes
- * ya calculados para no recomputarlos por acto.
+ * Remate del rival ante mi defensa (secuencias defensivas). `ok` = gol rival. Espejo
+ * del remate automático de oppChance (arquero + zaga pesan). `stat` permite el cabezazo
+ * (balón parado en contra) y `bonus` el perfil (un rival mejor parado remata mejor).
  */
-export function actOppShot(m, shooter, mine) {
-  const q = effStat(shooter, "tiro");
+export function actOppShot(m, shooter, mine, { stat = "tiro", bonus = 0 } = {}) {
+  const q = effStat(shooter, stat);
   const porQ = mine.por ? (effStat(mine.por, "atajadas", m.my.buffs) * 0.65 + effStat(mine.por, "reflejos", m.my.buffs) * 0.35) : 1;
-  const pg = clamp(0.12 + q * 0.08 - porQ * 0.06 - (mine.def - 2.5) * 0.04, 0.05, 0.55);
+  const pg = clamp(0.12 + q * 0.08 + bonus - porQ * 0.06 - (mine.def - 2.5) * 0.04, 0.05, 0.6);
   return { ok: rnd() < pg };
+}
+
+/**
+ * Duelo aéreo de un mío (pelotazo largo, balón parado): gana la pelota o la pierde.
+ * Pesa el CABEZAZO — la stat que casi no jugaba — contra la zaga rival. `handicap` resta
+ * probabilidad (la peinada al espacio es más difícil que ganar el choque frontal).
+ */
+export function actAerial(m, p, { handicap = 0 } = {}) {
+  const q = effStat(p, "cabezazo", m.my.buffs);
+  const pw = clamp(0.42 + q * 0.08 - oppR(m) * 0.03 - handicap, 0.15, 0.78);
+  return { ok: rnd() < pw };
 }
 
 /**
  * Intento de MI equipo de cortar la construcción rival (contener/presionar en un
  * repliegue). `press` = salir a presionar arriba: corta más, pero si falla el rival
- * queda mejor perfilado (lo escala sequences.js). `ok` = corté la jugada.
+ * queda mejor perfilado (lo escala sequences.js). `bonus` suma probabilidad — la
+ * recuperación alta (MI iniciativa, con el rival saliendo de su arco) roba más que
+ * la contención de emergencia con el rival lanzado. `ok` = corté la jugada.
  */
-export function actContain(m, mine, { press = false } = {}) {
+export function actContain(m, mine, { press = false, bonus = 0 } = {}) {
   const base = press ? 0.30 : 0.42;
-  const p = clamp(base + (mine.def - 2.5) * 0.06, 0.18, 0.75);
+  const p = clamp(base + bonus + (mine.def - 2.5) * 0.06, 0.18, 0.78);
   return { ok: rnd() < p, press };
 }

@@ -208,18 +208,27 @@ con su resolución **intacta**; los remates no interactivos pasaron a `chances.a
 |---|---|
 | `actPass(m,from,{hard})` | Pase; `hard` = filtrado (menos probable, deja mejor perfil). Monótona en el Pase. |
 | `actDribble(m,p)` | Regate: `{ok, foul}` — puede salir, ganar penal (`foul`) o perderse. |
-| `actShot(m,p,{stat,bonus})` | Remate de definición: base más alta que el ambiente (`0.15 + q·0.09 + bonus`). |
-| `actContain(m,mine,{press})` | Corte defensivo; `press` corta más pero arriesga (deja al rival mejor perfilado). |
-| `actOppShot(m,shooter,mine)` | Remate rival ante mi arquero (desenlace de un repliegue). `ok` = gol rival. |
+| `actShot(m,p,{stat,bonus})` | Remate de definición: base más alta que el ambiente (`0.15 + q·0.09 + bonus`). `stat` permite el cabezazo. |
+| `actContain(m,mine,{press,bonus})` | Corte defensivo; `press` corta más pero arriesga; `bonus` = mi iniciativa (la recuperación alta roba más que la contención de emergencia). |
+| `actOppShot(m,shooter,mine,{stat,bonus})` | Remate rival ante mi arquero. `stat` cabezazo (córner en contra), `bonus` el perfil. `ok` = gol rival. |
+| `actAerial(m,p,{handicap})` (A2) | Duelo aéreo: pesa el **Cabezazo** contra la zaga rival; `handicap` para la peinada al espacio. |
 
-**`game/match/sequences.js` — la máquina** (+ `content/sequences.js` = los tipos como datos):
+**`game/match/sequences.js` — el GENERADOR** (+ `content/sequences.js` = los tipos como datos):
 | Función | Qué hace |
 |---|---|
-| `maybeStartSequence(m)` | ¿Arranca una secuencia este tick? Sobre la marcha, apuntando al objetivo del partido (2-6). |
-| `seqPlan(m)` (interna) | Objetivo y reparto ofensivo/defensivo desde la preparación (ventaja atk+def) y la mentalidad; cacheado en `m._seqPlan`. |
-| `startSequence(m,type)` | Elige protagonista (por lado y `protWeight`) y crea la decisión del acto 1. |
-| `resolveSequenceAct(m,key)` | Resuelve el acto: narra y **escala** (deja la decisión del acto siguiente) o **cierra** (gol/erra/corte). Multi-acto sin id por acto. La construcción modula el `bonus` del remate, no cierra la jugada (si no, el scoring se derrumba — medido). |
-| `SEQ_MIN`/`SEQ_MAX`, `SEQUENCE_TYPES`, `sequenceType(id)` | Rango 2-6 y el catálogo A1 (circulación, transición, repliegue). |
+| `maybeStartSequence(m)` | ¿Arranca una secuencia este tick? Sobre la marcha, apuntando al objetivo del partido (2-6). El lado sale de `mineShare` (ventaja + mentalidad VIVA) y el tipo de `typeWeights`. |
+| `seqPlan(m)` (interna) | Objetivo, ventaja y `rivalProfile`; cacheado en `m._seqPlan`. |
+| `rivalProfile(m)` (interna, A2) | Perfil 0..1 del rival desde los promedios de su once (atk/def/pase/cab) — decisión #14, sin datos nuevos. |
+| `typeWeights(m,side,prof)` (interna, A2) | Pesos por tipo desde el perfil rival y la mentalidad (leída AL GENERAR: palanca viva). |
+| `startSequence(m,type)` | Elige protagonista(s) (por lado y `protWeight`; el córner rival usa su mejor cabeceador, la salida bajo presión a MI mejor pasador del fondo) y crea la decisión del acto 1. |
+| `SEQ_MIN`/`SEQ_MAX`, `SEQUENCE_TYPES`, `sequenceType(id)` | Rango 2-6 y el catálogo A2 (8 tipos). |
+
+**`game/match/sequence-acts.js` — los ACTOS** (extraído de sequences.js en A2, presupuesto §6):
+| Función | Qué hace |
+|---|---|
+| `buildActDecision(m)` | Crea la decisión `sequence` del acto actual según su `kind` (build/carry/press/duel/setpiece/finish/contain/defend_sp/playout). |
+| `resolveSequenceAct(m,key)` | Resuelve el acto: narra y **escala** o **cierra**. La construcción modula el `bonus` del remate, no cierra la jugada (si no, el scoring se derrumba — medido en A1 Y de nuevo en A2 con los tipos nuevos). El `playout` exitoso **convierte** la secuencia en transición mía (def→of). La contención rota rutea al **último hombre** (`LASTMAN_FROM_CONTAIN` 0.70, resolución del Sprint 1 intacta). |
+| `maybeRebound(m,txt)` / `maybeCounter(m,txt)` (A2, regla 7) | El fallo que encadena, bidireccional: remate fallado → rebote (0.30, uno por secuencia) · pérdida ARRIESGADA → contra rival (0.28), que va TODA al mano a mano si hay DEF (`LASTMAN_FROM_COUNTER` 1.0). |
 
 **Estado y consultas**
 | Método | Qué hace |
@@ -512,10 +521,12 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
   lesión garantizada), el descanso pasivo de día de preparación vs **víspera de partido**
   (incluida una run real llevada hasta el día del partido) y `matchFatigue`. Los valores se
   **derivan de las constantes**, no se hardcodean: un rebalance futuro no rompe el test.
-- **`sequences.test.js`** (Sprint A1) — la capa de secuencias: el catálogo (3 tipos, esquema, sides),
-  las Football Actions (bien formadas y **monótonas** en la stat que las rige), y la máquina sobre un
-  Match real: arranca, avanza multi-acto y **cierra sin loops** (1-3 actos), respeta el objetivo 2-6,
-  protagonista por lado, y el contrato §3.2 de la decisión `sequence`.
+- **`sequences.test.js`** (Sprints A1-A2) — la capa de secuencias: el catálogo (8 tipos, esquema,
+  sides, los 6 del roadmap presentes), las Football Actions (bien formadas y **monótonas** en la stat
+  que las rige; contener corta más que presionar), y la máquina sobre un Match real: arranca, avanza
+  multi-acto y **cierra sin loops**, respeta el objetivo 2-6, TODOS los tipos aparecen jugando, el
+  último hombre sigue asomando (absorción + pelotazo a la espalda), la **salida bajo presión
+  convierte en transición** (y también castiga), y reventarla es siempre segura.
 - **`momentum.test.js`** — el Momento 1..7: mapa nivel→% con tope (derivado de `MOMENTO_PCT_STEP`
   /`MOMENTO_PCT_CAP`, más la forma de la curva: simétrica y topada), asimetría (rival sin
   campo = sin efecto), integración con ratings (ficha/naturalOverall/statPenalties) y las

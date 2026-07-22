@@ -177,7 +177,7 @@ export function currentAura(p, buffs) {
  */
 export function difficultyOf(team) {
   const r = teamRating(team);
-  if (r >= 84) return { tier: "favorito", label: "Favorito", desc: "Candidato al título. El mundo espera que levantes la copa." };
+  if (r >= 85) return { tier: "favorito", label: "Favorito", desc: "Candidato al título. El mundo espera que levantes la copa." };
   if (r >= 81) return { tier: "aspirante", label: "Aspirante", desc: "Plantel serio que puede pelearle a cualquiera, ¿Lograrás sacarle rendimiento?" };
   if (r >= 74) return { tier: "sorpresa", label: "Sorpresa", desc: "Nadie los tiene en la lista de candidatos. Sorprender partido a partido es tu única arma." };
   return { tier: "leyenda", label: "Leyenda", desc: "Ser campeón con este plantel te convierte en leyenda eterna del fútbol. ¿Te atreves?" };

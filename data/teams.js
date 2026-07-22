@@ -29,7 +29,7 @@ export const WC_DATA = {
   teams: [
 
     // ╔═════════════════════════════════════════════════════════════════╗
-    // ║ 1. SELECCIONES JUGABLES (20) — orden confederación y alfabético ║
+    // ║ 1. SELECCIONES JUGABLES (23) — orden confederación y alfabético ║
     // ╚═════════════════════════════════════════════════════════════════╝
 
     // ---------- AFC ----------
@@ -40,13 +40,16 @@ export const WC_DATA = {
       players: [
         { name: "Jo Hyeon-woo",        pos: "POR", num: 21, stats: { atajadas: 82, reflejos: 85, salidas: 74, pase: 68, aura: 76 }, look: { skin: "#F1C27D", hair: "#0E0C0A", style: "short", beard: false } },
         { name: "Kim Seung-gyu",       pos: "POR", num:  1, stats: { atajadas: 76, reflejos: 77, salidas: 72, pase: 70, aura: 72 }, look: { skin: "#F1C27D", hair: "#17130F", style: "short", beard: false } },
+        
         { name: "Kim Min-jae",         pos: "DEF", num:  4, stats: { tiro: 52, defensa: 86, cabezazo: 82, pase: 76, aura: 80 }, look: { skin: "#F1C27D", hair: "#0E0C0A", style: "buzz", beard: false } },
         { name: "Kim Young-gwon",      pos: "DEF", num: 19, stats: { tiro: 46, defensa: 78, cabezazo: 74, pase: 72, aura: 72 }, look: { skin: "#F1C27D", hair: "#17130F", style: "short", beard: false } },
         { name: "Seol Young-woo",      pos: "DEF", num:  3, stats: { tiro: 60, defensa: 76, cabezazo: 66, pase: 76, aura: 70 }, look: { skin: "#F1C27D", hair: "#0E0C0A", style: "short", beard: false } },
+        
         { name: "Lee Kang-in",         pos: "MED", num: 18, stats: { tiro: 80, defensa: 56, cabezazo: 58, pase: 88, aura: 82 }, look: { skin: "#F1C27D", hair: "#17130F", style: "long", beard: false } },
         { name: "Hwang In-beom",       pos: "MED", num:  6, stats: { tiro: 72, defensa: 74, cabezazo: 68, pase: 84, aura: 76 }, look: { skin: "#F1C27D", hair: "#17130F", style: "buzz", beard: false } },
         { name: "Paik Seung-ho",       pos: "MED", num:  8, stats: { tiro: 74, defensa: 70, cabezazo: 66, pase: 78, aura: 72 }, look: { skin: "#F1C27D", hair: "#2A1D12", style: "buzz", beard: false } },
-        { name: "Son Heung-min",       pos: "DEL", num:  7, stats: { tiro: 87, defensa: 48, cabezazo: 68, pase: 84, aura: 88 }, look: { skin: "#F1C27D", hair: "#2A1D12", style: "short", beard: false } },
+        
+        { name: "Son Heung-min",       pos: "DEL", num:  7, stats: { tiro: 85, defensa: 48, cabezazo: 68, pase: 84, aura: 88 }, look: { skin: "#F1C27D", hair: "#2A1D12", style: "short", beard: false } },
         { name: "Hwang Hee-chan",      pos: "DEL", num: 11, stats: { tiro: 82, defensa: 52, cabezazo: 66, pase: 74, aura: 78 }, look: { skin: "#F1C27D", hair: "#0E0C0A", style: "short", beard: true } },
         // Jugador 11 { name: "Lee Jae-sung",        pos: "MED", num: 10, stats: { tiro: 78, defensa: 65, cabezazo: 67, pase: 82, aura: 79 }, look: { skin: "#F1C27D", hair: "#17130F", style: "short", beard: false } },
       ],
@@ -225,12 +228,14 @@ export const WC_DATA = {
         { name: "Ederson", pos: "POR", num: 23, stats: { atajadas: 83, reflejos: 82, salidas: 80, pase: 92, aura: 80 }, look: { skin: "#E0AC69", hair: "#1F1B16", style: "buzz", beard: true } },
         { name: "Marquinhos", pos: "DEF", num: 4, stats: { tiro: 55, defensa: 85, cabezazo: 85, pase: 80, aura: 90 }, look: { skin: "#C68642", hair: "#17130F", style: "short", beard: true } },
         { name: "Gabriel Magalhães", pos: "DEF", num: 3, stats: { tiro: 50, defensa: 87, cabezazo: 89, pase: 72, aura: 80 }, look: { skin: "#8D5524", hair: "#0E0C0A", style: "buzz", beard: true } },
+        
         { name: "Casemiro", pos: "MED", num: 5, stats: { tiro: 74, defensa: 84, cabezazo: 80, pase: 80, aura: 89 }, look: { skin: "#C68642", hair: "#17130F", style: "buzz", beard: true } },
         { name: "Bruno Guimarães", pos: "MED", num: 8, stats: { tiro: 74, defensa: 76, cabezazo: 66, pase: 89, aura: 87 }, look: { skin: "#E0AC69", hair: "#2A1D12", style: "short", beard: true } },
         { name: "Lucas Paquetá", pos: "MED", num: 20, stats: { tiro: 76, defensa: 62, cabezazo: 70, pase: 85, aura: 78 }, look: { skin: "#E0AC69", hair: "#17130F", style: "short", beard: true } },
+        
         { name: "Matheus Cunha", pos: "DEL", num: 9, stats: { tiro: 86, defensa: 48, cabezazo: 74, pase: 80, aura: 84 }, look: { skin: "#C68642", hair: "#17130F", style: "short", beard: true } },
-        { name: "Vinícius Júnior", pos: "DEL", num: 7, stats: { tiro: 92, defensa: 35, cabezazo: 62, pase: 85, aura: 96 }, look: { skin: "#8D5524", hair: "#0E0C0A", style: "curly", beard: false } },
-        { name: "Raphinha", pos: "DEL", num: 11, stats: { tiro: 89, defensa: 45, cabezazo: 70, pase: 87, aura: 88 }, look: { skin: "#C68642", hair: "#17130F", style: "short", beard: true } },
+        { name: "Vinícius Júnior", pos: "DEL", num: 7, stats: { tiro: 91, defensa: 35, cabezazo: 62, pase: 85, aura: 93 }, look: { skin: "#8D5524", hair: "#0E0C0A", style: "curly", beard: false } },
+        { name: "Raphinha", pos: "DEL", num: 11, stats: { tiro: 88, defensa: 45, cabezazo: 70, pase: 88, aura: 88 }, look: { skin: "#C68642", hair: "#17130F", style: "short", beard: true } },
         // 11 player { name: "Neymar", pos: "MED", num: 10, stats: { tiro: 86, defensa: 40, cabezazo: 60, pase: 91, aura: 94 }, look: { skin: "#C68642", hair: "#17130F", style: "short", beard: true } },
       ],
     },
@@ -350,39 +355,110 @@ export const WC_DATA = {
     },
     // ---------- UEFA ----------
     {
+      id: "ENG", name: "Inglaterra", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", iso: "gb-eng", confed: "UEFA", playable: true,
+      colors: { primary: "#FFFFFF", secondary: "#CE1124", text: "#0f172a" },
+      kits: { field: { shirt: "#FFFFFF", accent: "#CE1124" }, gk: { shirt: "#7CB518", accent: "#0B0F19" } },
+      players: [
+        { name: "Jordan Pickford",      pos: "POR", num:  1, stats: { atajadas: 84, reflejos: 86, salidas: 80, pase: 74, aura: 83 }, look: { skin: "#F1C27D", hair: "#4A331F", style: "short", beard: true } },
+        { name: "Dean Henderson",      pos: "POR", num: 13, stats: { atajadas: 81, reflejos: 82, salidas: 76, pase: 73, aura: 78 }, look: { skin: "#F1C27D", hair: "#2A1D12", style: "short", beard: false } },
+        
+        { name: "John Stones",         pos: "DEF", num:  5, stats: { tiro: 55, defensa: 85, cabezazo: 80, pase: 84, aura: 80 }, look: { skin: "#F1C27D", hair: "#6B4F2A", style: "short", beard: false } },
+        { name: "Marc Guéhi",          pos: "DEF", num:  6, stats: { tiro: 46, defensa: 85, cabezazo: 78, pase: 76, aura: 78 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "buzz", beard: false } },
+        
+        { name: "Declan Rice",         pos: "MED", num:  4, stats: { tiro: 78, defensa: 86, cabezazo: 76, pase: 88, aura: 84 }, look: { skin: "#F1C27D", hair: "#2A1D12", style: "short", beard: false } },
+        { name: "Elliot Anderson",     pos: "MED", num:  8, stats: { tiro: 76, defensa: 80, cabezazo: 70, pase: 84, aura: 84 }, look: { skin: "#F1C27D", hair: "#4A331F", style: "short", beard: false } },
+        { name: "Jude Bellingham",     pos: "MED", num: 10, stats: { tiro: 84, defensa: 76, cabezazo: 80, pase: 88, aura: 92 }, look: { skin: "#A0663A", hair: "#0E0C0A", style: "buzz", beard: false } },
+        
+        { name: "Anthony Gordon",      pos: "DEL", num: 18, stats: { tiro: 86, defensa: 48, cabezazo: 68, pase: 82, aura: 86 }, look: { skin: "#E0AC69", hair: "#C69C6D", style: "short", beard: false } },
+        { name: "Bukayo Saka",         pos: "DEL", num:  7, stats: { tiro: 89, defensa: 55, cabezazo: 62, pase: 88, aura: 86 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "curly", beard: false } },
+        { name: "Harry Kane",          pos: "DEL", num:  9, stats: { tiro: 92, defensa: 52, cabezazo: 84, pase: 73, aura: 85 }, look: { skin: "#F1C27D", hair: "#6B4F2A", style: "short", beard: true } },
+        // Jugador 11 { name: "Eberechi Eze", pos: "MED", num: 21, stats: { tiro: 84, defensa: 60, cabezazo: 70, pase: 88, aura: 86 }, look: { skin: "#6B4226", hair: "#17130F", style: "short", beard: true } },
+      ],
+    },
+    {
+      id: "ESP", name: "España", flag: "🇪🇸", iso: "es", confed: "UEFA", playable: true,
+      colors: { primary: "#C60B1E", secondary: "#FFC400", text: "#FFFFFF" },
+      kits: { field: { shirt: "#C60B1E", accent: "#FFC400" }, gk: { shirt: "#6A1B9A", accent: "#FFC400" } },
+      players: [
+        { name: "Unai Simón",         pos: "POR", num: 23, stats: { atajadas: 85, reflejos: 88, salidas: 84, pase: 83, aura: 80 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: false } },
+        { name: "David Raya",         pos: "POR", num:  1, stats: { atajadas: 85, reflejos: 86, salidas: 84, pase: 80, aura: 77 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: true } },
+
+        { name: "Pau Cubarsí",        pos: "DEF", num: 22, stats: { tiro: 42, defensa: 85, cabezazo: 80, pase: 85, aura: 82 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: false } },
+        { name: "Marc Cucurella",     pos: "DEF", num: 24, stats: { tiro: 62, defensa: 86, cabezazo: 72, pase: 83, aura: 88 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "curly", beard: true } },
+        { name: "Pedro Porro",        pos: "DEF", num: 12, stats: { tiro: 68, defensa: 84, cabezazo: 66, pase: 82, aura: 80 }, look: { skin: "#F1C27D", hair: "#4A331F", style: "short", beard: true } },
+
+        { name: "Rodri",              pos: "MED", num: 16, stats: { tiro: 75, defensa: 86, cabezazo: 65, pase: 93, aura: 87 }, look: { skin: "#F1C27D", hair: "#4A331F", style: "short", beard: true } },
+        { name: "Pedri",              pos: "MED", num: 20, stats: { tiro: 70, defensa: 72, cabezazo: 54, pase: 92, aura: 90 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: false } },
+        { name: "Fabián Ruiz",        pos: "MED", num:  8, stats: { tiro: 78, defensa: 80, cabezazo: 68, pase: 88, aura: 88 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: true } },
+
+        { name: "Mikel Oyarzabal",    pos: "DEL", num: 21, stats: { tiro: 82, defensa: 48, cabezazo: 78, pase: 86, aura: 86 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: true } },
+        { name: "Lamine Yamal",       pos: "DEL", num: 19, stats: { tiro: 90, defensa: 58, cabezazo: 75, pase: 90, aura: 92 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "curly", beard: false } },
+
+        // Jugador 11 { name: "Ferran Torres",      pos: "DEL", num:  7, stats: { tiro: 86, defensa: 44, cabezazo: 74, pase: 80, aura: 86 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: false } },
+    ],
+    },
+    {
       id: "FRA", name: "Francia", flag: "🇫🇷", iso: "fr", confed: "UEFA", playable: true,
-      colors: { primary: "#123274", secondary: "#EF4135", text: "#ffffff" },
+      colors: { primary: "#123274", secondary: "#EF4135", text: "#FFFFFF" },
       kits: { field: { shirt: "#123274", accent: "#FFFFFF" }, gk: { shirt: "#E8D820", accent: "#123274" } },
       players: [
         { name: "Maignan",             pos: "POR", num: 16, stats: { atajadas: 84, reflejos: 87, salidas: 84, pase: 70, aura: 84 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "buzz", beard: false } },
         { name: "Brice Samba",         pos: "POR", num: 1, stats: { atajadas: 82, reflejos: 84, salidas: 78, pase: 72, aura: 74 }, look: { skin: "#F1C27D", hair: "#4A331F", style: "short", beard: false } },
         { name: "William Saliba",      pos: "DEF", num: 17, stats: { tiro: 45, defensa: 89, cabezazo: 84, pase: 80, aura: 82 }, look: { skin: "#8D5524", hair: "#0E0C0A", style: "short", beard: false } },
         { name: "Dayot Upamecano",     pos: "DEF", num:  4, stats: { tiro: 48, defensa: 88, cabezazo: 85, pase: 76, aura: 78 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "buzz", beard: false } },
-        { name: "Aurélien Tchouaméni",  pos: "MED", num:  8, stats: { tiro: 68, defensa: 84, cabezazo: 78, pase: 84, aura: 80 }, look: { skin: "#8D5524", hair: "#17130F", style: "short", beard: false } },
+       
+        { name: "Aurélien Tchouaméni", pos: "MED", num:  8, stats: { tiro: 68, defensa: 84, cabezazo: 78, pase: 84, aura: 80 }, look: { skin: "#8D5524", hair: "#17130F", style: "short", beard: false } },
         { name: "Manu Koné",           pos: "MED", num: 6, stats: { tiro: 76, defensa: 82, cabezazo: 70, pase: 84, aura: 84 }, look: { skin: "#6B4226", hair: "#17130F", style: "short", beard: false } },
         { name: "Adrien Rabiot",       pos: "MED", num: 14, stats: { tiro: 78, defensa: 78, cabezazo: 76, pase: 86, aura: 86 }, look: { skin: "#E0AC69", hair: "#4A331F", style: "short", beard: true } },
         { name: "Michael Olise",       pos: "MED", num:  11, stats: { tiro: 92, defensa: 56, cabezazo: 70, pase: 91, aura: 91 }, look: { skin: "#A0663A", hair: "#17130F", style: "short", beard: false } },
+        
         { name: "Kylian Mbappé",       pos: "DEL", num: 10, stats: { tiro: 97, defensa: 36, cabezazo: 72, pase: 84, aura: 95 }, look: { skin: "#8D5524", hair: "#0E0C0A", style: "buzz", beard: false } },
         { name: "Ousmane Dembélé",     pos: "DEL", num: 7, stats: { tiro: 94, defensa: 40, cabezazo: 60, pase: 87, aura: 92 }, look: { skin: "#8D5524", hair: "#17130F", style: "curly", beard: false } },
         // Jugador 11 { name: "Bradley Barcola", pos: "DEL", num: 12, stats: { tiro: 86, defensa: 44, cabezazo: 70, pase: 83, aura: 86 }, look: { skin: "#6B4226", hair: "#17130F", style: "short", beard: false } },
       ],
     },
     {
-      id: "ENG", name: "Inglaterra", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", iso: "gb-eng", confed: "UEFA", playable: true,
-      colors: { primary: "#FFFFFF", secondary: "#CE1124", text: "#0f172a" },
-      kits: { field: { shirt: "#FFFFFF", accent: "#CE1124" }, gk: { shirt: "#7CB518", accent: "#0B0F19" } },
+      id: "GER", name: "Alemania", flag: "🇩🇪", iso: "de", confed: "UEFA", playable: true,
+      colors: { primary: "#FFFFFF", secondary: "#000000", text: "#0F172A" },
+      kits: { field: { shirt: "#FFFFFF", accent: "#000000" }, gk: { shirt: "#1FA64A", accent: "#FFFFFF" } },
       players: [
-        { name: "Jordan Pickford",      pos: "POR", num:  1, stats: { atajadas: 84, reflejos: 86, salidas: 80, pase: 76, aura: 82 }, look: { skin: "#F1C27D", hair: "#4A331F", style: "short", beard: true } },
-        { name: "Dean Henderson",      pos: "POR", num: 13, stats: { atajadas: 78, reflejos: 80, salidas: 76, pase: 70, aura: 72 }, look: { skin: "#F1C27D", hair: "#2A1D12", style: "short", beard: false } },
-        { name: "John Stones",         pos: "DEF", num:  5, stats: { tiro: 55, defensa: 85, cabezazo: 80, pase: 84, aura: 80 }, look: { skin: "#F1C27D", hair: "#6B4F2A", style: "short", beard: false } },
-        { name: "Marc Guéhi",          pos: "DEF", num:  6, stats: { tiro: 46, defensa: 85, cabezazo: 78, pase: 76, aura: 78 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "buzz", beard: false } },
-        { name: "Declan Rice",         pos: "MED", num:  4, stats: { tiro: 78, defensa: 86, cabezazo: 76, pase: 88, aura: 84 }, look: { skin: "#F1C27D", hair: "#2A1D12", style: "short", beard: false } },
-        { name: "Elliot Anderson",     pos: "MED", num:  8, stats: { tiro: 76, defensa: 80, cabezazo: 70, pase: 84, aura: 84 }, look: { skin: "#F1C27D", hair: "#4A331F", style: "short", beard: false } },
-        { name: "Jude Bellingham",     pos: "MED", num: 10, stats: { tiro: 84, defensa: 76, cabezazo: 80, pase: 88, aura: 92 }, look: { skin: "#A0663A", hair: "#0E0C0A", style: "buzz", beard: false } },
-        { name: "Anthony Gordon",      pos: "DEL", num: 18, stats: { tiro: 86, defensa: 48, cabezazo: 68, pase: 82, aura: 86 }, look: { skin: "#E0AC69", hair: "#C69C6D", style: "short", beard: false } },
-        { name: "Bukayo Saka",         pos: "DEL", num:  7, stats: { tiro: 89, defensa: 55, cabezazo: 62, pase: 88, aura: 86 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "curly", beard: false } },
-        { name: "Harry Kane",          pos: "DEL", num:  9, stats: { tiro: 92, defensa: 52, cabezazo: 84, pase: 73, aura: 85 }, look: { skin: "#F1C27D", hair: "#6B4F2A", style: "short", beard: true } },
-        // Jugador 11 { name: "Eberechi Eze", pos: "MED", num: 21, stats: { tiro: 84, defensa: 60, cabezazo: 70, pase: 88, aura: 86 }, look: { skin: "#6B4226", hair: "#17130F", style: "short", beard: true } },
+        { name: "Manuel Neuer",       pos: "POR", num:  1, stats: { atajadas: 85, reflejos: 83, salidas: 84, pase: 80, aura: 86 }, look: { skin: "#FFDBAC", hair: "#C69C6D", style: "short", beard: false } },
+        { name: "Oliver Baumann",     pos: "POR", num: 12, stats: { atajadas: 83, reflejos: 81, salidas: 82, pase: 72, aura: 78 }, look: { skin: "#FFDBAC", hair: "#6B4F2A", style: "short", beard: true } },
+
+        { name: "Antonio Rüdiger",    pos: "DEF", num:  2, stats: { tiro: 58, defensa: 83, cabezazo: 86, pase: 74, aura: 86 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "short", beard: true } },
+        { name: "Jonathan Tah",       pos: "DEF", num:  4, stats: { tiro: 52, defensa: 87, cabezazo: 87, pase: 78, aura: 80 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "buzz", beard: true } },
+        { name: "Joshua Kimmich",     pos: "DEF", num:  6, stats: { tiro: 76, defensa: 87, cabezazo: 74, pase: 91, aura: 90 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: false } },
+
+        { name: "Jamal Musiala",      pos: "MED", num: 10, stats: { tiro: 88, defensa: 54, cabezazo: 60, pase: 90, aura: 88 }, look: { skin: "#C68642", hair: "#0E0C0A", style: "curly", beard: false } },
+        { name: "Florian Wirtz",      pos: "MED", num: 17, stats: { tiro: 88, defensa: 56, cabezazo: 58, pase: 91, aura: 89 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: false } },
+        { name: "Felix Nmecha",       pos: "MED", num: 13, stats: { tiro: 78, defensa: 82, cabezazo: 77, pase: 82, aura: 80 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "short", beard: false } },
+
+        { name: "Kai Havertz",        pos: "DEL", num:  7, stats: { tiro: 84, defensa: 51, cabezazo: 76, pase: 88, aura: 86 }, look: { skin: "#FFDBAC", hair: "#C69C6D", style: "short", beard: false } },
+        { name: "Leroy Sané",         pos: "DEL", num: 19, stats: { tiro: 86, defensa: 57, cabezazo: 70, pase: 86, aura: 85 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "short", beard: false } },
+
+        // Jugador 11 { name: "Deniz Undav",        pos: "DEL", num: 26, stats: { tiro: 87, defensa: 42, cabezazo: 76, pase: 76, aura: 82 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: true } },
+      ],
+    },
+    {
+      id: "NED", name: "Países Bajos", flag: "🇳🇱", iso: "nl", confed: "UEFA", playable: true,
+      colors: { primary: "#F36C21", secondary: "#FFFFFF", text: "#0f172a" },
+      kits: { field: { shirt: "#F36C21", accent: "#FFFFFF" }, gk: { shirt: "#1B2A41", accent: "#F97316" } },
+      players: [
+        { name: "Bart Verbruggen",    pos: "POR", num:  1, stats: { atajadas: 84, reflejos: 85, salidas: 81, pase: 81, aura: 82 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: false } },
+        { name: "Mark Flekken",       pos: "POR", num: 23, stats: { atajadas: 82, reflejos: 84, salidas: 80, pase: 77, aura: 78 }, look: { skin: "#FFDBAC", hair: "#6B4F2A", style: "short", beard: true } },
+
+        { name: "Virgil van Dijk",    pos: "DEF", num:  4, stats: { tiro: 55, defensa: 85, cabezazo: 90, pase: 80, aura: 84 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "short", beard: true } },
+        { name: "Nathan Aké",         pos: "DEF", num:  5, stats: { tiro: 54, defensa: 85, cabezazo: 80, pase: 79, aura: 83 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "short", beard: true } },
+        { name: "Denzel Dumfries",    pos: "DEF", num: 22, stats: { tiro: 76, defensa: 82, cabezazo: 80, pase: 81, aura: 84 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "short", beard: true } },
+
+        { name: "Frenkie de Jong",    pos: "MED", num: 21, stats: { tiro: 74, defensa: 78, cabezazo: 56, pase: 90, aura: 89 }, look: { skin: "#FFDBAC", hair: "#C69C6D", style: "short", beard: false } },
+        { name: "Ryan Gravenberch",   pos: "MED", num:  8, stats: { tiro: 78, defensa: 76, cabezazo: 66, pase: 86, aura: 84 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "short", beard: false } },
+        { name: "Tijjani Reijnders",  pos: "MED", num: 14, stats: { tiro: 82, defensa: 72, cabezazo: 62, pase: 88, aura: 86 }, look: { skin: "#FFDBAC", hair: "#4A331F", style: "short", beard: false } },
+
+        { name: "Cody Gakpo",         pos: "DEL", num: 11, stats: { tiro: 84, defensa: 40, cabezazo: 75, pase: 84, aura: 85 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "short", beard: true } },
+        { name: "Donyell Malen",      pos: "DEL", num: 18, stats: { tiro: 85, defensa: 38, cabezazo: 70, pase: 78, aura: 83 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "short", beard: false } },
+
+        // Jugador 11 { name: "Memphis Depay",      pos: "DEL", num: 10, stats: { tiro: 82, defensa: 38, cabezazo: 76, pase: 82, aura: 90 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "short", beard: true } },
       ],
     },
     {
@@ -414,20 +490,24 @@ export const WC_DATA = {
       players: [
         { name: "Diogo Costa", pos: "POR", num: 1, stats: { atajadas: 83, reflejos: 84, salidas: 84, pase: 82, aura: 85 }, look: { skin: "#E0AC69", hair: "#17130F", style: "short", beard: false } },
         { name: "José Sá", pos: "POR", num: 12, stats: { atajadas: 81, reflejos: 82, salidas: 78, pase: 74, aura: 74 }, look: { skin: "#E0AC69", hair: "#2A1D12", style: "short", beard: true } },
+        
         { name: "Rúben Dias", pos: "DEF", num: 3, stats: { tiro: 58, defensa: 85, cabezazo: 85, pase: 80, aura: 85 }, look: { skin: "#E0AC69", hair: "#17130F", style: "short", beard: true } },
         { name: "Nuno Mendes", pos: "DEF", num: 19, stats: { tiro: 72, defensa: 88, cabezazo: 74, pase: 86, aura: 87 }, look: { skin: "#6B4226", hair: "#17130F", style: "short", beard: false } },
         { name: "João Cancelo", pos: "DEF", num: 20, stats: { tiro: 74, defensa: 82, cabezazo: 68, pase: 88, aura: 86 }, look: { skin: "#E0AC69", hair: "#2A1D12", style: "short", beard: true } },
+        
         { name: "Vitinha", pos: "MED", num: 23, stats: { tiro: 82, defensa: 74, cabezazo: 64, pase: 92, aura: 87 }, look: { skin: "#E0AC69", hair: "#2A1D12", style: "short", beard: false } },
         { name: "Bruno Fernandes", pos: "MED", num: 8, stats: { tiro: 85, defensa: 66, cabezazo: 70, pase: 93, aura: 86 }, look: { skin: "#E0AC69", hair: "#2A1D12", style: "short", beard: true } },
         { name: "João Neves", pos: "MED", num: 15, stats: { tiro: 74, defensa: 82, cabezazo: 66, pase: 86, aura: 85 }, look: { skin: "#E0AC69", hair: "#4A331F", style: "short", beard: false } },
+        
         { name: "Cristiano Ronaldo", pos: "DEL", num: 7, stats: { tiro: 85, defensa: 36, cabezazo: 82, pase: 65, aura: 99 }, look: { skin: "#E0AC69", hair: "#17130F", style: "short", beard: false } },
         { name: "Pedro Neto", pos: "DEL", num: 11, stats: { tiro: 86, defensa: 46, cabezazo: 68, pase: 84, aura: 85 }, look: { skin: "#C68642", hair: "#17130F", style: "short", beard: true } },
+        
         // Jugador 11 { name: "Rafael Leão", pos: "DEL", num: 17, stats: { tiro: 84, defensa: 42, cabezazo: 74, pase: 82, aura: 85 }, look: { skin: "#6B4226", hair: "#17130F", style: "short", beard: true } },
       ],
     },
 
     // ╔════════════════════════════════════════════════════════════════════╗
-    // ║ 2. RIVALES CLASIFICADOS NO JUGABLES AUN (28) — orden confederación ║
+    // ║ 2. RIVALES CLASIFICADOS NO JUGABLES AUN (25) — orden confederación ║
     // ║    y alfabético                                                    ║
     // ╚════════════════════════════════════════════════════════════════════╝
 
@@ -613,17 +693,6 @@ export const WC_DATA = {
     },
     // ---------- UEFA ----------
     {
-      id: "GER", name: "Alemania", flag: "🇩🇪", iso: "de", confed: "UEFA", rating: 86,
-      kit: { shirt: "#FFFFFF", accent: "#000000" },
-      figures: [
-        { name: "Wirtz", pos: "MED" },
-        { name: "Musiala", pos: "MED" },
-        { name: "Havertz", pos: "DEL" },
-        { name: "Rüdiger", pos: "DEF" },
-        { name: "Ter Stegen", pos: "POR" },
-      ],
-    },
-    {
       id: "AUT", name: "Austria", flag: "🇦🇹", iso: "at", confed: "UEFA", rating: 78,
       kit: { shirt: "#ED2939", accent: "#FFFFFF" },
       figures: [
@@ -689,28 +758,6 @@ export const WC_DATA = {
         { name: "Che Adams", pos: "DEL" },
         { name: "Robertson", pos: "DEF" },
         { name: "Gunn", pos: "POR" },
-      ],
-    },
-    {
-      id: "ESP", name: "España", flag: "🇪🇸", iso: "es", confed: "UEFA", rating: 92,
-      kit: { shirt: "#C60B1E", accent: "#FFC400" },
-      figures: [
-        { name: "Lamine Yamal", pos: "DEL" },
-        { name: "Pedri", pos: "MED" },
-        { name: "Rodri", pos: "MED" },
-        { name: "Huijsen", pos: "DEF" },
-        { name: "Unai Simón", pos: "POR" },
-      ],
-    },
-    {
-      id: "NED", name: "Países Bajos", flag: "🇳🇱", iso: "nl", confed: "UEFA", rating: 86,
-      kit: { shirt: "#F36C21", accent: "#FFFFFF" },
-      figures: [
-        { name: "Gakpo", pos: "DEL" },
-        { name: "Depay", pos: "DEL" },
-        { name: "Frenkie de Jong", pos: "MED" },
-        { name: "Van Dijk", pos: "DEF" },
-        { name: "Verbruggen", pos: "POR" },
       ],
     },
     {

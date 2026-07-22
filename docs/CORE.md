@@ -311,13 +311,56 @@ arriesgada (pase filtrado, conducción) puede perder la pelota. El **gate de gol
 como en las ocasiones que reemplaza — si cada acto fuera pass/fail, tres actos multiplicarían el
 fallo y el scoring se derrumbaría (medido en A1: bajaba a ~7%).
 
-**Catálogo A1** (mínimo, para validar el sistema; el completo de 6 es A2):
+**Catálogo A2** (completo — los 6 del roadmap + el repliegue de A1 + la cara defensiva del córner;
+los actos viven en `sequence-acts.js`, extraído de la máquina por presupuesto de líneas §6):
 
-| Tipo | Lado | Forma | Mapea a (A2+) |
+| Tipo | Lado | Forma | Mapea a (Filosofía) |
 |---|---|---|---|
 | 🎼 Circulación posicional | ofensiva | construir · construir · rematar (pesa el Pase) | Posesión |
-| ⚡ Transición rápida | ofensiva | conducir · rematar (vertical, mejor perfil de remate) | Contragolpe |
-| 🧱 Repliegue defensivo | defensiva | contener · (remate rival a atajar) | Bloque bajo |
+| ⚡ Transición rápida | ofensiva | conducir · rematar (vertical, mejor perfil) | Contragolpe |
+| 🦁 Recuperación alta | ofensiva | presionar (+0.10, mi iniciativa) · rematar — presión total roba menos pero en zona letal | High Press |
+| 🌩️ Pelotazo largo | ofensiva | duelo aéreo (¡por fin juega el **Cabezazo**!) · rematar — choque = cabecea él; peinada = habilita a un lanzado | Bloque bajo |
+| 🎯 Balón parado a favor | ofensiva | UNA decisión: centro al mejor cabeceador o jugada preparada | — |
+| 🚨 Balón parado en contra | defensiva | zona (segura) o salir a despejar (mata la jugada o deja solo al cabeceador) | — |
+| 🗼 Salida bajo presión | def→of | reventarla (gratis) o salir jugando: la pérdida regala un remate letal… o la jugada **SE CONVIERTE en transición mía** | — |
+| 🧱 Repliegue defensivo | defensiva | contener · (último hombre o remate rival) | Bloque bajo |
+
+### El fallo que encadena (A2, regla 7 del Bible) — bidireccional a propósito
+
+- **Rebote** (`REBOUND_CHANCE` 0.30): mi remate fallado deja la pelota viva y alguien la caza
+  (remate sucio, bonus −0.03, sin asistidor; **un solo rebote por secuencia**).
+- **Contra** (`COUNTER_CHANCE` 0.28): mi pérdida **ARRIESGADA** (filtrado interceptado, conducción
+  perdida, presión rota, pase de asistencia fallado) abre un contragolpe rival — elegir el riesgo
+  tiene que poder doler. La opción segura nunca lo dispara.
+
+La bidireccionalidad es la clave del balance: el rebote suma goles míos, la contra se los da al
+rival — medido, casi se cancelan (GF +0.05, GA +0.02 por partido).
+
+### Absorción del último hombre (A2, decisión PO #7) + el canal plano
+
+El último hombre ya no asoma como evento suelto arbitrario: **nace del fútbol** — una contención
+rota (`LASTMAN_FROM_CONTAIN` 0.70) o **toda contra con el equipo partido** (`LASTMAN_FROM_COUNTER`
+1.0) terminan en el mano a mano, con la resolución del Sprint 1 **intacta** (anticipar-fail 0.68,
+roja 0.12, penal barrerse 0.28 — `resolveLastMan` no se tocó). Exposición resultante ~0.77/partido
+(histórico ~0.9).
+
+> ⚠️ **La lección del canal plano (A2).** Al absorber el último hombre, los equipos DÉBILES dejaron
+> de generarle sustos al favorito: sus secuencias contra ti son pocas y sus remates flojos, mientras
+> que el viejo canal suelto era **PLANO** — hasta Cabo Verde te generaba escapadas, y el peligro del
+> mano a mano no depende de la calidad del que se escapa (anticipar-fail concede 0.68 sea quien sea).
+> Sin él, BRA derivó **+3.7pp**. Se restauró un canal ambiente CHICO (`BREAKAWAY_TICK` 0.018, el
+> pelotazo a la espalda que no nace de ninguna pérdida) — deliberadamente plano: **es el arma del
+> underdog**. Es un dial fino: 0 → +3.7pp · 0.035 → −3.4pp.
+
+### Identidad del rival y mentalidad (A2, decisiones #3 y #14)
+
+`rivalProfile` deriva de los promedios del once rival (sin datos nuevos, 0..1): **atk** (su peligro
+directo) · **def** (su solidez/intensidad, proxy de cuánto te presiona) · **pase** (su vocación de
+pelota) · **cab** (su juego aéreo). `typeWeights` convierte ese perfil + la **mentalidad** (palanca
+VIVA: se lee al generar, cambiarla a mitad de partido cambia el fútbol que sale) en pesos por tipo:
+un rival que ataca te deja contras; un bloque invita al pelotazo; uno que quiere la pelota, a
+presionarle la salida; su intensidad te presiona a ti (salida_fondo) y su juego aéreo vive del
+córner. Cuando llegue Filosofía, la filosofía real del rival reemplaza este proxy.
 
 **Generación** (`sequences.seqPlan` + `maybeStartSequence`): **2-6 por partido**, objetivo modulado
 por la **preparación** (ventaja atk+def sobre el rival) y la mentalidad. El favorito recibe más
@@ -333,6 +376,17 @@ gol hace una pausa breve. El reloj se auto-agenda con `setTimeout` para variar e
 > **La ventaja del DT humano.** El favorito recibe más y mejores secuencias, pero **ejecutarlas**
 > es del jugador: elegir bien el riesgo de cada acto rinde por encima del rating puro. El smoke,
 > que decide al azar, mide el piso; el humano que decide bien saca la diferencia.
+
+### ⚠️ Balance del Sprint A2
+
+Baseline (con los planteles nuevos del PO: +ESP/GER/NED): **33.8% n=4000**. Medido POR ETAPAS
+(lección del Sprint 4): catálogo+identidad **34.1** (+0.3, tras calibrar recuperación/pelotazo —
+la primera pasada dio 27.1: los tipos nuevos con compuerta rendían la mitad que circulación, misma
+lección de A1: el éxito de la compuerta debe pagar mejor) → encadenamiento **33.0** (−0.8, el diseño
+bidireccional se auto-compensa) → absorción **37.5 (¡+3.7, fuera del gate!)** → con `BREAKAWAY_TICK`
+0.018 → **34.1-35.0 n=4000 = +0.3..+1.2pp, dentro del gate**. Diales de A2: `AMBIENT_*`,
+`finishBonus`, `actAerial`/`actContain(bonus)`, `BREAKAWAY_TICK` (el más fino), pesos de
+`typeWeights`. Y de nuevo: **n=1500 mintió dos veces** (32.7 → 30.4 real; el gate SIEMPRE a n=4000).
 
 ### ⚠️ Balance del Sprint A1 (leer antes de tocar el partido)
 

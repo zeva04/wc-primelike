@@ -190,9 +190,40 @@ penales y último hombre siguen funcionando igual; el feed narra el origen de ca
 
 ---
 
-## SPRINT A2 — El catálogo
+## SPRINT A2 — El catálogo ✅ **CERRADO (22-jul-2026)**
 
 **Objetivo:** que el partido tenga variedad futbolística real y que el fallo deje de ser un muro.
+
+### Lo entregado (decisiones del PO vía AskUserQuestion al arrancar)
+
+- **Catálogo completo: 8 tipos** (los 6 del roadmap + repliegue + la cara defensiva del córner).
+  Elegido "los 6 + repliegue continúa": recuperación alta (High Press), pelotazo/duelo largo
+  (Bloque bajo, estrena el Cabezazo), balón parado ×2 caras, y 🗼 **salida bajo presión** — la
+  def→of: sobrevivir la presión rival CONVIERTE la jugada en transición mía.
+- **Fallo que encadena bidireccional moderado**: rebote 0.30 (un solo rebote/secuencia) + contra
+  0.28 sobre pérdidas ARRIESGADAS (la opción segura nunca la dispara). Se auto-compensa.
+- **Identidad del rival por pesos continuos** (`rivalProfile` de sus promedios, sin datos nuevos)
+  + la mentalidad como palanca VIVA que sesga el pool al momento de generar.
+- **Último hombre absorbido** (calibración del Sprint 1 intacta): contención rota 0.70 y TODA
+  contra 1.0 rutean al mano a mano. Exposición ~0.77/partido.
+- Deuda §6 saldada al vuelo: `sequences.js` (460 líneas) se partió en generador (143) +
+  `sequence-acts.js` (339) — mudanza pura, gate re-verificado.
+- Además: kits de GER/NED corregidos (`kit:` → `kits:`, PO OK), descripciones de ESP/GER/NED,
+  y `lineup.test` des-hardcodeado de los stats de Vinícius (deriva de datos, como discipline §8).
+
+### ⚖️ Las dos lecciones de balance de A2
+
+1. **La lección de A1 se repite en cada tipo nuevo**: recuperación y pelotazo nacieron con
+   compuertas (ganar la presión / el duelo) y EV de gol a la mitad de circulación → BRA 27.1
+   (−6.7pp). El arreglo no es quitar la compuerta (ES la identidad del tipo) sino pagar mejor el
+   éxito (`actContain(bonus)`, `actAerial` 0.42, finishBonus). Medido por tipo con un diag de
+   EV/secuencia: quedaron todos en banda 0.27-0.45.
+2. **El canal plano era el arma del underdog.** Absorbido el último hombre en secuencias, los
+   débiles no le generaban NINGÚN susto al favorito (sus secuencias son pocas y flojas, y el mano
+   a mano es peligro PLANO — no depende del que se escapa) → BRA +3.7pp. Se restauró un canal
+   ambiente chico (`BREAKAWAY_TICK` 0.018 ≈ 0.32/partido, "pelotazo a la espalda") que es un dial
+   FINÍSIMO: 0 → +3.7 · 0.035 → −3.4. **Gate final: 34.1-35.0% n=4000 vs 33.8 = dentro de ±2pp.**
+   Y n=1500 volvió a mentir dos veces — el gate del arco es SIEMPRE n=4000.
 
 ### Alcance
 

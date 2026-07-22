@@ -16,7 +16,10 @@ export const TEAM_DESC = {
   URU: "La garra charrúa hecha selección. Un país entero que juega cada pelota como si fuera la última.",
   // UEFA
   ENG: "La cuna del fútbol y una generación para soñar. Hambre de gloria tras años de espera.",
+  ESP: "La Roja del toque eterno: una escuela que nunca deja de producir talento, y la joya que ilusiona al mundo.",
   FRA: "Campeones y finalistas, una fábrica inagotable de cracks. Quizás el plantel más temible del planeta.",
+  GER: "La Mannschaft: cuatro estrellas y una maquinaria que compite hasta el último minuto. Nunca la des por muerta.",
+  NED: "La Naranja: herederos del fútbol total, talento y una tradición que exige jugar bonito.",
   NOR: "Haaland, Ødegaard y una generación irrepetible. La sorpresa nórdica que mete miedo.",
   POR: "Talento de sobra y una camada brillante. La búsqueda de la gloria más allá de una leyenda.",
   // CONCACAF

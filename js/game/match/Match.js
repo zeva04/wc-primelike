@@ -35,6 +35,7 @@ import { playedPos } from "../ratings.js";
 import { teamPowers } from "./powers.js";
 import * as Chances from "./chances.js";
 import * as Sequences from "./sequences.js";
+import * as SeqActs from "./sequence-acts.js";
 import * as Incidents from "./incidents.js";
 import * as Shootout from "./shootout.js";
 
@@ -45,9 +46,14 @@ import * as Shootout from "./shootout.js";
 // de las secuencias — son diales de balance del gate de A1.
 const PEN_MINE_TICK = 0.016;   // ≈0.29/partido, como cuando vivía en myChance (0.07)
 const PEN_OPP_TICK = 0.010;    // ≈0.18/partido, como cuando vivía en oppChance (0.06)
-const LAST_MAN_TICK = 0.05;    // ≈0.9/partido, la misma exposición del Sprint 1
-const AMBIENT_MINE = 0.78;     // el remate simulado propio cede algo de terreno a las secuencias
-const AMBIENT_OPP = 0.55;
+// El último hombre nace sobre todo de las SECUENCIAS (Sprint A2, absorción — decisión PO
+// #7): contención rota o contra tras pérdida (sequences.js). BREAKAWAY_TICK conserva un
+// canal ambiente CHICO — el pelotazo a la espalda que no nace de ninguna pérdida mía — y es
+// deliberadamente PLANO: es el arma del underdog (medido: sin él, los débiles no le generan
+// NINGÚN susto al favorito y BRA derivaba +3.7pp). La resolución del Sprint 1 sigue intacta.
+const BREAKAWAY_TICK = 0.018;
+const AMBIENT_MINE = 0.85;     // el remate simulado propio cede algo de terreno a las secuencias
+const AMBIENT_OPP = 0.70;
 
 export class Match {
   /**
@@ -142,7 +148,7 @@ export class Match {
     // Eventos interactivos INDEPENDIENTES de las secuencias (penal y último hombre, intactos
     // del calibrado previo; A1 no toca su matemática, solo cada cuánto asoman como evento suelto).
     if (rnd() < PEN_MINE_TICK) return Chances.myPenaltyChance(this);
-    if (rnd() < LAST_MAN_TICK && Chances.lastManChance(this)) return true;
+    if (rnd() < BREAKAWAY_TICK && Chances.lastManChance(this)) return true;
     if (rnd() < PEN_OPP_TICK) return Chances.oppPenaltyChance(this);
 
     // Ocasiones SIMULADAS (no interactivas): la parte "el resto se simula" del Bible §7.
@@ -168,7 +174,7 @@ export class Match {
 
   // ---------- Delegación a los módulos de jugadas ----------
 
-  resolveSequenceAct(key) { return Sequences.resolveSequenceAct(this, key); }
+  resolveSequenceAct(key) { return SeqActs.resolveSequenceAct(this, key); }
   resolvePenaltyMine(name) { return Chances.resolvePenaltyMine(this, name); }
   resolvePenaltyOpp(key) { return Chances.resolvePenaltyOpp(this, key); }
   resolveLastMan(key) { return Chances.resolveLastMan(this, key); }

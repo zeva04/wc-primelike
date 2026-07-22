@@ -25,11 +25,16 @@ function makeMatch(oppId = "MAR") {
   return new E.Match({ team: me, lineup, bench, mentalidad: "normal", buffs: {} }, opp, false, []);
 }
 
-// ---------- catálogo ----------
-assert(E.SEQUENCE_TYPES.length === 3, "A1 arranca con 3 tipos de secuencia", E.SEQUENCE_TYPES.length);
+// ---------- catálogo (A2: los 6 del roadmap + repliegue + la cara defensiva del córner) ----------
+assert(E.SEQUENCE_TYPES.length === 8, "A2 completa el catálogo: 8 tipos", E.SEQUENCE_TYPES.length);
 const sides = E.SEQUENCE_TYPES.map(t => t.side);
-assert(sides.filter(s => s === "mine").length === 2, "2 tipos ofensivos (mine)");
-assert(sides.filter(s => s === "opp").length === 1, "1 tipo defensivo (opp)");
+assert(sides.filter(s => s === "mine").length === 5, "5 tipos ofensivos (mine)", sides.join(","));
+assert(sides.filter(s => s === "opp").length === 3, "3 tipos con iniciativa rival (opp)", sides.join(","));
+for (const id of ["recuperacion", "circulacion", "transicion", "pelotazo", "balon_parado", "salida_fondo"]) {
+  assert(E.sequenceType(id), `el tipo del roadmap existe: ${id}`);
+}
+assert(E.sequenceType("repliegue")?.side === "opp", "el repliegue de A1 sigue en el pool");
+assert(E.sequenceType("balon_parado_def")?.side === "opp", "el balón parado tiene su cara defensiva");
 for (const t of E.SEQUENCE_TYPES) {
   assert(typeof t.id === "string" && t.name && t.icon, "tipo con id/name/icon", t.id);
   assert(Array.isArray(t.plan) && t.plan.length >= 1 && t.plan.length <= 3, "plan de 1 a 3 actos", `${t.id}: ${t.plan}`);
@@ -110,17 +115,20 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
   assert(m.seq === null, "el repliegue cierra sin quedar colgado");
 }
 
-// ---------- generación: respeta el objetivo 2-6 ----------
+// ---------- generación: respeta el objetivo 2-6 y el catálogo entero aparece ----------
 {
-  let sawGen = false, overshoot = false;
-  for (let t = 0; t < 40; t++) {
+  let sawGen = false, overshoot = false, sawLastMan = false;
+  const seen = new Set();
+  for (let t = 0; t < 60; t++) {
     const m = makeMatch(t % 2 ? "ARG" : "MAR");
     // Simular todos los ticks del partido resolviendo las secuencias al azar
     let guard = 0;
     while (!m.finished && guard++ < 500) {
       m.tick();
+      if (m.seq) seen.add(m.seq.type.id);
       if (m.decision) {
         const d = m.decision;
+        if (d.id === "last_man") sawLastMan = true;
         if (d.id === "sequence") { sawGen = true; m.resolveSequenceAct(d.options[Math.floor(Math.random() * d.options.length)].key); }
         else m.decision = null; // penales/último hombre/etc: no es el foco de este test
       }
@@ -133,6 +141,31 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
   }
   assert(sawGen, "el partido genera secuencias por sí solo");
   assert(!overshoot, "nunca se pasa del objetivo de secuencias del partido");
+  for (const t of E.SEQUENCE_TYPES) assert(seen.has(t.id), `el tipo ${t.id} aparece jugando (pesos > 0)`, [...seen].join(","));
+  assert(sawLastMan, "el último hombre sigue apareciendo (absorbido en secuencias + pelotazo a la espalda)");
+}
+
+// ---------- A2: la salida bajo presión CONVIERTE en transición mía (def→of) ----------
+{
+  let converted = false, punished = false;
+  for (let i = 0; i < 300 && !(converted && punished); i++) {
+    const m = makeMatch("ARG");
+    m.min = 30;
+    E.startSequence(m, E.sequenceType("salida_fondo"));
+    assert(m.seq.prot && m.my.lineup.includes(m.seq.prot), "la salida tiene MI protagonista (el que saca la pelota)");
+    m.resolveSequenceAct("jugar"); // siempre la opción arriesgada
+    if (m.seq && m.seq.type.id === "transicion") converted = true;     // rompió la presión
+    else punished = true;                                              // la perdió (o cerró)
+  }
+  assert(converted, "salir jugando puede CONVERTIR la secuencia en una transición mía");
+  assert(punished, "salir jugando también puede costar caro (no es gratis)");
+  // Reventarla es siempre segura: cierra sin riesgo
+  const m = makeMatch("ARG");
+  m.min = 30;
+  E.startSequence(m, E.sequenceType("salida_fondo"));
+  const golesAntes = m.gOpp;
+  m.resolveSequenceAct("despeje");
+  assert(m.seq === null && m.gOpp === golesAntes, "reventarla cierra la secuencia sin riesgo");
 }
 
 console.log(`sequences.test: ${checks} checks · fallos: ${fails}`);

@@ -94,8 +94,9 @@ js/
     match/
       Match.js                 ← clase: estado, tick, fases, cambios, resultado (~200)
       powers.js                ← effStat, gkQuality, teamPowers, MENT_MOD (~55)
-      actions.js               ← Football Actions: pase, regate, remate, contención (Bible §7) (~70)
-      sequences.js             ← máquina de Key Sequences: generar, escalar, cerrar (~230)
+      actions.js               ← Football Actions: pase, regate, remate, duelo aéreo, contención (Bible §7) (~95)
+      sequences.js             ← GENERADOR de Key Sequences: perfil rival, pesos, arranque (~145)
+      sequence-acts.js         ← los ACTOS: decisiones, resolución, rebote/contra/último hombre (~340)
       chances.js               ← penales en juego, último hombre, remate ambiente, VAR (~200)
       incidents.js             ← faltas, tarjetas, lesiones en juego (~120)
       shootout.js              ← tanda de penales (~90)
@@ -195,7 +196,8 @@ Formato: **propósito · contiene · NUNCA debe contener**.
 | `game/match/Match.js` | Máquina de estados del partido | constructor, tick, fases, subs, result | Resolución de ocasiones/faltas (delegada), textos de UI de pantalla |
 | `game/match/powers.js` | Fórmulas de poder | effStat, gkQuality, teamPowers | Estado, azar de eventos |
 | `game/match/actions.js` | Football Actions (Bible §7) | actPass/actDribble/actShot/actContain/actOppShot — gestos que devuelven resultado estructurado | Narración, mutar el marcador, hilo de la secuencia |
-| `game/match/sequences.js` | Máquina de Key Sequences | generación (2-6/partido), escalar/cerrar actos, resolveSequenceAct | Fórmulas de gesto (van a actions), datos de tipo (van a content) |
+| `game/match/sequences.js` | Generador de Key Sequences | objetivo 2-6/partido, rivalProfile, typeWeights (mentalidad viva), startSequence | Fórmulas de gesto (actions), datos de tipo (content), resolución de actos (sequence-acts) |
+| `game/match/sequence-acts.js` | Los actos de una secuencia | buildActDecision, resolveSequenceAct, escalada, rebote/contra (regla 7), ruteo al último hombre | Generación (qué/cuándo sale), fórmulas de gesto (actions) |
 | `game/match/chances.js` | Penales, último hombre, remate simulado | penales en juego, lastManChance, ambientShot*, goles, VAR | Tarjetas/lesiones, secuencias interactivas |
 | `game/match/incidents.js` | Incidencias | faltas, tarjetas, lesiones en juego | Fórmulas de gol |
 | `game/match/shootout.js` | Tanda de penales | start/shoot/check-end | Nada fuera de la tanda |

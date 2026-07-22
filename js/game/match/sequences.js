@@ -18,6 +18,11 @@
    el smoke sin tocar sus loops: resolver un acto puede dejar
    OTRA decisión (el acto siguiente) y ambos loops la reprocesan.
 
+   Los ACTOS (constructores de decisión, resolución, escalada y
+   el fallo que encadena) viven en sequence-acts.js desde A2
+   (presupuesto de líneas §6). Acá vive la GENERACIÓN: qué
+   secuencia sale, cuándo y con qué protagonista.
+
    GENERACIÓN (decisión PO): sobre la marcha, apuntando a un
    objetivo de 2-6 por partido modulado por la preparación (Bible:
    la preparación determina cuántas oportunidades recibes). Se
@@ -27,17 +32,29 @@
 import { rnd, ri, pick } from "../../core/rng.js";
 import { clamp } from "../../core/math.js";
 import { playedPos } from "../ratings.js";
-import { SEQUENCE_TYPES, sequenceType } from "../../content/sequences.js";
-import * as A from "./actions.js";
-import { goalMine, goalOpp, myPenalty } from "./chances.js";
+import { SEQUENCE_TYPES } from "../../content/sequences.js";
+import { buildActDecision } from "./sequence-acts.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
 export const SEQ_MIN = 2, SEQ_MAX = 6;
 
 /**
- * Objetivo de secuencias del partido y reparto ofensivo/defensivo, desde la preparación
- * (ventaja atk+def sobre el rival) y la mentalidad. Se calcula UNA vez por partido y queda
- * cacheado en m._seqPlan. El favorito bien preparado recibe más secuencias y más ofensivas;
+ * Perfil del rival DERIVADO de sus stats (decisión PO A2, #14): sin datos nuevos, cada
+ * dimensión se normaliza a 0..1 desde el promedio de sus jugadores de campo. Define qué
+ * fútbol te genera (y contra qué fútbol atacas tú): atk = su peligro directo · def = su
+ * solidez/intensidad (proxy de cuánto te presiona) · pase = su vocación de tener la pelota ·
+ * cab = su juego aéreo. Cuando llegue Filosofía, su filosofía real reemplaza este proxy.
+ */
+function rivalProfile(m) {
+  const field = m.oppLineup.filter(p => p.pos !== "POR");
+  const st = k => field.reduce((s, p) => s + (p.stats[k] || 50), 0) / Math.max(1, field.length);
+  const N = x => clamp((x - 58) / 28, 0, 1); // ~58 (genéricos débiles) → 0 · ~86 (élite) → 1
+  return { atk: N(st("tiro")), def: N(st("defensa")), pase: N(st("pase")), cab: N(st("cabezazo")) };
+}
+
+/**
+ * Objetivo de secuencias del partido, ventaja y perfil rival. Se calcula UNA vez por partido
+ * (cacheado en m._seqPlan). El favorito bien preparado recibe más secuencias y más ofensivas;
  * el superado, menos y más defensivas — es el pago visible de prepararse (Bible §7).
  */
 function seqPlan(m) {
@@ -45,10 +62,33 @@ function seqPlan(m) {
   const { mine, opp } = m.powers();
   const edge = (mine.atk - opp.atk) + (mine.def - opp.def); // ~[-6, 6]
   const target = clamp(Math.round(4 + edge * 0.32 + ri(-1, 1) * 0.5), SEQ_MIN, SEQ_MAX);
-  const mentShift = m.my.mentalidad === "ofensiva" ? 0.10 : m.my.mentalidad === "defensiva" ? -0.10 : 0;
-  const mineShare = clamp(0.5 + edge * 0.045 + mentShift, 0.3, 0.72);
-  m._seqPlan = { target, mineShare };
+  m._seqPlan = { target, edge, prof: rivalProfile(m) };
   return m._seqPlan;
+}
+
+/**
+ * Pesos de cada tipo dentro de su lado, desde el perfil rival y la MENTALIDAD (que es una
+ * palanca viva: se leen en el momento de generar, no al inicio — cambiarla a mitad de
+ * partido cambia el fútbol que sale, decisión PO A2 "sesgo perceptible").
+ * Lado mine (mi ataque, contra SU perfil): un rival que ataca deja espacio a la contra; un
+ * bloque sólido invita al juego directo y al balón parado; uno que quiere la pelota, a
+ * presionarle la salida. Lado opp (su iniciativa): su ataque genera repliegues, su intensidad
+ * te presiona la salida, su juego aéreo vive del córner.
+ */
+function typeWeights(m, side, prof) {
+  const ment = m.my.mentalidad;
+  if (side === "mine") return {
+    circulacion: 3,
+    transicion: 2.5 + 2 * prof.atk,
+    recuperacion: (2 + 1.5 * prof.pase) * (ment === "ofensiva" ? 1.6 : 1),
+    pelotazo: (1.3 + 1.8 * prof.def) * (ment === "defensiva" ? 1.5 : 1),
+    balon_parado: 1.5,
+  };
+  return {
+    repliegue: 2 + 3 * prof.atk,
+    salida_fondo: 0.8 + 2.5 * prof.def,
+    balon_parado_def: 0.8 + 1 * prof.cab,
+  };
 }
 
 /**
@@ -65,13 +105,16 @@ export function maybeStartSequence(m) {
   const ticksLeft = Math.max(1, Math.ceil((end - m.min) / 5));
   const pStart = (plan.target - done) / ticksLeft;
   if (rnd() >= pStart) return false;
-  const side = rnd() < plan.mineShare ? "mine" : "opp";
+  const mentShift = m.my.mentalidad === "ofensiva" ? 0.10 : m.my.mentalidad === "defensiva" ? -0.10 : 0;
+  const mineShare = clamp(0.5 + plan.edge * 0.045 + mentShift, 0.3, 0.72);
+  const side = rnd() < mineShare ? "mine" : "opp";
   const pool = SEQUENCE_TYPES.filter(t => t.side === side);
-  startSequence(m, pick(pool));
+  const w = typeWeights(m, side, plan.prof);
+  startSequence(m, m._weightedPick(pool, pool.map(t => w[t.id] ?? 1)));
   return true;
 }
 
-/** Arranca una secuencia de un tipo dado: elige protagonista y crea la decisión del acto 1. */
+/** Arranca una secuencia de un tipo dado: elige protagonista(s) y crea la decisión del acto 1. */
 export function startSequence(m, type) {
   m._seqCount = (m._seqCount || 0) + 1;
   m.stats.decisiones++;
@@ -79,154 +122,22 @@ export function startSequence(m, type) {
     const cands = m.activeMine().filter(p => p.pos !== "POR");
     const prot = m._weightedPick(cands, cands.map(p => type.protWeight[playedPos(p)] ?? 1));
     m.seq = { type, prot, actIdx: 0, bonus: 0 };
-    m.log("event", `⚡ min ${m.min}' — ${type.icon} ${type.flavor.intro(prot)}`);
+    m.log("event", `${type.icon} min ${m.min}' — ${type.flavor.intro(prot)}`);
   } else {
-    const shooters = m.oppLineup.filter(p => (p.pos === "DEL" || p.pos === "MED") && !p.expulsado);
-    const shooter = shooters.length ? pick(shooters) : pick(m.oppLineup);
-    m.seq = { type, shooter, actIdx: 0 };
-    m.log("event", `🧱 min ${m.min}' — ${type.flavor.intro(m.oppTeam)}`);
+    // El atacante rival: en un córner en contra manda su mejor cabeceador; si no, un DEL/MED.
+    const alive = m.oppLineup.filter(p => !p.expulsado);
+    const shooter = type.plan[0] === "defend_sp"
+      ? alive.filter(p => p.pos !== "POR").sort((a, b) => (b.stats.cabezazo || 0) - (a.stats.cabezazo || 0))[0] || pick(alive)
+      : (() => { const s = alive.filter(p => p.pos === "DEL" || p.pos === "MED"); return s.length ? pick(s) : pick(alive); })();
+    m.seq = { type, shooter, actIdx: 0, bonus: 0 };
+    // La salida bajo presión además necesita MI protagonista: el que saca la pelota jugada
+    // (el DEF de mejor pase; sin DEF en pie, el jugador de campo de mejor pase).
+    if (type.plan[0] === "playout") {
+      const defs = m.activeMine().filter(p => playedPos(p) === "DEF");
+      const pool = defs.length ? defs : m.activeMine().filter(p => p.pos !== "POR");
+      m.seq.prot = pool.sort((a, b) => (b.stats.pase || 0) - (a.stats.pase || 0))[0];
+    }
+    m.log("event", `${type.icon} min ${m.min}' — ${type.flavor.intro(m.oppTeam)}`);
   }
   buildActDecision(m);
-}
-
-/** Crea la decisión del acto actual según su `kind`. Las opciones son reglas (mapean a
- *  Football Actions); el flavor viene del tipo. */
-function buildActDecision(m) {
-  const s = m.seq, kind = s.type.plan[s.actIdx];
-  const opts = {
-    build: () => ({
-      title: `⚡ min ${m.min}' — Circulación: ${s.prot.name} tiene la pelota`,
-      text: "¿Cómo la hacen circular?",
-      options: [
-        { label: "🎩 Pase seguro", hint: `Mantiene la posesión (Pase ${s.prot.stats.pase})`, key: "seguro" },
-        { label: "🔑 Pase filtrado", hint: "Arriesgado, pero deja mejor perfil de remate", key: "filtrado" },
-      ],
-    }),
-    carry: () => ({
-      title: `⚡ min ${m.min}' — Transición: ${s.prot.name} conduce`,
-      text: "La defensa rival viene a la carrera. ¿Qué hace?",
-      options: [
-        { label: "🏃 Conducir al espacio", hint: `Puede ganar una falta (Aura ${s.prot.stats.aura})`, key: "conducir" },
-        { label: "🎯 Pase al pie", hint: `Rápido y seguro (Pase ${s.prot.stats.pase})`, key: "pase" },
-      ],
-    }),
-    finish: () => ({
-      title: `🎯 min ${m.min}' — ¡Momento de definir! ${s.prot.name}`,
-      text: "¿Cómo resuelve la jugada?",
-      options: [
-        { label: "💥 Rematar", hint: `Tiro ${s.prot.stats.tiro}`, key: "rematar" },
-        { label: "🤝 Buscar al mejor ubicado", hint: "Un pase más para una definición mejor", key: "asistir" },
-      ],
-    }),
-    contain: () => ({
-      title: `🧱 min ${m.min}' — ¡${s.shooter.name} encara! Hay que defender`,
-      text: "¿Cómo lo frena la zaga?",
-      options: [
-        { label: "🧍 Contener y esperar", hint: "Seguro: baja la peligrosidad", key: "contener" },
-        { label: "🏃 Salir a presionar", hint: "Corta más, pero si falla queda mejor perfilado", key: "presionar" },
-      ],
-    }),
-  }[kind]();
-  m.decision = { id: "sequence", ...opts };
-}
-
-/**
- * Resuelve el acto actual con la opción elegida. Narra, y ESCALA (deja la decisión del acto
- * siguiente) o CIERRA la secuencia (desenlace: gol, erra, corte). Devuelve false (el tick
- * sigue) — como los otros resolvers.
- */
-export function resolveSequenceAct(m, key) {
-  const s = m.seq;
-  m.decision = null;
-  const kind = s.type.plan[s.actIdx];
-  const f = s.type.flavor;
-
-  if (kind === "build") {
-    // La construcción NO es una compuerta de supervivencia: modula la CALIDAD del remate
-    // (bonus), no si la jugada muere. El pase seguro siempre progresa; el filtrado arriesga
-    // perder la pelota a cambio de mejor perfil. Así el gate de gol es el remate (como las
-    // ocasiones que reemplaza), no la cadena de actos — si no, tres actos multiplican el
-    // fallo y el scoring se derrumba (medido en A1).
-    if (key === "filtrado") {
-      const r = A.actPass(m, s.prot, { hard: true });
-      if (!r.ok) return closeSeq(m, "chance", `min ${m.min}' — ${f.buildFail}`);
-      s.bonus += 0.07;
-    }
-    m.log("plain", `min ${m.min}' — ${f.buildOk}`);
-    return escalate(m);
-  }
-
-  if (kind === "carry") {
-    if (key === "conducir") {
-      const r = A.actDribble(m, s.prot);
-      if (r.foul) { m.log("event", `min ${m.min}' — ¡Derriban a ${s.prot.name}! ¡PENAL!`); closeSilent(m); return myPenalty(m); }
-      if (!r.ok) return closeSeq(m, "chance", `min ${m.min}' — ${f.carryFail}`);
-      s.bonus += 0.05;
-    } else {
-      s.bonus += 0.02; // pase al pie: seguro, siempre progresa
-    }
-    m.log("plain", `min ${m.min}' — ${f.carryOk(s.prot)}`);
-    return escalate(m);
-  }
-
-  if (kind === "finish") {
-    if (key === "asistir") {
-      const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
-      const mate = mates.length ? m._weightedPick(mates, mates.map(p => playedPos(p) === "DEL" ? 3 : 1)) : s.prot;
-      const pass = A.actPass(m, s.prot);
-      if (!pass.ok) return closeSeq(m, "chance", `min ${m.min}' — el pase de ${s.prot.name} no encuentra a nadie.`);
-      const shot = A.actShot(m, mate, { stat: f.finishStat, bonus: s.bonus + f.finishBonus + 0.04 });
-      if (shot.ok) { goalMine(m, mate, "¡Definición tras la asistencia!", s.prot); return closeSilent(m); }
-      return closeSeq(m, "chance", `min ${m.min}' — ${mate.name} no logra conectar el remate.`);
-    }
-    const shot = A.actShot(m, s.prot, { stat: f.finishStat, bonus: s.bonus + f.finishBonus });
-    if (shot.ok) { goalMine(m, s.prot, "¡Culminó la jugada!", "open"); return closeSilent(m); }
-    return closeSeq(m, "chance", `min ${m.min}' — ${s.prot.name} remata pero ${pick(["ataja el arquero", "se va desviado", "la saca la defensa"])}.`);
-  }
-
-  if (kind === "contain") {
-    const { mine } = m.powers();
-    const r = A.actContain(m, mine, { press: key === "presionar" });
-    if (r.ok) return closeSeq(m, "event", `min ${m.min}' — 🧱 ${f.containOk}`);
-    if (r.press) s.bonus = 0.05; // presión fallida: el rival queda mejor perfilado
-    m.log("chance", `min ${m.min}' — ${f.containFail(m.oppTeam)}`);
-    return escalate(m); // escala al remate rival (clear)
-  }
-
-  // clear: el rival remata, mi arquero responde (desenlace defensivo, sin decisión extra en A1)
-  const { mine } = m.powers();
-  const r = A.actOppShot(m, s.shooter, mine);
-  if (r.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
-  return closeSeq(m, "chance", `min ${m.min}' — ${s.shooter.name} remata pero ${pick([`ataja ${mine.por ? mine.por.name : "el arquero"}`, "se va afuera", "la bloquea la zaga"])}.`);
-}
-
-// Actos que se resuelven SOLOS, sin pedir decisión al DT (desenlaces): el remate rival de una
-// secuencia de repliegue. El resto son interactivos (crean una decisión `sequence`).
-const AUTO_ACTS = new Set(["clear"]);
-
-/**
- * Pasa al acto siguiente. Si el plan se acabó, cierra. Si el próximo acto es interactivo,
- * crea su decisión. Si es un desenlace automático (AUTO_ACTS), lo resuelve en el acto —
- * sin pedirle nada al DT (p. ej. el remate rival tras una contención fallida).
- */
-function escalate(m) {
-  const s = m.seq;
-  s.actIdx++;
-  if (s.actIdx >= s.type.plan.length) return closeSilent(m);
-  if (AUTO_ACTS.has(s.type.plan[s.actIdx])) return resolveSequenceAct(m, null);
-  buildActDecision(m);
-  return false;
-}
-
-/** Cierra la secuencia con una línea de relato. */
-function closeSeq(m, kind, text) {
-  m.log(kind, text);
-  m.seq = null;
-  return false;
-}
-
-/** Cierra la secuencia sin relato extra (el desenlace ya se narró: gol, penal, etc.). */
-function closeSilent(m) {
-  m.seq = null;
-  return false;
 }
