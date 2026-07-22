@@ -71,7 +71,10 @@ export class Match {
   constructor(my, oppTeam, knockout, oppBanned = []) {
     this.my = my;
     this.oppTeam = oppTeam;
-    this.oppLineup = genOpponentLineup(oppTeam, oppBanned);
+    // ESCALADA (R2): la profundidad KO viaja en matchCtx (como moral/filo — el Match no
+    // conoce la run) y enciende la forma de torneo del once rival (0 en grupos = ×1).
+    this.koRound = my.koRound || 0;
+    this.oppLineup = genOpponentLineup(oppTeam, oppBanned, this.koRound);
     this.knockout = knockout;
     this.min = 0;
     this.gMy = 0; this.gOpp = 0;

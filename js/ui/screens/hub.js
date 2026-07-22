@@ -163,6 +163,10 @@ function showScoutReport(oppId) {
         </div>
       </div>
       <div class="space-y-2 mt-4">
+        ${rep.modoMundial ? `<div class="rounded-xl border border-amber-500/60 bg-amber-500/10 p-3">
+          <span class="font-semibold text-sm text-amber-300">🔥 Modo Mundial: llega un +${rep.modoMundial.pct}% encendido</span>
+          <p class="text-[11px] text-amber-200/70 mt-1">En eliminatorias los rivales suben con cada ronda — el Mundial de verdad se juega en finales.${rep.modoMundial.madura ? " Y a esta altura del torneo, su idea llega madurada: juega su fútbol en serio." : ""}</p>
+        </div>` : ""}
         <div class="rounded-xl border tp-border tp-bg-soft p-3">
           <div class="flex items-center justify-between">
             <span class="font-semibold text-sm">${rep.filosofia.icon} Su idea: ${rep.filosofia.name}</span>

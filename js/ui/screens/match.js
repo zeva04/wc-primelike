@@ -8,7 +8,7 @@
 import { getTeam } from "../../data/teams-repo.js";
 import { statLine, playedPos, outOfPosPenalty } from "../../game/ratings.js";
 import { swapAssignments, canPlayAt } from "../../game/lineup.js";
-import { STAGE_LABEL } from "../../game/tournament/knockout.js";
+import { STAGE_LABEL, koRoundOf } from "../../game/tournament/knockout.js";
 import { Match } from "../../game/match/Match.js";
 import { filoCtx } from "../../game/philosophy.js";
 import { S } from "../session.js";
@@ -23,7 +23,8 @@ function startMatch(oppId) {
   const opp = getTeam(oppId);
   const bench = S.run.squad.filter(p => !S.selectedLineup.includes(p) && !p.suspendido && p.lesionadoPartidos === 0);
   // La filosofía cruza la frontera run→Match como la moral: {id, nivel}, nada más (F1).
-  S.matchCtx = { team: me, lineup: S.selectedLineup.slice(), bench, mentalidad: "normal", buffs: { ...S.run.buffs }, moral: S.run.moral, filo: filoCtx(S.run) };
+  // koRound (R2): la profundidad KO enciende la escalada del rival (forma de torneo).
+  S.matchCtx = { team: me, lineup: S.selectedLineup.slice(), bench, mentalidad: "normal", buffs: { ...S.run.buffs }, moral: S.run.moral, filo: filoCtx(S.run), koRound: koRoundOf(S.run.stage) };
   S.match = new Match(S.matchCtx, opp, S.run.stage !== "groups", S.run.rivalBans[oppId] || []);
   S.feedRendered = 0;
   S.paused = false;

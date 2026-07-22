@@ -84,17 +84,31 @@ function curatedShape(team) {
   return filo ? getFormation(FILO_FORMATION[filo]) : null;
 }
 
+// FORMA DE TORNEO (arco del Rebalance R2, decisión PO 22-jul-2026): "el Mundial de
+// verdad se juega en 5 finales" — el rival de eliminatorias llega en MODO MUNDIAL:
+// +3% de rendimiento por ronda KO (16avos ×1.03 … final ×1.15). Entra como `p.forma`
+// en el once generado y multiplica effStat (match/powers) — el mismo patrón de
+// asimetría en los datos que energía/oxid: MIS jugadores nunca llevan el campo.
+// Solo MIS partidos: el mundo simulado (tournament/sim) no cambia. El perfil rival
+// (sequences.rivalProfile) lee los stats BASE a propósito: la escalada no cambia QUÉ
+// fútbol te genera, cambia lo bien que lo ejecuta.
+export const TOURNEY_FORM_PER_ROUND = 0.03;
+/** Multiplicador de forma de torneo para una profundidad KO (0 en grupos → ×1). */
+export function tourneyFormaMult(koRound) { return 1 + TOURNEY_FORM_PER_ROUND * (koRound || 0); }
+
 /**
  * Alineación de 6 titulares del rival (Game Vision: formato 6v6), excluyendo a
  * los suspendidos (`banned`: nombres en `run.rivalBans`, las rojas del mundo
  * vivo). Jugables usan sus mejores 6 disponibles; el resto arma su mejor seis
  * del plantel de 10 (figuras + genéricos). Los 16 CURADOS (F2) forman con la
  * formación de su filosofía (el bloque de SWE presenta 3 DEF de verdad).
+ * `koRound` (R2) estampa la forma de torneo en el once.
  */
-export function genOpponentLineup(team, banned = []) {
+export function genOpponentLineup(team, banned = [], koRound = 0) {
   const pool = (team.players || genOpponentSquad(team)).filter(p => !banned.includes(p.name));
   const shape = curatedShape(team);
-  return (shape ? bestSixShaped(pool, shape) : bestSix(pool)).map(p => ({ name: p.name, pos: p.pos, num: p.num, stats: { ...p.stats }, look: p.look, energia: 100, amarilla: false, expulsado: false, lesionado: false }));
+  const forma = tourneyFormaMult(koRound);
+  return (shape ? bestSixShaped(pool, shape) : bestSix(pool)).map(p => ({ name: p.name, pos: p.pos, num: p.num, stats: { ...p.stats }, look: p.look, energia: 100, forma, amarilla: false, expulsado: false, lesionado: false }));
 }
 
 /**

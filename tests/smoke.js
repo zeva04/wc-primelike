@@ -85,9 +85,12 @@ function playMatch(run, oppId) {
   const bench = available.filter(p => !lineup.includes(p));
   // matchCtx homólogo al de screens/match.js (la moral entra al generador por acá — A3;
   // la filosofía viaja igual desde F1: {id, nivel}, el Match no conoce la run)
-  const ctx = { team: me, lineup, bench, mentalidad: "normal", buffs: { ...run.buffs }, moral: run.moral, filo: E.filoCtx(run) };
+  const ctx = { team: me, lineup, bench, mentalidad: "normal", buffs: { ...run.buffs }, moral: run.moral, filo: E.filoCtx(run), koRound: E.koRoundOf(run.stage) };
   const banned = run.rivalBans[oppId] || [];
   const match = new E.Match(ctx, opp, run.stage !== "groups", banned);
+  // Escalada R2: el once rival lleva la forma de torneo exacta de la ronda (×1 en grupos)
+  const formaEsperada = E.tourneyFormaMult(E.koRoundOf(run.stage));
+  assert(match.oppLineup.every(p => p.forma === formaEsperada), "la forma de torneo del rival cuadra con la ronda", `${run.stage} → ${formaEsperada}`);
   // La suspensión por roja ajena es real: el suspendido no puede estar en el once rival
   for (const name of banned) assert(!match.oppLineup.some(p => p.name === name), "suspendido fuera del once rival", name);
   assert(match.oppLineup.length === 6, "el rival siempre forma 6 (los genéricos cubren al suspendido)");
@@ -306,7 +309,9 @@ function playRun(teamId) {
   for (let k = 1; k < run.journal.length; k++) {
     assert(run.journal[k].day >= run.journal[k - 1].day, "diario fuera de orden cronológico");
   }
-  return { champion, journal: run.journal.length };
+  // Instrumento por ronda (R2): DÓNDE murió la run — la escalada debe sentirse en KO,
+  // no en grupos, y este reporte es el termómetro de esa forma.
+  return { champion, journal: run.journal.length, stage: champion ? "champion" : run.stage };
 }
 
 // ---------- ejecución ----------
@@ -317,18 +322,22 @@ const results = [];
 
 for (const teamId of teamsToRun) {
   let champs = 0, journalSum = 0;
+  const deaths = {}; // instrumento por ronda (R2): dónde mueren las runs
   for (let i = 0; i < RUNS; i++) {
     const id = teamId || playables[Math.floor(Math.random() * playables.length)];
     const r = playRun(id);
     if (r.champion) champs++;
     journalSum += r.journal;
+    deaths[r.stage] = (deaths[r.stage] || 0) + 1;
   }
-  results.push({ team: teamId || "(azar)", champs, journal: journalSum / RUNS });
+  results.push({ team: teamId || "(azar)", champs, journal: journalSum / RUNS, deaths });
 }
 
 console.log(`\nsmoke: ${teamsToRun.length * RUNS} runs en ${((Date.now() - t0) / 1000).toFixed(1)}s · fallos: ${fails}`);
+const DEATH_COLS = [["groups", "grupos"], ["r32", "16avos"], ["r16", "8vos"], ["qf", "4tos"], ["sf", "semis"], ["final", "final"], ["champion", "🏆"]];
 for (const r of results) {
   console.log(`  ${r.team.padEnd(7)} campeón ${(100 * r.champs / RUNS).toFixed(1).padStart(5)}%  · diario ~${r.journal.toFixed(0)} entradas`);
+  console.log(`    caídas: ${DEATH_COLS.map(([k, lbl]) => `${lbl} ${(100 * (r.deaths[k] || 0) / RUNS).toFixed(1)}%`).join(" · ")}`);
 }
 console.log(fails ? "❌ smoke con fallos" : "✅ smoke OK");
 process.exit(fails ? 1 : 0);

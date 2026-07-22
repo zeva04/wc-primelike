@@ -77,7 +77,8 @@ function seqPlan(m) {
   // partido — se cachea con el plan. El proxy de stats (prof) queda como BASE:
   // la filosofía multiplica encima, no lo reemplaza (un bloque de élite sigue
   // siendo más sólido que un bloque débil).
-  m._seqPlan = { target, edge, prof: rivalProfile(m), oppFilo: rivalFilo(m.oppTeam) };
+  // R2: la identidad rival MADURA con la profundidad del torneo (desde cuartos +1 nivel)
+  m._seqPlan = { target, edge, prof: rivalProfile(m), oppFilo: rivalFilo(m.oppTeam, m.koRound) };
   return m._seqPlan;
 }
 

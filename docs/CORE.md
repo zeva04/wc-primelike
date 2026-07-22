@@ -226,11 +226,12 @@ Dentro de un partido las stats 1–99 se **normalizan a una escala ~0–5** para
 de probabilidad, y se les aplica el desgaste físico:
 
 ```
-effStat = (stat + buff) / 20  ×  energyMult(energía)  ×  oxidMult(racha)
+effStat = (stat + buff) / 20  ×  energyMult(energía)  ×  oxidMult(racha)  ×  forma
 energyMult = 1                                  si energía ≥ 65   (la banda verde)
            = 1 − 0.25 × ((65−energía)/60)²      bajo el umbral    (convexa hasta ×0.75)
 oxidMult   = 1                                  si racha < 3      (días sin entrenar)
-           = 1 − 0.15 × ((racha−2)/3)²          racha 3-5         (convexa hasta ×0.85)
+           = 1 − 0.18 × ((racha−2)/3)²          racha 3-5         (convexa hasta ×0.82)
+forma      = 1 + 0.03 × ronda_KO                SOLO el once rival (modo Mundial: ×1.03…×1.15)
 ```
 
 - **÷20** lleva 1–99 al rango ~0–5 donde están calibradas todas las fórmulas.
@@ -243,16 +244,24 @@ oxidMult   = 1                                  si racha < 3      (días sin ent
   ES la banda (`components.energyCls`, misma constante).
 - **factor oxidación = el ESPEJO de la banda** (arco del Rebalance R1, 22-jul-2026): una
   racha de **3+ días de preparación sin Entrenar ni Sesión Táctica** enciende un
-  multiplicador convexo que cae hasta **×0.85** en racha 5+. **Jugar también resetea**
-  ("jugar es ritmo", decisión PO), así que la curva entera vive comprimida en racha 3→5:
-  la ventana de preparación es de 4-5 días y la oxidación no es un estado crónico — es
-  **cómo llegas al partido** (racha 3 ×0.983 · 4 ×0.933 · 5+ ×0.85). También resetea el
-  cambio de identidad (reinstalar ideas es trabajo táctico); Bonding y Oportunidades NO.
-  La racha vive en `run.diasSinEntrenar` (`game/oxidation`) y se estampa como `p.oxid` en
-  el plantel — entra a effStat por el mismo caño que la energía, y el rival, que nunca
-  lleva el campo, queda en ×1. Piso combinado banda×óxido: **×0.6375**, fijado en
-  unitario (`tests/oxidation.test.js`). En la UI el color ES la mecánica
-  (`components.oxidCls`): gris bajo umbral · ámbar racha 3-4 · rojo 5+.
+  multiplicador convexo que cae hasta **×0.82** en racha 5+ (nació ×0.85 en R1; R2 lo
+  profundizó — es la palanca quirúrgica del recuperador, ver el blockquote de R2).
+  **Jugar también resetea** ("jugar es ritmo", decisión PO), así que la curva entera vive
+  comprimida en racha 3→5: la ventana de preparación es de 4-5 días y la oxidación no es
+  un estado crónico — es **cómo llegas al partido** (racha 3 ×0.98 · 4 ×0.92 · 5+ ×0.82).
+  También resetea el cambio de identidad (reinstalar ideas es trabajo táctico); Bonding y
+  Oportunidades NO. La racha vive en `run.diasSinEntrenar` (`game/oxidation`) y se
+  estampa como `p.oxid` en el plantel — entra a effStat por el mismo caño que la energía,
+  y el rival, que nunca lleva el campo, queda en ×1. Piso combinado banda×óxido:
+  **×0.615**, fijado en unitario (`tests/oxidation.test.js`). En la UI el color ES la
+  mecánica (`components.oxidCls`): gris bajo umbral · ámbar racha 3-4 · rojo 5+.
+- **factor forma = el MODO MUNDIAL del rival** (arco del Rebalance R2, 22-jul-2026): en
+  eliminatorias el once rival llega **+3% por ronda KO** (16avos ×1.03 … final ×1.15,
+  `opponents.tourneyFormaMult`), estampado como `p.forma` al generar su alineación — la
+  asimetría espejo de `p.oxid`: solo el rival la lleva, y solo en MIS partidos (el mundo
+  simulado no cambia). El perfil rival (`sequences.rivalProfile`) lee stats BASE a
+  propósito: la escalada no cambia QUÉ fútbol te genera, cambia lo bien que lo ejecuta.
+  Se narra: el informe del rival y la previa del Daily anuncian el modo Mundial.
 
 > **Rebalance del 20-jul-2026 (decisión PO).** El factor de energía pesaba **35%**
 > (`0.65 + 0.35`) y bajó a **20%**, acoplado a subir el cansancio del partido de −10 a
@@ -303,6 +312,23 @@ oxidMult   = 1                                  si racha < 3      (días sin ent
 > arranca con el peldaño de abajo cerca de su meta final (10-15). El nerf C (Recuperar no
 > sube sobre la banda) quedó **DIFERIDO**: "que el descanso se borre" no es realista
 > (PO) — se retoma solo si los números de R2 lo piden, con una variante realista.
+
+> **La escalada de rivales (arco del Rebalance R2, 22-jul-2026, decisión PO).** "El
+> Mundial de verdad se juega en 5 finales": en KO el rival llega en **modo Mundial** —
+> forma de torneo **+3%/ronda** (`p.forma`, ×1.03…×1.15) + identidad que **madura**
+> (+1 nivel desde cuartos, tope Consolidada). Medido por etapas (todo el gate 2×n=4000,
+> BRA): la forma sola movió la escalera entera −5..−9pp con los grupos INTACTOS (el
+> instrumento por ronda del smoke lo confirma: la muerte extra vive en KO); la madurez
+> midió ~0pp (condimento narrativo, como se anticipó). Con la escalada, el recuperador
+> quedó en 16.6 y **la tesis manda 10-15**: su palanca quirúrgica fue el piso del óxido
+> (0.85→**0.82** — solo él la pisa, medido) → **13.3/14.2 ✓ la tesis del arco se
+> cumple**. Escalera final R2: recuperar ~13.7 · entrenar ~19.7 · mixto ~32.7 · smart
+> ~40.8 · KOR ~28 · CPV ~6.5 · spread BRA−CPV 34→26. La **deuda del Contra** (−1.95 del
+> Meta) quedó PAGADA sin palanca dirigida: post-escalada mide 34.4/41.3 (n=2000), sobre
+> el mixto — las avanzadas de M2 la habían pagado ya. **Pendiente declarado → R3**: el
+> mixto azar (32.7 vs meta ~25) NO se persigue con el dial global — subirlo hundiría a
+> smart (clavado en 40) y arriesgaría a CPV (gate ≥3); la brecha azar↔greedy se ensancha
+> castigando DECISIONES, y esa palanca nueva es el arco siguiente (decisión PO).
 
 > Este es el único punto donde se mezcla "escala 1–99" (datos) con "escala 0–5" (fórmulas).
 > Todo lo demás del partido razona en 0–5.
@@ -898,7 +924,7 @@ Las palancas de la economía:
 - **Ritmo / Oxidación** (R1, 22-jul-2026): la contracara de descansar. Cada día de
   preparación sin **Entrenar / Sesión Táctica / cambio de identidad** suma a
   `run.diasSinEntrenar`; al 3º el plantel se **oxida** y rinde menos en el próximo
-  partido (§4, `oxidMult`: racha 3 −2% · 4 −7% · 5+ −15%). **Jugar devuelve el ritmo**
+  partido (§4, `oxidMult`: racha 3 −2% · 4 −8% · 5+ −18%). **Jugar devuelve el ritmo**
   (el reset vive en `flow.postMatchUpdate` — el partido se juega con la racha que traías).
   Visible en el hub (chip ⚙️ Ritmo + aviso si está oxidado), en la Gestión de Plantilla
   (línea en la card de energía) y narrado en el Diario la primera vez que se enciende

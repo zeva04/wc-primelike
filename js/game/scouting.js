@@ -19,9 +19,10 @@
    ============================================================ */
 import { getTeam } from "../data/teams-repo.js";
 import { playerOverall, teamFigure } from "./ratings.js";
-import { bestSix, expectedOpponentLineup } from "./opponents.js";
+import { bestSix, expectedOpponentLineup, tourneyFormaMult } from "./opponents.js";
 import { teamPowers, gkQuality } from "./match/powers.js";
-import { rivalFilo } from "./philosophy.js";
+import { rivalFilo, rivalFiloLevel } from "./philosophy.js";
+import { koRoundOf } from "./tournament/knockout.js";
 import { getPhilosophy, FILO_LEVELS } from "../content/philosophies.js";
 
 // La lectura táctica de cada identidad rival (F2): qué te propone y por dónde
@@ -112,13 +113,17 @@ export function buildOpponentReport(run, oppId) {
   // La identidad del rival (F2): curada para los 16, derivada para el resto. El nivel
   // sale de su jerarquía (los grandes llegan Consolidados) — el informe la NOMBRA
   // porque es accionable: la matriz de counters premia elegir bien contra qué juegas.
-  const rf = rivalFilo(opp);
+  // R2: el nivel que muestra es el MADURADO por la ronda (el que vas a enfrentar), y
+  // `modoMundial` narra la escalada (forma de torneo) cuando hay eliminatoria.
+  const koRound = koRoundOf(run.stage);
+  const rf = rivalFilo(opp, koRound);
   const rfData = getPhilosophy(rf.id);
 
   return {
     oppId,
     name: opp.name,
     filosofia: { id: rf.id, name: rfData.name, icon: rfData.icon, nivel: FILO_LEVELS[rf.nivel].label, consolidada: rf.nivel === 2, detalle: FILO_SCOUT[rf.id] },
+    modoMundial: koRound ? { pct: Math.round((tourneyFormaMult(koRound) - 1) * 100), madura: rivalFiloLevel(opp, koRound) > rivalFiloLevel(opp) } : null,
     lineas: {
       ataque: { nivel: nivel(oppP.atk - myP.def), detalle: DETALLE.ataque[nivel(oppP.atk - myP.def)] },
       defensa: { nivel: nivel(oppP.def - myP.atk), detalle: DETALLE.defensa[nivel(oppP.def - myP.atk)] },

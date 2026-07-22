@@ -39,7 +39,9 @@ const LINEA_TXT = { ataque: "su ataque", defensa: "su defensa", arquero: "su arq
 function scoutHint(run, oppId) {
   const rep = buildOpponentReport(run, oppId);
   // F3 (deuda de F2): la previa NOMBRA la identidad rival — el informe completo da la lectura
-  const filo = ` Juegan al ${rep.filosofia.name}${rep.filosofia.consolidada ? " y llegan consolidados en su idea" : ""}.`;
+  // R2: y anuncia el MODO MUNDIAL (la escalada de eliminatorias se narra, no se sufre a ciegas)
+  const modo = rep.modoMundial ? ` Llega en modo Mundial (+${rep.modoMundial.pct}% de forma): en eliminatorias, cada rival es una final.` : "";
+  const filo = ` Juegan al ${rep.filosofia.name}${rep.filosofia.consolidada ? " y llegan consolidados en su idea" : ""}.${modo}`;
   const lineas = Object.entries(rep.lineas);
   const debil = lineas.find(([, l]) => l.nivel === "Bajo");
   if (debil) return `${filo} El informe marca su punto débil: ${LINEA_TXT[debil[0]]}.`;

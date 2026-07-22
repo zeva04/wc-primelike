@@ -17,9 +17,12 @@ const assert = (cond, msg, ctx) => { checks++; if (!cond) { fails++; console.err
 assert(E.oxidMult(0) === 1, "sin racha no hay óxido");
 assert(E.oxidMult(E.OXID_THRESHOLD - 1) === 1, "justo bajo el umbral (2 días) todavía es gratis");
 assert(E.oxidMult(undefined) === 1, "sin campo racha (rival/duck-typed) no castiga: la asimetría vive en los datos");
-// La tabla pactada con el PO (partido resetea → la curva entera vive entre 3 y 5):
-assert(Math.abs(E.oxidMult(3) - (1 - 0.15 / 9)) < 1e-9, "racha 3: el primer día oxidado es casi gratis (×0.983)", E.oxidMult(3));
-assert(Math.abs(E.oxidMult(4) - (1 - 0.15 * 4 / 9)) < 1e-9, "racha 4: ventana corta completa sin entrenar (×0.933)", E.oxidMult(4));
+// La tabla pactada con el PO (partido resetea → la curva entera vive entre 3 y 5).
+// Derivada del piso, no hardcodeada (lección de medical.test): el rebalance del piso
+// (0.85→0.82 en R2) no rompe el test — la FORMA de la curva es lo que se fija acá.
+const K = 1 - E.OXID_FLOOR_MULT; // el castigo total del piso
+assert(Math.abs(E.oxidMult(3) - (1 - K / 9)) < 1e-9, "racha 3: el primer día oxidado es casi gratis (1/9 del castigo)", E.oxidMult(3));
+assert(Math.abs(E.oxidMult(4) - (1 - K * 4 / 9)) < 1e-9, "racha 4: ventana corta completa sin entrenar (4/9 del castigo)", E.oxidMult(4));
 assert(Math.abs(E.oxidMult(E.OXID_FLOOR_AT) - E.OXID_FLOOR_MULT) < 1e-9, "racha 5: ventana larga completa toca el piso", E.oxidMult(5));
 assert(E.oxidMult(12) === E.OXID_FLOOR_MULT, "más allá del piso no sigue cayendo (clamp)");
 // Convexa como la banda: el castigo del primer día oxidado es MENOR que un tercio del total

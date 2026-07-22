@@ -84,19 +84,26 @@ peldaño de abajo cerca de su meta final (10-15) — la escalada de rivales se d
 mirando ESO. Unitario: `tests/oxidation.test.js` (curva exacta + piso combinado
 banda×óxido ×0.6375 + la regla de la racha sobre el motor real).
 
-### R2 — "El Mundial de verdad"
-1. Decisión de diseño al arrancar: el mecanismo de escalada (forma / identidad que
-   madura / avanzadas rivales — o combinación y en qué dosis).
-2. Implementar y medir por RONDA (nuevo instrumento posible: % de caída por ronda del
-   smoke — dónde mueren las runs; la escalada debe sentirse en KO, no en grupos).
-3. Relato: la escalada se narra (el Daily y el informe del rival anuncian que el rival
-   llega "en modo Mundial"; la vitrina rival muestra su nivel de torneo).
-4. **GATE FINAL DEL ARCO — la escalera completa (2×n=4000)**: recuperador **10-15** ·
-   entrenar-solo ~15-20 · mixto ~25 · smart ~40 · CPV ≥3 · spread proporcional al
-   actual. Revisita del Contra (−1.95, deuda del Meta): los cruces cambian con rivales
-   que suben — foto por filo obligatoria; si sigue hundido, UNA palanca dirigida con ok
-   del PO. La dificultad global queda recalibrada como parte del gate, no como daño
-   colateral.
+### R2 — "El Mundial de verdad" — ✅ CERRADO (22-jul-2026, con 1 pendiente → R3)
+Decisiones del PO al arrancar: **forma de torneo +3%/ronda desde 16avos** (`p.forma`
+×1.03…×1.15, estampada en el once rival — solo MIS partidos) + **identidad que madura**
+(+1 nivel desde cuartos, tope Consolidada) · avanzadas rivales en RESERVA (contenido
+nuevo, no un enchufe listo). Instrumento nuevo del smoke: **% de caída por ronda**
+(dónde mueren las runs) — confirmó que la escalada vive en KO (grupos ~2.1% intactos).
+
+Medido por etapas (gate 2×n=4000): forma sola → mixto 42.7→33.5 · smart 49.5→40.9 ·
+recuperar 21.9→16.8; madurez → ~0pp (condimento narrativo, anticipado). El recuperador
+a 16.6 violaba la tesis (10-15) → palanca quirúrgica: **piso del óxido 0.85→0.82** (solo
+él la pisa) → **13.3/14.2 ✓ LA TESIS DEL ARCO SE CUMPLE**. Narración completa: informe
+del rival (chip "🔥 Modo Mundial +X%" + idea madurada), previa del Daily. Deuda del
+Contra: **PAGADA sin palanca** (34.4/41.3 n=2000, sobre el mixto — M2 ya la había
+saldado). Deuda de dificultad: pagada (mixto 42.7→32.7, −10pp).
+
+**El pendiente declarado → R3 (decisión PO):** mixto azar quedó en **32.6/32.9** vs meta
+~25. El dial global NO llega: +4%/ronda hundiría a smart (40.6/41.0, clavado en meta) y
+arriesgaría a CPV (5.9-7.2, gate ≥3). La brecha azar↔greedy (~8pp) se ensancha
+castigando DECISIONES, no inflando rivales — esa palanca nueva es el sprint R3, con
+diseño propio.
 
 ## Riesgos declarados
 
@@ -117,3 +124,9 @@ banda×óxido ×0.6375 + la regla de la racha sobre el motor real).
   de ~30-35: overshoot quirúrgico aceptado por el PO). Nerf C diferido. La escalera hoy:
   recuperar 22.7 · entrenar ~26 · mixto ~40.3 · smart ~50 · CPV 8.6 — a R2 le queda
   comprimir la mitad de arriba (mixto→~25, smart→~40) SIN perforar el 10-15 de abajo.
+- **22-jul-2026 (ter)** — **R2 CERRADO**: forma +3%/ronda + madurez desde cuartos +
+  piso del óxido 0.82. **La tesis del arco se cumple: recuperar 13.3/14.2 ∈ 10-15.**
+  Escalera final: recuperar ~13.7 · entrenar ~19.7 · mixto ~32.7 · smart ~40.8 · CPV
+  ~6.5 · spread 34→26. Contra pagado, dificultad pagada. Pendiente ÚNICO → **R3**: el
+  mixto (32.7 vs ~25) exige una palanca de DECISIONES, no de rivales — diseño al
+  arrancar R3.

@@ -141,15 +141,20 @@ export function derivePhilosophy(team) {
  * Nivel de identidad del rival, por jerarquía: los grandes llegan CONSOLIDADOS
  * a su idea (decisión PO F2), los del medio en desarrollo, los chicos
  * aprendiendo. Misma escala 0..2 que FILO_LEVELS (y mismos multiplicadores).
+ * LA IDENTIDAD MADURA (R2, decisión PO): desde CUARTOS (koRound ≥ 3) todo rival
+ * sube +1 nivel (tope Consolidada) — el mediano que llegó lejos ya juega su
+ * fútbol en serio. El eje es tournament/knockout.koRoundOf.
  */
-export function rivalFiloLevel(team) {
+export const FILO_MADURA_DESDE = 3; // koRound de cuartos
+export function rivalFiloLevel(team, koRound = 0) {
   const r = teamRating(team);
-  return r >= 84 ? 2 : r >= 78 ? 1 : 0;
+  const base = r >= 84 ? 2 : r >= 78 ? 1 : 0;
+  return Math.min(2, base + (koRound >= FILO_MADURA_DESDE ? 1 : 0));
 }
 
 /** La identidad rival completa para el Match y el scouting: {id, nivel, curated}. */
-export function rivalFilo(team) {
-  return { id: derivePhilosophy(team), nivel: rivalFiloLevel(team), curated: !!TEAM_PHILOSOPHIES[team.id] };
+export function rivalFilo(team, koRound = 0) {
+  return { id: derivePhilosophy(team), nivel: rivalFiloLevel(team, koRound), curated: !!TEAM_PHILOSOPHIES[team.id] };
 }
 
 /**

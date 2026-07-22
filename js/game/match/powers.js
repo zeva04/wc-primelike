@@ -48,7 +48,10 @@ export function energyMult(en) {
 // botón de Recuperar — hacer que NO CONSTRUIR deje de ser gratis (ROADMAP-rebalance §A).
 export const OXID_THRESHOLD = 3;   // días seguidos sin entrenar que encienden el óxido
 export const OXID_FLOOR_AT = 5;    // racha donde toca el piso (= ventana larga completa)
-export const OXID_FLOOR_MULT = 0.85;
+// 0.85 → 0.82 (R2, decisión PO 22-jul): con la escalada de rivales el recuperador quedó
+// en 16.6 y la tesis manda 10-15 — el piso del óxido es SU palanca quirúrgica (mixto y
+// smart no la pisan, medido en R1: −1.5pp máx de derrame). Combinado banda×óxido: ×0.615.
+export const OXID_FLOOR_MULT = 0.82;
 /** Multiplicador de rendimiento por oxidación: ×1.0 bajo el umbral (racha < 3), cayendo
  *  CONVEXO (cuadrático, como la banda: el 3er día casi gratis ×0.983, el 5º duele ×0.85)
  *  hasta ×OXID_FLOOR_MULT en racha 5+. El piso combinado banda×oxidación es
@@ -73,7 +76,9 @@ export function oxidMult(racha) {
 export function effStat(p, key, buffs = {}) {
   let v = effectiveStat(p, key);
   if (buffs[key]) v += buffs[key];
-  return clamp(v / 20, 0.05, 5.5) * energyMult(p.energia) * (p.oxid || 1);
+  // p.forma (R2): la FORMA DE TORNEO del rival en KO (opponents.tourneyFormaMult) — la
+  // asimetría espejo de p.oxid: solo el once rival la lleva, mis jugadores nunca.
+  return clamp(v / 20, 0.05, 5.5) * energyMult(p.energia) * (p.oxid || 1) * (p.forma || 1);
 }
 
 /** Calidad global del arquero: atajadas manda (60%), reflejos (25%) y salidas (15%) complementan. */
