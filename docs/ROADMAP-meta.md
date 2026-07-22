@@ -168,3 +168,6 @@ hace el greedy del canje, Bonding con moral baja (regla existente). Flags nuevos
   (2) spread BRA−CPV ~29.9 vs ~25.0 pre-arco (se abrió en M1, M2 no lo agravó);
   (3) el Contra −1.95 bajo su techo pre-avanzadas (estructural, 6 palancas probadas).
   Ninguna se esconde: las tres se atacan JUNTAS cuando se recalibre la dificultad.
+  → Ese rebalance ya tiene arco: **`ROADMAP-rebalance.md`** (R1 "La oxidación" + R2 "El
+  Mundial de verdad"), diseñado el mismo 22-jul con la meta del PO: el que solo recupera
+  debe ganar 10-15%, no 46.
