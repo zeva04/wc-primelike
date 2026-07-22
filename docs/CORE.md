@@ -226,13 +226,19 @@ Dentro de un partido las stats 1–99 se **normalizan a una escala ~0–5** para
 de probabilidad, y se les aplica el desgaste físico:
 
 ```
-effStat = (stat + buff) / 20  ×  (0.80 + 0.20 × energía/100)
+effStat = (stat + buff) / 20  ×  energyMult(energía)
+energyMult = 1                                  si energía ≥ 65   (la banda verde)
+           = 1 − 0.25 × ((65−energía)/60)²      bajo el umbral    (convexa hasta ×0.75)
 ```
 
 - **÷20** lleva 1–99 al rango ~0–5 donde están calibradas todas las fórmulas.
 - **buff**: bonus temporal (entrenamiento, evento) en la misma escala 1–99.
-- **factor energía**: un jugador a 100 de energía rinde al 100%; a 0 de energía rinde al
-  **80%**. Nunca cae a cero — un crack cansado sigue siendo peligroso.
+- **factor energía = la BANDA VERDE** (arco del Meta M1, 22-jul-2026): con energía ≥ **65**
+  (`ENERGY_OK`) el multiplicador es **×1.0** — un plantel al 75% juega exactamente como al
+  100%. Bajo el umbral cae **convexo** (cuadrático) hasta **×0.75** en el piso (energía 5):
+  rozar la banda es casi gratis (60 → ×0.998), estar fundido de verdad duele (30 → ×0.91).
+  Nunca cae a cero — un crack cansado sigue siendo peligroso. El verde de la UI de energía
+  ES la banda (`components.energyCls`, misma constante).
 
 > **Rebalance del 20-jul-2026 (decisión PO).** El factor de energía pesaba **35%**
 > (`0.65 + 0.35`) y bajó a **20%**, acoplado a subir el cansancio del partido de −10 a
@@ -247,6 +253,25 @@ effStat = (stat + buff) / 20  ×  (0.80 + 0.20 × energía/100)
 > Recuperar" sigue siendo la estrategia más fuerte (+13.2pp) — descansar cuando estás
 > cansado ES lo correcto, así que se acepta; lo que se eliminó fue la opción que NUNCA
 > convenía, que es lo que prohíbe el Bible.
+
+> **La banda verde (arco del Meta M1, 22-jul-2026, decisión PO).** El residual anterior
+> ("siempre Recuperar" +13.2pp) resultó ser estructural: con la energía como poder LINEAL,
+> Recuperar era comprar rendimiento universal a diario (46-47% vs mixto 30.8, BRA n=4000).
+> La tesis del arco — *Recuperar no es estrategia: es el seguro para que estar fundido no
+> penalice; lo importante es que el equipo MEJORE* — se implementó como la banda: sobre 65
+> plano, bajo 65 convexo. La forma se midió en etapas: lineal con umbral 70 dejó el gap en
+> ~12pp (la masa de titulares del juego mixto vive en 55-68, y ese castigo "chico" compone
+> 6 jugadores × 7 partidos × ~30 secuencias); la convexa lo bajó a **~6.5pp** (mixto
+> 39.3/40.8, recuperar 45.5/47.7, dos corridas n=4000). El gate formal del sprint
+> (recuperar ≤ mixto+3pp) quedó **NO cumplido y aceptado** (decisión PO): el espíritu sí se
+> cumplió — el DT greedy del smoke (`--smart`) le gana a siempre-Recuperar en ambas
+> corridas (49.5/49.1) y hasta siempre-Táctica lo empata (43.7). El resto del gap es el
+> lastre del azar (el pool tiene 3 filas de Entrenar, estrategia de 25.3%), no la energía.
+> Deuda declarada: el spread BRA−CPV se abrió de ~25.0 a ~30.8 (los favoritos liberan más
+> poder al salir de la penalización) — se trata con la dificultad global al cerrar el arco.
+> También se probó y REVIRTIÓ subir la pasiva 8→9: no discrimina (cerró ~0.4pp/punto e
+> infló todo). El Press mantuvo su costo relativo exacto (−0.7 vs mixto, igual que
+> pre-arco): sin re-costeo.
 
 > Este es el único punto donde se mezcla "escala 1–99" (datos) con "escala 0–5" (fórmulas).
 > Todo lo demás del partido razona en 0–5.
@@ -781,7 +806,8 @@ Las palancas de la economía:
 - **Energía** (0–100): **jugar CANSA** — cada partido resta **−14 cada 30' disputados**
   (`matchFatigue`: un titular de 90' pierde −42; un suplente que entra a los 30' del final,
   −14). Subió de −10 a −14 en el rebalance del 20-jul-2026, acoplado a bajar el peso de la
-  energía en el rendimiento (§4): el partido vacía más rápido, pero cada punto pesa menos. El que **descansó** recupera **+30**. Entre partidos hay **recuperación pasiva**:
+  energía en el rendimiento — hoy ese peso es la **banda verde** (§4): sobre 65 no pesa,
+  bajo 65 castiga convexo. El que **descansó** recupera **+30**. Entre partidos hay **recuperación pasiva**:
   **+8 por día de preparación** y **+2 el día de partido** (`applyDailyRecovery`, en
   `advanceDay`), más la acción Recuperar y varios eventos. Sin la pasiva, el cansancio entra en espiral (no hay forma de
   reponer a un titular fijo) — medido: BRA se hunde a 5.9%; con la pasiva vuelve a 28.8%

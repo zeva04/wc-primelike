@@ -21,7 +21,7 @@ import { buildOpponentReport } from "../../game/scouting.js";
 import { EVENT_THEMES } from "../../content/themes.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, starsHtml, modal, closeModal, modalOpen, toast, momentoChip } from "../components.js";
+import { screenShell, $, flagImg, starsHtml, modal, closeModal, modalOpen, toast, momentoChip, energyCls } from "../components.js";
 import { spriteSvg } from "../sprites.js";
 import { mountPitch } from "../pitch.js";
 import { renderGroupTableCard, renderKoInfoCard } from "./worldcup.js";
@@ -425,7 +425,7 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
   const mb = moraleBand(moral);
   const moralCls = moral >= 61 ? "text-emerald-400" : moral >= 41 ? "text-slate-300" : "text-red-400";
   const avgEnergy = Math.round(run.squad.reduce((s, p) => s + p.energia, 0) / run.squad.length);
-  const enCls = avgEnergy > 65 ? "text-emerald-400" : avgEnergy > 35 ? "text-amber-400" : "text-red-400";
+  const enCls = energyCls(avgEnergy);
   const formationLabel = getFormation(S.formation) ? S.formation : "Improvisada";
   const chips = buffChips();
   const canjeables = canjeableBuffs(run);

@@ -192,7 +192,8 @@ sobrevive a cualquier re-agendado.
 ### 8. Partido interactivo — funciones de poder (`js/game/match/powers.js`)
 | Función | Qué hace |
 |---|---|
-| `effStat(p,key,buffs)` | Stat efectiva ~0–5 (stat÷20) con buffs y castigo por energía. |
+| `energyMult(en)` | La **banda verde** (M1): ×1.0 con energía ≥`ENERGY_OK` (65); bajo el umbral cae convexo (cuadrático) hasta `ENERGY_FLOOR_MULT` (×0.75) en el piso (5). La UI colorea con la misma constante (`components.energyCls`). |
+| `effStat(p,key,buffs)` | Stat efectiva ~0–5 (stat÷20) con buffs, castigada por energía vía `energyMult`. |
 | `gkQuality(por,buffs)` | Calidad global del arquero (atajadas 60% · reflejos 25% · salidas 15%). |
 | `teamPowers(lineup,ment,buffs)` | Ataque y defensa (~0–5) de una alineación, con mentalidad e inferioridad numérica. El bonus de `buffs.tactica` MURIÓ en F1 (la táctica ya no compra poder: construye identidad). |
 
@@ -395,7 +396,8 @@ Los helpers `app()` y `$()` viven en `ui/components.js`.
 | Función | Qué hace |
 |---|---|
 | `starsHtml(rating,size)` | Fila de 5 estrellas con relleno parcial. |
-| `energyBar(en)` | Barra de energía coloreada. |
+| `energyBar(en)` | Barra de energía coloreada (verde = dentro de la banda, `ENERGY_OK`). |
+| `energyCls(en)` | Clase de color del texto de energía: verde = EN la banda verde (M1, ≥`ENERGY_OK`), ámbar = paga peaje, rojo = fundido (≤35). Una sola fuente con el motor. |
 | `posBadge(pos)` | Etiqueta de posición con color. |
 | `flagImg(team,cls)` | Bandera como `<img>` local (los emoji no renderizan en Windows). |
 | `applyTeamColors(team)` | Vuelca los colores del equipo a variables CSS `--team-*`. |
@@ -523,7 +525,14 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 - **`run-all.js`** — corre toda la batería en orden y resume (`node tests/run-all.js`).
 - **`smoke.js`** — simula runs completas sin UI con decisiones al azar y verifica invariantes
   (disciplina, diario, energía, límites de loop). `--team=BRA --runs=1500` es el árbitro de
-  deriva de balance; `--all` tabula las 18 jugables. (Modo `--smart` pendiente de recrear.)
+  deriva de balance; `--all` tabula las 18 jugables.
+  **`--smart`** (M1): el **DT greedy que mide el TECHO** (el azar mide el piso). Heurísticas
+  acordadas con el PO: Recuperar SOLO si la energía media del once proyectado cae bajo
+  `ENERGY_OK`; Bonding con moral ≤40; Sesión Táctica al foco de las aristas de SU filosofía
+  hasta Consolidada; después Entrenar (defensa: 2 stats/día). Nunca cambia de filosofía y NO
+  toma Oportunidades (comparable con `--action`). Excluye `--action`; compone con
+  `--team`/`--filo`. Nació para el arco del Meta: el arco cambia la estrategia óptima y el
+  azar no la ve.
   **`--action=<id|grupo>`** fija la Acción del Día (`entrenar`, `recuperar`, `tactica`…) para
   **comparar estrategias** y auditar el "no dominant strategy" del Bible (con el flag no se
   toman oportunidades). `--nocanje` apaga el canje para aislar su efecto.
@@ -548,6 +557,11 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
   lesión garantizada), el descanso pasivo de día de preparación vs **víspera de partido**
   (incluida una run real llevada hasta el día del partido) y `matchFatigue`. Los valores se
   **derivan de las constantes**, no se hardcodean: un rebalance futuro no rompe el test.
+- **`powers.test.js`** (M1) — la **banda verde** de energía en unitario (ley del sprint: la
+  curva no se testea solo por smoke): plana sobre `ENERGY_OK`, convexa bajo el umbral (a
+  mitad de rampa, un cuarto del castigo), piso exacto `ENERGY_FLOOR_MULT`, monotonía sin
+  saltos, sin castigo para el rival duck-typed, la banda avisa antes que el riesgo de
+  lesión (`ENERGY_OK > FATIGUE_INJURY_FROM`), y `effStat` monta la banda (75 juega como 100).
 - **`sequences.test.js`** (Sprints A1-A2) — la capa de secuencias: el catálogo (8 tipos, esquema,
   sides, los 6 del roadmap presentes), las Football Actions (bien formadas y **monótonas** en la stat
   que las rige; contener corta más que presionar), y la máquina sobre un Match real: arranca, avanza

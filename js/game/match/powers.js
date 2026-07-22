@@ -8,23 +8,43 @@ import { effectiveStat, playedPos } from "../ratings.js";
 // Modificadores de la mentalidad táctica (en escala normalizada ~0-5)
 export const MENT_MOD = { defensiva: { atk: -0.5, def: +0.6 }, normal: { atk: 0, def: 0 }, ofensiva: { atk: +0.6, def: -0.5 } };
 
+// BANDA VERDE de energía (arco del Meta M1, decisión PO 22-jul-2026): sobre el umbral
+// la energía NO pesa — un plantel al 75% juega como al 100%. Bajo el umbral el castigo
+// crece LINEAL hasta el piso (×0.75 con el tanque vacío, energía 5). Reemplaza al peso
+// lineal del 20% (rebalance del 20-jul): con poder lineal, Recuperar era comprar
+// rendimiento universal a diario y dominaba como estrategia fija (44-47% vs mixto 30.5,
+// BRA n=4000). La banda convierte a Recuperar en lo que manda la tesis del arco: el
+// SEGURO para volver a la banda, no una ventaja que se acumula. Ver CORE §4/§Energía.
+// 70→65 (M1, decisión PO con diag): los titulares fijos del juego mixto convergen a
+// 60-75 (−42/partido ≈ +pasiva de la ventana), justo BAJO el umbral 70 — con 70, el
+// siempre-recuperador (100% en banda) les sacaba ~12pp de título. Bajar a 65 mete a esa
+// masa en la banda sin regalarle nada al que ya vive al 100%.
+export const ENERGY_OK = 65;
+export const ENERGY_FLOOR_MULT = 0.75;
+/** Multiplicador de rendimiento por energía: ×1.0 dentro de la banda verde (≥ENERGY_OK),
+ *  cayendo CONVEXO (cuadrático) hasta ×ENERGY_FLOOR_MULT en el piso de energía (5).
+ *  Convexa y no lineal (M1, decisión PO tras medir): rozar la banda es casi gratis
+ *  (60 → ×0.998) pero estar fundido de verdad duele (30 → ×0.91, 5 → ×0.75). Con la
+ *  rampa lineal, el castigo chico de la masa de titulares que vive en 55-68 componía
+ *  ~12pp de título a favor de recuperar a diario — el título compone 6 jugadores ×
+ *  7 partidos × ~30 secuencias, y ese interés compuesto era el reinado de Recuperar. */
+export function energyMult(en) {
+  const e = en !== undefined ? en : 100;
+  if (e >= ENERGY_OK) return 1;
+  const x = (ENERGY_OK - e) / (ENERGY_OK - 5);
+  return 1 - (1 - ENERGY_FLOOR_MULT) * x * x;
+}
+
 /**
  * Stat efectiva normalizada a ~0-5 (stat 1-99 ÷ 20), con buffs (escala 1-99) y castigo por energía.
  * Parte de `effectiveStat`, así que el castigo por jugar fuera de puesto entra al partido
  * por el mismo caño que ve el DT en la ficha (docs/CORE.md §2b).
- *
- * PESO DE LA ENERGÍA (rebalance del PO, 20-jul-2026): la energía vale **20%** del
- * rendimiento (antes 35%). Iba acoplado a subir el cansancio del partido
- * (`medical.FATIGUE_PER_30`: −14 cada 30'): un jugador cansado ya no queda inservible,
- * pero los partidos vacían más rápido — la rotación sigue importando y Entrenar deja de
- * ser una trampa. Medido: Entrenar pasó de 12.0% a 22.5% de campeón como estrategia fija
- * (−16.9pp → −4.9pp respecto del juego mixto) con la dificultad intacta. Ver CORE §4.
+ * El castigo por energía es la banda verde (`energyMult`): plano arriba, lineal abajo.
  */
 export function effStat(p, key, buffs = {}) {
   let v = effectiveStat(p, key);
   if (buffs[key]) v += buffs[key];
-  const en = p.energia !== undefined ? p.energia : 100;
-  return clamp(v / 20, 0.05, 5.5) * (0.80 + 0.20 * (en / 100));
+  return clamp(v / 20, 0.05, 5.5) * energyMult(p.energia);
 }
 
 /** Calidad global del arquero: atajadas manda (60%), reflejos (25%) y salidas (15%) complementan. */

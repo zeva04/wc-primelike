@@ -12,6 +12,7 @@
      node tests/smoke.js                  → 300 runs, equipo al azar
      node tests/smoke.js --runs=1500 --team=BRA
      node tests/smoke.js --all [--runs=100]   → tabla por selección
+     node tests/smoke.js --smart --runs=4000 --team=BRA → el TECHO (DT greedy)
    ============================================================ */
 import { loadEngine } from "./load-engine.js";
 
@@ -33,9 +34,39 @@ const ACTION = args.action || null;
 // fotografiar cada identidad por separado (F2): separa el costo de una identidad del
 // ruido del azar. Sin el flag, se elige al azar (el PISO de siempre).
 const FILO = args.filo || null;
+// --smart: el DT GREEDY del arco del Meta (M1) — el smoke al azar mide el PISO de la
+// mecánica; este flag mide el TECHO de una estrategia óptima simple. El arco cambia la
+// estrategia dominante y el azar no la ve. Compone con --filo/--team; excluye --action
+// (el greedy YA decide la acción cada día). Heurísticas acordadas con el PO (M1).
+const SMART = !!args.smart;
+if (SMART && ACTION) { console.error("--smart y --action son excluyentes: el greedy ya decide la acción del día"); process.exit(1); }
 
 let fails = 0;
 const assert = (cond, msg, ctx) => { if (!cond) { fails++; console.error("FAIL:", msg, ctx || ""); } };
+
+// ---------- el DT greedy del techo (--smart, heurísticas acordadas con el PO en M1) ----------
+// Prioridad de cada día: (1) Recuperar SOLO si la energía media del ONCE proyectado cae
+// bajo SMART_RECOVER_AT — el umbral de la banda verde: recuperar fresco es un día tirado;
+// (2) Bonding solo con moral ≤40 (la misma regla situacional del piso); (3) Sesión
+// Táctica al foco de las aristas de SU filosofía hasta Consolidada — la tesis del arco:
+// lo importante es que el equipo MEJORE; (4) después, Entrenar (defensa: mueve 2 stats
+// por día, el canje greedy lo convierte al doble de ritmo). NUNCA cambia de filosofía
+// (mejorar > resetear) y NO toma Oportunidades: mide estrategia pura, comparable con las
+// fotos de --action. Si el modificador del día bloquea la elección, cae a la siguiente.
+const SMART_RECOVER_AT = E.ENERGY_OK; // el umbral de la banda verde: una sola fuente
+function smartDayAction(run, opts) {
+  const has = id => opts.find(a => a.id === id);
+  const { lineup } = E.currentLineup(run.squad, null, null);
+  const avg = lineup.reduce((s, p) => s + p.energia, 0) / (lineup.length || 1);
+  if (avg < SMART_RECOVER_AT && has("recuperar")) return has("recuperar");
+  if ((run.moral ?? 50) <= 40 && has("bonding")) return has("bonding");
+  const f = E.getPhilosophy(run.filoId);
+  if (f && E.filoPoints(run) < E.FILO_LEVELS[E.FILO_LEVELS.length - 1].min) {
+    const foco = has(`tactica_${f.firma}`) || has(`tactica_${f.aristas.find(k => k !== f.firma)}`);
+    if (foco) return foco;
+  }
+  return has("entrenar_defensa") || has("entrenar_ataque") || has("entrenar_pases") || opts[0];
+}
 
 // ---------- un partido interactivo con decisiones al azar ----------
 function playMatch(run, oppId) {
@@ -132,16 +163,18 @@ function playRun(teamId) {
         // entraran los 5 al sorteo uniforme, la táctica pasaría de ~1/5 a ~5/9 de los
         // días y la comparación con el baseline pre-F1 quedaría envenenada. El foco
         // al azar dentro del grupo es justamente el PISO que este smoke mide.
+        // (con --smart NO se colapsa: el greedy elige su foco exacto, y tampoco entra
+        // la Oportunidad — ver smartDayAction)
         const tacRows = opts.filter(a => a.group === "tactica");
-        if (tacRows.length) opts = opts.filter(a => a.group !== "tactica").concat(tacRows[Math.floor(Math.random() * tacRows.length)]);
+        if (!SMART && tacRows.length) opts = opts.filter(a => a.group !== "tactica").concat(tacRows[Math.floor(Math.random() * tacRows.length)]);
         assert(opts.length > 0, "ningún modificador puede bloquear TODAS las acciones");
-        if (opp) opts.push(opp);
+        if (opp && !SMART) opts.push(opp);
         const blocked = E.DAY_ACTIONS.find(a => E.actionMult(run, a) === 0);
         if (blocked) assert(E.applyDayAction(run, blocked.id) === null, "una acción bloqueada no debe aplicarse", blocked.id);
         // Con --action se juega SIEMPRE esa estrategia (si hoy está disponible); si no, al azar.
         const forced = ACTION ? opts.filter(x => x.id === ACTION || x.group === ACTION) : [];
         const pool = forced.length ? forced : opts;
-        const a = pool[Math.floor(Math.random() * pool.length)];
+        const a = SMART ? smartDayAction(run, opts) : pool[Math.floor(Math.random() * pool.length)];
         let res;
         if (opp && a.id === opp.id && opp.choose) {
           // La oportunidad con elección exige objetivo: sin él no se aplica, y un

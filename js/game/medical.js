@@ -26,6 +26,10 @@ export const FATIGUE_PER_30 = 14;
 export const REST_RECOVERY = 30;
 // Recuperación pasiva: cada día de preparación el plantel descansa un poco (sin esto, el
 // cansancio de −42/partido entra en espiral y no hay forma de reponer a un titular fijo).
+// En M1 se probó 8→9 para cerrar el gate de la banda verde y se REVIRTIÓ (decisión PO):
+// la pasiva no discrimina — le devuelve el bache post-partido también al que recupera a
+// diario (cerró ~0.4pp de gap por punto) y solo infló el global abriendo el spread. El
+// gate se cerró por el umbral de la banda (match/powers.ENERGY_OK), no por acá.
 export const DAILY_RECOVERY = 8;
 // La VÍSPERA del partido rinde menos (Sprint 4): el día de partido también cobra descanso
 // pasivo —antes no cobraba nada, bug reportado por el PO— pero a tasa reducida: viaje al

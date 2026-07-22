@@ -15,9 +15,18 @@ export function starsHtml(rating, size = "text-base") {
   </span>`;
 }
 
-/** Barra de energía coloreada según nivel (verde/ámbar/rojo). */
+import { ENERGY_OK } from "../game/match/powers.js";
+
+/** Color de texto de la energía: verde = DENTRO de la banda verde (rinde pleno,
+ *  match/powers.ENERGY_OK — M1: la UI muestra la banda por definición, no por
+ *  coincidencia) · ámbar = paga peaje · rojo = fundido de verdad. */
+export function energyCls(en) {
+  return en >= ENERGY_OK ? "text-emerald-400" : en > 35 ? "text-amber-400" : "text-red-400";
+}
+
+/** Barra de energía coloreada según nivel (verde = en banda / ámbar / rojo). */
 export function energyBar(en) {
-  const color = en > 65 ? "bg-emerald-500" : en > 35 ? "bg-amber-500" : "bg-red-500";
+  const color = en >= ENERGY_OK ? "bg-emerald-500" : en > 35 ? "bg-amber-500" : "bg-red-500";
   return `<div class="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
     <div class="${color} h-full rounded-full transition-all" style="width:${en}%"></div>
   </div>`;

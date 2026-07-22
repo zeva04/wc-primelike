@@ -24,7 +24,7 @@ import {
 } from "../../game/lineup.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, momentoChip, toast, modal, closeModal } from "../components.js";
+import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, energyCls, momentoChip, toast, modal, closeModal } from "../components.js";
 import { mountPitch, POS_NAME } from "../pitch.js";
 import { spriteSvg } from "../sprites.js";
 
@@ -172,7 +172,7 @@ function renderEnergyPanel() {
   const rows = [...S.run.squad].sort((a, b) => a.energia - b.energia || a.name.localeCompare(b.name));
   el.innerHTML = rows.map(p => {
     const titular = S.selectedLineup.includes(p);
-    const cls = p.energia > 65 ? "text-emerald-400" : p.energia > 35 ? "text-amber-400" : "text-red-400";
+    const cls = energyCls(p.energia);
     return `<button data-name="${p.name}" title="${titular ? "Titular" : "Suplente"}${isAvailable(p) ? "" : p.suspendido ? " · suspendido" : " · lesionado"}" class="ep-row w-full flex items-center gap-1.5 px-1 py-0.5 rounded-lg text-left transition-colors cursor-pointer ${
       p.name === selName ? "bg-slate-700/60" : "hover:bg-slate-700/40"} ${isAvailable(p) ? "" : "opacity-40"}">
       ${posBadge(playedPos(p))}
@@ -282,7 +282,7 @@ function renderPlayerCard() {
     <div class="space-y-1 mb-3 text-xs">
       <div class="flex items-center justify-between gap-2">
         <span class="text-slate-400">Energía</span>
-        <span class="flex items-center gap-1.5"><span class="w-16">${energyBar(p.energia)}</span><b class="w-8 text-right ${p.energia > 65 ? "text-emerald-400" : p.energia > 35 ? "text-amber-400" : "text-red-400"}">${p.energia}%</b></span>
+        <span class="flex items-center gap-1.5"><span class="w-16">${energyBar(p.energia)}</span><b class="w-8 text-right ${energyCls(p.energia)}">${p.energia}%</b></span>
       </div>
       <div class="flex items-center justify-between gap-2" title="Forma del jugador (Normal es lo neutro): sube y baja con su rendimiento en los partidos y afecta sus stats">
         <span class="text-slate-400">Momento</span>
