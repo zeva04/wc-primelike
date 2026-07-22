@@ -63,7 +63,7 @@ function playMatch(run, oppId) {
     if (match.decision) {
       const d = match.decision;
       const opt = d.options[Math.floor(Math.random() * d.options.length)];
-      if (d.id === "chance") match.resolveChance(opt.key);
+      if (d.id === "sequence") match.resolveSequenceAct(opt.key);
       else if (d.id === "penalty_mine") match.resolvePenaltyMine(opt.key);
       else if (d.id === "penalty_opp") match.resolvePenaltyOpp(opt.key);
       else if (d.id === "last_man") match.resolveLastMan(opt.key);

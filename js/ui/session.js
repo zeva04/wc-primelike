@@ -12,6 +12,6 @@ export const S = {
   formation: null,      // id de la formación elegida (ej. "2-1-2"); define el puesto de cada slot
   timer: null,          // setInterval del relato del partido
   paused: false,        // pausa manual del usuario
-  speed: 1,             // velocidad del relato (x1 / x2)
+  speed: 1,             // ritmo del relato: 1 = crucero (ráfaga entre secuencias) · 2 = más rápido
   feedRendered: 0,      // nº de líneas del relato ya pintadas
 };

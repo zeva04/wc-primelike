@@ -50,7 +50,7 @@ function renderMatchScreen() {
         </div>
         <button id="btn-pause" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">⏸️ Pausa</button>
         <button id="btn-subs" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">🔄 Plantilla (<span id="subs-left">3</span>)</button>
-        <button id="btn-speed" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">⏩ x1</button>
+        <button id="btn-speed" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">⏩ Rápido</button>
       </div>
     </div>
     <div class="grid md:grid-cols-3 gap-4">
@@ -76,28 +76,39 @@ function renderMatchScreen() {
   $("#btn-pause").onclick = togglePause;
   $("#btn-subs").onclick = openSquadModal;
   $("#btn-speed").onclick = () => {
+    // El reloj lee CRUISE() en cada paso, así que cambiar la velocidad tiene efecto solo: no
+    // hace falta reiniciar el timer (reiniciar duplicaría el auto-agendado).
     S.speed = S.speed === 1 ? 2 : 1;
-    $("#btn-speed").textContent = `⏩ x${S.speed}`;
-    if (S.timer) { stopTimer(); startTimer(); }
+    $("#btn-speed").textContent = S.speed === 1 ? "⏩ Rápido" : "🐢 Normal";
   };
 }
 
-/** Arranca el reloj: cada tick avanza el partido y reacciona a decisiones/entretiempo/penales/fin. */
-function startTimer() {
-  stopTimer();
-  S.timer = setInterval(() => {
-    if (S.paused || S.match.decision || S.match.finished) return;
-    const r = S.match.tick();
-    updateMatchUI();
-    if (r === true && S.match.decision) { stopTimer(); showDecision(); }
-    else if (r === "halftime") { stopTimer(); showHalftime(); }
-    else if (r === "pens") { stopTimer(); go("shootout"); }
-    else if (r === "end") { stopTimer(); go("finish-match"); }
-  }, S.speed === 1 ? 1000 : 450);
+// Ritmo del partido (Bible §7, decisión PO "ráfaga"): la simulación CORRE entre secuencias
+// —el relato de ambiente pasa rápido, da la sensación de partido vivo— y FRENA en seco al
+// llegar una secuencia (que es una decisión, congela sola). Un gol hace una pausa breve para
+// que se registre. El reloj se auto-agenda con setTimeout para poder variar el ritmo por paso.
+const CRUISE = () => (S.speed === 1 ? 360 : 150);
+const GOAL_HOLD = 1150;
+
+/** Un paso del reloj: avanza el partido, reacciona, y agenda el siguiente al ritmo que toque. */
+function step() {
+  if (S.paused || S.match.decision || S.match.finished) { S.timer = setTimeout(step, CRUISE()); return; }
+  const before = S.match.feed.length;
+  const r = S.match.tick();
+  updateMatchUI();
+  if (r === true && S.match.decision) { stopTimer(); showDecision(); return; }
+  if (r === "halftime") { stopTimer(); showHalftime(); return; }
+  if (r === "pens") { stopTimer(); go("shootout"); return; }
+  if (r === "end") { stopTimer(); go("finish-match"); return; }
+  const scored = S.match.feed.slice(before).some(f => f.kind === "goal" || f.kind === "goal_opp");
+  S.timer = setTimeout(step, scored ? GOAL_HOLD : CRUISE());
 }
 
+/** Arranca el reloj del relato. */
+function startTimer() { stopTimer(); S.timer = setTimeout(step, CRUISE()); }
+
 /** Detiene el reloj del partido. */
-export function stopTimer() { if (S.timer) { clearInterval(S.timer); S.timer = null; } }
+export function stopTimer() { if (S.timer) { clearTimeout(S.timer); S.timer = null; } }
 
 /** Alterna pausa/reanudar del relato. */
 function togglePause() {
@@ -182,7 +193,7 @@ function showDecision() {
 /** Enruta la opción elegida al método correspondiente de Match y reanuda (o encadena otra decisión). */
 function handleDecision(d, key) {
   const match = S.match;
-  if (d.id === "chance") match.resolveChance(key);
+  if (d.id === "sequence") match.resolveSequenceAct(key);
   else if (d.id === "penalty_mine") match.resolvePenaltyMine(key);
   else if (d.id === "penalty_opp") match.resolvePenaltyOpp(key);
   else if (d.id === "last_man") match.resolveLastMan(key);

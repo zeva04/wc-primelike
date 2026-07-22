@@ -97,6 +97,18 @@ export function overallAt(p, pos, conMomento = true) {
 export function playerOverall(p) { return overallAt(p, playedPos(p)); }
 
 /**
+ * La FIGURA de un equipo: el jugador de mayor media (`playerOverall`), **incluido el arquero**
+ * (Cabo Verde, p. ej., tiene su mejor media en el arco — antes el menú excluía a los POR y
+ * mostraba a otro). Desempate por **mayor aura** (decisión PO 21-jul-2026): a igual media,
+ * manda la personalidad. Devuelve la referencia al jugador; `team.players` debe existir.
+ */
+export function teamFigure(team) {
+  return [...team.players].sort((a, b) =>
+    playerOverall(b) - playerOverall(a) || (b.stats.aura ?? 0) - (a.stats.aura ?? 0)
+  )[0];
+}
+
+/**
  * Nota del jugador EN SU PUESTO, ignorando dónde lo hayan parado hoy Y su momento: es su
  * talento, no su circunstancia (el Momento es circunstancia, así que tampoco entra — y de
  * paso el once automático no persigue al que está en racha: recorte de balance 17-jul).
@@ -165,8 +177,8 @@ export function currentAura(p, buffs) {
  */
 export function difficultyOf(team) {
   const r = teamRating(team);
-  if (r >= 85) return { tier: "favorito", label: "Favorito", desc: "Candidato al título. El mundo espera que levantes la copa." };
-  if (r >= 78) return { tier: "aspirante", label: "Aspirante", desc: "Plantel serio que puede pelearle a cualquiera, ¿Lograrás sacarle rendimiento?" };
-  if (r >= 68) return { tier: "sorpresa", label: "Sorpresa", desc: "Nadie los tiene en la lista de candidatos. Sorprender partido a partido es tu única arma." };
-  return { tier: "leyenda", label: "Campaña legendaria", desc: "Ser campeón con este plantel te convierte en leyenda eterna del fútbol. ¿Te atreves?" };
+  if (r >= 84) return { tier: "favorito", label: "Favorito", desc: "Candidato al título. El mundo espera que levantes la copa." };
+  if (r >= 81) return { tier: "aspirante", label: "Aspirante", desc: "Plantel serio que puede pelearle a cualquiera, ¿Lograrás sacarle rendimiento?" };
+  if (r >= 74) return { tier: "sorpresa", label: "Sorpresa", desc: "Nadie los tiene en la lista de candidatos. Sorprender partido a partido es tu única arma." };
+  return { tier: "leyenda", label: "Leyenda", desc: "Ser campeón con este plantel te convierte en leyenda eterna del fútbol. ¿Te atreves?" };
 }

@@ -9,15 +9,18 @@
      1. creador en chances.js/incidents.js (setea m.decision)
      2. resolver aquí o en el módulo hermano
      3. ruteo en ui.js handleDecision()
-   | id           | la crea      | la resuelve            |
-   |--------------|--------------|------------------------|
-   | chance       | chances.js   | resolveChance          |
-   | penalty_mine | chances.js   | resolvePenaltyMine     |
-   | penalty_opp  | chances.js   | resolvePenaltyOpp      |
-   | last_man     | chances.js   | resolveLastMan         |
-   | protect      | incidents.js | ruteo UI → makeSub     |
-   | forced_sub   | incidents.js | ruteo UI → makeSub     |
-   | gk_red       | incidents.js | ruteo UI → makeSub     |
+   | id           | la crea       | la resuelve            |
+   |--------------|---------------|------------------------|
+   | sequence     | sequences.js  | resolveSequenceAct     |
+   | penalty_mine | chances.js    | resolvePenaltyMine     |
+   | penalty_opp  | chances.js    | resolvePenaltyOpp      |
+   | last_man     | chances.js    | resolveLastMan         |
+   | protect      | incidents.js  | ruteo UI → makeSub     |
+   | forced_sub   | incidents.js  | ruteo UI → makeSub     |
+   | gk_red       | incidents.js  | ruteo UI → makeSub     |
+   (`sequence` es multi-acto: resolver un acto puede dejar OTRA
+   decisión `sequence` —el acto siguiente—; los loops de UI y smoke
+   la reprocesan solos porque tick() corta con decisión pendiente.)
 
    La UI lo maneja así:
      1. `tick()` cada ~1s → avanza 5 min y devuelve false | true (hay decisión) | "halftime" | "pens" | "end"
@@ -31,8 +34,20 @@ import { canPlayAt } from "../lineup.js";
 import { playedPos } from "../ratings.js";
 import { teamPowers } from "./powers.js";
 import * as Chances from "./chances.js";
+import * as Sequences from "./sequences.js";
 import * as Incidents from "./incidents.js";
 import * as Shootout from "./shootout.js";
+
+// Frecuencias por tick de los eventos INDEPENDIENTES de las secuencias (Sprint A1). Penal y
+// último hombre se calibraron antes y quedan intactos; acá solo se fija cada cuánto asoman
+// como evento suelto (antes vivían dentro de myChance/oppChance). Los remates AMBIENTE (la
+// parte simulada del Bible §7) se escalan por AMBIENT_* para dejarle sitio al gol interactivo
+// de las secuencias — son diales de balance del gate de A1.
+const PEN_MINE_TICK = 0.016;   // ≈0.29/partido, como cuando vivía en myChance (0.07)
+const PEN_OPP_TICK = 0.010;    // ≈0.18/partido, como cuando vivía en oppChance (0.06)
+const LAST_MAN_TICK = 0.05;    // ≈0.9/partido, la misma exposición del Sprint 1
+const AMBIENT_MINE = 0.78;     // el remate simulado propio cede algo de terreno a las secuencias
+const AMBIENT_OPP = 0.55;
 
 export class Match {
   /**
@@ -63,7 +78,7 @@ export class Match {
     this.pensAtajadosPor = []; // nombre de MI arquero por cada penal que atajó
     this.lastManStops = [];    // MIS centrales que cortaron un gol como último hombre (+Momento)
     this.lastManFouls = [];    // MIS centrales que se ganaron tarjeta/penal como último hombre (−Momento)
-    this._interactiveChanceCooldown = 0;
+    this.seq = null;           // secuencia en curso {type, prot/shooter, actIdx, bonus} o null (sequences.js)
     // Minutos jugados por jugador (para el cansancio post-partido, medical): los titulares
     // entran al minuto 0; un cambio cierra los del que sale y arranca los del que entra.
     this._minutes = new Map();                              // jugador → minutos ya acumulados (los que salieron)
@@ -109,7 +124,6 @@ export class Match {
     if (this.min >= end) return this._finishRegular();
 
     this.min += 5;
-    if (this._interactiveChanceCooldown > 0) this._interactiveChanceCooldown--;
 
     const { mine, opp } = this.powers();
 
@@ -117,18 +131,25 @@ export class Match {
     if (this.min === 45) { this.log("info", "⏸️ Entretiempo. Ajusta tu equipo si quieres."); return "halftime"; }
     if (this.phase === "extra" && this.min === 105) { this.log("info", "⏸️ Fin del primer tiempo extra."); return "halftime"; }
 
-    // [MORAL → OCASIONES] PRÓXIMA ITERACIÓN (decisión PO 17-jul-2026): la Moral del
-    // equipo (run.moral, game/morale.js) modulará AQUÍ el tipo y número de ocasiones
-    // propias — p. ej. escalar la probabilidad de abajo según la banda anímica, o sesgar
-    // el mix de jugadas. Requiere pasar la moral por el contexto `my` (el Match no
-    // conoce la run). v1: sin efecto mecánico.
-    // ¿Ocasión mía? (leve ventaja al DT humano: sus decisiones deben poder torcer partidos)
-    const ratioMy = mine.atk / (mine.atk + opp.def);
-    if (rnd() < 0.12 + 0.22 * ratioMy) return this._myChance(opp);
+    // [MORAL → OCASIONES] SPRINT A3: la Moral del equipo sesgará AQUÍ el TIPO de secuencia
+    // (no el número — decisión PO), pasando la moral por matchCtx (el Match no conoce la run).
+    // El hook ya no vive suelto: entra por sequences.js cuando A3 lo enchufe.
 
-    // ¿Ocasión rival?
+    // Key Sequences (Bible §7): la columna interactiva del partido. Reemplazan a las
+    // ocasiones sueltas de myChance/oppChance; 2-6 por partido moduladas por la preparación.
+    if (Sequences.maybeStartSequence(this)) return true;
+
+    // Eventos interactivos INDEPENDIENTES de las secuencias (penal y último hombre, intactos
+    // del calibrado previo; A1 no toca su matemática, solo cada cuánto asoman como evento suelto).
+    if (rnd() < PEN_MINE_TICK) return Chances.myPenaltyChance(this);
+    if (rnd() < LAST_MAN_TICK && Chances.lastManChance(this)) return true;
+    if (rnd() < PEN_OPP_TICK) return Chances.oppPenaltyChance(this);
+
+    // Ocasiones SIMULADAS (no interactivas): la parte "el resto se simula" del Bible §7.
+    const ratioMy = mine.atk / (mine.atk + opp.def);
+    if (rnd() < (0.12 + 0.22 * ratioMy) * AMBIENT_MINE) Chances.ambientShotMine(this);
     const ratioOpp = opp.atk / (opp.atk + mine.def);
-    if (rnd() < 0.09 + 0.24 * ratioOpp) return this._oppChance(mine);
+    if (rnd() < (0.09 + 0.24 * ratioOpp) * AMBIENT_OPP) Chances.ambientShotOpp(this, mine);
 
     // Faltas / tarjetas / lesiones
     if (rnd() < 0.10) return this._foulEvent();
@@ -147,9 +168,7 @@ export class Match {
 
   // ---------- Delegación a los módulos de jugadas ----------
 
-  _myChance(opp) { return Chances.myChance(this, opp); }
-  _oppChance(mine) { return Chances.oppChance(this, mine); }
-  resolveChance(key) { return Chances.resolveChance(this, key); }
+  resolveSequenceAct(key) { return Sequences.resolveSequenceAct(this, key); }
   resolvePenaltyMine(name) { return Chances.resolvePenaltyMine(this, name); }
   resolvePenaltyOpp(key) { return Chances.resolvePenaltyOpp(this, key); }
   resolveLastMan(key) { return Chances.resolveLastMan(this, key); }

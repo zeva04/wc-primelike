@@ -11,75 +11,79 @@ import { momentoMult } from "../momentum.js";
 import { ASSIST_CHANCE, POS_ASSIST_WEIGHT } from "../assists.js";
 import { effStat } from "./powers.js";
 
-// Fracción de las ocasiones peligrosas del rival que se vuelven decisión de "último hombre"
-// para MI central (barrerse/esperar/anticipar). Dial de balance del Sprint 1 (decisión PO
-// 20-jul-2026): ayuda a DEFENDER + suma Momento a los DEF, poder asimétrico → gatear con smoke.
-const LAST_MAN_CHANCE = 0.25;
+/**
+ * Protagonista rival de una ocasión: un DEL/MED en cancha (o cualquiera si no queda ninguno).
+ * Lo comparten el remate ambiente, el penal en contra y el último hombre.
+ */
+function oppShooter(m) {
+  const shooters = m.oppLineup.filter(p => (p.pos === "DEL" || p.pos === "MED") && !p.expulsado);
+  return shooters.length ? pick(shooters) : pick(m.oppLineup);
+}
 
-/** Ocasión de mi equipo: puede ser penal, decisión interactiva (55%) o remate automático. */
-export function myChance(m, opp) {
+/**
+ * Ocasión MÍA SIMULADA (no interactiva): un remate ambiente que produce gol o relato. Es la
+ * parte "el resto se simula" del Bible §7 — lo interactivo lo llevan las secuencias
+ * (sequences.js). Espejo del antiguo remate automático de myChance.
+ */
+export function ambientShotMine(m) {
   m.stats.misTiros++;
-  // Protagonista según dónde está PARADO: el que juega de 9 pisa el área más seguido,
-  // sea o no su puesto natural.
   const cands = m.activeMine().filter(p => p.pos !== "POR");
-  const weights = cands.map(p => playedPos(p) === "DEL" ? 3 : playedPos(p) === "MED" ? 2 : 1);
-  const prot = m._weightedPick(cands, weights);
-  // Penal a favor (poco frecuente)
-  if (rnd() < 0.07) return myPenalty(m);
-  // 55% de las ocasiones son interactivas
-  if (m._interactiveChanceCooldown === 0 && rnd() < 0.55) {
-    m._interactiveChanceCooldown = 2;
-    const mates = cands.filter(p => p !== prot);
-    const mate = mates.length ? m._weightedPick(mates, mates.map(p => playedPos(p) === "DEL" ? 3 : 1)) : prot;
-    m.decision = {
-      id: "chance", prot, mate,
-      title: `⚡ min ${m.min}' — ¡${prot.name} queda en posición de ataque!`,
-      text: "¿Cómo la juega?",
-      options: [
-        { label: `🎯 Remata él mismo`, hint: `Tiro ${prot.stats.tiro}`, key: "shoot" },
-        { label: `🤝 Pase a ${mate.name}`, hint: `Pase ${prot.stats.pase} → Tiro ${mate.stats.tiro}`, key: "pass" },
-        { label: `😤 Jugada individual`, hint: `Aura ${prot.stats.aura} (arriesgada, puede ganar penal)`, key: "solo" },
-      ],
-    };
-    m.stats.decisiones++;
-    return true;
-  }
-  // Ocasión automática
+  const prot = m._weightedPick(cands, cands.map(p => playedPos(p) === "DEL" ? 3 : playedPos(p) === "MED" ? 2 : 1));
   const q = effStat(prot, rnd() < 0.75 ? "tiro" : "cabezazo", m.my.buffs);
   const pGoal = clamp(0.11 + q * 0.08 - (teamRating(m.oppTeam) / 20) * 0.035, 0.06, 0.55);
   if (rnd() < pGoal) goalMine(m, prot, pick(["¡Golazo!", "¡Define como crack!", "¡La clava en el ángulo!"]), "open");
   else m.log("chance", `min ${m.min}' — ${prot.name} remata... ${pick(["¡ataja el arquero!", "¡se va apenas desviado!", "¡al palo!", "la defensa despeja."])}`);
-  return false;
 }
 
-/** Resuelve la decisión "chance": shoot (tiro), pass (pase+tiro del compañero) o solo (aura, puede ganar penal). */
-export function resolveChance(m, key) {
-  const d = m.decision; m.decision = null;
-  const oppR = teamRating(m.oppTeam) / 20;
-  const attempt = (player, stat, bonus, texts, assist) => {
-    const q = effStat(player, stat, m.my.buffs);
-    const p = clamp(0.14 + q * 0.09 + bonus - oppR * 0.035, 0.05, 0.68);
-    if (rnd() < p) goalMine(m, player, texts.goal, assist);
-    else m.log("chance", `min ${m.min}' — ${texts.fail}`);
+/**
+ * Ocasión RIVAL SIMULADA (no interactiva): remate ambiente rival. La defensa interactiva la
+ * llevan las secuencias de repliegue. Espejo del antiguo remate automático de oppChance.
+ */
+export function ambientShotOpp(m, mine) {
+  m.stats.oppTiros++;
+  const prot = oppShooter(m);
+  const q = effStat(prot, "tiro");
+  const porQ = mine.por ? (effStat(mine.por, "atajadas", m.my.buffs) * 0.65 + effStat(mine.por, "reflejos", m.my.buffs) * 0.35) : 1;
+  const pGoal = clamp(0.12 + q * 0.08 - porQ * 0.06 - (mine.def - 2.5) * 0.04, 0.05, 0.55);
+  if (rnd() < pGoal) goalOpp(m, prot);
+  else m.log("chance", `min ${m.min}' — ${prot.name} remata para ${m.oppTeam.name}... ${pick([`¡atajadón de ${mine.por ? mine.por.name : "tu arquero"}!`, "¡se va desviado!", "¡la defensa la saca!"])}`);
+}
+
+/**
+ * Penal a favor como evento independiente (antes vivía dentro de myChance). Lo dispara el
+ * tick a baja frecuencia; la resolución (resolvePenaltyMine) queda intacta.
+ */
+export function myPenaltyChance(m) {
+  m.stats.misTiros++;
+  return myPenalty(m);
+}
+
+/**
+ * Último hombre como evento independiente (antes vivía dentro de oppChance). Necesita un DEF
+ * mío en cancha; si no hay, no dispara (devuelve false). La resolución (resolveLastMan) y sus
+ * perfiles calibrados en el Sprint 1 quedan INTACTOS — A1 no toca su matemática.
+ */
+export function lastManChance(m) {
+  const defs = m.activeMine().filter(p => playedPos(p) === "DEF");
+  if (!defs.length) return false;
+  const def = pick(defs), prot = oppShooter(m);
+  m.decision = {
+    id: "last_man", prot: def, shooter: prot,
+    title: `🛡️ min ${m.min}' — ¡${prot.name} filtra un pase y se escapa! ${def.name} es el último hombre`,
+    text: "¿Cómo lo encara?",
+    options: [
+      { label: "🏃 Anticipar", hint: `Defensa ${def.stats.defensa} — corte limpio, o queda de cara al arco`, key: "anticipar" },
+      { label: "🧹 Barrerse", hint: "Puede cortar, pero arriesga tarjeta o penal", key: "barrerse" },
+      { label: "🧍 Esperar / contener", hint: "Seguro: baja la peligrosidad, remate a atajar", key: "esperar" },
+    ],
   };
-  if (key === "shoot") {
-    // Remate propio: jugada abierta, asistencia posible de un compañero (assistFor).
-    attempt(d.prot, "tiro", 0.02, { goal: "¡Remate letal!", fail: `${d.prot.name} remata pero ${pick(["ataja el arquero", "se va por arriba", "un defensa la saca en la línea"])}.` }, "open");
-  } else if (key === "pass") {
-    const pPass = clamp(0.35 + effStat(d.prot, "pase", m.my.buffs) * 0.11, 0.3, 0.92);
-    if (rnd() < pPass) {
-      m.log("plain", `min ${m.min}' — ¡Gran pase de ${d.prot.name}!`);
-      // El pase es la asistencia: si el compañero convierte, el pasador (d.prot) la firma.
-      attempt(d.mate, "tiro", 0.06, { goal: "¡Definición perfecta tras el pase!", fail: `${d.mate.name} no logra conectar bien el remate.` }, d.prot);
-    } else m.log("chance", `min ${m.min}' — el pase de ${d.prot.name} es interceptado.`);
-  } else if (key === "solo") {
-    const pSolo = clamp(0.05 + effStat(d.prot, "aura", m.my.buffs) * 0.075, 0.05, 0.5);
-    const roll = rnd();
-    if (roll < pSolo) goalMine(m, d.prot, "¡JUGADÓN! Se saca a todos de encima y define. ¡Puro aura!");
-    else if (roll < pSolo + 0.12) { m.log("event", `min ${m.min}' — ¡Derriban a ${d.prot.name} en el área! ¡PENAL!`); return myPenalty(m); }
-    else m.log("chance", `min ${m.min}' — ${d.prot.name} intenta la individual pero lo frenan.`);
-  }
-  return false;
+  m.stats.decisiones++;
+  return true;
+}
+
+/** Penal en contra como evento independiente (antes dentro de oppChance). */
+export function oppPenaltyChance(m) {
+  return oppPenaltyDecision(m, oppShooter(m));
 }
 
 /** Penal a favor: pide al usuario elegir pateador (decisión "penalty_mine"). */
@@ -127,42 +131,6 @@ function oppPenaltyDecision(m, shooter) {
   };
   m.stats.decisiones++;
   return true;
-}
-
-/** Ocasión rival: último hombre (25%), penal en contra interactivo (6%) o remate automático. */
-export function oppChance(m, mine) {
-  m.stats.oppTiros++;
-  const shooters = m.oppLineup.filter(p => (p.pos === "DEL" || p.pos === "MED") && !p.expulsado);
-  const prot = shooters.length ? pick(shooters) : pick(m.oppLineup);
-  // Último hombre: una fracción de las ocasiones peligrosas se convierte en decisión de MI
-  // central. Necesita un DEF mío en cancha; si no hay (rojas/lesiones), sigue el flujo normal.
-  if (rnd() < LAST_MAN_CHANCE) {
-    const defs = m.activeMine().filter(p => playedPos(p) === "DEF");
-    if (defs.length) {
-      const def = pick(defs);
-      m.decision = {
-        id: "last_man", prot: def, shooter: prot,
-        title: `🛡️ min ${m.min}' — ¡${prot.name} filtra un pase y se escapa! ${def.name} es el último hombre`,
-        text: "¿Cómo lo encara?",
-        options: [
-          { label: "🏃 Anticipar", hint: `Defensa ${def.stats.defensa} — corte limpio, o queda de cara al arco`, key: "anticipar" },
-          { label: "🧹 Barrerse", hint: "Puede cortar, pero arriesga tarjeta o penal", key: "barrerse" },
-          { label: "🧍 Esperar / contener", hint: "Seguro: baja la peligrosidad, remate a atajar", key: "esperar" },
-        ],
-      };
-      m.stats.decisiones++;
-      return true;
-    }
-  }
-  // Penal en contra: decisión interactiva de atajada
-  if (rnd() < 0.06) return oppPenaltyDecision(m, prot);
-  // La calidad del arquero y la zaga pesan fuerte: tener defensa débil debe doler
-  const q = effStat(prot, "tiro");
-  const porQ = mine.por ? (effStat(mine.por, "atajadas", m.my.buffs) * 0.65 + effStat(mine.por, "reflejos", m.my.buffs) * 0.35) : 1;
-  const pGoal = clamp(0.12 + q * 0.08 - porQ * 0.06 - (mine.def - 2.5) * 0.04, 0.05, 0.55);
-  if (rnd() < pGoal) goalOpp(m, prot);
-  else m.log("chance", `min ${m.min}' — ${prot.name} remata para ${m.oppTeam.name}... ${pick([`¡atajadón de ${mine.por ? mine.por.name : "tu arquero"}!`, "¡se va desviado!", "¡la defensa la saca!"])}`);
-  return false;
 }
 
 /** Penal en contra: el usuario eligió el lado del arquero; adivinar da chance real de atajar. */

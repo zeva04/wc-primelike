@@ -4,7 +4,8 @@
    ============================================================ */
 import { allTeams } from "../../data/teams-repo.js";
 import { pick } from "../../core/rng.js";
-import { teamRating, teamStars, playerOverall, statLine, difficultyOf } from "../../game/ratings.js";
+import { teamRating, teamStars, playerOverall, statLine, difficultyOf, teamFigure } from "../../game/ratings.js";
+import { teamDesc } from "../../content/team-flavor.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, starsHtml, posBadge, numTag } from "../components.js";
@@ -41,7 +42,7 @@ function renderMenu() {
   const sel = playables.find(t => t.id === menuSel);
   const diff = difficultyOf(sel);
   const c = sel.colors || {};
-  const best = sel.players.filter(p => p.pos !== "POR").slice().sort((a, b) => playerOverall(b) - playerOverall(a))[0];
+  const best = teamFigure(sel);
 
   screenShell(`
     <div class="text-center mb-6 mt-4">
@@ -77,7 +78,7 @@ function renderMenu() {
             </div>
             <span class="px-3 py-1.5 rounded-full border text-xs font-bold ${DIFF_CHIP[diff.tier]}">${diff.label}</span>
           </div>
-          <p class="text-xs text-slate-400 mb-4">${diff.desc}</p>
+          <p class="text-xs text-slate-400 mb-4">${teamDesc(sel.id)}</p>
           <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
             ${sel.players.map(p => `
               <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-2 text-center" title="${statLine(p)}">

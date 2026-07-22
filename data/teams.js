@@ -83,7 +83,7 @@ export const WC_DATA = {
         { name: "Márcio Rosa",         pos: "POR", num: 12, stats: { atajadas: 60, reflejos: 62, salidas: 56, pase: 50, aura: 56 }, look: { skin: "#8D5524", hair: "#0E0C0A", style: "buzz", beard: false } },
 
         { name: "Logan Costa",         pos: "DEF", num:  5, stats: { tiro: 44, defensa: 70, cabezazo: 70, pase: 60, aura: 62 }, look: { skin: "#8D5524", hair: "#0E0C0A", style: "short", beard: true } },
-        { name: "Roberto Lopes",       pos: "DEF", num:  4, stats: { tiro: 40, defensa: 70, cabezazo: 66, pase: 58, aura: 62 }, look: { skin: "#A0663A", hair: "#0E0C0A", style: "bald", beard: true } },
+        { name: "Pico Lopes",       pos: "DEF", num:  4, stats: { tiro: 40, defensa: 70, cabezazo: 66, pase: 58, aura: 62 }, look: { skin: "#A0663A", hair: "#0E0C0A", style: "bald", beard: true } },
         { name: "Diney Borges",        pos: "DEF", num:  3, stats: { tiro: 42, defensa: 64, cabezazo: 60, pase: 56, aura: 54 }, look: { skin: "#6B4226", hair: "#17130F", style: "buzz", beard: false } },
 
         { name: "Jamiro Monteiro",     pos: "MED", num: 10, stats: { tiro: 62, defensa: 58, cabezazo: 54, pase: 70, aura: 64 }, look: { skin: "#8D5524", hair: "#0E0C0A", style: "buzz", beard: true } },

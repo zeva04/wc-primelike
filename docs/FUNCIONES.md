@@ -92,6 +92,7 @@ Las secciones siguientes documentan las mismas funciones, ahora indicando su mó
 | Función | Qué hace |
 |---|---|
 | `playerOverall(p)` | Nota 1–99 del jugador, promedio ponderado por posición (`OVR_WEIGHTS`). |
+| `teamFigure(team)` | La **figura** del equipo: mejor `playerOverall`, **incluido el arquero** (antes el menú excluía a los POR y erraba en Cabo Verde, cuya mejor media es Vozinha). Desempate por **mayor aura** (decisión PO 21-jul). La usan el menú y el scout del rival. |
 | `playerStars(p)` | Estrellas visuales del jugador. |
 | `teamRating(team)` | Media 1–99 del equipo (promedio de sus 5 mejores notas). |
 | `teamStars(team)` | Estrellas visuales del equipo. |
@@ -192,9 +193,33 @@ sobrevive a cualquier re-agendado.
 | `gkQuality(por,buffs)` | Calidad global del arquero (atajadas 60% · reflejos 25% · salidas 15%). |
 | `teamPowers(lineup,ment,buffs)` | Ataque y defensa (~0–5) de una alineación, con mentalidad, inferioridad numérica y el bonus parejo de `buffs.tactica` (Sesión táctica; solo llega por los buffs propios). |
 
-### 8. Partido interactivo — clase `Match` (`js/game/match/Match.js` + `chances.js` / `incidents.js` / `shootout.js`)
-La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y llama al
+### 8. Partido interactivo — clase `Match` (`js/game/match/Match.js` + `sequences.js` / `actions.js` / `chances.js` / `incidents.js` / `shootout.js`)
+La UI la maneja así: `tick()` cada ~360 ms → si hay `decision`, muestra modal y llama al
 `resolve*` correspondiente → en `"pens"` gestiona la tanda → al final `result()`.
+
+**Sprint A1 — la capa de secuencias.** La columna interactiva del partido son las **Key Sequences**
+(Bible §7): `Match.tick` ya no dispara las viejas ocasiones (`myChance`/`oppChance`/`resolveChance`
+**retiradas**), sino que llama a `sequences.maybeStartSequence`. Penal y último hombre quedaron como
+eventos independientes de baja frecuencia (`chances.myPenaltyChance`/`lastManChance`/`oppPenaltyChance`),
+con su resolución **intacta**; los remates no interactivos pasaron a `chances.ambientShot*`.
+
+**`game/match/actions.js` — Football Actions** (bloques reutilizables, devuelven resultado estructurado, no narran):
+| Función | Qué hace |
+|---|---|
+| `actPass(m,from,{hard})` | Pase; `hard` = filtrado (menos probable, deja mejor perfil). Monótona en el Pase. |
+| `actDribble(m,p)` | Regate: `{ok, foul}` — puede salir, ganar penal (`foul`) o perderse. |
+| `actShot(m,p,{stat,bonus})` | Remate de definición: base más alta que el ambiente (`0.15 + q·0.09 + bonus`). |
+| `actContain(m,mine,{press})` | Corte defensivo; `press` corta más pero arriesga (deja al rival mejor perfilado). |
+| `actOppShot(m,shooter,mine)` | Remate rival ante mi arquero (desenlace de un repliegue). `ok` = gol rival. |
+
+**`game/match/sequences.js` — la máquina** (+ `content/sequences.js` = los tipos como datos):
+| Función | Qué hace |
+|---|---|
+| `maybeStartSequence(m)` | ¿Arranca una secuencia este tick? Sobre la marcha, apuntando al objetivo del partido (2-6). |
+| `seqPlan(m)` (interna) | Objetivo y reparto ofensivo/defensivo desde la preparación (ventaja atk+def) y la mentalidad; cacheado en `m._seqPlan`. |
+| `startSequence(m,type)` | Elige protagonista (por lado y `protWeight`) y crea la decisión del acto 1. |
+| `resolveSequenceAct(m,key)` | Resuelve el acto: narra y **escala** (deja la decisión del acto siguiente) o **cierra** (gol/erra/corte). Multi-acto sin id por acto. La construcción modula el `bonus` del remate, no cierra la jugada (si no, el scoring se derrumba — medido). |
+| `SEQ_MIN`/`SEQ_MAX`, `SEQUENCE_TYPES`, `sequenceType(id)` | Rango 2-6 y el catálogo A1 (circulación, transición, repliegue). |
 
 **Estado y consultas**
 | Método | Qué hace |
@@ -211,14 +236,12 @@ La UI la maneja así: `tick()` cada ~1s → si hay `decision`, muestra modal y l
 |---|---|
 | `tick()` | Avanza ~5 min. Devuelve `false` \| `true` (decisión) \| `"halftime"` \| `"pens"` \| `"end"`. |
 
-**Ocasiones y decisiones** (privados con `_`; los `resolve*` los llama la UI)
+**Decisiones del partido** (los `resolve*` los llama la UI vía `handleDecision`)
 | Método | Qué hace |
 |---|---|
-| `_myChance(opp)` | Ocasión mía: penal, decisión interactiva (55%) o remate automático. |
-| `resolveChance(key)` | Resuelve "chance": `shoot` / `pass` / `solo`. |
-| `_myPenalty()` / `resolvePenaltyMine(name)` | Penal a favor: pide pateador y lo ejecuta. |
-| `_oppChance(mine)` | Ocasión rival: **último hombre** (25%, si hay un DEF mío en cancha), penal en contra (6%) o remate. |
-| `resolvePenaltyOpp(key)` | Penal en contra: el usuario eligió el lado del arquero. |
+| `resolveSequenceAct(key)` | Resuelve el acto actual de la secuencia en curso (delega en `sequences.js`). |
+| `resolvePenaltyMine(name)` | Penal a favor: ejecuta con el pateador elegido. Lo dispara `chances.myPenaltyChance` desde el tick. |
+| `resolvePenaltyOpp(key)` | Penal en contra: el usuario eligió el lado del arquero. Lo dispara `chances.oppPenaltyChance`. |
 | `resolveLastMan(key)` | Decisión de **último hombre** de MI central: `anticipar` (corte limpio +Momento, o el delantero queda de cara al arco → gol muy probable), `barrerse` (corta, o falta → PENAL en el área / tarjeta, a veces roja → −Momento), `esperar` (contiene, remate normal a atajar, **nunca** da Momento). Marca `lastManStops` (+1) / `lastManFouls` (−1). |
 
 **Faltas, lesiones y cambios**
@@ -370,7 +393,7 @@ Los helpers `app()` y `$()` viven en `ui/components.js`.
 | Función | Qué hace |
 |---|---|
 | `difficultyOf(team)` | Etiqueta de dificultad según la media (label, colores, descripción). |
-| `renderMenu()` | Pinta el menú: héroe, pestañas de continente, carrusel y plantel. |
+| `renderMenu()` | Pinta el menú: héroe, pestañas de continente, carrusel y plantel. Debajo del equipo muestra su **descripción** (`content/team-flavor.teamDesc`, ya no el texto de dificultad — el chip de tier sí queda) y su **figura** (`teamFigure`). |
 
 Estado del menú: `menuSel` (equipo activo), `menuConfed` (pestaña). El botón 🎲 sortea un
 equipo y posiciona el carrusel sin iniciar la partida.
@@ -431,9 +454,9 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 | `openSquadModal()` | **Gestión de plantilla en vivo**: la cancha de `ui/pitch.js` con el partido en pausa. Arrastrar titular sobre titular reubica (azul, gratis) — **salvo dos que jueguen el MISMO puesto** (enrocar dos defensas no cambia nada: se prohíbe, pedido del PO); traer a alguien del banco es un cambio (verde, gasta 1 de 3). **Nada toca el partido hasta Confirmar**: los cambios se arman como plan y se aplican juntos; "Salir sin guardar" lo descarta. Las reubicaciones sí mutan `posJugada` en el momento (es lo que la cancha lee para previsualizar), por eso se guarda el estado previo y se restaura al cancelar. Al confirmar se aplican **primero los cambios y después las posiciones finales**: si el DT reubicó a alguien DESPUÉS de meterlo, `makeSub` le pondría el puesto del que salió y el plan quedaría pisado. |
 | `startMatch(oppId)` | Crea el `Match` y arranca el reloj. |
 | `renderMatchScreen()` | Estructura fija: marcador, controles, relato, alineaciones. |
-| `startTimer()` / `stopTimer()` / `togglePause()` | Control del reloj de ticks. |
+| `step()` / `startTimer()` / `stopTimer()` / `togglePause()` | Control del reloj. **Ritmo ráfaga (A1)**: el reloj se auto-agenda con `setTimeout` (no `setInterval`), corre rápido entre secuencias (`CRUISE` ~360 ms, o ~150 en modo Rápido) y **frena** en cada decisión; un gol hace una pausa breve (`GOAL_HOLD`). Cambiar la velocidad tiene efecto solo (el paso lee `CRUISE()`), sin reiniciar el timer. |
 | `updateMatchUI()` | Refresca marcador, minuto, relato y panel "En cancha". |
-| `showDecision()` / `handleDecision(d,key)` | Muestran y enrutan las decisiones al motor. |
+| `showDecision()` / `handleDecision(d,key)` | Muestran y enrutan las decisiones al motor. `sequence` → `resolveSequenceAct`; penales y último hombre como antes. |
 | `showHalftime()` | Pausa de entretiempo. |
 | `openSubsModal()` | Modal de cambios con reglas (sustituido en gris, POR solo por POR). |
 
@@ -489,6 +512,10 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
   lesión garantizada), el descanso pasivo de día de preparación vs **víspera de partido**
   (incluida una run real llevada hasta el día del partido) y `matchFatigue`. Los valores se
   **derivan de las constantes**, no se hardcodean: un rebalance futuro no rompe el test.
+- **`sequences.test.js`** (Sprint A1) — la capa de secuencias: el catálogo (3 tipos, esquema, sides),
+  las Football Actions (bien formadas y **monótonas** en la stat que las rige), y la máquina sobre un
+  Match real: arranca, avanza multi-acto y **cierra sin loops** (1-3 actos), respeta el objetivo 2-6,
+  protagonista por lado, y el contrato §3.2 de la decisión `sequence`.
 - **`momentum.test.js`** — el Momento 1..7: mapa nivel→% con tope (derivado de `MOMENTO_PCT_STEP`
   /`MOMENTO_PCT_CAP`, más la forma de la curva: simétrica y topada), asimetría (rival sin
   campo = sin efecto), integración con ratings (ficha/naturalOverall/statPenalties) y las

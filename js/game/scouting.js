@@ -18,7 +18,7 @@
      gratis e ilimitado — la curiosidad no se castiga).
    ============================================================ */
 import { getTeam } from "../data/teams-repo.js";
-import { playerOverall } from "./ratings.js";
+import { playerOverall, teamFigure } from "./ratings.js";
 import { bestSix, expectedOpponentLineup } from "./opponents.js";
 import { teamPowers, gkQuality } from "./match/powers.js";
 
@@ -57,7 +57,7 @@ const shadow = p => ({ name: p.name, pos: p.pos, stats: { ...p.stats }, energia:
 /** La figura del rival: con stats reales manda la nota; sin ellas, su figura curada (la primera). */
 function keyFigure(opp) {
   if (opp.players) {
-    const star = [...opp.players].sort((a, b) => playerOverall(b) - playerOverall(a))[0];
+    const star = teamFigure(opp); // mejor media, incluye POR, desempata por aura (§ratings)
     return { name: star.name, pos: star.pos, nota: playerOverall(star), por_que: POR_QUE[star.pos] };
   }
   const star = opp.figures[0];

@@ -282,35 +282,71 @@ Ajustes finales:
 
 ## 6. El partido, minuto a minuto (`Match.tick`)
 
-El partido avanza en **ticks de 5 minutos** (90 min = 18 ticks). En cada tick se tiran
-dados en este orden:
+El partido avanza en **ticks de 5 minutos** (90 min = 18 ticks). Desde el **Sprint A1** (rework
+del partido) la columna interactiva son las **Key Sequences** (Bible §7); lo demás se simula.
+En cada tick, en orden:
 
-1. **¿Ocasión mía?** con probabilidad `0.12 + 0.22 × atk/(atk+def_rival)`
-2. **¿Ocasión rival?** con probabilidad `0.09 + 0.24 × atk_rival/(atk_rival+def)`
-3. **¿Falta?** 10% · **¿Lesión?** 2.8%
-4. Si no pasó nada, una línea de relato de ambiente.
+1. **¿Arranca una secuencia?** (`sequences.maybeStartSequence`) — la capa interactiva.
+2. **¿Penal a favor?** ~1.6% · **¿Último hombre?** ~5% (si hay un DEF mío) · **¿Penal en contra?** ~1%
+3. **Ocasiones SIMULADAS** (no interactivas): un remate ambiente propio y otro rival, a
+   `(0.12 + 0.22 × ratioMy) × 0.78` y `(0.09 + 0.24 × ratioOpp) × 0.55` — la parte "el resto se
+   simula" del Bible. Producen gol o relato sin pedir nada al DT.
+4. **¿Falta?** 10% · **¿Lesión?** 2.8% · si no, una línea de ambiente.
 
-> **La ventaja del DT humano.** Los coeficientes de *mi* ocasión (0.12 / 0.22) son
-> levemente más altos que los del rival (0.09 / 0.24 pero sobre una base menor). Es
-> deliberado: las decisiones del jugador deben poder torcer un partido. Un humano que
-> elige bien rinde por encima de lo que diría el rating puro.
+Penal y último hombre eran ramas internas de las viejas ocasiones (`myChance`/`oppChance`,
+retiradas en A1); ahora asoman como **eventos independientes** a baja frecuencia, con su
+resolución del Sprint 1 **intacta** (A1 no toca su matemática).
 
-### Resolución de una ocasión propia
+### Key Sequences (`game/match/sequences.js` + `content/sequences.js` + `actions.js`)
 
-El 55% de mis ocasiones son **interactivas** (aparece un dilema); el resto se resuelven solas.
-La probabilidad de gol de un remate es:
+Una secuencia es una **historia en miniatura de 1 a 3 actos** (decisión PO): cada acto es una
+decisión (`id: "sequence"`, contrato §3.2) que se resuelve con **Football Actions** — los bloques
+reutilizables de `actions.js` (pase, regate, remate, contención…). Al acertar, la jugada **escala**
+al acto siguiente; al fallar, **cierra**. La escalera multi-acto funciona sola en la UI y el smoke:
+resolver un acto puede dejar la decisión del acto siguiente, y tick() corta con decisión pendiente.
 
-```
-P(gol) = clamp(0.11 + calidadRemate × 0.08 − ratingRival/20 × 0.035,  0.06,  0.55)
-```
+**Los actos de construcción NO son compuertas de supervivencia**: modulan la CALIDAD del remate
+(un `bonus`), no si la jugada muere. El camino seguro siempre llega al desenlace; solo la opción
+arriesgada (pase filtrado, conducción) puede perder la pelota. El **gate de gol es el remate final**,
+como en las ocasiones que reemplaza — si cada acto fuera pass/fail, tres actos multiplicarían el
+fallo y el scoring se derrumbaría (medido en A1: bajaba a ~7%).
 
-En las decisiones interactivas cada opción cambia la fórmula:
+**Catálogo A1** (mínimo, para validar el sistema; el completo de 6 es A2):
 
-| Opción | Cómo se calcula | Cuándo conviene |
-|---|---|---|
-| 🎯 **Rematar** | tiro del protagonista + pequeño bonus | Tienes a un killer con tiro alto |
-| 🤝 **Pasar** | primero pasa (según su pase), luego remata el compañero con bonus | El compañero define mejor que quien tiene la pelota |
-| 😤 **Individual** | según **aura**; puede terminar en golazo, en penal ganado o en nada | Jugadores con aura muy alta (Messi, Mbappé) |
+| Tipo | Lado | Forma | Mapea a (A2+) |
+|---|---|---|---|
+| 🎼 Circulación posicional | ofensiva | construir · construir · rematar (pesa el Pase) | Posesión |
+| ⚡ Transición rápida | ofensiva | conducir · rematar (vertical, mejor perfil de remate) | Contragolpe |
+| 🧱 Repliegue defensivo | defensiva | contener · (remate rival a atajar) | Bloque bajo |
+
+**Generación** (`sequences.seqPlan` + `maybeStartSequence`): **2-6 por partido**, objetivo modulado
+por la **preparación** (ventaja atk+def sobre el rival) y la mentalidad. El favorito recibe más
+secuencias y más ofensivas; el superado, menos y más defensivas — el pago visible de prepararse
+(Bible §7). Se decide **sobre la marcha** (por tick, repartiendo las que faltan entre los ticks
+restantes) para que el **Sprint A3** pueda meter contexto dinámico (marcador, minuto, fatiga,
+expulsados) sin reescribir el generador.
+
+**Ritmo** (`screens/match.js`, decisión PO "ráfaga"): entre secuencias la simulación **corre**
+(~360 ms/tick, el relato de ambiente pasa rápido) y **frena en seco** al llegar una secuencia; un
+gol hace una pausa breve. El reloj se auto-agenda con `setTimeout` para variar el paso.
+
+> **La ventaja del DT humano.** El favorito recibe más y mejores secuencias, pero **ejecutarlas**
+> es del jugador: elegir bien el riesgo de cada acto rinde por encima del rating puro. El smoke,
+> que decide al azar, mide el piso; el humano que decide bien saca la diferencia.
+
+### ⚠️ Balance del Sprint A1 (leer antes de tocar el partido)
+
+Baseline HEAD **29.1% n=4000**. El cambio de "muchas decisiones cortas" a "2-6 secuencias largas"
+es el gate grande del arco. Primera pasada: **6.7%** (derrumbe) — la causa fue el fallo-por-acto
+multiplicándose (arriba). Con la construcción como modulador de calidad (no compuerta) y el remate
+de definición calibrado al de la ocasión vieja, quedó en **30.8% n=4000 = +1.7pp, dentro del gate**
+(consistente entre n=1500 y n=4000). Diales pactados si deriva, EN ORDEN: (1) número de secuencias,
+(2) prob. de gol por acto (`AMBIENT_MINE`/`finishBonus`/`actShot`), (3) reparto ofensivo/defensivo.
+La calibración del último hombre y de los penales **no se tocó**.
+
+Las **Football Actions** están ancladas a las fórmulas de las ocasiones que reemplazan (la intención
+es "menos momentos y más largos", no otra matemática de gol). El remate de definición usa base más
+alta que el ambiente (`0.15 + q·0.09`, espejo del viejo "shoot" interactivo).
 
 ---
 
@@ -695,9 +731,9 @@ telegrafía. **Balance neutral**: BRA 28.5% n=4000 = baseline (los conflictos so
 —algunos regalan buffs permanentes, otros son riesgo puro—, así que modular su frecuencia no
 mueve sistemáticamente el % de campeón). Diales si deriva: `CONFLICT_CHANCE_BY_BAND`.
 
-> **El efecto EN-PARTIDO sigue diferido** (va con el rework del partido): la Moral modulará el
-> **tipo y número de ocasiones** que el equipo genera — hook `[MORAL → OCASIONES]` comentado
-> en `Match.tick`; requerirá pasar la moral por `matchCtx` porque el motor no conoce la run.
+> **El efecto EN-PARTIDO llega en el Sprint A3** (ya hay capa de secuencias, §6): la Moral sesgará
+> el **TIPO** de secuencia (no el número — decisión PO), enchufándose en `sequences.js`; requerirá
+> pasar la moral por `matchCtx` porque el motor del partido no conoce la run.
 
 ### Goleadores del torneo (`run.scorers`, `game/scorers.js`)
 
@@ -795,11 +831,13 @@ nadie tiene la copa asegurada, que es exactamente el espíritu roguelike.
 
 ## Resumen de una jugada de gol, de punta a punta
 
-1. `Match.tick()` decide que hay ocasión mía (§6).
-2. Se elige al protagonista (ponderado: los delanteros aparecen más).
-3. Si es interactiva, la UI muestra el dilema; eliges rematar/pasar/individual.
-4. La opción define la fórmula; `effStat` convierte las stats 1–99 en calidad 0–5
-   aplicando energía (§4).
-5. Se compara contra la defensa rival y sale `P(gol)`; se tira el dado.
-6. Si es gol, el VAR puede revisarlo (12% de revisión, 30% de anulación).
-7. El relato se actualiza y el partido sigue.
+1. `Match.tick()` decide que arranca una **secuencia** ofensiva mía (§6, `maybeStartSequence`).
+2. Se elige al protagonista según el tipo (circulación pesa al MED, transición al DEL).
+3. La UI muestra el primer acto (construir/conducir); eliges seguro vs arriesgado — cada opción
+   modula el `bonus` del remate (o arriesga perder la pelota).
+4. La jugada **escala** al acto de definición; eliges rematar o buscar al mejor ubicado.
+5. `actShot` (en `actions.js`) usa `effStat` (stats 1–99 → calidad 0–5, con energía §4) + el bonus
+   acumulado; se compara con la defensa rival, sale `P(gol)` y se tira el dado.
+6. Si es gol, `goalMine` lo anota con su asistidor y el VAR puede revisarlo (12% / 30% de anulación;
+   los penales no se anulan por offside).
+7. La secuencia cierra, el relato se actualiza y el partido vuelve al ritmo de crucero (§6).

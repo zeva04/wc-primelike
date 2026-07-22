@@ -92,13 +92,17 @@ js/
       knockout.js              ← STAGE_ORDER/LABEL, simKnockoutRound, pairNextRound, nextOpponentId (~55)
       sim.js                   ← quickSim (Poisson IA) (~35)
     match/
-      Match.js                 ← clase: estado, tick, fases, cambios, resultado (~190)
+      Match.js                 ← clase: estado, tick, fases, cambios, resultado (~200)
       powers.js                ← effStat, gkQuality, teamPowers, MENT_MOD (~55)
-      chances.js               ← ocasiones propias/rivales, penales en juego (~160)
+      actions.js               ← Football Actions: pase, regate, remate, contención (Bible §7) (~70)
+      sequences.js             ← máquina de Key Sequences: generar, escalar, cerrar (~230)
+      chances.js               ← penales en juego, último hombre, remate ambiente, VAR (~200)
       incidents.js             ← faltas, tarjetas, lesiones en juego (~120)
       shootout.js              ← tanda de penales (~90)
   content/                     ── tablas que el PO edita; datos + flavor, cero reglas ──
     themes.js                  ← EVENT_THEMES (4 temáticas) (~15)
+    team-flavor.js             ← TEAM_DESC: la descripción de cada selección para el menú (~45)
+    sequences.js               ← SEQUENCE_TYPES: los tipos de Key Sequence como datos (~60)
     prep-events.js             ← PREP_EVENTS (10 eventos inevitables) (~50)
     conflicts.js               ← RANDOM_EVENTS (6 conflictos con decisión) (~85)
     injuries.js                ← INJURY_TYPES (15 lesiones con pesos) (~30)
@@ -190,7 +194,9 @@ Formato: **propósito · contiene · NUNCA debe contener**.
 | `game/tournament/*` | La copa alrededor tuyo | tablas, fechas, clasificación, brackets, quickSim, nextOpponentId | Nada del partido interactivo |
 | `game/match/Match.js` | Máquina de estados del partido | constructor, tick, fases, subs, result | Resolución de ocasiones/faltas (delegada), textos de UI de pantalla |
 | `game/match/powers.js` | Fórmulas de poder | effStat, gkQuality, teamPowers | Estado, azar de eventos |
-| `game/match/chances.js` | Ocasiones y goles | _myChance/_oppChance/resolve*, penales en juego, VAR | Tarjetas/lesiones |
+| `game/match/actions.js` | Football Actions (Bible §7) | actPass/actDribble/actShot/actContain/actOppShot — gestos que devuelven resultado estructurado | Narración, mutar el marcador, hilo de la secuencia |
+| `game/match/sequences.js` | Máquina de Key Sequences | generación (2-6/partido), escalar/cerrar actos, resolveSequenceAct | Fórmulas de gesto (van a actions), datos de tipo (van a content) |
+| `game/match/chances.js` | Penales, último hombre, remate simulado | penales en juego, lastManChance, ambientShot*, goles, VAR | Tarjetas/lesiones, secuencias interactivas |
 | `game/match/incidents.js` | Incidencias | faltas, tarjetas, lesiones en juego | Fórmulas de gol |
 | `game/match/shootout.js` | Tanda de penales | start/shoot/check-end | Nada fuera de la tanda |
 | `content/*` | **Lo que el PO edita**: tablas de contenido | datos + flavor + `effect(run)` que solo usa core | Reglas de sistemas, imports de game/ui, DOM |
@@ -239,10 +245,15 @@ Las decisiones siguen siendo `{id, title, text, options[{label, hint, key}]}` co
 
 | id | La crea | La resuelve |
 |---|---|---|
-| `chance` | chances.js | resolveChance |
+| `sequence` | sequences.js | resolveSequenceAct |
 | `penalty_mine` / `penalty_opp` | chances.js | resolvePenaltyMine/Opp |
 | `last_man` | chances.js | resolveLastMan |
 | `protect` / `forced_sub` / `gk_red` | incidents.js | ruteo UI → makeSub |
+
+`sequence` es **multi-acto**: resolver un acto puede dejar OTRA decisión `sequence` (el acto
+siguiente). Los loops de UI y smoke la reprocesan solos porque `tick()` corta con decisión
+pendiente — no hace falta un id por acto. (En A1 se retiró `chance`: las ocasiones interactivas
+se volvieron secuencias.)
 
 ### ⚖️ Autocrítica de la sección
 
@@ -351,9 +362,10 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
 | Nuevo conflicto (aun multi-opción) | content/conflicts | content/conflicts | calendar, hub |
 | Nuevo tipo de lesión | content/injuries | content/injuries | medical, match |
 | Cambiar regla de amarillas (p.ej. 3 en vez de 2) | game/discipline + CORE.md | game/discipline | match/incidents (solo detecta faltas), ui |
-| Nuevo skill moment del partido | match/chances + contrato §3.2 | match/chances (creador+resolver) + screens/match (ruteo) | Match.js (tick), powers |
+| Nuevo tipo de secuencia | content/sequences (datos) + sequences.js (si necesita un acto nuevo) + actions.js (si el gesto no existe) | esos archivos | Match.js (tick), powers, screens |
+| Nuevo skill moment suelto (no secuencia) | match/chances + contrato §3.2 | match/chances (creador+resolver) + screens/match (ruteo) | Match.js (tick), powers |
 | Nueva pantalla | screens/ vecinas + components | screens/nueva.js + navegación en la pantalla origen | game/** |
-| **Sistema de Filosofía** | Game Vision + flow + powers | NUEVOS: game/philosophy.js, content/philosophies.js, screens/philosophy.js + hooks: flow (progresión), powers (modificadores), hub (card) | tournament, discipline, storage |
+| **Sistema de Filosofía** | Bible §5 + sequences.js + flow | NUEVOS: game/philosophy.js, content/philosophies.js, screens/philosophy.js + hooks: **sequences.js (sesga el pool de secuencias — es un GENERADOR, no un modificador de powers)**, flow (progresión, la alimenta la Sesión Táctica), hub (card) | tournament, discipline, storage, powers (Filosofía NO es un modificador estadístico escondido) |
 | **Mundo vivo / noticias** | tournament/*, calendar | NUEVOS: game/news.js, content/headlines.js + hook en flow.postMatch + card en hub | match/**, discipline |
 | **Conflictos en cadena** | calendar, content/conflicts | calendar (dayPlan multi-acto), content/conflicts (formato cadena), run.js (estado de cadenas) | match/**, tournament |
 | Logros | journal (ya es el log de momentos) | NUEVOS: game/achievements.js, content/achievements.js + hook en flow.endRun + sección en end.js | resto |
