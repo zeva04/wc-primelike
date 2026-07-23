@@ -55,7 +55,8 @@ export function ambientShotOpp(m, mine) {
  * tick a baja frecuencia; la resolución (resolvePenaltyMine) queda intacta.
  */
 export function myPenaltyChance(m) {
-  m.stats.misTiros++;
+  // (el tiro del penal se cuenta en resolvePenaltyMine — la RESOLUCIÓN: así también
+  // cuentan los penales nacidos de secuencias, que llaman a myPenalty directo. Bug T3)
   return myPenalty(m);
 }
 
@@ -104,6 +105,7 @@ export function myPenalty(m) {
 export function resolvePenaltyMine(m, name) {
   const p = m.my.lineup.find(x => x.name === name);
   m.decision = null;
+  m.stats.misTiros++; // el penal ES un tiro — contado en la resolución (único punto, bug T3)
   // RECORTE DE BALANCE (17-jul-2026): la definición de penales NO lleva el % del Momento
   // (÷ momentoMult lo neutraliza). Fue la "primera línea de recorte" pactada al aprobar
   // la feature: con el efecto pleno, BRA derivaba ~+2pp en el smoke (precedente FEAT-003).
@@ -137,6 +139,7 @@ function oppPenaltyDecision(m, shooter) {
 /** Penal en contra: el usuario eligió el lado del arquero; adivinar da chance real de atajar. */
 export function resolvePenaltyOpp(m, key) {
   const d = m.decision; m.decision = null;
+  m.stats.oppTiros++; // simetría con resolvePenaltyMine: el penal rival también es un tiro (bug T3)
   const { mine } = m.powers();
   const shooterDir = pick(["izq", "centro", "der"]);
   const por = mine.por;
@@ -192,6 +195,7 @@ export function resolveLastMan(m, key) {
     const pCut = clamp(0.46 + edge * 0.14 + effStat(def, "aura", m.my.buffs) * 0.02, 0.25, 0.82);
     if (rnd() < pCut) return lastManStop(m, def, `${def.name} LEE el pase y se anticipa. ¡Corte magistral del último hombre!`);
     m.log("chance", `min ${m.min}' — ${def.name} se adelanta pero ${shooter.name} le gana la espalda y queda de cara al arco...`);
+    m.stats.oppTiros++; // el mano a mano ES un remate rival (bug T3: no se contaba)
     if (rnd() < 0.68) return goalOpp(m, shooter); // gol muy probable
     m.log("event", `min ${m.min}' — ¡${m.powers().mine.por ? m.powers().mine.por.name : "tu arquero"} le tapa el mano a mano de milagro!`);
     return false;
@@ -225,6 +229,7 @@ export function resolveLastMan(m, key) {
 
   // esperar: contiene. Baja la peligrosidad y se resuelve como remate normal a atajar.
   const { mine } = m.powers();
+  m.stats.oppTiros++; // remate rival contenido pero remate al fin (bug T3: no se contaba)
   const q = effStat(shooter, "tiro");
   const porQ = mine.por ? (effStat(mine.por, "atajadas", m.my.buffs) * 0.65 + effStat(mine.por, "reflejos", m.my.buffs) * 0.35) : 1;
   const pGoal = clamp(0.18 + q * 0.06 - porQ * 0.05 - (dPow - 2.5) * 0.04, 0.05, 0.42);

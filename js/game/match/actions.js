@@ -51,8 +51,12 @@ export function actDribble(m, p, { bonus = 0 } = {}) {
  * transición limpia dejan mejor perfil de remate). Espejo del remate automático de
  * myChance (0.12 + q·0.085 − oppR·0.035), que es el que fija el ritmo de gol del juego.
  * Devuelve solo si fue gol; anotar es cosa de sequences.js (goalMine con su asistidor).
+ * Cuenta el tiro en m.stats — EL punto único de conteo de los remates de secuencia
+ * (excepción documentada al "no muta": stats no es marcador. Antes solo contaban los
+ * remates ambiente y el panel post-partido sub-reportaba desde A1 — bug T3).
  */
 export function actShot(m, p, { stat = "tiro", bonus = 0 } = {}) {
+  m.stats.misTiros++;
   const q = effStat(p, stat, m.my.buffs);
   // El remate de definición de una secuencia es una ocasión construida: base más alta que el
   // remate ambiente (espejo del antiguo "shoot" interactivo, 0.14 + q·0.09).
@@ -64,8 +68,10 @@ export function actShot(m, p, { stat = "tiro", bonus = 0 } = {}) {
  * Remate del rival ante mi defensa (secuencias defensivas). `ok` = gol rival. Espejo
  * del remate automático de oppChance (arquero + zaga pesan). `stat` permite el cabezazo
  * (balón parado en contra) y `bonus` el perfil (un rival mejor parado remata mejor).
+ * Cuenta el tiro rival en m.stats (punto único, espejo de actShot — bug T3).
  */
 export function actOppShot(m, shooter, mine, { stat = "tiro", bonus = 0 } = {}) {
+  m.stats.oppTiros++;
   const q = effStat(shooter, stat);
   const porQ = mine.por ? (effStat(mine.por, "atajadas", m.my.buffs) * 0.65 + effStat(mine.por, "reflejos", m.my.buffs) * 0.35) : 1;
   const pg = clamp(0.12 + q * 0.08 + bonus - porQ * 0.06 - (mine.def - 2.5) * 0.04, 0.05, 0.6);
