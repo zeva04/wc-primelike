@@ -235,8 +235,8 @@ Posesión) · Expansión = Segunda Jugada.
 #### Intermediate
 | Rasgo | Rama | Req. Principio | Descripción | Backlog | Momento |
 |---|---|---|---|---|---|
-| **Dueños del Área** | Firma | Solidez 2 | El equipo domina el juego aéreo defensivo dentro de su propia área. | Centros rivales (inducidos por Jaula) se degradan en la definición; el despeje limpio puede iniciar `pelotazo` propio. Cadena: forzar banda → comer centros → lanzar. | El despeje número diez del central y la contra que nace de ahí. |
-| **Pelota Parada Ensayada** *(migrado F2)* | Respuesta | **Elaboración 2** | Cada tiro libre y córner ejecuta una jugada ensayada en el entrenamiento. | Mecánica F2: balón parado ×1.3. Las faltas del Oficio alimentan más balones parados — la respuesta al sitio de Posesión es castigar cada interrupción. | El córner ensayado que termina en gol del 2. |
+| **Dueños del Área** *(migrado F2)* | Firma | Solidez 2 | El equipo domina el juego aéreo defensivo dentro de su propia área. | **Corrección T2**: el rasgo F2 real del Bloque era la fortaleza profunda (deepContain + convertDeep) — migra ACÁ ("el despeje limpio inicia pelotazo" ES el convert). Además: el córner defendido puede encadenar pelotazo propio. Cadena: forzar banda → comer centros → lanzar. | El despeje número diez del central y la contra que nace de ahí. |
+| **Pelota Parada Ensayada** | Respuesta | **Elaboración 2** | Cada tiro libre y córner ejecuta una jugada ensayada en el entrenamiento. | **Corrección T2**: el ×1.3 del balón parado NO era rasgo de Consolidada (es arma incondicional del Bloque desde el gate F2 — se queda). Este rasgo lo APILA: balón parado con mejor jugada (bonus) y más frecuente en el pool (×1.25). | El córner ensayado que termina en gol del 2. |
 | **Plataforma** | Expansión | Directo 2 | Ganada la segunda pelota, el equipo la convierte en ataque organizado en campo rival. | La secuencia post-segunda-bola sube de calidad: de duelo suelto a llegada estructurada. Pelotazo con segunda ganada ≈ posesión avanzada. | Peinada, control del 10, llegada limpia. |
 
 #### Advanced
@@ -328,11 +328,34 @@ Posesión) · Expansión = Segunda Jugada.
   narrativo) · visibilidad de hombre_libre/jaula · smoke compra al azar (el piso;
   el techo --smart no elige rasgos aún — heurística para T2).
 
-### T2 — "Las ramas" (Intermediate + migración F2)
+### T2 — "Las ramas" (Intermediate + migración F2) — ✅ CERRADO (23-jul-2026)
 - Los 12 Intermediate. Migración de los 4 rasgos F2 al árbol (Consolidada deja de
   regalar; `noteFiloMilestones` se actualiza).
 - Regla del principio ajeno en Respuesta + su UI (por qué mi filosofía sube lenta).
 - Gate: matriz F2 estable (los Intermediate no la rompen) + migración sin regresión.
+
+**Resultados del cierre:**
+- Los 12 Intermediate con hooks nuevos: breakawayGuard (Anticipar corta el pelotazo
+  ambiente ANTES del mano a mano — calibración del último hombre intacta) · deepFinish ·
+  playoutRescue · variantSwitch (condicional al rival) · skipUpgrade · supportUpgrade ·
+  chainOnDefendSp · setpieceRehearsed (bonus + pool ×1.25) · secondBallUpgrade.
+- **Migración F2 completada**: filoRasgo() MURIÓ — el gate es hasTrait(). caceria
+  foulBreakDeep→Cacería Letal · sinfonia 4º compás + penal profundo→Sitio al Área ·
+  contra_letal deepBonus→La Trampa Cerrada · fortaleza deepContain/convertDeep→Dueños
+  del Área. **Corrección al diseño**: el ×1.3 del balón parado NO era el rasgo F2 del
+  Bloque (es su arma incondicional y se queda); el rasgo real era la fortaleza profunda.
+- **Hallazgo de diseño — la excepción del Contra**: su Respuesta (Trampa Cerrada) pide
+  Solidez, que ES suya (aguantar para cazar); su principio AJENO (Elaboración) vive en
+  la Expansión (Superioridad 2) y abre el camino que La Invitación (T3, Elaboración 3)
+  continúa: el Contra aprende a tener la pelota POR ETAPAS. Codificado en tests.
+- Gate cualitativo: los 20 momentos narrados SE VEN (0.05–0.37/partido en Consolidada;
+  las 3 migraciones de tasa sin texto propio se verifican por plumbing en traits.test).
+- Gate cuantitativo: **22.6% vs 22.1 de T1 (n=8000 — ruido): los Intermediate + la
+  migración son neto neutros.** Por filosofía: press 21.4 · posesión 23.4 · contra 22.8 ·
+  bloque 22.0 (spread 2.0pp) — el Bloque NO cayó al perder su regalo de Consolidada.
+- Deudas: smoke ~2× más lento (18ms/run — más fútbol real por las cadenas; profiling
+  si molesta) · --smart sigue sin comprar rasgos (T3: el techo con árbol) · la deuda
+  del +1.4pp de T1 sigue abierta para el pase de balance de T3.
 
 ### T3 — "La doctrina" (Advanced + Master + consagración)
 - Los 8 Advanced (convergencias, neutralización de matchups) + los 4 Master.

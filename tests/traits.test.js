@@ -113,8 +113,10 @@ const assert = (cond, msg, ctx) => { checks++; if (!cond) { fails++; console.err
   const r = E.newRun("BRA");
   E.choosePhilosophy(r, "contra");
   const tree = E.traitTree(r);
-  assert(tree.length === 3, "el árbol del contra trae sus 3 básicos (T1)");
-  assert(tree.every(t => !t.owned && t.buyable), "con 1 PI los 3 básicos son comprables (el 1-de-3 del inicio)");
+  assert(tree.length === 6, "el árbol del contra trae 3 básicos + 3 intermediate (T2)", tree.length);
+  const buyables = tree.filter(t => t.buyable);
+  assert(buyables.length === 3 && buyables.every(t => t.tier === "basic"), "con 1 PI solo los 3 básicos son comprables (el 1-de-3 del inicio)");
+  assert(tree.filter(t => t.tier === "intermediate").every(t => !t.buyable && t.faltas.length >= 2), "los intermediate nacen con candado múltiple (previo + nivel + principio)");
   E.buyTrait(r, "tres_pases");
   const tree2 = E.traitTree(r);
   assert(tree2.find(t => t.id === "tres_pases").owned, "el comprado figura owned");
@@ -239,6 +241,76 @@ function forcePlay(m, typeId, optIdx = 0) {
     const con = share(["amplitud"]), sin = share([]);
     assert(con > sin, "Amplitud sube la circulación contra el Bloque (celda suavizada, no invertida)", `con=${(con * 100).toFixed(1)}% sin=${(sin * 100).toFixed(1)}%`);
   }
+}
+
+// ---------- T2: los 12 Intermediate — catálogo, gating y la regla del ajeno ----------
+{
+  assert(E.TRAITS.length === 24, "24 rasgos en el catálogo (12 Basic + 12 Intermediate)", E.TRAITS.length);
+  const inters = E.TRAITS.filter(t => t.tier === "intermediate");
+  assert(inters.length === 12, "12 Intermediate (3 por filosofía)", inters.length);
+  for (const filo of ["press", "posesion", "contra", "bloque"]) {
+    const own = E.traitsOf(filo, "intermediate");
+    assert(own.length === 3 && new Set(own.map(t => t.rama)).size === 3, `${filo}: un intermediate por rama`);
+  }
+  const filoAristas = id => E.getPhilosophy(id).aristas;
+  for (const t of inters) {
+    // Las 4 condiciones del GDD §5: previo en SU rama, principio, nivel 3
+    const prev = E.traitById(t.req.previo);
+    assert(prev && prev.filo === t.filo && prev.rama === t.rama && prev.tier === "basic",
+      "el previo es el básico de SU rama", `${t.id} ← ${t.req.previo}`);
+    assert(t.req.nivel === 3 && t.req.principio?.min === 2, "gating uniforme: nivel 3 + principio 2", t.id);
+    assert(E.aristaById(t.req.principio.id), "el principio requerido existe", t.id);
+  }
+  // LA REGLA DEL ARCO (tabla aprobada por el PO): toda filosofía paga al menos UN
+  // principio AJENO en sus intermediate (cubrirse/expandirse cuesta pureza). En
+  // Press/Posesión/Bloque el ajeno vive en la Respuesta; el Contra es la excepción
+  // documentada — su Respuesta pide Solidez (que ES suya: aguantar para cazar) y su
+  // ajeno (Elaboración) vive en la Expansión, abriendo el camino que La Invitación
+  // (T3, Elaboración 3) continúa: el Contra aprende a tener la pelota por etapas.
+  const esAjeno = t => !filoAristas(t.filo).includes(t.req.principio.id);
+  for (const [id, ajeno] of [["caceria_letal", false], ["anticipar", true], ["arco_vista", false],
+    ["tercer_hombre", false], ["cambio_frente", true], ["sitio_area", false],
+    ["primer_pase", false], ["trampa_cerrada", false], ["superioridad", true],
+    ["duenos_area", false], ["pelota_ensayada", true], ["plataforma", false]]) {
+    assert(esAjeno(E.traitById(id)) === ajeno, `principio ${ajeno ? "AJENO" : "propio"} según la tabla aprobada`, id);
+  }
+  for (const filo of ["press", "posesion", "contra", "bloque"]) {
+    assert(E.traitsOf(filo, "intermediate").some(esAjeno), `${filo} paga al menos un principio ajeno`);
+  }
+}
+
+// ---------- T2: la cadena de compra básico → intermediate ----------
+{
+  const r = E.newRun("BRA");
+  E.choosePhilosophy(r, "press");             // 1 PI
+  E.buyTrait(r, "morder");                    // gasta el inicial
+  r.aristas.presion = 2;                      // nivel 3 (2 pts) y Presión 2
+  E.syncIdentityPI(r);                        // +2 PI (niveles 2 y 3)
+  const reqs = E.traitReqs(r, E.traitById("caceria_letal"));
+  assert(reqs.ok, "con previo + nivel 3 + Presión 2 + PI, Cacería Letal se abre", reqs.faltas.join(" · "));
+  assert(E.buyTrait(r, "caceria_letal"), "la compra intermediate procede");
+  // El ajeno de la rama Respuesta: sin Solidez no hay Anticipar aunque sobren PI
+  E.buyTrait(r, "trampa_banda");
+  r.aristas.verticalidad = 1; E.syncIdentityPI(r); // repone el PI (nivel 4) para aislar la falta de Solidez
+  const anticipar = E.traitReqs(r, E.traitById("anticipar"));
+  assert(!anticipar.ok && anticipar.faltas.some(x => x.includes("Solidez")), "Anticipar exige Solidez (AJENA): el candado la nombra", anticipar.faltas.join(" · "));
+  r.aristas.solidez = 2;
+  assert(E.traitReqs(r, E.traitById("anticipar")).ok, "con Solidez 2 el candado se abre (cubrirse costó pureza)");
+}
+
+// ---------- T2: la migración F2 — el efecto profundo responde al RASGO, no a la etapa ----------
+{
+  // Plumbing: hasTrait lee el ctx del Match
+  const mSin = makeMatch("MAR", "posesion", [], 2);            // Consolidada SIN el rasgo
+  const mCon = makeMatch("MAR", "posesion", ["sitio_area"], 2);
+  assert(!E.hasTrait(mSin, "sitio_area") && E.hasTrait(mCon, "sitio_area"), "hasTrait lee matchCtx.filo.rasgos");
+  // El 4º compás de la sinfonía: Consolidada YA NO lo regala — lo compra Sitio al Área
+  E.startSequence(mSin, E.sequenceType("sinfonia"));
+  assert(!mSin.seq.plan, "Consolidada sin el rasgo: la sinfonía queda en 3 compases (la migración quitó el regalo)");
+  mSin.seq = null; mSin.decision = null;
+  E.startSequence(mCon, E.sequenceType("sinfonia"));
+  assert(mCon.seq.plan && mCon.seq.plan.filter(k => k === "build").length === 4, "con Sitio al Área la sinfonía gana su 4º compás");
+  mCon.seq = null; mCon.decision = null;
 }
 
 console.log(`\ntraits: ${checks} checks · fallos: ${fails}`);

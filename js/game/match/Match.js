@@ -42,6 +42,7 @@ import * as Sequences from "./sequences.js";
 import * as SeqActs from "./sequence-acts.js";
 import * as Incidents from "./incidents.js";
 import * as Shootout from "./shootout.js";
+import { hookOf, traitMoment } from "./trait-hooks.js";
 
 // Frecuencias por tick de los eventos INDEPENDIENTES de las secuencias (Sprint A1). Penal y
 // último hombre se calibraron antes y quedan intactos; acá solo se fija cada cuánto asoman
@@ -160,7 +161,15 @@ export class Match {
     // Eventos interactivos INDEPENDIENTES de las secuencias (penal y último hombre, intactos
     // del calibrado previo; A1 no toca su matemática, solo cada cuánto asoman como evento suelto).
     if (rnd() < PEN_MINE_TICK) { this._flow.push({ min: this.min, side: "mine", w: 2 }); return Chances.myPenaltyChance(this); }
-    if (rnd() < BREAKAWAY_TICK && Chances.lastManChance(this)) { this._flow.push({ min: this.min, side: "opp", w: 2 }); return true; }
+    if (rnd() < BREAKAWAY_TICK) {
+      // T2 — Anticipar la Espalda: el central que LEYÓ el pelotazo lo corta antes del
+      // mano a mano (el canal ambiente del breakaway — exactamente el fútbol que este
+      // rasgo compra: la vacuna contra el balón largo que salta la presión). La
+      // calibración del último hombre queda intacta: se corta ANTES de nacer.
+      const g = hookOf(this, "breakawayGuard");
+      if (g && rnd() < g.p) { traitMoment(this, g.traitId, [g.texto]); }
+      else if (Chances.lastManChance(this)) { this._flow.push({ min: this.min, side: "opp", w: 2 }); return true; }
+    }
     if (rnd() < PEN_OPP_TICK) { this._flow.push({ min: this.min, side: "opp", w: 2 }); return Chances.oppPenaltyChance(this); }
 
     // Ocasiones SIMULADAS (no interactivas): la parte "el resto se simula" del Bible §7.

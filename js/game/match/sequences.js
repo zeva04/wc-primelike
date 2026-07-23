@@ -37,7 +37,7 @@ import { SEQUENCE_TYPES, ADVANCED_BY_FILO } from "../../content/sequences.js";
 import { FIRMA_TYPE, FILO_LEVELS, FILO_ETAPAS, getPhilosophy } from "../../content/philosophies.js";
 import { rivalFilo } from "../philosophy.js";
 import { buildActDecision } from "./sequence-acts.js";
-import { hookOf } from "./trait-hooks.js";
+import { hookOf, hasTrait } from "./trait-hooks.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
 export const SEQ_MIN = 2, SEQ_MAX = 6;
@@ -196,6 +196,10 @@ function applyFiloWeights(m, side, w, oppFilo) {
   if (pm && side === "mine" && (!pm.vsFilo || pm.vsFilo === oppFilo?.id)) {
     for (const k of Object.keys(pm.weights)) if (w[k] !== undefined && w[k] > 0) w[k] *= pm.weights[k];
   }
+  // T2 — Pelota Parada Ensayada: la jugada ensayada también sale MÁS seguido
+  // (se apila sobre el ×1.3 incondicional del Bloque: su arma, más afilada).
+  const sr = hookOf(m, "setpieceRehearsed");
+  if (sr && side === "mine" && w.balon_parado > 0) w.balon_parado *= sr.poolMult;
   // F2 — la firma rival sesga SU lado, con su nivel como magnitud (escala de
   // ETAPAS: el rival no tiene escalera fina — sus mults F2 quedan exactos, T1)
   if (oppFilo && side === "opp") {
@@ -239,10 +243,10 @@ export function filoShareShift(myFilo, oppFilo) {
   return d;
 }
 
-/** ¿Tengo el RASGO de esta filosofía activo? (F2: Consolidada = etapa 2, decisión PO #6). */
-export function filoRasgo(m, filoId) {
-  return m.my.filo?.id === filoId && m.my.filo.etapa >= 2;
-}
+/* filoRasgo() MURIÓ en T2 (migración F2, decisión PO #2): el efecto profundo que
+   Consolidada regalaba automático ahora se COMPRA en el árbol — el gate es
+   trait-hooks.hasTrait (caceria_letal · sitio_area · trampa_cerrada · duenos_area).
+   Consolidada da su PI, el mult 2.1 y el share 0.9 de la avanzada — nada más. */
 
 /**
  * Acierto de un acto en una secuencia del TIPO FIRMA de mi filosofía (F1, "successful
@@ -296,11 +300,9 @@ export function startSequence(m, type) {
     // Momento → protagonista (decisión #15): ver protMomentum.
     const prot = m._weightedPick(cands, cands.map(p => (type.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
     m.seq = { type, prot, actIdx: 0, bonus: 0 };
-    // Los RASGOS de F2 se FUSIONARON en las secuencias avanzadas (M2, decisión PO):
-    // Consolidada ya no bufea los tipos base — PROFUNDIZA tu avanzada. El único que
-    // sigue usando el plan propio es la sinfonía profunda: 4º compás en Consolidada
-    // (el viejo rasgo de Posesión, ahora dentro de SU fútbol).
-    if (type.id === "sinfonia" && filoRasgo(m, "posesion")) m.seq.plan = ["build", ...type.plan];
+    // El 4º compás de la sinfonía profunda: era el rasgo F2 de Posesión (Consolidada);
+    // desde T2 lo COMPRA Sitio al Área (migración al árbol, decisión PO #2).
+    if (type.id === "sinfonia" && hasTrait(m, "sitio_area")) m.seq.plan = ["build", ...type.plan];
     // T1 — hooks de ARRANQUE del árbol de rasgos: la secuencia puede nacer en su
     // variante del rasgo, con relato propio (el momento nombrable abre la jugada).
     // Ambos matchean por FAMILIA (gate T1: sin esto el básico moría al consolidar).
@@ -309,9 +311,27 @@ export function startSequence(m, type) {
     // acelera la avanzada sin canibalizar sus bonus de escalada.
     let traitIntro = null;
     const vd = hookOf(m, "variantDeep"); // Asfixia en Salida: el robo nace sobre el saque de meta
-    if (vd && vd.of === familyOf(type) && rnd() < vd.p) { m.seq.bonus += vd.bonus; traitIntro = vd.intro; }
+    if (vd && vd.of === familyOf(type) && rnd() < vd.p) {
+      m.seq.bonus += vd.bonus;
+      m.seq.deepVariant = true; // Arco a la Vista (T2) profundiza ESTE desenlace
+      traitIntro = vd.intro;
+    }
+    // Cambio de Frente (T2): variante condicional al RIVAL (solo contra el bloque
+    // que la amplitud viene estirando) — mismo mecanismo, otra condición.
+    const vs = hookOf(m, "variantSwitch");
+    if (vs && vs.of === familyOf(type) && vs.vsFilo === seqPlan(m).oppFilo?.id && rnd() < vs.p) {
+      m.seq.bonus += vs.bonus;
+      traitIntro = vs.intro;
+    }
     const sk = hookOf(m, "skipToFinish"); // Tres Pases o Nada: la contra se juega a una
-    if (sk && sk.of === familyOf(type) && rnd() < sk.p) { m.seq.actIdx = 1; m.seq.bonus += sk.bonus; traitIntro = sk.intro; }
+    if (sk && sk.of === familyOf(type) && rnd() < sk.p) {
+      m.seq.actIdx = 1;
+      m.seq.bonus += sk.bonus;
+      traitIntro = sk.intro;
+      // El Primer Pase (T2): el salto gana calidad y SU voz (el pase que rompe la línea)
+      const up = hookOf(m, "skipUpgrade");
+      if (up) { m.seq.bonus += up.bonus; traitIntro = up.intro; }
+    }
     // [RELATO CON IDENTIDAD] (F3): cuando la secuencia es MI tipo firma, la narra la
     // filosofía ("el pressing que entrenamos toda la semana") en vez del intro genérico.
     const filoIntros = m.my.filo && FIRMA_TYPE[m.my.filo.id] === type.id ? getPhilosophy(m.my.filo.id).firmaIntros : null;

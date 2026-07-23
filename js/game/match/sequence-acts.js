@@ -14,8 +14,8 @@
 import { rnd, pick } from "../../core/rng.js";
 import { playedPos } from "../ratings.js";
 import { sequenceType } from "../../content/sequences.js";
-import { protMomentum, noteFiloHit, filoRasgo, familyOf } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
-import { hookOf, rollChain, chainMine, traitMoment } from "./trait-hooks.js"; // el árbol de rasgos (T1)
+import { protMomentum, noteFiloHit, familyOf } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
+import { hookOf, rollChain, chainMine, traitMoment, hasTrait } from "./trait-hooks.js"; // el árbol de rasgos (T1/T2)
 
 // El plan de actos de la secuencia: el propio si lo tiene (rasgo de Posesión:
 // un acto más de circulación, lo arma startSequence) o el del catálogo.
@@ -212,9 +212,10 @@ export function resolveSequenceAct(m, key) {
         return maybeCounter(m, `min ${m.min}' — ${f.carryFail}`, true);
       }
       // El Contragolpe letal paga por tramo (adv.carryBonus: el rival partido vale más
-      // que la transición simple) y Consolidada profundiza el primero (rasgo F2 fusionado).
+      // que la transición simple); el 1er tramo profundo era el rasgo F2 de Consolidada —
+      // desde T2 lo compra La Trampa Cerrada (migración al árbol).
       s.bonus += (s.type.advFor === "contra" ? s.type.adv.carryBonus[Math.min(s.actIdx, 1)] : 0.05)
-        + (s.type.advFor === "contra" && s.actIdx === 0 && filoRasgo(m, "contra") ? s.type.adv.deepBonus : 0);
+        + (s.type.advFor === "contra" && s.actIdx === 0 && hasTrait(m, "trampa_cerrada") ? s.type.adv.deepBonus : 0);
       m.log("plain", `min ${m.min}' — ${f.carryOk(s.prot)}`);
       dtOk(m);
     } else {
@@ -238,14 +239,14 @@ export function resolveSequenceAct(m, key) {
     const r = A.actContain(m, mine, { press: total, bonus: 0.10 });
     if (!r.ok) {
       // Cacería total: el rival que la rompe, un % de las veces la rompe CON FALTA —
-      // amarilla (acumula) + tiro libre encadenado. Consolidada sube ese % (el rival ya
-      // no sabe cómo pararte). El resto de las roturas siguen doliendo como siempre.
-      if (caza && rnd() < (filoRasgo(m, "press") ? s.type.adv.foulBreakDeep : s.type.adv.foulBreak)) return advFoulSetPiece(m, f.foulText, s.type.adv.freekickBonus);
+      // amarilla (acumula) + tiro libre encadenado. El % profundo era el rasgo F2 de
+      // Consolidada — desde T2 lo compra Cacería Letal (migración al árbol).
+      if (caza && rnd() < (hasTrait(m, "caceria_letal") ? s.type.adv.foulBreakDeep : s.type.adv.foulBreak)) return advFoulSetPiece(m, f.foulText, s.type.adv.freekickBonus);
       return maybeCounter(m, `min ${m.min}' — ${f.pressFail}`, total);
     }
-    // El 2º robo de la cacería es en ZONA LETAL (+trapBonus); Consolidada suma el rasgo
-    // F2 fusionado (+deepBonus). La Recuperación alta base ya no lleva el bonus del rasgo.
-    s.bonus += (total ? 0.15 : 0.05) + (caza && s.actIdx === 1 ? s.type.adv.trapBonus + (filoRasgo(m, "press") ? s.type.adv.deepBonus : 0) : 0);
+    // El 2º robo de la cacería es en ZONA LETAL (+trapBonus); el deepBonus era el rasgo
+    // F2 de Consolidada — desde T2 lo compra Cacería Letal (migración al árbol).
+    s.bonus += (total ? 0.15 : 0.05) + (caza && s.actIdx === 1 ? s.type.adv.trapBonus + (hasTrait(m, "caceria_letal") ? s.type.adv.deepBonus : 0) : 0);
     m.log("event", `min ${m.min}' — ${caza && s.actIdx === 1 ? f.press2Ok : f.pressOk}`);
     if (total) dtOk(m);
     // T1 — Trampa en la Banda: el robo de la recuperación puede CONVERTIRSE en ataque
@@ -281,11 +282,13 @@ export function resolveSequenceAct(m, key) {
       }
       // T1 — Segunda Jugada: el duelo perdido no siempre es pérdida — la segunda
       // pelota puede caer nuestra y el bloque vuelve a lanzar (secuencia reactiva).
+      // T2 — Plataforma la sube de calidad: posición establecida, con su propia voz.
       const sj = rollChain(m, "chainOnDuelFail");
       if (sj) {
         if (key === "peinar") dtFail(m);
         m.log("chance", `min ${m.min}' — ${f.duelFail}`);
-        return chainMine(m, sj.to, { bonus: sj.bonus, intro: sj.intro, buildDecision: buildActDecision }) ? false : closeSilent(m);
+        const up = hookOf(m, "secondBallUpgrade");
+        return chainMine(m, sj.to, { bonus: sj.bonus + (up?.bonus || 0), intro: up?.intro || sj.intro, buildDecision: buildActDecision }) ? false : closeSilent(m);
       }
       const out = closeSeq(m, "chance", `min ${m.min}' — ${f.duelFail}`);
       if (key === "peinar") dtFail(m);
@@ -308,9 +311,10 @@ export function resolveSequenceAct(m, key) {
   if (kind === "finish") {
     // La sinfonía (M2): si TODOS los compases sonaron (desesperación llena), un % de las
     // veces el rival ya no llega con las piernas y te baja DENTRO del área — penal.
-    // Consolidada (4 compases) desespera más. Si no hay penal, el remate llega limpio.
+    // El penal profundo (y el 4º compás) eran el rasgo F2 de Consolidada — desde T2 los
+    // compra Sitio al Área (migración al árbol). Si no hay penal, el remate llega limpio.
     if (s.type.advFor === "posesion" && (s.buildOks || 0) >= planOf(s).filter(k => k === "build").length
-        && rnd() < (filoRasgo(m, "posesion") ? s.type.adv.penaltyChanceDeep : s.type.adv.penaltyChance)) {
+        && rnd() < (hasTrait(m, "sitio_area") ? s.type.adv.penaltyChanceDeep : s.type.adv.penaltyChance)) {
       m.log("event", `min ${m.min}' — ${f.penaltyText(s.prot)}`);
       closeSilent(m);
       return myPenalty(m);
@@ -320,18 +324,30 @@ export function resolveSequenceAct(m, key) {
     // Por FAMILIA: la sinfonía también acelera (hallazgo del gate T1).
     const acc = hookOf(m, "accelFinish");
     if (acc && familyOf(s.type) === acc.of && rnd() < acc.p) { s.bonus += acc.bonus; m.log("event", `min ${m.min}' — ${acc.intro(s.prot)}`); }
+    // T2 — Arco a la Vista: si la jugada nació en su variante profunda (la asfixia
+    // sobre el saque de meta), el desenlace llega a quemarropa.
+    const df = hookOf(m, "deepFinish");
+    if (df && s.deepVariant && familyOf(s.type) === df.of) { s.bonus += df.bonus; traitMoment(m, df.traitId, [df.texto]); }
     const stat = s.finishStat || f.finishStat;
     if (key === "asistir") {
       const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
-      const mate = mates.length ? m._weightedPick(mates, mates.map(p => playedPos(p) === "DEL" ? 3 : 1)) : s.prot;
+      // T2 — Superioridad Numérica: en la familia de la contra, el pase elige al MEJOR
+      // ubicado DE VERDAD (el de mejor Tiro), no a un corredor cualquiera.
+      const supUp = hookOf(m, "supportUpgrade");
+      const numeric = supUp && familyOf(s.type) === "transicion" && mates.length > 0;
+      const mate = !mates.length ? s.prot
+        : numeric ? [...mates].sort((a, b) => (b.stats.tiro || 0) - (a.stats.tiro || 0))[0]
+        : m._weightedPick(mates, mates.map(p => playedPos(p) === "DEL" ? 3 : 1));
       const pass = A.actPass(m, s.prot);
       if (!pass.ok) return maybeCounter(m, `min ${m.min}' — el pase de ${s.prot.name} no encuentra a nadie.`, true);
       // T1 — Correr en Manada: en la contra, el "buscar al mejor ubicado" encuentra
       // superioridad de verdad — la definición llega con dos camisetas libres.
       // Por FAMILIA: el contragolpe letal también corre en manada (gate T1).
       const sup = hookOf(m, "finishSupport");
-      const supBonus = sup && familyOf(s.type) === sup.of ? sup.bonus : 0;
-      if (supBonus) traitMoment(m, sup.traitId, [sup.texto]);
+      const supBonus = (sup && familyOf(s.type) === sup.of ? sup.bonus : 0) + (numeric ? supUp.bonus : 0);
+      // La voz: Superioridad (si la hay) pisa a la de la Manada — un momento, no dos.
+      if (numeric) traitMoment(m, supUp.traitId, [supUp.texto]);
+      else if (sup && familyOf(s.type) === sup.of) traitMoment(m, sup.traitId, [sup.texto]);
       const shot = A.actShot(m, mate, { stat: "tiro", bonus: s.bonus + f.finishBonus + 0.04 + supBonus });
       if (shot.ok) { goalMine(m, mate, "¡Definición tras la asistencia!", s.prot); return closeSilent(m); }
       return maybeRebound(m, `min ${m.min}' — ${mate.name} no logra conectar el remate.`);
@@ -343,23 +359,39 @@ export function resolveSequenceAct(m, key) {
 
   if (kind === "setpiece") {
     // Balón parado a favor: una decisión, desenlace inmediato (secuencia de un solo duelo).
+    // T2 — Pelota Parada Ensayada: la pizarra entra en acción — ambas opciones llegan
+    // mejor ensayadas (bonus de situación) y el momento se narra una vez por jugada.
+    const sr = hookOf(m, "setpieceRehearsed");
+    const srB = sr ? sr.bonus : 0;
+    if (sr && !s.rehearsedTold) { s.rehearsedTold = true; traitMoment(m, sr.traitId, [sr.texto]); }
     if (key === "centro") {
       const t = s.target || s.prot;
-      const shot = A.actShot(m, t, { stat: "cabezazo", bonus: 0.10 });
+      const shot = A.actShot(m, t, { stat: "cabezazo", bonus: 0.10 + srB });
       if (shot.ok) { goalMine(m, t, "¡Cabezazo letal en el balón parado!", s.prot); return closeSilent(m); }
       return maybeRebound(m, `min ${m.min}' — el centro busca a ${t.name} pero ${pick(["gana el arquero en el aire", "la despeja la zaga", "el cabezazo se va por arriba"])}.`);
     }
-    const shot = A.actShot(m, s.prot, { stat: "tiro", bonus: 0.06 });
+    const shot = A.actShot(m, s.prot, { stat: "tiro", bonus: 0.06 + srB });
     if (shot.ok) { goalMine(m, s.prot, "¡La jugada preparada termina en gol!", "open"); return closeSilent(m); }
     return maybeRebound(m, `min ${m.min}' — la jugada ensayada muere en ${pick(["un rebote", "el achique del arquero", "un despeje al córner"])}.`);
   }
 
   if (kind === "defend_sp") {
     // Córner en contra: zona = seguro; salir = puede matarla de una, o dejar solo al cabeceador.
+    // T2 — Dueños del Área: el córner DEFENDIDO puede encadenar pelotazo propio
+    // (comer centros → lanzar: la cadena completa de la firma del Bloque).
     const { mine } = m.powers();
+    const chainDS = () => {
+      const ds = rollChain(m, "chainOnDefendSp");
+      return ds ? chainMine(m, ds.to, { bonus: ds.bonus, intro: ds.intro, buildDecision: buildActDecision }) : false;
+    };
     if (key === "salir") {
       const r = A.actContain(m, mine, { press: true, bonus: 0.06 });
-      if (r.ok) { const out = closeSeq(m, "event", `min ${m.min}' — 🥊 ¡La zaga sale con todo y despeja el córner de una!`); dtOk(m); return out; }
+      if (r.ok) {
+        m.log("event", `min ${m.min}' — 🥊 ¡La zaga sale con todo y despeja el córner de una!`);
+        dtOk(m);
+        if (chainDS()) return false;
+        return closeSilent(m);
+      }
       dtFail(m);
       const shot = A.actOppShot(m, s.shooter, mine, { stat: "cabezazo", bonus: 0.08 });
       if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
@@ -367,7 +399,9 @@ export function resolveSequenceAct(m, key) {
     }
     const shot = A.actOppShot(m, s.shooter, mine, { stat: "cabezazo", bonus: -0.05 }); // área poblada
     if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
-    return closeSeq(m, "chance", `min ${m.min}' — la zona aguanta: el cabezazo de ${s.shooter.name} ${pick(["se va desviado", "muere en las manos del arquero", "lo saca la defensa"])}.`);
+    m.log("chance", `min ${m.min}' — la zona aguanta: el cabezazo de ${s.shooter.name} ${pick(["se va desviado", "muere en las manos del arquero", "lo saca la defensa"])}.`);
+    if (chainDS()) return false;
+    return closeSilent(m);
   }
 
   if (kind === "playout") {
@@ -376,6 +410,11 @@ export function resolveSequenceAct(m, key) {
     if (key === "despeje") return closeSeq(m, "plain", `min ${m.min}' — ${f.playoutSafe}`);
     const r = A.actPass(m, s.prot, { hard: true });
     if (!r.ok) {
+      // T2 — El Tercer Hombre: la salida rota puede RESCATARSE — el desmarcado aparece
+      // a tiempo y el regalo letal no existe (la posesión se pierde sin sangre). La
+      // vacuna comprable contra el festín del Press rival.
+      const th = hookOf(m, "playoutRescue");
+      if (th && rnd() < th.p) return closeSeq(m, "plain", `min ${m.min}' — ${th.texto}`);
       m.log("chance", `min ${m.min}' — ${f.playoutFail(s.prot)}`);
       dtFail(m);
       const { mine } = m.powers();
@@ -398,14 +437,14 @@ export function resolveSequenceAct(m, key) {
   if (kind === "contain") {
     const { mine } = m.powers();
     const fortaleza = s.type.advFor === "bloque"; // la avanzada del Bloque (M2)
-    // El rasgo F2 del Bloque (+contención) se FUSIONÓ en su avanzada: solo la fortaleza
-    // consolidada contiene mejor — el repliegue base volvió a su matemática original.
-    const r = A.actContain(m, mine, { press: key === "presionar", bonus: fortaleza && filoRasgo(m, "bloque") ? s.type.adv.deepContain : 0 });
+    // La contención profunda de la fortaleza era el rasgo F2 de Consolidada — desde T2
+    // la compra Dueños del Área (migración al árbol); el repliegue base sigue original.
+    const r = A.actContain(m, mine, { press: key === "presionar", bonus: fortaleza && hasTrait(m, "duenos_area") ? s.type.adv.deepContain : 0 });
     if (r.ok) {
       // La fortaleza CASTIGA (M2): la contención exitosa convierte — pelotazo inmediato
-      // con el rival desarmado (def→of, el patrón de la salida bajo presión). Consolidada
-      // convierte más. Si no convierte, la jugada muere cortada como siempre.
-      if (fortaleza && rnd() < (filoRasgo(m, "bloque") ? s.type.adv.convertDeep : s.type.adv.convert)) {
+      // con el rival desarmado (def→of, el patrón de la salida bajo presión). El convert
+      // profundo era el rasgo F2 de Consolidada — desde T2 lo compra Dueños del Área.
+      if (fortaleza && rnd() < (hasTrait(m, "duenos_area") ? s.type.adv.convertDeep : s.type.adv.convert)) {
         if (r.press) dtOk(m);
         m.log("event", `min ${m.min}' — ${f.convertText(m.oppTeam)}`);
         const t = sequenceType("pelotazo");

@@ -14,7 +14,7 @@
    ============================================================ */
 import { getPhilosophy, aristaById, ARISTAS, FILO_LEVELS, FILO_ETAPAS } from "../../content/philosophies.js";
 import { sequenceType, ADVANCED_BY_FILO } from "../../content/sequences.js";
-import { RAMA_LABELS } from "../../content/traits.js";
+import { RAMA_LABELS, DEEP_TRAIT } from "../../content/traits.js";
 import { filoPoints, filoLevel, filoEtapa } from "../../game/philosophy.js";
 import { traitTree, buyTrait } from "../../game/traits.js";
 import { S } from "../session.js";
@@ -34,6 +34,7 @@ const bar = (pct, cls) => `<div class="h-1.5 rounded-full bg-slate-900/80 overfl
  * candado (faltas legibles). El PI disponible manda el call-to-action.
  */
 function treePanel(run) {
+  const f = getPhilosophy(run.filoId);
   const tree = traitTree(run);
   const pi = run.identityPoints || 0;
   const byRama = Object.keys(RAMA_LABELS).map(rama => ({ rama, ...RAMA_LABELS[rama], traits: tree.filter(t => t.rama === rama) }));
@@ -44,19 +45,28 @@ function treePanel(run) {
     </div>
     <p class="text-[11px] text-slate-500 mb-3">Cada nivel de identidad otorga un Punto de Identidad. Un rasgo es una idea futbolística permanente: no te hace más fuerte — te hace jugar distinto.</p>
     <div class="grid md:grid-cols-3 gap-3">
-      ${byRama.map(r => `<div class="rounded-xl border border-slate-700 bg-slate-900/40 p-3">
-        <div class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">${r.label}</div>
-        <div class="text-[10px] text-slate-500 mb-2">${r.desc}</div>
-        ${r.traits.map(t => `<div class="rounded-lg border p-2.5 ${t.owned ? "tp-border tp-bg-soft" : t.buyable ? "border-amber-500/50 bg-slate-800/80" : "border-slate-700 bg-slate-900/50 opacity-70"}">
+      ${byRama.map(r => `<div class="rounded-xl border border-slate-700 bg-slate-900/40 p-3 space-y-2">
+        <div>
+          <div class="text-[10px] font-black uppercase tracking-widest text-slate-400">${r.label}</div>
+          <div class="text-[10px] text-slate-500">${r.desc}</div>
+        </div>
+        ${r.traits.map(t => {
+          // El principio AJENO (regla del arco): el candado avisa que entrenarlo
+          // no acelera tu filosofía — la decisión más cara del sistema, explicada.
+          const ajena = t.req.principio && !f.aristas.includes(t.req.principio.id) ? aristaById(t.req.principio.id) : null;
+          return `<div class="rounded-lg border p-2.5 ${t.owned ? "tp-border tp-bg-soft" : t.buyable ? "border-amber-500/50 bg-slate-800/80" : "border-slate-700 bg-slate-900/50 opacity-70"}">
           <div class="flex items-center justify-between gap-1">
             <span class="text-xs font-bold ${t.owned ? "tp-text" : "text-slate-200"}">${t.icon} ${t.nombre}</span>
             ${t.owned ? `<span class="text-[9px] font-black text-emerald-400 uppercase">✓ tuya</span>` : t.buyable ? "" : `<span class="text-[10px]">🔒</span>`}
           </div>
+          <div class="text-[8px] font-black uppercase tracking-widest ${t.tier === "basic" ? "text-slate-500" : "text-indigo-300"} mt-0.5">${t.tier === "basic" ? "básico" : "intermedio"}</div>
           <div class="text-[10px] text-slate-400 leading-snug mt-1">${t.desc}</div>
           <div class="text-[10px] text-slate-500 italic mt-1">Su momento: ${t.momento}</div>
           ${t.buyable ? `<button data-buy="${t.id}" class="mt-2 w-full px-2 py-1.5 rounded-lg border border-amber-500/60 bg-amber-500/10 text-amber-300 text-[11px] font-bold cursor-pointer transition-all hover:bg-amber-500/20">Incorporar (1 PI)</button>` : ""}
           ${!t.owned && !t.buyable && t.faltas.length ? `<div class="text-[9px] text-slate-500 mt-1.5">Falta: ${t.faltas.join(" · ")}</div>` : ""}
-        </div>`).join("")}
+          ${!t.owned && ajena ? `<div class="text-[9px] text-amber-400/90 leading-snug mt-1">⚠️ Pide ${ajena.icon} ${ajena.label}, un principio AJENO: entrenarlo no acelera tu filosofía.</div>` : ""}
+        </div>`;
+        }).join("")}
       </div>`).join("")}
     </div>
   </div>`;
@@ -74,6 +84,8 @@ function renderPhilosophy(opts = {}) {
   const firma = aristaById(f.firma);
   const firmaType = sequenceType(firma.tipo);
   const adv = ADVANCED_BY_FILO[f.id]; // la secuencia avanzada de mi identidad (M2)
+  const deep = DEEP_TRAIT[f.id];      // el rasgo que la profundiza (migración F2, T2)
+  const deepOwned = (run.rasgos?.[f.id] || []).includes(deep.id);
   // Progreso hacia el próximo umbral, desde el piso del nivel actual (para que la barra
   // no nazca medio llena al subir de nivel).
   const nivelPct = next ? (100 * (pts - nivel.min)) / (next.min - nivel.min) : 100;
@@ -111,9 +123,9 @@ function renderPhilosophy(opts = {}) {
             <div class="text-[11px] font-bold ${etapa >= 1 ? "tp-text" : "text-slate-400"}">${etapa >= 1 ? "✅ Fútbol superior desbloqueado" : `🔒 Fútbol superior — se conquista En desarrollo (${FILO_ETAPAS[1].min} pts)`}</div>
             <div class="text-[12px] font-black ${etapa >= 1 ? "text-slate-100" : "text-slate-500"} mt-1">${adv.icon} ${adv.name}</div>
             <div class="text-[11px] ${etapa >= 1 ? "text-slate-200" : "text-slate-500"} mt-0.5">${adv.vitrina}</div>
-            <div class="mt-2 pt-2 border-t ${etapa === 2 ? "border-amber-500/40" : "border-slate-700/60"}">
-              <span class="text-[11px] font-bold ${etapa === 2 ? "text-amber-300" : "text-slate-500"}">${etapa === 2 ? "✅ Profunda (Consolidada)" : `🔒 Consolidada la profundiza (${FILO_ETAPAS[2].min} pts)`}</span>
-              <div class="text-[11px] ${etapa === 2 ? "text-slate-200" : "text-slate-500"} mt-0.5">${f.rasgo}</div>
+            <div class="mt-2 pt-2 border-t ${deepOwned ? "border-amber-500/40" : "border-slate-700/60"}">
+              <span class="text-[11px] font-bold ${deepOwned ? "text-amber-300" : "text-slate-500"}">${deepOwned ? "✅ Profundizada por el árbol" : "🌳 Su profundidad se COMPRA en el árbol"}</span>
+              <div class="text-[11px] ${deepOwned ? "text-slate-200" : "text-slate-500"} mt-0.5">${deep.icon} <b>${deep.nombre}</b> — ${f.rasgo}</div>
             </div>
           </div>
         </div>

@@ -57,6 +57,13 @@ export function hookOf(m, name) {
   return traitHooks(m)[name]?.[0] || null;
 }
 
+/** ¿El DT compró este rasgo? — EL GATE DE LA MIGRACIÓN F2 (T2): donde antes
+ *  decidía filoRasgo (Consolidada regalaba el efecto profundo), ahora decide
+ *  el árbol. Consolidada da su PI y nada más (decisión PO #2). */
+export function hasTrait(m, traitId) {
+  return (m.my.filo?.rasgos || []).includes(traitId);
+}
+
 /**
  * Tira un hook con probabilidad y presupuesto de cadena: devuelve el hook si
  * procede encadenar (y CONSUME presupuesto), null si no. Para hooks sin `p`

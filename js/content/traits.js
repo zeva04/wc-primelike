@@ -54,6 +54,31 @@
                        jaula que invita a la banda: llegadas de peor calidad).
    - oppLoseActs:      {p}             una secuencia rival multi-acto pierde
                        continuidad (el partido cortado del oficio).
+
+   Vocabulario Intermediate (T2 — regla: matchear por FAMILIA):
+   - deepPress / deepPosesion / deepContra / deepBloque: {} — LA MIGRACIÓN F2:
+     el efecto profundo que Consolidada regalaba ahora se COMPRA (caceria
+     foulBreakDeep · sinfonia 4º compás + penal profundo · contra_letal
+     deepBonus · fortaleza deepContain/convertDeep). Los interpreta el gate
+     hasTrait() donde antes decidía filoRasgo().
+   - breakawayGuard:   {p, texto}      el pelotazo ambiente a la espalda puede
+                       morir cortado por el central que lo leyó (Anticipar).
+   - deepFinish:       {of, bonus, texto} el desenlace de una VARIANTE PROFUNDA
+                       (variantDeep) llega aún más limpio (Arco a la Vista).
+   - playoutRescue:    {p, texto}      la salida jugada que falla puede rescatarse
+                       (el tercer hombre aparece): sin remate regalado.
+   - variantSwitch:    {of, vsFilo, p, bonus, intro} variante de arranque
+                       condicional al rival (el cambio de frente vs bloque).
+   - skipUpgrade:      {bonus, intro}  el salto de Tres Pases gana calidad y voz
+                       propia (el primer pase que rompe la última línea).
+   - supportUpgrade:   {bonus}         el "buscar al mejor ubicado" elige al MEJOR
+                       de verdad (max Tiro) con superioridad real.
+   - chainOnDefendSp:  {to, p, bonus, intro} el córner rival defendido encadena
+                       pelotazo propio (comer centros → lanzar).
+   - setpieceRehearsed:{bonus, poolMult, texto} el balón parado propio ejecuta la
+                       jugada ensayada (mejor) y sale más seguido en el pool.
+   - secondBallUpgrade:{bonus, intro}  la cadena de Segunda Jugada sube de calidad
+                       y gana su propia voz (posición establecida).
    ============================================================ */
 
 export const TRAITS = [
@@ -173,6 +198,134 @@ export const TRAITS = [
     hooks: { chainOnDuelFail: { to: "pelotazo", p: 0.30, bonus: 0.02,
       intro: p => `¡La segunda pelota es nuestra! El rechace cae al pie y ${p.name} vuelve a la carga.` } },
   },
+
+  /* ================= INTERMEDIATE (T2 "Las ramas") =================
+     Gating: básico de la rama + Nivel 3 + Principio a 2 (AJENO en la
+     rama Respuesta: cubrirse cuesta pureza de identidad) + 1 PI.
+     Los marcados (migrado F2) absorben el efecto que Consolidada
+     regalaba automático — ahora se compra. */
+
+  /* ---------------- 🦁 High Press ---------------- */
+  {
+    id: "caceria_letal", filo: "press", rama: "firma", tier: "intermediate", icon: "🩸",
+    nombre: "Cacería Letal",
+    desc: "La presión tras pérdida se vuelve tan intensa que al rival solo le queda frenarla con falta.",
+    momento: "La amarilla al cinco rival antes del minuto veinte.",
+    req: { nivel: 3, previo: "morder", principio: { id: "presion", min: 2 } },
+    // Migración F2: la Cacería total rota deja falta (amarilla + tiro libre) MÁS
+    // seguido — el foulBreakDeep que antes regalaba Consolidada (filoRasgo press).
+    hooks: { deepPress: {} },
+  },
+  {
+    id: "anticipar", filo: "press", rama: "respuesta", tier: "intermediate", icon: "🛡️",
+    nombre: "Anticipar la Espalda",
+    desc: "Los centrales se adelantan para cortar el balón largo que busca superar la presión.",
+    momento: "El central cortando de cabeza el pelotazo que iba a partir al equipo.",
+    req: { nivel: 3, previo: "trampa_banda", principio: { id: "solidez", min: 2 } }, // AJENO: cubrirse cuesta
+    hooks: { breakawayGuard: { p: 0.40,
+      texto: "El central LEYÓ el pelotazo a la espalda: paso adelante y corte de cabeza. La presión sigue viva." } },
+  },
+  {
+    id: "arco_vista", filo: "press", rama: "expansion", tier: "intermediate", icon: "🎯",
+    nombre: "Arco a la Vista",
+    desc: "Los robos en campo rival se convierten inmediatamente en ocasiones de gol.",
+    momento: "Robo y gol en dos toques.",
+    req: { nivel: 3, previo: "asfixia_salida", principio: { id: "verticalidad", min: 2 } },
+    hooks: { deepFinish: { of: "recuperacion", bonus: 0.08,
+      texto: "El robo fue tan arriba que el arco ya está a la vista: definición a quemarropa." } },
+  },
+
+  /* ---------------- 🎼 Posesión ---------------- */
+  {
+    id: "tercer_hombre", filo: "posesion", rama: "firma", tier: "intermediate", icon: "🔺",
+    nombre: "El Tercer Hombre",
+    desc: "Las combinaciones de tres jugadores rompen líneas y aseguran la salida bajo presión.",
+    momento: "La pared que deja atrás a toda la primera línea de presión.",
+    req: { nivel: 3, previo: "hombre_libre", principio: { id: "elaboracion", min: 2 } },
+    // Mitiga el festín del Press rival: la salida jugada que falla puede rescatarse.
+    hooks: { playoutRescue: { p: 0.40,
+      texto: "¡El tercer hombre salva la salida! El pase interceptado encuentra al desmarcado y el regalo no existe." } },
+  },
+  {
+    id: "cambio_frente", filo: "posesion", rama: "respuesta", tier: "intermediate", icon: "🌊",
+    nombre: "Cambio de Frente",
+    desc: "El equipo mueve el balón de banda a banda para desorganizar al bloque rival.",
+    momento: "El cambio de cuarenta metros y centro atrás con el bloque descolocado.",
+    req: { nivel: 3, previo: "amplitud", principio: { id: "directo", min: 2 } }, // AJENO: el cambio largo ES juego directo
+    hooks: { variantSwitch: { of: "circulacion", vsFilo: "bloque", p: 0.30, bonus: 0.07,
+      intro: p => `¡CAMBIO DE FRENTE de ${p.name}! Cuarenta metros de vuelo y el bloque entero descolocado.` } },
+  },
+  {
+    id: "sitio_area", filo: "posesion", rama: "expansion", tier: "intermediate", icon: "🏟️",
+    nombre: "Sitio al Área",
+    desc: "Las posesiones prolongadas acorralan al rival en su área y fuerzan errores.",
+    momento: "El penal en el minuto ochenta tras diez minutos de sitio.",
+    req: { nivel: 3, previo: "pausa", principio: { id: "presion", min: 2 } },
+    // Migración F2: el 4º compás de la sinfonía + el penal profundo (filoRasgo posesion).
+    hooks: { deepPosesion: {} },
+  },
+
+  /* ---------------- ⚡ Contragolpe ---------------- */
+  {
+    id: "primer_pase", filo: "contra", rama: "firma", tier: "intermediate", icon: "📡",
+    nombre: "El Primer Pase",
+    desc: "El primer pase tras el robo busca directamente romper la última línea.",
+    momento: "El pase de cincuenta metros que deja el mano a mano.",
+    req: { nivel: 3, previo: "tres_pases", principio: { id: "verticalidad", min: 2 } },
+    hooks: { skipUpgrade: { bonus: 0.06,
+      intro: p => `¡El PRIMER PASE rompe la última línea! ${p.name} queda lanzado con cincuenta metros por delante.` } },
+  },
+  {
+    id: "trampa_cerrada", filo: "contra", rama: "respuesta", tier: "intermediate", icon: "⛓️",
+    nombre: "La Trampa Cerrada",
+    desc: "Cuando el rival se vuelca al ataque, el equipo multiplica las contras a campo abierto.",
+    momento: "La segunda contra consecutiva con el rival regalado.",
+    req: { nivel: 3, previo: "tender_trampa", principio: { id: "solidez", min: 2 } }, // AJENO: aguantar para cazar
+    // Migración F2: el 1er tramo del Contragolpe letal deja al rival AÚN más partido
+    // (deepBonus que antes regalaba Consolidada — filoRasgo contra).
+    hooks: { deepContra: {} },
+  },
+  {
+    id: "superioridad", filo: "contra", rama: "expansion", tier: "intermediate", icon: "🎯",
+    nombre: "Superioridad Numérica",
+    desc: "Los contraataques buscan sistemáticamente el dos contra uno en el último tercio.",
+    momento: "El dos contra uno resuelto con pase al del área chica.",
+    req: { nivel: 3, previo: "manada", principio: { id: "elaboracion", min: 2 } },
+    hooks: { supportUpgrade: { bonus: 0.05, // el pase busca al MEJOR ubicado de verdad (max Tiro)
+      texto: "SUPERIORIDAD numérica: el pase encuentra al mejor rematador completamente libre." } },
+  },
+
+  /* ---------------- 🧱 Bloque bajo ---------------- */
+  {
+    id: "duenos_area", filo: "bloque", rama: "firma", tier: "intermediate", icon: "🗿",
+    nombre: "Dueños del Área",
+    desc: "El equipo domina el juego aéreo defensivo dentro de su propia área.",
+    momento: "El despeje número diez del central y la contra que nace de ahí.",
+    req: { nivel: 3, previo: "jaula", principio: { id: "solidez", min: 2 } },
+    // Migración F2: la fortaleza PROFUNDA (deepContain + convertDeep — filoRasgo bloque:
+    // "la muralla contiene mejor y castiga casi siempre") + el córner rival defendido
+    // puede encadenar pelotazo propio (comer centros → lanzar).
+    hooks: { deepBloque: {}, chainOnDefendSp: { to: "pelotazo", p: 0.30, bonus: 0.03,
+      intro: p => `¡El área es NUESTRA! Despeje limpio, y ${p.name} ya tiene el pelotazo armado.` } },
+  },
+  {
+    id: "pelota_ensayada", filo: "bloque", rama: "respuesta", tier: "intermediate", icon: "📐",
+    nombre: "Pelota Parada Ensayada",
+    desc: "Cada tiro libre y córner ejecuta una jugada ensayada en el entrenamiento.",
+    momento: "El córner ensayado que termina en gol del dos.",
+    req: { nivel: 3, previo: "oficio", principio: { id: "elaboracion", min: 2 } }, // AJENO: ensayar es elaborar
+    hooks: { setpieceRehearsed: { bonus: 0.06, poolMult: 1.25,
+      texto: "Esto se ensayó mil veces: la pizarra del balón parado entra en acción." } },
+  },
+  {
+    id: "plataforma", filo: "bloque", rama: "expansion", tier: "intermediate", icon: "🏗️",
+    nombre: "Plataforma",
+    desc: "Ganada la segunda pelota, el equipo la convierte en ataque organizado en campo rival.",
+    momento: "Peinada, control del diez, llegada limpia.",
+    req: { nivel: 3, previo: "segunda_jugada", principio: { id: "directo", min: 2 } },
+    hooks: { secondBallUpgrade: { bonus: 0.06,
+      intro: p => `¡Segunda pelota y POSICIÓN establecida! ${p.name} organiza el ataque en campo rival.` } },
+  },
 ];
 
 /** Un rasgo por id (o undefined). */
@@ -188,3 +341,10 @@ export const RAMA_LABELS = {
   respuesta: { label: "Respuesta", desc: "cubre tu matchup débil" },
   expansion: { label: "Expansión", desc: "abre un fútbol lateral" },
 };
+
+/** El rasgo que PROFUNDIZA la avanzada de cada filosofía (la migración F2, T2):
+ *  la vitrina y el diario apuntan acá donde antes prometían el regalo automático
+ *  de Consolidada. Derivado de los hooks deep* exactos — no puede divergir. */
+const DEEP_HOOKS = ["deepPress", "deepPosesion", "deepContra", "deepBloque"];
+export const DEEP_TRAIT = Object.fromEntries(
+  TRAITS.filter(t => DEEP_HOOKS.some(h => t.hooks[h])).map(t => [t.filo, t]));

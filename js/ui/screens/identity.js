@@ -47,7 +47,7 @@ function renderChooseIdentity() {
           </div>
           <div class="text-[10px] text-emerald-400 leading-snug">✓ ${p.fuerte}</div>
           <div class="text-[10px] text-amber-400 leading-snug">⚠️ ${p.advertencia}</div>
-          <div class="text-[10px] text-slate-500 leading-snug mt-auto">🔓 En desarrollo: ${ADVANCED_BY_FILO[p.id].icon} <b>${ADVANCED_BY_FILO[p.id].name}</b>, tu fútbol superior · 🏆 Consolidada lo profundiza</div>
+          <div class="text-[10px] text-slate-500 leading-snug mt-auto">🔓 En desarrollo: ${ADVANCED_BY_FILO[p.id].icon} <b>${ADVANCED_BY_FILO[p.id].name}</b>, tu fútbol superior · 🌳 su profundidad se compra en el árbol de rasgos</div>
         </button>`).join("")}
     </div>
     <div class="flex items-center justify-center gap-4 mt-6">

@@ -25,6 +25,7 @@ import { clamp } from "../core/math.js";
 import { addJournal } from "./journal.js";
 import { trackOxidacion } from "./oxidation.js";
 import { syncIdentityPI, creditInheritedPI, activeTraitIds } from "./traits.js";
+import { DEEP_TRAIT } from "../content/traits.js";
 
 // Progresión por ejecución: cada ACIERTO de acto en una secuencia del tipo firma
 // (los cuenta el Match en `match.filoHits`) vale FILO_EXEC_GAIN de la arista
@@ -129,10 +130,19 @@ export function noteFiloMilestones(run) {
     icon: "🔓", tone: "gold", title: `¡Conquista! ${adv.icon} ${adv.name} ya es nuestro fútbol`,
     desc: `La idea de ${f.name} entró: desde hoy la ${adv.name} sale en los partidos. El fútbol básico quedó atrás — esto se entrenó.`,
   });
-  else addJournal(run, {
-    icon: "⭐", tone: "gold", title: `La idea es LEY: ${f.name} consolidada`,
-    desc: `${adv.icon} ${adv.name} se profundiza: ${f.rasgo}`,
-  });
+  else {
+    // T2 (migración F2): Consolidada ya no regala el efecto profundo — lo compra su
+    // rasgo Intermediate. El diario celebra la ley y apunta al árbol (o celebra la
+    // sinergia si el DT ya lo había comprado).
+    const deep = DEEP_TRAIT[f.id];
+    const owned = (run.rasgos?.[f.id] || []).includes(deep.id);
+    addJournal(run, {
+      icon: "⭐", tone: "gold", title: `La idea es LEY: ${f.name} consolidada`,
+      desc: owned
+        ? `${adv.icon} ${adv.name} domina el pool — y con ${deep.nombre} ya comprada, tu fútbol superior juega PROFUNDO.`
+        : `${adv.icon} ${adv.name} domina el pool. Su profundidad no viene de regalo: ${deep.icon} ${deep.nombre} te espera en el árbol de rasgos.`,
+    });
+  }
   return lvl;
 }
 
