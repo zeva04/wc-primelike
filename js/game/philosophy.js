@@ -17,13 +17,14 @@
    {id, nivel} (se arma en screens/match.js Y tests/smoke.js);
    el Match no conoce la run (ARQUITECTURA §3.2).
    ============================================================ */
-import { getPhilosophy, aristaById, filoPointsOf, filoLevelOf } from "../content/philosophies.js";
+import { getPhilosophy, aristaById, filoPointsOf, filoLevelOf, filoEtapaOf } from "../content/philosophies.js";
 import { ADVANCED_BY_FILO } from "../content/sequences.js";
 import { TEAM_PHILOSOPHIES } from "../content/team-philosophies.js";
 import { teamRating } from "./ratings.js";
 import { clamp } from "../core/math.js";
 import { addJournal } from "./journal.js";
 import { trackOxidacion } from "./oxidation.js";
+import { syncIdentityPI, creditInheritedPI, activeTraitIds } from "./traits.js";
 
 // Progresión por ejecución: cada ACIERTO de acto en una secuencia del tipo firma
 // (los cuenta el Match en `match.filoHits`) vale FILO_EXEC_GAIN de la arista
@@ -37,12 +38,20 @@ export const FILO_EXEC_CAP = 2;
  *  Delegado en content/philosophies desde F3 (el contenido también lo lee). */
 export const filoPoints = filoPointsOf;
 
-/** Índice del nivel actual en FILO_LEVELS (0 Aprendiendo · 1 En desarrollo · 2 Consolidada). */
+/** Índice del nivel actual en FILO_LEVELS (0..9 desde T1 — la escalera de PI). */
 export const filoLevel = filoLevelOf;
 
-/** La filosofía para matchCtx: `{id, nivel}` o null — la frontera run→Match, como la moral. */
+/** Etapa del nivel (0 Aprendiendo · 1 En desarrollo · 2 Consolidada) — la escala
+ *  0-2 original de F1: el rival, la brecha R3 y los gates viven acá (T1). */
+export const filoEtapa = filoEtapaOf;
+
+/** La filosofía para matchCtx: `{id, nivel, etapa, rasgos}` o null — la frontera
+ *  run→Match, como la moral. `nivel` (0..9) sesga MI pool; `etapa` (0..2) es la
+ *  escala de los gates (avanzada, rasgo, brecha R3) y de todo lo que compara
+ *  contra el rival; `rasgos` son los ids ACTIVOS del árbol (T1 — el Match los
+ *  interpreta vía sus hooks, jamás conoce la run). */
 export function filoCtx(run) {
-  return run.filoId ? { id: run.filoId, nivel: filoLevel(run) } : null;
+  return run.filoId ? { id: run.filoId, nivel: filoLevel(run), etapa: filoEtapa(run), rasgos: activeTraitIds(run) } : null;
 }
 
 /**
@@ -61,6 +70,9 @@ export function choosePhilosophy(run, filoId) {
     icon: f.icon, tone: "gold", title: `El equipo abraza una identidad: ${f.name}`,
     desc: `${f.lema} El plan: entrenar ${nombres.join(" y ")} hasta que ese fútbol salga solo.`,
   });
+  // El PI inicial (T1, decisión PO): elegir filosofía ES el nivel 1 — el sync lo
+  // acredita y el flujo de inicio lo gasta en 1 de los 3 rasgos básicos.
+  syncIdentityPI(run);
   return f;
 }
 
@@ -75,10 +87,15 @@ export function changePhilosophy(run, filoId) {
   const f = getPhilosophy(filoId);
   if (!f || !run.actionPending || f.id === run.filoId) return null;
   const prev = getPhilosophy(run.filoId);
+  syncIdentityPI(run); // niveles pendientes de la identidad SALIENTE: se acreditan antes de soltarla
   run.filoId = f.id;
-  // Las aristas persisten: la identidad nueva puede NACER con nivel. Ese nivel heredado
+  // ANTI-FARMING (T1): la identidad nueva NACE acreditada a su nivel heredado — la
+  // arista compartida cuenta para dos filosofías y premiarla dos veces imprimiría PI.
+  // Los rasgos comprados de la saliente quedan LATENTES en run.rasgos (decisión PO #3).
+  creditInheritedPI(run);
+  // Las aristas persisten: la identidad nueva puede NACER con nivel. Esa etapa heredada
   // no se narra como conquista (no se conquistó hoy) — la base narrada arranca ahí.
-  run.filoNarrado = filoLevel(run);
+  run.filoNarrado = filoEtapa(run);
   run.actionPending = false;
   run.lastAction = { day: run.day, id: `filo_${f.id}`, group: null, icon: f.icon, title: `Cambio de identidad: ${f.name}` };
   addJournal(run, {
@@ -92,18 +109,19 @@ export function changePhilosophy(run, filoId) {
 }
 
 /**
- * La CONQUISTA narrada (M2): si el nivel de identidad cruzó un umbral desde la última
- * vez que se contó, el diario lo celebra — nivel 1 desbloquea la secuencia AVANZADA
- * (el fútbol superior ya sale en los partidos), nivel 2 la profundiza. Se llama en los
- * dos beats donde las aristas crecen: la Acción del Día (day-action) y el post-partido
- * (flow, la ejecución). Los eventos del calendario que sumen arista se narran en el
- * siguiente beat — la conquista no se pierde, se cuenta apenas hay micrófono.
- * Devuelve el nivel narrado o null.
+ * La CONQUISTA narrada (M2): si la ETAPA de identidad cruzó un umbral desde la última
+ * vez que se contó, el diario lo celebra — Desarrollo desbloquea la secuencia AVANZADA
+ * (el fútbol superior ya sale en los partidos), Consolidada la profundiza. Se llama en
+ * los dos beats donde las aristas crecen: la Acción del Día (day-action) y el
+ * post-partido (flow, la ejecución). Los eventos del calendario que sumen arista se
+ * narran en el siguiente beat — la conquista no se pierde, se cuenta apenas hay
+ * micrófono. (T1: los hitos son de ETAPA — los 10 niveles finos otorgan PI, no relato;
+ * su celebración es la pantalla del árbol.) Devuelve la etapa narrada o null.
  */
 export function noteFiloMilestones(run) {
   const f = getPhilosophy(run.filoId);
   if (!f) return null;
-  const lvl = filoLevel(run);
+  const lvl = filoEtapa(run);
   if (lvl <= (run.filoNarrado ?? 0)) return null;
   run.filoNarrado = lvl;
   const adv = ADVANCED_BY_FILO[f.id];
@@ -140,7 +158,8 @@ export function derivePhilosophy(team) {
 /**
  * Nivel de identidad del rival, por jerarquía: los grandes llegan CONSOLIDADOS
  * a su idea (decisión PO F2), los del medio en desarrollo, los chicos
- * aprendiendo. Misma escala 0..2 que FILO_LEVELS (y mismos multiplicadores).
+ * aprendiendo. Escala 0..2 de FILO_ETAPAS (y sus multiplicadores exactos —
+ * la escalera de 10 niveles de T1 es solo MÍA: el rival no compra rasgos).
  * LA IDENTIDAD MADURA (R2, decisión PO): en eliminatorias todo rival sube +1
  * nivel (tope Consolidada) — nadie llega a KO sin idea. Nació "desde cuartos"
  * (koRound 3) y R3 la adelantó a 16avos (decisión PO 22-jul): la brecha de
@@ -169,10 +188,12 @@ export function rivalFilo(team, koRound = 0) {
 // existe (koRound 0). El dial declarado del sprint es ESTA constante.
 export const IDENTITY_GAP_PCT = 0.04; // nació 0.02; el dial declarado de R3 (medido: 2% movía −1.8pp)
 /** Multiplicador del castigo por brecha de identidad: ×1 en grupos o sin brecha;
- *  ×(1 + 0.02·brecha) con brecha = nivel rival (madurado por la ronda) − mi nivel. */
-export function identityGapMult(oppTeam, myNivel, koRound = 0) {
+ *  ×(1 + 0.04·brecha) con brecha = etapa rival (madurada por la ronda) − MI etapa.
+ *  ETAPA vs etapa (T1): la escalera de 10 niveles no toca la brecha — cero
+ *  recalibración del Rebalance. */
+export function identityGapMult(oppTeam, myEtapa, koRound = 0) {
   if (!koRound) return 1;
-  const gap = Math.max(0, rivalFiloLevel(oppTeam, koRound) - (myNivel ?? 0));
+  const gap = Math.max(0, rivalFiloLevel(oppTeam, koRound) - (myEtapa ?? 0));
   return 1 + IDENTITY_GAP_PCT * gap;
 }
 

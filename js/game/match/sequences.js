@@ -34,9 +34,10 @@ import { clamp } from "../../core/math.js";
 import { playedPos } from "../ratings.js";
 import { moraleBand } from "../morale.js";
 import { SEQUENCE_TYPES, ADVANCED_BY_FILO } from "../../content/sequences.js";
-import { FIRMA_TYPE, FILO_LEVELS, getPhilosophy } from "../../content/philosophies.js";
+import { FIRMA_TYPE, FILO_LEVELS, FILO_ETAPAS, getPhilosophy } from "../../content/philosophies.js";
 import { rivalFilo } from "../philosophy.js";
 import { buildActDecision } from "./sequence-acts.js";
+import { hookOf } from "./trait-hooks.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
 export const SEQ_MIN = 2, SEQ_MAX = 6;
@@ -163,9 +164,18 @@ const RIVAL_FIRMA_OPP = { press: "salida_fondo", posesion: "repliegue" };
 const ADV_SOURCE = { caceria: "recuperacion", sinfonia: "circulacion", contra_letal: "transicion", fortaleza: "repliegue" };
 const ADV_SHARE = [0.6, 0.9]; // [nivel 1, nivel 2]
 
+/** La FAMILIA de un tipo: la avanzada pertenece a su tipo base (cacería ES
+ *  recuperación profunda). Los hooks de rasgos que no canibalizan la jugada
+ *  avanzada matchean por familia (T1, hallazgo del gate: sin esto, el rasgo
+ *  básico se apagaba justo cuando la identidad consolidaba y la avanzada
+ *  desplazaba a su base — share 0.9). */
+export const familyOf = type => ADV_SOURCE[type.id] || type.id;
+
 function applyFiloWeights(m, side, w, oppFilo) {
   const filo = m.my.filo;
-  // F1 — mi tipo firma pesa por mi nivel (llega por matchCtx, como la moral)
+  // F1 — mi tipo firma pesa por mi nivel (llega por matchCtx, como la moral).
+  // T1: nivel FINO (0..9, mult interpolado ×1.35→×2.10) — cada sesión táctica
+  // se siente en el pool; el rival sigue en etapas (abajo).
   if (filo) {
     const t = FIRMA_TYPE[filo.id];
     if (w[t] !== undefined && w[t] > 0) w[t] *= FILO_LEVELS[filo.nivel]?.mult || 1;
@@ -179,10 +189,18 @@ function applyFiloWeights(m, side, w, oppFilo) {
   // propia del Bloque: el balón parado ES su gol (el scouting ya lo decía). No es
   // celda de matriz: es su fortaleza incondicional, como la firma.
   if (filo?.id === "bloque" && side === "mine") w.balon_parado *= 1.3;
-  // F2 — la firma rival sesga SU lado, con su nivel como magnitud
+  // T1 — los RASGOS también sesgan el pool (Amplitud Máxima vs Bloque): SUAVIZAN
+  // celdas de la matriz, jamás las invierten (regla del arco: neutralizar es de
+  // Advanced, y aun ahí solo empareja). Condicional al rival si el hook lo pide.
+  const pm = hookOf(m, "poolMod");
+  if (pm && side === "mine" && (!pm.vsFilo || pm.vsFilo === oppFilo?.id)) {
+    for (const k of Object.keys(pm.weights)) if (w[k] !== undefined && w[k] > 0) w[k] *= pm.weights[k];
+  }
+  // F2 — la firma rival sesga SU lado, con su nivel como magnitud (escala de
+  // ETAPAS: el rival no tiene escalera fina — sus mults F2 quedan exactos, T1)
   if (oppFilo && side === "opp") {
     const t = RIVAL_FIRMA_OPP[oppFilo.id];
-    if (t && w[t] !== undefined) w[t] *= FILO_LEVELS[oppFilo.nivel]?.mult || 1;
+    if (t && w[t] !== undefined) w[t] *= FILO_ETAPAS[oppFilo.nivel]?.mult || 1;
     if (oppFilo.id === "bloque") { w.balon_parado_def *= 1.3; w.salida_fondo *= 0.6; }
   }
   // M2 — la secuencia AVANZADA de mi filosofía entra al pool desde En desarrollo
@@ -194,10 +212,10 @@ function applyFiloWeights(m, side, w, oppFilo) {
   // repartir ANTES de la matriz dejaba al letal sobre-jugado justo en sus peores cruces).
   // Bible regla 3: la progresión desbloquea GENERACIÓN — la avanzada REEMPLAZA a tu
   // fútbol básico: quien no entrena su idea se queda en él.
-  if (filo && filo.nivel >= 1) {
+  if (filo && filo.etapa >= 1) {
     const advId = ADVANCED_BY_FILO[filo.id]?.id;
     if (advId && w[advId] !== undefined) {
-      const share = ADV_SHARE[Math.min(filo.nivel - 1, 1)];
+      const share = ADV_SHARE[Math.min(filo.etapa - 1, 1)];
       const src = ADV_SOURCE[advId];
       w[advId] = (w[src] || 1) * share;
       if (w[src]) w[src] *= 1 - share;
@@ -221,9 +239,9 @@ export function filoShareShift(myFilo, oppFilo) {
   return d;
 }
 
-/** ¿Tengo el RASGO de esta filosofía activo? (F2: Consolidada = nivel 2, decisión PO #6). */
+/** ¿Tengo el RASGO de esta filosofía activo? (F2: Consolidada = etapa 2, decisión PO #6). */
 export function filoRasgo(m, filoId) {
-  return m.my.filo?.id === filoId && m.my.filo.nivel >= 2;
+  return m.my.filo?.id === filoId && m.my.filo.etapa >= 2;
 }
 
 /**
@@ -283,10 +301,21 @@ export function startSequence(m, type) {
     // sigue usando el plan propio es la sinfonía profunda: 4º compás en Consolidada
     // (el viejo rasgo de Posesión, ahora dentro de SU fútbol).
     if (type.id === "sinfonia" && filoRasgo(m, "posesion")) m.seq.plan = ["build", ...type.plan];
+    // T1 — hooks de ARRANQUE del árbol de rasgos: la secuencia puede nacer en su
+    // variante del rasgo, con relato propio (el momento nombrable abre la jugada).
+    // Ambos matchean por FAMILIA (gate T1: sin esto el básico moría al consolidar).
+    // El salto de Tres Pases va al ACTO 1: en la transición base es el desenlace
+    // (la contra a una), en el contragolpe letal conserva un tramo + definición —
+    // acelera la avanzada sin canibalizar sus bonus de escalada.
+    let traitIntro = null;
+    const vd = hookOf(m, "variantDeep"); // Asfixia en Salida: el robo nace sobre el saque de meta
+    if (vd && vd.of === familyOf(type) && rnd() < vd.p) { m.seq.bonus += vd.bonus; traitIntro = vd.intro; }
+    const sk = hookOf(m, "skipToFinish"); // Tres Pases o Nada: la contra se juega a una
+    if (sk && sk.of === familyOf(type) && rnd() < sk.p) { m.seq.actIdx = 1; m.seq.bonus += sk.bonus; traitIntro = sk.intro; }
     // [RELATO CON IDENTIDAD] (F3): cuando la secuencia es MI tipo firma, la narra la
     // filosofía ("el pressing que entrenamos toda la semana") en vez del intro genérico.
     const filoIntros = m.my.filo && FIRMA_TYPE[m.my.filo.id] === type.id ? getPhilosophy(m.my.filo.id).firmaIntros : null;
-    m.log("event", `${type.icon} min ${m.min}' — ${filoIntros ? pick(filoIntros)(prot) : type.flavor.intro(prot)}`);
+    m.log("event", `${type.icon} min ${m.min}' — ${traitIntro ? traitIntro(prot) : filoIntros ? pick(filoIntros)(prot) : type.flavor.intro(prot)}`);
   } else {
     // El atacante rival: en un córner en contra manda su mejor cabeceador; si no, un DEL/MED.
     const alive = m.oppLineup.filter(p => !p.expulsado);

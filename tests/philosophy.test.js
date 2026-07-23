@@ -28,9 +28,15 @@ for (const p of E.PHILOSOPHIES) {
 }
 // cada arista mapea a un tipo real del catálogo de secuencias
 for (const a of E.ARISTAS) assert(E.SEQUENCE_TYPES.some(t => t.id === a.tipo), "la arista mapea a un tipo de secuencia real", a.id);
-assert(E.FILO_LEVELS.length === 3 && E.FILO_LEVELS[0].min === 0, "3 niveles y el primero arranca en 0");
+// T1 (arco de Rasgos): la escalera fina de 10 niveles + las 3 ETAPAS de F1 (valores exactos)
+assert(E.FILO_LEVELS.length === 10 && E.FILO_LEVELS[0].min === 0, "10 niveles y el primero arranca en 0");
 assert(E.FILO_LEVELS.every((l, i) => i === 0 || l.min > E.FILO_LEVELS[i - 1].min), "umbrales de nivel crecientes");
 assert(E.FILO_LEVELS.every((l, i) => i === 0 || l.mult > E.FILO_LEVELS[i - 1].mult), "multiplicadores crecientes");
+assert(E.FILO_LEVELS[0].mult === 1.35 && E.FILO_LEVELS[9].mult === 2.1, "la escalera interpola los extremos aprobados en F1");
+assert(E.FILO_ETAPAS.length === 3, "3 etapas");
+assert(E.FILO_ETAPAS[0].min === 0 && E.FILO_ETAPAS[1].min === 4 && E.FILO_ETAPAS[2].min === 9, "umbrales de etapa EXACTOS de F1 (anclas intactas)");
+assert(E.FILO_ETAPAS[0].mult === 1.35 && E.FILO_ETAPAS[1].mult === 1.7 && E.FILO_ETAPAS[2].mult === 2.1, "mults de etapa EXACTOS de F1 (el rival no se recalibra)");
+assert(E.FILO_LEVELS[3].etapa === 0 && E.FILO_LEVELS[4].etapa === 1 && E.FILO_LEVELS[8].etapa === 1 && E.FILO_LEVELS[9].etapa === 2, "el mapeo nivel→etapa respeta las anclas 4/9");
 
 // ---------- nacimiento, elección y nivel ----------
 const run = E.newRun("BRA");
@@ -39,16 +45,19 @@ assert(E.filoCtx(run) === null, "sin filosofía no hay filo en el matchCtx");
 const antes = run.journal.length;
 assert(E.choosePhilosophy(run, "no_existe") === null, "elegir una filosofía inexistente no hace nada");
 const f = E.choosePhilosophy(run, "press");
-assert(f && run.filoId === "press" && run.journal.length === antes + 1, "la elección queda en la run y escribe el diario");
+// T1: la elección escribe DOS entradas — la identidad y el PI inicial del nivel 1
+assert(f && run.filoId === "press" && run.journal.length === antes + 2, "la elección queda en la run y escribe el diario (identidad + PI)");
 
-assert(E.filoPoints(run) === 0 && E.filoLevel(run) === 0, "nace Aprendiendo con 0 pts");
+assert(E.filoPoints(run) === 0 && E.filoLevel(run) === 0 && E.filoEtapa(run) === 0, "nace en nivel 1 (índice 0), Aprendiendo, con 0 pts");
 run.aristas.presion = 3; run.aristas.solidez = 99; // solidez NO es del press: no cuenta
-assert(E.filoPoints(run) === 3 && E.filoLevel(run) === 0, "las aristas ajenas no suman al nivel");
+assert(E.filoPoints(run) === 3 && E.filoLevel(run) === 3 && E.filoEtapa(run) === 0, "las aristas ajenas no suman; 3 pts = nivel 4, aún Aprendiendo");
 run.aristas.verticalidad = 1;
-assert(E.filoPoints(run) === 4 && E.filoLevel(run) === 1, "umbral de En desarrollo (4 pts)");
+assert(E.filoPoints(run) === 4 && E.filoLevel(run) === 4 && E.filoEtapa(run) === 1, "ancla de En desarrollo (4 pts = nivel 5)");
 run.aristas.presion = 8;
-assert(E.filoLevel(run) === 2, "umbral de Consolidada (9 pts)");
-assert(E.filoCtx(run).id === "press" && E.filoCtx(run).nivel === 2, "filoCtx viaja {id, nivel}");
+assert(E.filoLevel(run) === 9 && E.filoEtapa(run) === 2, "ancla de Consolidada (9 pts = nivel 10)");
+assert(E.filoCtx(run).id === "press" && E.filoCtx(run).nivel === 9 && E.filoCtx(run).etapa === 2, "filoCtx viaja {id, nivel, etapa}");
+run.aristas.presion = 20; run.aristas.verticalidad = 20;
+assert(E.filoLevel(run) === 9 && E.filoEtapa(run) === 2, "la escalera tiene techo: puntos de sobra no desbordan el índice");
 
 // ---------- focos de la Sesión Táctica ----------
 {
@@ -206,7 +215,8 @@ assert(E.filoCtx(run).id === "press" && E.filoCtx(run).nivel === 2, "filoCtx via
   assert(E.identityGapMult(cpv, 1, 1) === 1, "…y con nivel propio 1 esa brecha desaparece");
 
   // El canal completo: forma × brecha llegan multiplicadas al once del Match.
-  const my = { team: E.getTeam("BRA"), lineup: [], bench: [], mentalidad: "normal", buffs: {}, moral: 50, filo: { id: "press", nivel: 0 }, koRound: 3 };
+  // (T1: el Match lee filo.etapa para la brecha — matchCtx viaja {id, nivel, etapa})
+  const my = { team: E.getTeam("BRA"), lineup: [], bench: [], mentalidad: "normal", buffs: {}, moral: 50, filo: { id: "press", nivel: 0, etapa: 0 }, koRound: 3 };
   const m = new E.Match(my, fra, true);
   const esperado = E.tourneyFormaMult(3) * E.identityGapMult(fra, 0, 3);
   assert(m.oppLineup.every(p => Math.abs(p.forma - esperado) < 1e-9), "p.forma = forma de torneo × brecha, exacto", esperado);

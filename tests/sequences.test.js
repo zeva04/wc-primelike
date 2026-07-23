@@ -162,9 +162,11 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
 
 // ---------- M2: el gating por nivel de las avanzadas, y sus desenlaces nuevos ----------
 {
-  const withFilo = (filoId, nivel, oppId = "MAR") => {
+  const withFilo = (filoId, etapa, oppId = "MAR") => {
     const m = makeMatch(oppId);
-    m.my.filo = { id: filoId, nivel };
+    // matchCtx dual (T1): el parámetro es la ETAPA (0/1/2, la escala de los gates —
+    // avanzada, rasgo); el nivel fino equivalente es el ancla de esa etapa (0/4/9 pts).
+    m.my.filo = { id: filoId, nivel: [0, 4, 9][etapa], etapa };
     return m;
   };
   const playAll = (m, seen) => {

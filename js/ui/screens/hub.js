@@ -11,8 +11,8 @@ import { dayLabel, advanceDay } from "../../game/calendar.js";
 import { buildDaily } from "../../game/daily.js";
 import { applyDayAction, actionMult, multLabel, dayOpportunity, canjeableBuffs, canjeBuff } from "../../game/day-action.js";
 import { DAY_ACTIONS, ARISTA_FOCUS, TRAIN_BUFF, TRAIN_FATIGUE, CANJE_THRESHOLD, CANJE_PERMANENT, STAT_LABELS } from "../../content/day-actions.js";
-import { PHILOSOPHIES, getPhilosophy, aristaById, FILO_LEVELS } from "../../content/philosophies.js";
-import { filoPoints, filoLevel, changePhilosophy } from "../../game/philosophy.js";
+import { PHILOSOPHIES, getPhilosophy, aristaById, FILO_LEVELS, FILO_ETAPAS } from "../../content/philosophies.js";
+import { filoPoints, filoLevel, filoEtapa, changePhilosophy } from "../../game/philosophy.js";
 import { RARITIES } from "../../content/rarities.js";
 import { addJournal } from "../../game/journal.js";
 import { moraleBand } from "../../game/morale.js";
@@ -302,7 +302,9 @@ function actionCard() {
   // Las 2 aristas de la filosofía se destacan (tu identidad); las otras 3 quedan
   // disponibles — pre-entrenar otra filosofía es legal (demolición orgánica, PO #1).
   const filo = getPhilosophy(run.filoId);
-  const nivel = FILO_LEVELS[filoLevel(run)];
+  // T1: la etiqueta visible es la ETAPA (Aprendiendo/Desarrollo/Consolidada);
+  // el nivel fino (1-10) vive en la pantalla del árbol.
+  const nivel = FILO_ETAPAS[filoEtapa(run)];
   const tacMult = actionMult(run, tacRows[0]);
   const tacState = !chosen ? "active" : (chosenGroup === "tactica" ? "chosen" : "muted");
   return `<div class="bg-slate-800/60 border tp-border rounded-2xl p-4 flex-1 flex flex-col">
@@ -391,16 +393,17 @@ function filoCard() {
   const f = getPhilosophy(run.filoId);
   if (!f) return "";
   const pts = filoPoints(run);
-  const lvl = filoLevel(run);
+  const lvl = filoLevel(run);           // nivel fino 0..9 (T1: la escalera de PI)
+  const etapa = filoEtapa(run);         // etiqueta visible: la etapa de siempre
   const nivel = FILO_LEVELS[lvl];
   const next = FILO_LEVELS[lvl + 1] || null;
   const pct = next ? Math.min(100, (100 * (pts - nivel.min)) / (next.min - nivel.min)) : 100;
   return `<div id="btn-filo" class="rounded-xl border tp-border tp-bg-soft px-3 py-2 mb-3 shrink-0 cursor-pointer transition-all hover:brightness-125" title="Ver la identidad del equipo">
     <div class="flex items-center justify-between gap-2">
-      <span class="text-xs font-bold ${lvl === 2 ? "text-amber-300" : "tp-text"}">${f.icon} ${f.name}</span>
-      <span class="text-[9px] uppercase tracking-wider font-black text-slate-400">${nivel.label}${next ? ` · ${pts}/${next.min}` : ""}</span>
+      <span class="text-xs font-bold ${etapa === 2 ? "text-amber-300" : "tp-text"}">${f.icon} ${f.name}</span>
+      <span class="text-[9px] uppercase tracking-wider font-black text-slate-400">${run.identityPoints > 0 ? `<span class="text-amber-300">🧠 ${run.identityPoints} PI</span> · ` : ""}Nv ${lvl + 1} · ${FILO_ETAPAS[etapa].label}${next ? ` · ${pts}/${next.min}` : ""}</span>
     </div>
-    <div class="h-1 rounded-full bg-slate-900/80 overflow-hidden mt-1.5"><div class="h-full rounded-full ${lvl === 2 ? "bg-amber-400" : "tp-gradient"}" style="width:${pct}%"></div></div>
+    <div class="h-1 rounded-full bg-slate-900/80 overflow-hidden mt-1.5"><div class="h-full rounded-full ${etapa === 2 ? "bg-amber-400" : "tp-gradient"}" style="width:${pct}%"></div></div>
   </div>`;
 }
 

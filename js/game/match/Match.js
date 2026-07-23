@@ -78,7 +78,8 @@ export class Match {
     this.oppLineup = genOpponentLineup(oppTeam, oppBanned, this.koRound);
     // LA BRECHA DE IDENTIDAD (R3): el rival con más idea que yo amplifica su modo
     // Mundial — se apila sobre p.forma (mismo canal, un solo campo en los datos).
-    const gapMult = identityGapMult(oppTeam, my.filo?.nivel, this.koRound);
+    // ETAPA vs etapa (T1): la escalera fina de niveles no toca la brecha.
+    const gapMult = identityGapMult(oppTeam, my.filo?.etapa, this.koRound);
     if (gapMult !== 1) for (const p of this.oppLineup) p.forma *= gapMult;
     this.knockout = knockout;
     this.min = 0;
@@ -203,9 +204,10 @@ export class Match {
       tired: act.reduce((s, p) => s + p.energia, 0) / Math.max(1, act.length) < 55,
       band: moraleBand(this.my.moral ?? 50).id,
       net: this.flow().net,
-      // El ambiente lee la FILOSOFÍA (F3): id y nivel de matchCtx.filo, null sin identidad
+      // El ambiente lee la FILOSOFÍA (F3): id y ETAPA de matchCtx.filo (0..2 — sus
+      // líneas comparan contra la escala original de F1), null sin identidad
       filo: this.my.filo?.id ?? null,
-      filoLvl: this.my.filo?.nivel ?? 0,
+      filoLvl: this.my.filo?.etapa ?? 0,
     };
     const pool = AMBIENT_LINES.filter(l => l.when(ctx));
     return this._weightedPick(pool, pool.map(l => l.w)).text(this);

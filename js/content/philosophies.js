@@ -36,17 +36,29 @@ export const ARISTAS = [
 
 export const aristaById = id => ARISTAS.find(a => a.id === id);
 
-// Niveles de identidad (decisión PO #6 + umbrales elegidos en F1): el nivel se
-// calcula sobre la SUMA de las 2 aristas propias. `mult` es el sesgo del tipo
-// firma en typeWeights — comparable a la mentalidad (×1.5-1.6), que sigue siendo
-// el ajuste de corto plazo (Bible §5 regla 5). Umbrales calibrados a la run:
-// ~13 acciones hasta cerrar grupos → Desarrollo hacia la fecha 2-3 invirtiendo
-// 1 de cada 3 días; Consolidada recién en cuartos (con ejecución encima).
-export const FILO_LEVELS = [
+/* Las ETAPAS de identidad (los 3 niveles originales de F1, valores EXACTOS —
+   umbrales 0/4/9 y mult ×1.35/×1.7/×2.1 calibrados en F1). Desde el arco de
+   Rasgos (T1) son la vista narrativa Y la escala técnica del RIVAL: rivalFiloLevel,
+   la brecha R3 (identityGapMult), los gates de la avanzada/rasgo y el scouting
+   siguen operando etapa vs etapa — CERO recalibración del Rebalance. */
+export const FILO_ETAPAS = [
   { id: "aprendiendo", label: "Aprendiendo",   min: 0, mult: 1.35 },
   { id: "desarrollo",  label: "En desarrollo", min: 4, mult: 1.7 },
   { id: "consolidada", label: "Consolidada",   min: 9, mult: 2.1 },
 ];
+
+/* La escalera de 10 NIVELES (arco de Rasgos T1, decisión PO #1 — SIN testear:
+   dial abierto): división proporcional de lo aprobado en F1. Umbral = nivel-1
+   puntos (un punto por nivel); `mult` interpola linealmente ×1.35→×2.10 y solo
+   sesga MI tipo firma (el rival usa FILO_ETAPAS). Cada subida de nivel otorga
+   1 Punto de Identidad (game/traits) — el nivel 1 incluido, al elegir filosofía.
+   Las anclas de F1 no se mueven: Desarrollo a 4 pts (nivel 5) · Consolidada a
+   9 (nivel 10) — `etapa` indexa FILO_ETAPAS. */
+export const FILO_LEVELS = Array.from({ length: 10 }, (_, i) => ({
+  min: i,
+  mult: +(1.35 + (i * 0.75) / 9).toFixed(2),
+  etapa: i >= 9 ? 2 : i >= 4 ? 1 : 0,
+}));
 
 /* Las 4 filosofías (decisión PO #5): combinación de 2 aristas; `firma` es la
    arista que define su fútbol (su `tipo` es el tipo firma del pool). `fuerte` y
@@ -133,6 +145,11 @@ export function filoLevelOf(r) {
   let lvl = 0;
   FILO_LEVELS.forEach((l, i) => { if (pts >= l.min) lvl = i; });
   return lvl;
+}
+/** Etapa (0 Aprendiendo · 1 En desarrollo · 2 Consolidada) del nivel actual —
+ *  la vista 0-2 que consumen el rival, la brecha R3 y los gates (T1). */
+export function filoEtapaOf(r) {
+  return FILO_LEVELS[filoLevelOf(r)].etapa;
 }
 
 // Tipo firma por filosofía ({press: "recuperacion", ...}): lo que el pool sesga

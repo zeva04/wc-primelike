@@ -69,7 +69,10 @@ function renderChooseIdentity() {
   $("#btn-continue").onclick = () => {
     if (!elegida) return;
     choosePhilosophy(S.run, elegida);
-    go("draw");
+    // Arco de Rasgos (T1, decisión PO): elegir filosofía acredita el PI del nivel 1
+    // y lleva DIRECTO al árbol — el 1-de-3 de rasgos básicos es la segunda decisión
+    // de identidad de la run. De ahí, al sorteo.
+    go("philosophy", { onboarding: true });
   };
 }
 

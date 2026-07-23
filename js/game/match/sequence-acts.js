@@ -14,7 +14,8 @@
 import { rnd, pick } from "../../core/rng.js";
 import { playedPos } from "../ratings.js";
 import { sequenceType } from "../../content/sequences.js";
-import { protMomentum, noteFiloHit, filoRasgo } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
+import { protMomentum, noteFiloHit, filoRasgo, familyOf } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
+import { hookOf, rollChain, chainMine, traitMoment } from "./trait-hooks.js"; // el árbol de rasgos (T1)
 
 // El plan de actos de la secuencia: el propio si lo tiene (rasgo de Posesión:
 // un acto más de circulación, lo arma startSequence) o el del catálogo.
@@ -150,7 +151,20 @@ export function resolveSequenceAct(m, key) {
     // fallo y el scoring se derrumba (medido en A1).
     if (key === "filtrado") {
       const r = A.actPass(m, s.prot, { hard: true });
-      if (!r.ok) return maybeCounter(m, `min ${m.min}' — ${f.buildFail}`, true);
+      if (!r.ok) {
+        // T1 — Buscar al Hombre Libre: el filtrado interceptado puede RECICLARSE (una
+        // vez por secuencia): la posesión no muere — aparece el desmarcado, la pelota
+        // cambia de pies y el MISMO momento se juega de nuevo (el bonus se perdió).
+        const h = hookOf(m, "recycleBuild");
+        if (h && !s.recycled && rnd() < h.p) {
+          s.recycled = true;
+          traitMoment(m, h.traitId, [h.texto]);
+          passTo(m, s);
+          buildActDecision(m);
+          return false;
+        }
+        return maybeCounter(m, `min ${m.min}' — ${f.buildFail}`, true);
+      }
       s.bonus += 0.07;
     }
     s.buildOks = (s.buildOks || 0) + 1; // la sinfonía (M2) cuenta la desesperación rival
@@ -234,6 +248,20 @@ export function resolveSequenceAct(m, key) {
     s.bonus += (total ? 0.15 : 0.05) + (caza && s.actIdx === 1 ? s.type.adv.trapBonus + (filoRasgo(m, "press") ? s.type.adv.deepBonus : 0) : 0);
     m.log("event", `min ${m.min}' — ${caza && s.actIdx === 1 ? f.press2Ok : f.pressOk}`);
     if (total) dtOk(m);
+    // T1 — Trampa en la Banda: el robo de la recuperación puede CONVERTIRSE en ataque
+    // inmediato (transición con el bonus a cuestas) en vez de escalar a su desenlace.
+    // Por FAMILIA pero SOLO en el primer acto (gate T1): el robo en banda de la
+    // cacería también convierte, pero jamás aborta su trampa final en zona letal.
+    // El acierto de la firma ya se contó ANTES de convertir (noteFiloHit manual).
+    const cv = hookOf(m, "convertOnPress");
+    if (cv && familyOf(s.type) === "recuperacion" && s.actIdx === 0 && rnd() < cv.p) {
+      noteFiloHit(m);
+      traitMoment(m, cv.traitId, [cv.texto]);
+      const t = sequenceType(cv.to);
+      m.seq = { type: t, prot: s.prot, actIdx: 0, bonus: s.bonus + cv.bonus };
+      buildActDecision(m);
+      return false;
+    }
     return escalate(m);
   }
 
@@ -250,6 +278,14 @@ export function resolveSequenceAct(m, key) {
         if (key === "peinar") dtFail(m);
         m.log("chance", `min ${m.min}' — ${sequenceType("fortaleza").flavor.cornerText}`);
         return chainSetPiece(m, 0.02);
+      }
+      // T1 — Segunda Jugada: el duelo perdido no siempre es pérdida — la segunda
+      // pelota puede caer nuestra y el bloque vuelve a lanzar (secuencia reactiva).
+      const sj = rollChain(m, "chainOnDuelFail");
+      if (sj) {
+        if (key === "peinar") dtFail(m);
+        m.log("chance", `min ${m.min}' — ${f.duelFail}`);
+        return chainMine(m, sj.to, { bonus: sj.bonus, intro: sj.intro, buildDecision: buildActDecision }) ? false : closeSilent(m);
       }
       const out = closeSeq(m, "chance", `min ${m.min}' — ${f.duelFail}`);
       if (key === "peinar") dtFail(m);
@@ -279,13 +315,24 @@ export function resolveSequenceAct(m, key) {
       closeSilent(m);
       return myPenalty(m);
     }
+    // T1 — Pausa: en el desenlace de la circulación, la aceleración súbita — el
+    // rival dormido por el tempo no llega al cierre (mejor perfil, relato propio).
+    // Por FAMILIA: la sinfonía también acelera (hallazgo del gate T1).
+    const acc = hookOf(m, "accelFinish");
+    if (acc && familyOf(s.type) === acc.of && rnd() < acc.p) { s.bonus += acc.bonus; m.log("event", `min ${m.min}' — ${acc.intro(s.prot)}`); }
     const stat = s.finishStat || f.finishStat;
     if (key === "asistir") {
       const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
       const mate = mates.length ? m._weightedPick(mates, mates.map(p => playedPos(p) === "DEL" ? 3 : 1)) : s.prot;
       const pass = A.actPass(m, s.prot);
       if (!pass.ok) return maybeCounter(m, `min ${m.min}' — el pase de ${s.prot.name} no encuentra a nadie.`, true);
-      const shot = A.actShot(m, mate, { stat: "tiro", bonus: s.bonus + f.finishBonus + 0.04 });
+      // T1 — Correr en Manada: en la contra, el "buscar al mejor ubicado" encuentra
+      // superioridad de verdad — la definición llega con dos camisetas libres.
+      // Por FAMILIA: el contragolpe letal también corre en manada (gate T1).
+      const sup = hookOf(m, "finishSupport");
+      const supBonus = sup && familyOf(s.type) === sup.of ? sup.bonus : 0;
+      if (supBonus) traitMoment(m, sup.traitId, [sup.texto]);
+      const shot = A.actShot(m, mate, { stat: "tiro", bonus: s.bonus + f.finishBonus + 0.04 + supBonus });
       if (shot.ok) { goalMine(m, mate, "¡Definición tras la asistencia!", s.prot); return closeSilent(m); }
       return maybeRebound(m, `min ${m.min}' — ${mate.name} no logra conectar el remate.`);
     }
@@ -368,11 +415,26 @@ export function resolveSequenceAct(m, key) {
         buildActDecision(m);
         return false;
       }
+      // T1 — Tender la Trampa: el repliegue contenido puede CONVERTIR en contra
+      // (el rival quedó estirado a propósito) — el patrón def→of, ahora comprable.
+      const tt = s.type.id === "repliegue" ? rollChain(m, "chainOnContain") : null;
+      if (tt) {
+        m.log("event", `min ${m.min}' — 🧱 ${f.containOk}`);
+        if (r.press) dtOk(m);
+        return chainMine(m, tt.to, { bonus: tt.bonus, intro: tt.intro, buildDecision: buildActDecision }) ? false : closeSilent(m);
+      }
       const out = closeSeq(m, "event", `min ${m.min}' — 🧱 ${f.containOk}`); if (r.press) dtOk(m); return out;
     }
     if (r.press) s.bonus = 0.05; // presión fallida: el rival queda mejor perfilado
     m.log("chance", `min ${m.min}' — ${f.containFail(m.oppTeam)}`);
     if (r.press) dtFail(m);
+    // T1 — Oficio de Trinchera: el avance rival puede morir CORTADO (falta táctica,
+    // ritmo roto) antes de llegar al remate — el partido se corta, la jugada muere.
+    const of = hookOf(m, "oppLoseActs");
+    if (of && rnd() < of.p) {
+      traitMoment(m, of.traitId, [of.texto]);
+      return closeSilent(m);
+    }
     // ABSORCIÓN DEL ÚLTIMO HOMBRE (Sprint A2, decisión PO #7): buena parte de las
     // contenciones rotas terminan en el mano a mano con MI central — la decisión
     // `last_man` del Sprint 1, con su calibración INTACTA (lastManChance/resolveLastMan
@@ -383,9 +445,16 @@ export function resolveSequenceAct(m, key) {
 
   // clear: el rival remata, mi arquero responde (desenlace defensivo automático)
   const { mine } = m.powers();
-  const r = A.actOppShot(m, s.shooter, mine, { bonus: s.bonus });
+  // T1 — Jaula Central: el remate del repliegue llega INCÓMODO (la jaula lo empujó
+  // a la banda: la situación es peor, no mi arquero mejor — el canal finishBonus).
+  // Por FAMILIA: la fortaleza también encierra (gate T1).
+  const jl = hookOf(m, "oppShotMalus");
+  const malus = jl && familyOf(s.type) === jl.seq ? jl.bonus : 0;
+  const r = A.actOppShot(m, s.shooter, mine, { bonus: s.bonus + malus });
   if (r.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
-  return closeSeq(m, "chance", `min ${m.min}' — ${s.shooter.name} remata pero ${pick([`ataja ${mine.por ? mine.por.name : "el arquero"}`, "se va afuera", "la bloquea la zaga"])}.`);
+  const out = closeSeq(m, "chance", `min ${m.min}' — ${s.shooter.name} remata pero ${pick([`ataja ${mine.por ? mine.por.name : "el arquero"}`, "se va afuera", "la bloquea la zaga"])}.`);
+  if (malus && rnd() < 0.4) traitMoment(m, jl.traitId, [jl.texto]); // el momento se narra a veces (sin spamear)
+  return out;
 }
 
 // Actos que se resuelven SOLOS, sin pedir decisión al DT (desenlaces): el remate rival de una
@@ -448,6 +517,12 @@ function maybeCounter(m, failText, risky = false) {
   if (rnd() >= COUNTER_CHANCE) {
     const out = closeSeq(m, "chance", failText);
     if (risky) dtFail(m);
+    // T1 — Morder Tras Pérdida: si la pérdida NO abrió contra rival, la jauría puede
+    // cazarla de vuelta — recuperación REACTIVA en campo rival. El orden importa: el
+    // riesgo del contragolpe rival queda EXACTO (0.28, calibración A2); la mordida
+    // vive en el 72% restante, donde antes la jugada simplemente moría.
+    const md = rollChain(m, "chainOnMineFail");
+    if (md && chainMine(m, md.to, { bonus: md.bonus, intro: md.intro, buildDecision: buildActDecision })) return false;
     return out;
   }
   m.log("chance", failText);

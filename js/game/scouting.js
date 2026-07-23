@@ -21,9 +21,9 @@ import { getTeam } from "../data/teams-repo.js";
 import { playerOverall, teamFigure } from "./ratings.js";
 import { bestSix, expectedOpponentLineup, tourneyFormaMult } from "./opponents.js";
 import { teamPowers, gkQuality } from "./match/powers.js";
-import { rivalFilo, rivalFiloLevel, identityGapMult, filoLevel } from "./philosophy.js";
+import { rivalFilo, rivalFiloLevel, identityGapMult, filoEtapa } from "./philosophy.js";
 import { koRoundOf } from "./tournament/knockout.js";
-import { getPhilosophy, FILO_LEVELS } from "../content/philosophies.js";
+import { getPhilosophy, FILO_ETAPAS } from "../content/philosophies.js";
 
 // La lectura táctica de cada identidad rival (F2): qué te propone y por dónde
 // se le entra — el "España quiere la pelota: presiónala o enciérrate" del roadmap.
@@ -122,13 +122,13 @@ export function buildOpponentReport(run, oppId) {
   return {
     oppId,
     name: opp.name,
-    filosofia: { id: rf.id, name: rfData.name, icon: rfData.icon, nivel: FILO_LEVELS[rf.nivel].label, consolidada: rf.nivel === 2, detalle: FILO_SCOUT[rf.id] },
+    filosofia: { id: rf.id, name: rfData.name, icon: rfData.icon, nivel: FILO_ETAPAS[rf.nivel].label, consolidada: rf.nivel === 2, detalle: FILO_SCOUT[rf.id] },
     modoMundial: koRound ? {
       pct: Math.round((tourneyFormaMult(koRound) - 1) * 100),
       madura: rivalFiloLevel(opp, koRound) > rivalFiloLevel(opp),
       // La brecha de identidad (R3): si su idea supera a la mía, el castigo se nombra —
       // es accionable (consolidar tu identidad ANTES de KO es la vacuna).
-      brechaPct: Math.round((identityGapMult(opp, filoLevel(run), koRound) - 1) * 100),
+      brechaPct: Math.round((identityGapMult(opp, filoEtapa(run), koRound) - 1) * 100),
     } : null,
     lineas: {
       ataque: { nivel: nivel(oppP.atk - myP.def), detalle: DETALLE.ataque[nivel(oppP.atk - myP.def)] },

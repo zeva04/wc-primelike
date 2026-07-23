@@ -32,7 +32,7 @@
    ============================================================ */
 import { clamp } from "../core/math.js";
 import { pick } from "../core/rng.js";
-import { addFiloProgress, addFirmaProgress, getPhilosophy, filoLevelOf } from "./philosophies.js";
+import { addFiloProgress, addFirmaProgress, getPhilosophy, filoEtapaOf } from "./philosophies.js";
 import { STAT_LABELS } from "./day-actions.js";
 
 const buff = (r, k, v) => { r.buffs[k] = (r.buffs[k] || 0) + v; };
@@ -102,7 +102,7 @@ export const PREP_EVENTS = [
     teaser: "Un columnista prepara una nota grande sobre la identidad del equipo.",
     effect: r => {
       const f = getPhilosophy(r.filoId);
-      if (f && filoLevelOf(r) >= 1) { r.moral = clamp((r.moral ?? 50) + 8, 1, 100); return `"${f.name}" ya es marca registrada: la prensa aplaude la idea y el grupo se agranda (+8 de Moral).`; }
+      if (f && filoEtapaOf(r) >= 1) { r.moral = clamp((r.moral ?? 50) + 8, 1, 100); return `"${f.name}" ya es marca registrada: la prensa aplaude la idea y el grupo se agranda (+8 de Moral).`; }
       buff(r, "aura", -5);
       return "La nota salió con sorna: el proyecto todavía no se ve en la cancha (−5 de Aura el próximo partido).";
     } },

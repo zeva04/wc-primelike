@@ -92,7 +92,7 @@ function playMatch(run, oppId) {
   // de identidad exactos para la ronda y MI nivel (×1 en grupos; smart llega Consolidado
   // a KO y es inmune a la brecha por construcción — la tesis de R3 en un invariante).
   const koR = E.koRoundOf(run.stage);
-  const formaEsperada = E.tourneyFormaMult(koR) * E.identityGapMult(opp, E.filoCtx(run)?.nivel, koR);
+  const formaEsperada = E.tourneyFormaMult(koR) * E.identityGapMult(opp, E.filoCtx(run)?.etapa, koR);
   assert(match.oppLineup.every(p => Math.abs(p.forma - formaEsperada) < 1e-9), "la forma del rival cuadra con ronda y brecha", `${run.stage} → ${formaEsperada}`);
   // La suspensión por roja ajena es real: el suspendido no puede estar en el once rival
   for (const name of banned) assert(!match.oppLineup.some(p => p.name === name), "suspendido fuera del once rival", name);
@@ -147,6 +147,16 @@ function playRun(teamId) {
   // mirando su grupo y sus focos; acá nadie optimiza. No calibrar el techo con esto.
   const filoElegida = E.choosePhilosophy(run, FILO || E.PHILOSOPHIES[Math.floor(Math.random() * E.PHILOSOPHIES.length)].id);
   assert(filoElegida && run.filoId === filoElegida.id, "la elección de filosofía queda en la run");
+  // El flujo de inicio del arco de Rasgos (T1): elegir filosofía acredita el PI del
+  // nivel 1, y el DT gasta su 1-de-3 en un básico al azar (el PISO: nadie optimiza).
+  assert(run.identityPoints === 1, "elegir filosofía acredita el PI inicial", run.identityPoints);
+  {
+    const opciones = E.traitTree(run).filter(t => t.buyable);
+    assert(opciones.length === 3, "los 3 básicos de la filosofía están comprables al inicio", opciones.length);
+    const elegido = opciones[Math.floor(Math.random() * opciones.length)];
+    assert(E.buyTrait(run, elegido.id), "el 1-de-3 del inicio se compra", elegido.id);
+    assert(run.identityPoints === 0 && E.activeTraitIds(run).length === 1, "la compra cobra el PI");
+  }
   let alive = true, champion = false, guard = 0;
   let oppSeen = 0, oppTaken = 0; // contabilidad paralela de oportunidades (audita run.stats)
   const dailySeen = new Map();   // texto de titular → último día en portada (bug PO 22-jul: sin repetirse en la semana)
@@ -210,6 +220,16 @@ function playRun(teamId) {
           assert(b.p.stats[c.key] >= b.v, "el crecimiento permanente nunca decrece", b.p.name);
         }
       }
+      // El árbol de Rasgos (T1): el DT del piso gasta cada PI disponible en un rasgo
+      // comprable al azar apenas lo tiene (la compra es gratis en tiempo — no consume
+      // acción). Con solo los básicos en el pool, el árbol se agota rápido.
+      for (let tGuard = 0; run.identityPoints > 0 && tGuard < 10; tGuard++) {
+        const buyables = E.traitTree(run).filter(t => t.buyable);
+        if (!buyables.length) break;
+        const piAntes = run.identityPoints;
+        assert(E.buyTrait(run, buyables[Math.floor(Math.random() * buyables.length)].id), "el rasgo comprable se compra");
+        assert(run.identityPoints === piAntes - 1, "cada compra cobra exactamente 1 PI");
+      }
       const ev = E.advanceDay(run);
       if (run.dayOpp) {
         oppDays++; oppSeen++;
@@ -270,7 +290,16 @@ function playRun(teamId) {
     }
     assert(Number.isInteger(run.moral) && run.moral >= 1 && run.moral <= 100, "moral en rango 1..100", run.moral);
     assert(Object.values(run.aristas).every(v => typeof v === "number" && v >= 0), "aristas numéricas y no negativas", JSON.stringify(run.aristas));
-    assert(E.filoLevel(run) >= 0 && E.filoLevel(run) <= 2, "nivel de filosofía en rango 0..2");
+    assert(E.filoLevel(run) >= 0 && E.filoLevel(run) <= 9, "nivel de filosofía en rango 0..9 (escalera T1)");
+    assert(E.filoEtapa(run) >= 0 && E.filoEtapa(run) <= 2, "etapa de filosofía en rango 0..2");
+    assert(E.FILO_LEVELS[E.filoLevel(run)].etapa === E.filoEtapa(run), "nivel y etapa coherentes (vista dual T1)");
+    // La economía de Rasgos (T1): PI enteros y no negativos; los comprados son válidos,
+    // sin duplicar y de la filosofía de SU llave (la latencia jamás mezcla árboles).
+    assert(Number.isInteger(run.identityPoints) && run.identityPoints >= 0, "PI enteros y no negativos", run.identityPoints);
+    for (const [fid, ids] of Object.entries(run.rasgos)) {
+      assert(new Set(ids).size === ids.length, "sin rasgos duplicados", fid);
+      for (const id of ids) assert(E.traitById(id)?.filo === fid, "rasgo válido y de la filosofía de su llave", `${fid}:${id}`);
+    }
     assert(run.journal.length >= journalBefore + 1, "el diario debe crecer con el partido");
 
     const adv = E.advanceStage(run, out.advanced);

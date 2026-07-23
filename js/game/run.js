@@ -75,6 +75,9 @@ export function newRun(myTeamId) {
     moral: 50,                 // Moral del equipo 1..100 (escribe game/morale; content/ la muta con clamp)
     filoId: null,              // filosofía elegida tras el sorteo (escribe game/philosophy)
     aristas: {},               // progreso por arista {presion: 3, ...} — PERSISTE al cambiar de filosofía (mutan content/day-actions y game/philosophy)
+    identityPoints: 0,         // Puntos de Identidad disponibles (arco de Rasgos T1 — escribe game/traits)
+    piCredited: {},            // {filoId: nivel ya acreditado} anti-farming: PI solo de la filosofía ACTIVA (escribe game/traits)
+    rasgos: {},                // {filoId: [traitIds]} rasgos comprados POR filosofía — LATENTES al cambiar (escribe game/traits)
     scorers: {},               // goleadores del torneo ajenos {"teamId|name": {teamId,name,goles}} (escribe game/scorers)
     assists: {},               // asistidores del torneo ajenos {"teamId|name": {teamId,name,asistencias}} (escribe game/assists)
     stats: { pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, tarjetas: 0, eventos: 0, penalesAtajados: 0, oppOfrecidas: 0, oppAprovechadas: 0 },
