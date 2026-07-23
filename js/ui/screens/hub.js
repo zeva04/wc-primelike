@@ -163,9 +163,9 @@ function showScoutReport(oppId) {
         </div>
       </div>
       <div class="space-y-2 mt-4">
-        ${rep.modoMundial ? `<div class="rounded-xl border border-amber-500/60 bg-amber-500/10 p-3">
-          <span class="font-semibold text-sm text-amber-300">🔥 Modo Mundial: llega un +${rep.modoMundial.pct}% encendido</span>
-          <p class="text-[11px] text-amber-200/70 mt-1">En eliminatorias los rivales suben con cada ronda — el Mundial de verdad se juega en finales.${rep.modoMundial.madura ? " Y a esta altura del torneo, su idea llega madurada: juega su fútbol en serio." : ""}</p>
+        ${rep.modoMundial ? `<div class="rounded-xl border ${rep.modoMundial.brechaPct ? "border-red-500/60 bg-red-500/10" : "border-amber-500/60 bg-amber-500/10"} p-3">
+          <span class="font-semibold text-sm ${rep.modoMundial.brechaPct ? "text-red-300" : "text-amber-300"}">🔥 Modo Mundial: llega un +${rep.modoMundial.pct + rep.modoMundial.brechaPct}% encendido</span>
+          <p class="text-[11px] ${rep.modoMundial.brechaPct ? "text-red-200/70" : "text-amber-200/70"} mt-1">En eliminatorias los rivales suben con cada ronda — el Mundial de verdad se juega en finales.${rep.modoMundial.madura ? " Y a esta altura del torneo, su idea llega madurada: juega su fútbol en serio." : ""}${rep.modoMundial.brechaPct ? ` <b>Llega con más idea que nosotros (+${rep.modoMundial.brechaPct}% extra): a la final no se llega improvisando — consolidar nuestra identidad es la vacuna.</b>` : ""}</p>
         </div>` : ""}
         <div class="rounded-xl border tp-border tp-bg-soft p-3">
           <div class="flex items-center justify-between">

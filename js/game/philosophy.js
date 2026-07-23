@@ -141,11 +141,14 @@ export function derivePhilosophy(team) {
  * Nivel de identidad del rival, por jerarquía: los grandes llegan CONSOLIDADOS
  * a su idea (decisión PO F2), los del medio en desarrollo, los chicos
  * aprendiendo. Misma escala 0..2 que FILO_LEVELS (y mismos multiplicadores).
- * LA IDENTIDAD MADURA (R2, decisión PO): desde CUARTOS (koRound ≥ 3) todo rival
- * sube +1 nivel (tope Consolidada) — el mediano que llegó lejos ya juega su
- * fútbol en serio. El eje es tournament/knockout.koRoundOf.
+ * LA IDENTIDAD MADURA (R2, decisión PO): en eliminatorias todo rival sube +1
+ * nivel (tope Consolidada) — nadie llega a KO sin idea. Nació "desde cuartos"
+ * (koRound 3) y R3 la adelantó a 16avos (decisión PO 22-jul): la brecha de
+ * identidad medía −1.3pp porque en 16avos/octavos los rivales chicos eran nivel
+ * 0 y la brecha no existía justo donde mueren las runs del improvisador. El eje
+ * es tournament/knockout.koRoundOf.
  */
-export const FILO_MADURA_DESDE = 3; // koRound de cuartos
+export const FILO_MADURA_DESDE = 1; // koRound de 16avos (R3; nació 3 = cuartos en R2)
 export function rivalFiloLevel(team, koRound = 0) {
   const r = teamRating(team);
   const base = r >= 84 ? 2 : r >= 78 ? 1 : 0;
@@ -155,6 +158,22 @@ export function rivalFiloLevel(team, koRound = 0) {
 /** La identidad rival completa para el Match y el scouting: {id, nivel, curated}. */
 export function rivalFilo(team, koRound = 0) {
   return { id: derivePhilosophy(team), nivel: rivalFiloLevel(team, koRound), curated: !!TEAM_PHILOSOPHIES[team.id] };
+}
+
+// EL MUNDIAL CASTIGA AL SIN IDEA (arco del Rebalance R3, decisión PO 22-jul-2026):
+// en KO, el rival con MÁS nivel de identidad que yo amplifica su modo Mundial —
+// +2% de poder por nivel de brecha, apilado sobre p.forma (canal de PODER: la
+// lección de R2 es que los sesgos de pool miden ~0pp). El DT que llega a KO
+// Consolidado es INMUNE por construcción — a la final no se llega improvisando;
+// el que dispersó su Sesión Táctica entre 5 aristas paga la brecha. En grupos no
+// existe (koRound 0). El dial declarado del sprint es ESTA constante.
+export const IDENTITY_GAP_PCT = 0.04; // nació 0.02; el dial declarado de R3 (medido: 2% movía −1.8pp)
+/** Multiplicador del castigo por brecha de identidad: ×1 en grupos o sin brecha;
+ *  ×(1 + 0.02·brecha) con brecha = nivel rival (madurado por la ronda) − mi nivel. */
+export function identityGapMult(oppTeam, myNivel, koRound = 0) {
+  if (!koRound) return 1;
+  const gap = Math.max(0, rivalFiloLevel(oppTeam, koRound) - (myNivel ?? 0));
+  return 1 + IDENTITY_GAP_PCT * gap;
 }
 
 /**

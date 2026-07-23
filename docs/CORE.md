@@ -262,6 +262,13 @@ forma      = 1 + 0.03 × ronda_KO                SOLO el once rival (modo Mundia
   simulado no cambia). El perfil rival (`sequences.rivalProfile`) lee stats BASE a
   propósito: la escalada no cambia QUÉ fútbol te genera, cambia lo bien que lo ejecuta.
   Se narra: el informe del rival y la previa del Daily anuncian el modo Mundial.
+  Sobre `p.forma` se apilan además (R2/R3): la identidad rival que MADURA (+1 nivel desde
+  16avos, tope Consolidada — `philosophy.FILO_MADURA_DESDE`; nació "desde cuartos" y R3 la
+  adelantó) y la **BRECHA DE IDENTIDAD** (`philosophy.identityGapMult`): si mi nivel de
+  identidad < el del rival madurado, su modo Mundial suma **+4% por nivel de brecha**
+  (`IDENTITY_GAP_PCT`; brecha 2 → +8%). El DT Consolidado es INMUNE por construcción —
+  improvisar se paga; consolidar la identidad antes de KO es la vacuna. La brecha solo
+  castiga (mi nivel sobre el suyo no me premia) y no existe en grupos.
 
 > **Rebalance del 20-jul-2026 (decisión PO).** El factor de energía pesaba **35%**
 > (`0.65 + 0.35`) y bajó a **20%**, acoplado a subir el cansancio del partido de −10 a
@@ -329,6 +336,21 @@ forma      = 1 + 0.03 × ronda_KO                SOLO el once rival (modo Mundia
 > mixto azar (32.7 vs meta ~25) NO se persigue con el dial global — subirlo hundiría a
 > smart (clavado en 40) y arriesgaría a CPV (gate ≥3); la brecha azar↔greedy se ensancha
 > castigando DECISIONES, y esa palanca nueva es el arco siguiente (decisión PO).
+
+> **La brecha de identidad (arco del Rebalance R3 "Improvisar se paga", 22-jul-2026,
+> decisión PO).** El peldaño pendiente de R2 (mixto 32.7, meta ~25) se atacó con la única
+> palanca preparación-side que deja a smart intacto: en KO, el rival con más idea que yo
+> amplifica su modo Mundial. Medido por etapas: +2%/brecha con madurez desde cuartos →
+> −1.3pp (la brecha no existía en 16avos/octavos, donde mueren las runs); madurez
+> adelantada a 16avos + dial a +4% → mixto ~29.7. El dial NO converge más abajo: el
+> recuperador (nivel 0 SIEMPRE) paga brecha completa mientras el mixto llega a nivel 1 a
+> mitad de KO — +8% habría perforado el ≥9 pactado. **Gate R3 re-pactado y CERRADO
+> (3×n=4000 en los bordes):** mixto **30.1/29.5/29.6** (~29.7 ∈ 29-31) · recuperar
+> 10.8/11.6 ✓ 10-15 · smart 41.4/42.3 ✓ inmune por construcción · entrenar 15.6/14.4
+> (~15.0, el borde inferior de 15-20: entrenar stats sin construir idea apenas supera al
+> que no hace nada — coherente con la tesis) · CPV 5.7 ≥3 ✓ · filos 27-34 (posesión
+> premium, contra sano). La escalera final del arco COMPLETO: **11.3 · 15.0 · 29.7 ·
+> 41.9** — del 46% pre-arco a un tercio, con el techo intacto.
 
 > Este es el único punto donde se mezcla "escala 1–99" (datos) con "escala 0–5" (fórmulas).
 > Todo lo demás del partido razona en 0–5.

@@ -31,6 +31,7 @@
    ============================================================ */
 import { rnd } from "../../core/rng.js";
 import { genOpponentLineup } from "../opponents.js";
+import { identityGapMult } from "../philosophy.js";
 import { canPlayAt } from "../lineup.js";
 import { playedPos } from "../ratings.js";
 import { moraleBand } from "../morale.js";
@@ -75,6 +76,10 @@ export class Match {
     // conoce la run) y enciende la forma de torneo del once rival (0 en grupos = ×1).
     this.koRound = my.koRound || 0;
     this.oppLineup = genOpponentLineup(oppTeam, oppBanned, this.koRound);
+    // LA BRECHA DE IDENTIDAD (R3): el rival con más idea que yo amplifica su modo
+    // Mundial — se apila sobre p.forma (mismo canal, un solo campo en los datos).
+    const gapMult = identityGapMult(oppTeam, my.filo?.nivel, this.koRound);
+    if (gapMult !== 1) for (const p of this.oppLineup) p.forma *= gapMult;
     this.knockout = knockout;
     this.min = 0;
     this.gMy = 0; this.gOpp = 0;

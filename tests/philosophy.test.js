@@ -182,6 +182,36 @@ assert(E.filoCtx(run).id === "press" && E.filoCtx(run).nivel === 2, "filoCtx via
   assert(E.filoShareShift({ id: "press" }, { id: "press" }) === 0, "el Press no toca el reparto (paga energía)");
 }
 
+// ---------- R2/R3: la escalada — madurez por ronda y la brecha de identidad ----------
+{
+  // La madurez (R2): +1 nivel desde cuartos (koRound 3), tope Consolidada.
+  const fra = E.getTeam("FRA"), swe = E.getTeam("SWE"), cpv = E.getTeam("CPV");
+  assert(E.rivalFiloLevel(fra) === 2, "un grande llega Consolidado de base");
+  assert(E.rivalFiloLevel(fra, 5) === 2, "Consolidada es el tope: la final no lo sube a 3");
+  assert(E.rivalFiloLevel(swe, 1) === Math.min(2, E.rivalFiloLevel(swe) + 1), "desde 16avos todo rival madura (R3: nadie llega a KO sin idea)");
+  assert(E.rivalFiloLevel(swe, 0) === E.rivalFiloLevel(swe), "en grupos nadie madura (koRound 0)");
+  assert(E.rivalFiloLevel(cpv, 3) === 1, "el chico (Aprendiendo) llega a cuartos En desarrollo");
+
+  // La brecha (R3): tabla exacta, inmunidad con nivel propio ≥ rival, grupos ×1.
+  assert(E.identityGapMult(fra, 0, 0) === 1, "en grupos la brecha no existe (koRound 0)");
+  assert(E.identityGapMult(fra, 2, 5) === 1, "Consolidado es INMUNE: brecha 0 hasta en la final (la tesis de R3)");
+  assert(Math.abs(E.identityGapMult(fra, 1, 1) - (1 + E.IDENTITY_GAP_PCT)) < 1e-9, "brecha 1 → +2%", E.identityGapMult(fra, 1, 1));
+  assert(Math.abs(E.identityGapMult(fra, 0, 1) - (1 + 2 * E.IDENTITY_GAP_PCT)) < 1e-9, "brecha 2 → +4% (el sin idea ante un grande)");
+  assert(E.identityGapMult(fra, undefined, 1) === E.identityGapMult(fra, 0, 1), "sin filosofía = nivel 0 (duck-typed)");
+  assert(E.identityGapMult(cpv, 2, 1) === 1, "mi nivel sobre el suyo NUNCA me premia: la brecha solo castiga");
+  // La brecha COMPONE con la madurez (R3: desde 16avos): hasta el rival chico llega
+  // a KO con idea (nivel 1 madurado) y castiga al improvisador — nunca en grupos.
+  assert(Math.abs(E.identityGapMult(cpv, 0, 1) - (1 + E.IDENTITY_GAP_PCT)) < 1e-9,
+    "el chico madurado ya genera brecha 1 contra el sin idea desde 16avos", E.identityGapMult(cpv, 0, 1));
+  assert(E.identityGapMult(cpv, 1, 1) === 1, "…y con nivel propio 1 esa brecha desaparece");
+
+  // El canal completo: forma × brecha llegan multiplicadas al once del Match.
+  const my = { team: E.getTeam("BRA"), lineup: [], bench: [], mentalidad: "normal", buffs: {}, moral: 50, filo: { id: "press", nivel: 0 }, koRound: 3 };
+  const m = new E.Match(my, fra, true);
+  const esperado = E.tourneyFormaMult(3) * E.identityGapMult(fra, 0, 3);
+  assert(m.oppLineup.every(p => Math.abs(p.forma - esperado) < 1e-9), "p.forma = forma de torneo × brecha, exacto", esperado);
+}
+
 console.log(`\nphilosophy: ${checks} checks · fallos: ${fails}`);
 console.log(fails ? "❌ philosophy con fallos" : "✅ philosophy OK");
 process.exit(fails ? 1 : 0);

@@ -105,6 +105,56 @@ arriesgaría a CPV (5.9-7.2, gate ≥3). La brecha azar↔greedy (~8pp) se ensan
 castigando DECISIONES, no inflando rivales — esa palanca nueva es el sprint R3, con
 diseño propio.
 
+### R3 — "Improvisar se paga" — ✅ CERRADO (22-jul-2026, gate re-pactado a mixto 29-31)
+
+**La meta:** el peldaño que R2 declaró pendiente — mixto azar **32.7 → ~25** con el resto
+de la escalera intacta. **La restricción que define el diseño** (medida, no opinada): la
+separación mixto↔smart vive 100% en la PREPARACIÓN — en el smoke ambos resuelven las
+secuencias al azar, así que castigar decisiones de partido no movería la brecha un pp.
+Lo que el mixto hace mal y el smart no: dispersa la Sesión Táctica entre 5 aristas
+(llega a KO Aprendiendo, sin avanzada) y recupera al azar.
+
+**La palanca (decisión PO): A — el Mundial castiga al sin idea.** En KO, si mi nivel de
+identidad es MENOR que el del rival (ya madurado por R2), su modo Mundial se amplifica:
+**+2% de poder por nivel de brecha** (`gap = max(0, nivelRival − miNivel)`, apilado
+sobre `p.forma`; brecha 2 → +4%). Smart es INMUNE por construcción (Consolidada antes de
+KO); el mixto disperso paga la improvisación. En grupos no existe (koRound 0). Canal de
+PODER, no de pool — la lección de R2: los sesgos de pool miden ~0pp. DESCARTADA la
+palanca B (sobre-descanso suma doble a la racha): protege la narrativa simple de R1
+("días sin entrenar") y su arrastre al recuperador.
+
+**El dial declarado:** si +2%/brecha deja al mixto sobre ~27, el ajuste es SUBIR LA
+BRECHA (+3-4%) — no inventar otra palanca: smart sigue inmune a cualquier dosis, cosa
+que el dial global de R2 nunca permitió. Tope del dial: CPV ≥3 (el azar débil también
+lleva brecha).
+
+**La válvula del recuperador (decisión PO): tolerancia hasta ~9** — arrastra brecha 2
+siempre (nivel 0), y se acepta hasta ~9 de título SIN re-diales durante R3 (la tesis
+10-15 se relee como "~10, no menos de 9").
+
+**El sprint:** 1. baseline fresco (protocolo: 7 fotos + caídas por ronda; la referencia
+es el cierre de R2). 2. Implementar A + unitario (tabla del gap, inmunidad con nivel
+propio ≥ rival, grupos ×1). 3. Medir AISLADA; si falta dosis, el dial con ok del PO.
+4. Narración: el informe nombra la brecha ("llega con más idea — te va a pasar por
+encima") y la previa del Daily la anuncia. 5. **GATE R3 (2×n=4000):** mixto **23-27** ·
+smart 38-42 · recuperador ≥9 · entrenar 15-20 · CPV ≥3 · KOR proporcional · fotos por
+filo · bordes con 3ª corrida.
+
+**CÓMO CERRÓ (decisiones PO en sesión):** +2%/brecha midió −1.3pp — la brecha no existía
+en 16avos/octavos (rivales chicos nivel 0) justo donde mueren las runs. Ajustes
+aprobados: **madurez adelantada a 16avos** (`FILO_MADURA_DESDE` 3→1, "en eliminatorias
+nadie llega sin idea" — revisión de una decisión de R2) y **dial a +4%/brecha**. Ahí el
+dial topó su techo estructural: duplicarlo movía al mixto −0.8pp y al recuperador −2.3pp
+(nivel 0 SIEMPRE paga brecha completa; el mixto alcanza nivel 1 a mitad de KO y esquiva
+la mitad) — no hay dosis que cierre mixto ~25 sin perforar el ≥9. **Gate re-pactado a
+mixto 29-31 y CERRADO (bordes con 3ª):** mixto 30.1/29.5/29.6 · recuperar 10.8/11.6 ✓
+10-15 · smart 41.4/42.3 ✓ inmune · entrenar 15.6/14.4 (~15.0, borde inferior aceptado:
+entrenar stats sin idea apenas supera al que improvisa — opción anotada si molesta:
+eximir del gap a quien entrena) · CPV 5.7 ✓ · filos 27.1-33.9 (posesión premium, contra
+sano). **Escalera final del ARCO COMPLETO: 11.3 · 15.0 · 29.7 · 41.9** (pre-arco:
+46.4 · 27.2 · 41.8 · 50.5). La narración quedó: chip rojo del informe suma forma+brecha
+("+17% encendido — llega con más idea"), previa del Daily la nombra.
+
 ## Riesgos declarados
 
 | Riesgo | Contención |
@@ -130,3 +180,15 @@ diseño propio.
   ~6.5 · spread 34→26. Contra pagado, dificultad pagada. Pendiente ÚNICO → **R3**: el
   mixto (32.7 vs ~25) exige una palanca de DECISIONES, no de rivales — diseño al
   arrancar R3.
+- **22-jul-2026 (quater)** — **R3 DISEÑADO** (decisiones PO en sesión): palanca única A
+  "el Mundial castiga al sin idea" (+2% de poder rival por nivel de brecha de identidad,
+  solo KO, canal de poder); B descartada; el dial es la brecha misma (smart inmune a
+  cualquier dosis); tolerancia del recuperador hasta ~9 sin re-diales. Gate: mixto 23-27
+  con la escalera intacta. Sin implementar.
+- **22-jul-2026 (quinquies)** — **R3 CERRADO y ARCO DEL REBALANCE COMPLETO**: brecha
+  +4% con madurez desde 16avos; el dial topó su techo estructural (recuperador nivel 0
+  paga siempre la brecha completa) y el gate del mixto se re-pactó a 29-31 con ok del
+  PO. Escalera final: **recuperar 11.3 · entrenar 15.0 · mixto 29.7 · smart 41.9** ·
+  CPV 5.7 · KOR 22.5. La tesis del arco ("ganar sin jugar no tiene sentido") cumplida:
+  46.4 → 11.3. Deudas del Meta: las 3 pagadas (dificultad 41.8→29.7, spread 34→24,
+  Contra sano 28.4).
