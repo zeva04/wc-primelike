@@ -39,15 +39,20 @@ export function rivalLook(name, team) {
   };
 }
 
+/** Camiseta que viste el jugador (arco usa kits.gk; el resto, la titular): {shirt, accent}. */
+export function kitOf(player, team) {
+  const field = team.kits ? team.kits.field : (team.kit || { shirt: "#64748B", accent: "#334155" });
+  const gk = team.kits ? (team.kits.gk || field) : { shirt: "#52525B", accent: "#18181B" };
+  return player.pos === "POR" ? gk : field;
+}
+
 /**
  * Sprite pixelado (busto 12×14): piel + pelo (estilo) + barba + camiseta del equipo, dibujado
  * píxel a píxel en SVG. El arquero usa la equipación kits.gk; los rivales usan su `kit` titular.
  */
 export function spriteSvg(player, team, sizeCls = "w-8 h-9") {
   const look = player.look || rivalLook(player.name || "?", team);
-  const field = team.kits ? team.kits.field : (team.kit || { shirt: "#64748B", accent: "#334155" });
-  const gk = team.kits ? (team.kits.gk || field) : { shirt: "#52525B", accent: "#18181B" };
-  const kit = player.pos === "POR" ? gk : field;
+  const kit = kitOf(player, team);
   const S = look.skin, H = look.hair, K = kit.shirt, A = kit.accent, E = "#12161C";
   const st = look.style || "short";
   const px = [];

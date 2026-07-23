@@ -11,6 +11,7 @@ import { go } from "./ui/nav.js";
 // Pantallas: el import las registra en nav (orden irrelevante)
 import "./ui/screens/menu.js";
 import "./ui/screens/history.js";
+import "./ui/screens/identity.js";
 import "./ui/screens/draw.js";
 import "./ui/screens/hub.js";
 import "./ui/screens/philosophy.js";

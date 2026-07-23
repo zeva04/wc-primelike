@@ -386,7 +386,8 @@ entre pantallas es `go("nombre", ...args)` — así no hay imports circulares (�
 | `ui/theme.js` | §2: applyTeamColors, trofeo y balón SVG |
 | `ui/screens/menu.js` | §4: carrusel (la regla de dificultad vive en `game/ratings`) |
 | `storage/history.js` + `ui/screens/history.js` | §5: persistencia / pantalla |
-| `ui/screens/draw.js` | §6 (`start-run`) |
+| `ui/screens/identity.js` | §6 (`start-run`) |
+| `ui/screens/draw.js` | §6 (`draw`) |
 | `ui/screens/hub.js` | §7: hub, calendario, efectos, modales de evento/conflicto |
 | `ui/screens/squad.js` | §7: Gestión de Plantilla (las reglas viven en `game/lineup`) |
 | `ui/screens/worldcup.js` | §7: Estado del Mundial + tarjetas de posición reutilizables |
@@ -443,11 +444,12 @@ equipo y posiciona el carrusel sin iniciar la partida.
 | `getHistory()` / `saveHistoryEntry(e)` | Leen/escriben el historial en `localStorage`. |
 | `renderHistory()` | Pantalla con las runs pasadas. |
 
-### 6. Sorteo de grupos — `ui/screens/draw.js`
+### 6. Inicio de run y sorteo de grupos — `ui/screens/identity.js`, `ui/screens/draw.js`
 | Función | Qué hace |
 |---|---|
-| `startRun(teamId)` | Crea la run, aplica colores y muestra el sorteo. |
-| `renderDraw()` | Pantalla de sorteo con los 12 grupos **+ la elección de identidad** (F1, decisión PO #1: se elige DESPUÉS de ver el grupo): 4 cards con aristas, lema, fortaleza, advertencia de counter y el rasgo de Consolidada. "Comenzar la aventura" queda deshabilitado hasta elegir; confirma con `choosePhilosophy`. |
+| `startRun(teamId)` (identity.js, `start-run`) | Crea la run, aplica colores y muestra la elección de identidad. |
+| `renderChooseIdentity()` (identity.js) | Pantalla previa al sorteo (F1, decisión PO #1: se elige apenas confirmado el equipo, ANTES de ver el grupo): confirma equipo o vuelve a `menu`, y 4 cards de identidad en grilla 2×2 con aristas, lema, fortaleza, advertencia de counter y el rasgo de Consolidada. "Confirmar" queda deshabilitado hasta elegir; aplica con `choosePhilosophy` y sigue a `draw`. |
+| `renderDraw()` (draw.js, `draw`) | Pantalla de sorteo con los 12 grupos (la identidad ya quedó fijada). "Comenzar la aventura" lleva a `hub`. |
 
 ### 6b. La cancha reutilizable — `ui/pitch.js`
 | Función | Qué hace |

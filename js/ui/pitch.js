@@ -13,9 +13,15 @@
    ============================================================ */
 import { playerOverall, playedPos, outOfPosPenalty } from "../game/ratings.js";
 import { posBadge } from "./components.js";
-import { spriteSvg } from "./sprites.js";
+import { spriteSvg, kitOf } from "./sprites.js";
 
 export const POS_NAME = { POR: "Arquero", DEF: "Defensa", MED: "Mediocampista", DEL: "Delantero" };
+
+/** Dorsal centrado sobre la camiseta, en el color secundario del kit (combina con cada plantel). */
+export function jerseyNum(p, team, sizeCls = "text-xs") {
+  const accent = kitOf(p, team).accent;
+  return `<span class="absolute left-1/2 -translate-x-1/2 top-[75%] -translate-y-1/2 font-black leading-none select-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] ${sizeCls}" style="color:${accent}">${p.num || "–"}</span>`;
+}
 
 // Filas de la cancha (% desde arriba): el arquero abajo, los delanteros arriba.
 // Equiespaciadas a 23%: menos que eso y las fichas se pisan en pantallas chicas.
@@ -38,13 +44,14 @@ let view = null; // configuración de la cancha montada (solo hay una a la vez)
  *   onSelect(p)        clic en una ficha
  *   badge(p)           html extra sobre la ficha (🟨 🟥 🚑 🔄)
  *   extra(p)           html bajo la nota, dentro de la placa (el partido pone la energía)
+ *   headBar(p)         html de una barra angosta sobre la cabeza (Gestión de Plantilla pone la energía)
  *   muted(p)           pintarlo apagado (expulsado, lesionado, suspendido)
  *   draggable(p)       si se puede arrastrar
  */
 export function mountPitch(cfg) {
   view = {
     sizes: { sprite: "w-10 h-12 sm:w-12 sm:h-14", bench: "w-9 h-11" },
-    badge: () => "", extra: () => "", muted: () => false, draggable: () => true, onSelect: () => {},
+    badge: () => "", extra: () => "", headBar: () => "", muted: () => false, draggable: () => true, onSelect: () => {},
     ...cfg,
   };
   paintField();
@@ -102,12 +109,13 @@ function token(p, x, y) {
       off ? "opacity-40 cursor-not-allowed" : view.draggable(p) ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}"
     style="left:${x}%;top:${y}%">
     <div class="relative pointer-events-none">
+      ${view.headBar(p) ? `<div class="absolute left-1/2 -translate-x-1/2 -top-2">${view.headBar(p)}</div>` : ""}
       <div class="absolute left-1/2 -translate-x-1/2 bottom-0 w-8 h-1.5 bg-black/40 rounded-[50%]"></div>
       <div class="relative rounded border-2 px-0.5 transition-all group-hover:brightness-125 ${
         sel ? "tp-border tp-bg-soft tp-ring" : fuera ? "border-orange-400/70" : "border-transparent"}">
         ${spriteSvg(p, view.team, view.sizes.sprite)}
+        ${jerseyNum(p, view.team, "text-[13px]")}
       </div>
-      <span class="absolute -top-1.5 -left-2.5 text-[9px] font-black text-slate-200 bg-slate-900/90 border border-slate-600 rounded px-1">${p.num || "–"}</span>
       ${fuera ? `<span class="absolute -top-2 -right-2 text-[11px] font-black text-slate-900 bg-orange-400 border border-orange-200 rounded-full w-4 h-4 flex items-center justify-center leading-none">!</span>` : ""}
     </div>
     <span class="mt-0.5 px-1.5 py-0.5 rounded bg-slate-900/85 border text-center leading-tight pointer-events-none ${
@@ -127,9 +135,12 @@ function benchCard(p) {
     class="relative flex flex-col items-center gap-0.5 p-1 pt-2 rounded-lg border-2 transition-all ${
       off ? "opacity-40 cursor-not-allowed" : view.draggable(p) ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${
       sel ? "tp-border tp-bg-soft" : "border-slate-700 bg-slate-900/50 hover:border-slate-500"}">
-    <span class="absolute top-0.5 left-0.5 text-[8px] font-black text-slate-300 bg-slate-800/90 rounded px-0.5 pointer-events-none">${p.num || "–"}</span>
+    ${view.headBar(p) ? `<span class="absolute top-0.5 left-1/2 -translate-x-1/2 pointer-events-none">${view.headBar(p)}</span>` : ""}
     <span class="absolute top-0.5 right-0.5 text-[9px] pointer-events-none">${view.badge(p)}</span>
-    <span class="relative pointer-events-none">${spriteSvg(p, view.team, view.sizes.bench)}</span>
+    <span class="relative pointer-events-none">
+      ${spriteSvg(p, view.team, view.sizes.bench)}
+      ${jerseyNum(p, view.team, "text-[11px]")}
+    </span>
     <span class="scale-[0.82] origin-center -my-0.5 pointer-events-none">${posBadge(p.pos)}</span>
     <span class="text-[9px] font-medium text-slate-300 truncate max-w-full leading-tight pointer-events-none">${p.name}</span>
     <b class="text-[11px] text-amber-300 leading-none pointer-events-none">${playerOverall(p)}</b>

@@ -24,24 +24,14 @@ import {
 } from "../../game/lineup.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, energyCls, oxidCls, momentoChip, toast, modal, closeModal } from "../components.js";
-import { oxidState } from "../../game/oxidation.js";
-import { mountPitch, POS_NAME } from "../pitch.js";
+import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, energyCls, momentoChip, toast, modal, closeModal } from "../components.js";
+import { mountPitch, POS_NAME, jerseyNum } from "../pitch.js";
 import { spriteSvg } from "../sprites.js";
 
 const STAT_NAME = {
   tiro: "Tiro", defensa: "Defensa", cabezazo: "Cabezazo", pase: "Pase", aura: "Aura",
   atajadas: "Atajadas", reflejos: "Reflejos", salidas: "Salidas",
 };
-
-/** Línea de RITMO (oxidación R1) en la card de energía: misma constante de color que el hub. */
-function ritmoLine() {
-  const ox = oxidState(S.run);
-  const txt = ox.oxidado
-    ? `Oxidado: ${ox.racha} días sin entrenar — el plantel rinde un ${Math.round((1 - ox.mult) * 100)}% menos`
-    : ox.racha ? `${ox.racha} día${ox.racha > 1 ? "s" : ""} sin entrenar` : "Ritmo al día";
-  return `<div class="text-[10px] font-bold ${oxidCls(ox.racha)} mb-2" title="Entrenar o la Sesión Táctica recuperan el ritmo; jugar también (el partido lo devuelve)">⚙️ ${txt}</div>`;
-}
 
 let selName = null; // jugador con la ficha abierta (solo estado visual de esta pantalla)
 
@@ -68,6 +58,7 @@ function renderSquadScreen() {
             <div id="formation-picker" class="relative"></div>
           </div>
           <div class="flex items-end gap-4">
+            ${squadEnergyBadge()}
             ${moraleBadge()}
             <div class="text-right">
               <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Media del once</div>
@@ -93,12 +84,6 @@ function renderSquadScreen() {
           </div>
           <div id="bench" class="grid grid-cols-4 gap-1.5"></div>
         </div>
-        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-          <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-0.5">⚡ Energía del plantel</div>
-          <p class="text-[10px] text-slate-500 mb-2">Del más cansado al más entero — para decidir a quién rotar o descansar.</p>
-          ${ritmoLine()}
-          <div id="energy-panel" class="space-y-0.5"></div>
-        </div>
       </div>
     </div>
     <button id="btn-confirm" class="btn-primary w-full mt-4">✔ Confirmar y volver</button>
@@ -112,6 +97,18 @@ function renderSquadScreen() {
 
 const availables = () => S.run.squad.filter(isAvailable);
 const isAvailable = p => !p.suspendido && p.lesionadoPartidos === 0;
+
+/** Barra de energía promedio de la plantilla, a la izquierda de la Moral del equipo. */
+function squadEnergyBadge() {
+  const avg = Math.round(S.run.squad.reduce((sum, p) => sum + p.energia, 0) / S.run.squad.length);
+  return `<div title="Energía promedio de la plantilla (${avg}/100)">
+    <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">⚡ Energía del plantel</div>
+    <div class="flex items-center gap-2">
+      <span class="w-20 inline-block">${energyBar(avg)}</span>
+      <b class="${energyCls(avg)} text-sm">${avg}%</b>
+    </div>
+  </div>`;
+}
 
 /** Barra de moral del equipo, a la izquierda de la Media del once en el bloque de la cancha. */
 function moraleBadge() {
@@ -165,34 +162,10 @@ function renderAll() {
     canSwap: (a, b) => swapCandidates(a).includes(b) ? { tone: "sky" } : null,
     onSwap: (a, b) => { swapPlayers(a, b); renderAll(); },
     onSelect: p => { selName = p.name; renderAll(); },
+    headBar: p => `<div class="w-6">${energyBar(p.energia)}</div>`,
   });
   renderPlayerCard();
-  renderEnergyPanel();
   renderStatus(available);
-}
-
-/**
- * Vista de energía del plantel (Sprint 3): TODAS las barras de un vistazo, ordenadas del
- * más cansado al más entero — es el insumo para decidir la rotación (jugar cansa −10 cada
- * 30', docs/CORE.md §Energía). Marca en negrita a los titulares del once actual y atenúa a
- * los no disponibles (suspendidos/lesionados). Clic en una fila abre esa ficha.
- */
-function renderEnergyPanel() {
-  const el = $("#energy-panel");
-  if (!el) return;
-  const rows = [...S.run.squad].sort((a, b) => a.energia - b.energia || a.name.localeCompare(b.name));
-  el.innerHTML = rows.map(p => {
-    const titular = S.selectedLineup.includes(p);
-    const cls = energyCls(p.energia);
-    return `<button data-name="${p.name}" title="${titular ? "Titular" : "Suplente"}${isAvailable(p) ? "" : p.suspendido ? " · suspendido" : " · lesionado"}" class="ep-row w-full flex items-center gap-1.5 px-1 py-0.5 rounded-lg text-left transition-colors cursor-pointer ${
-      p.name === selName ? "bg-slate-700/60" : "hover:bg-slate-700/40"} ${isAvailable(p) ? "" : "opacity-40"}">
-      ${posBadge(playedPos(p))}
-      <span class="flex-1 min-w-0 truncate text-[11px] ${titular ? "font-bold" : "text-slate-400"}">${p.name}</span>
-      <span class="w-10 shrink-0">${energyBar(p.energia)}</span>
-      <b class="w-8 text-right text-[10px] ${cls}">${p.energia}%</b>
-    </button>`;
-  }).join("");
-  el.querySelectorAll(".ep-row").forEach(b => b.onclick = () => { selName = b.dataset.name; renderAll(); });
 }
 
 /* ---------- Formación ---------- */
@@ -271,7 +244,7 @@ function renderPlayerCard() {
     <div class="flex items-center gap-3 mb-3">
       <div class="relative shrink-0 bg-slate-900/70 border-2 ${fuera ? "border-orange-400" : "tp-border"} rounded-lg p-1">
         ${spriteSvg(p, me, "w-16 h-20")}
-        <span class="absolute -top-2 -left-2 text-[9px] font-black text-slate-200 bg-slate-800 border border-slate-600 rounded px-1">${p.num || "–"}</span>
+        ${jerseyNum(p, me, "text-lg")}
       </div>
       <div class="min-w-0">
         <div class="font-black text-lg leading-tight truncate">${p.name}</div>

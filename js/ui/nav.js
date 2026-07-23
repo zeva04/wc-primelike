@@ -6,8 +6,8 @@
    Solución: cada pantalla se REGISTRA aquí al importarse y las
    demás la invocan por nombre con go(). Nadie importa pantallas.
 
-   Nombres registrados hoy: menu · history · start-run · hub ·
-   squad · worldcup · journal · start-match · shootout ·
+   Nombres registrados hoy: menu · history · start-run · draw ·
+   hub · squad · worldcup · journal · start-match · shootout ·
    finish-match · end-run · end-screen
    ============================================================ */
 
