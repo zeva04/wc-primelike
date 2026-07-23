@@ -68,12 +68,14 @@ export function hasTrait(m, traitId) {
  * Tira un hook con probabilidad y presupuesto de cadena: devuelve el hook si
  * procede encadenar (y CONSUME presupuesto), null si no. Para hooks sin `p`
  * (pasivos, ej. finishSupport) usar hookOf — esto es solo para reactivas.
+ * `pPlus` suma probabilidad externa (T3: el Master que afila la cadena básica —
+ * El Robo es el Pase suma chainPlus a la p de Morder).
  */
-export function rollChain(m, name) {
+export function rollChain(m, name, pPlus = 0) {
   const h = hookOf(m, name);
   if (!h) return null;
   if ((m._chainCount || 0) >= MAX_CHAINS) return null;
-  if (rnd() >= h.p) return null;
+  if (rnd() >= h.p + pPlus) return null;
   m._chainCount = (m._chainCount || 0) + 1;
   return h;
 }

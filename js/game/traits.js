@@ -74,19 +74,26 @@ export function activeTraits(run) {
 /**
  * ¿Cumple la run los requisitos de un rasgo? Devuelve {ok, faltas: [textos]} —
  * las faltas en lenguaje de jugador para los candados de la UI (T1.5).
- * Las 4 condiciones del GDD §5; en Basic solo aplican nivel y PI.
+ * Las 4 condiciones del GDD §5. Formas del req (T3 extiende para convergencias):
+ *   previo: id            — el rasgo previo de la rama (Intermediate)
+ *   todos: [ids]          — TODOS requeridos (Advanced: Int líder + Básico apoyo;
+ *                           Master: los 3 básicos — presencia en las tres ramas)
+ *   alguno: [ids]         — al menos UNO (Master: cualquiera de los 2 Advanced)
+ *   principio: {id, min}  — un Principio mínimo
+ *   principios: [{id,min}]— varios (Master: ambos propios a 4)
+ *   nivel: n              — nivel de Filosofía mínimo (1-10)
  */
 export function traitReqs(run, t) {
   const faltas = [];
   const owned = activeTraitIds(run);
-  if (t.req.previo) {
-    const prev = traitById(t.req.previo);
-    if (!owned.includes(t.req.previo)) faltas.push(`requiere ${prev ? prev.nombre : t.req.previo}`);
-  }
-  if (t.req.principio) {
-    const a = aristaById(t.req.principio.id);
-    if ((run.aristas?.[t.req.principio.id] || 0) < t.req.principio.min)
-      faltas.push(`${a.icon} ${a.label} ${t.req.principio.min} (tienes ${run.aristas?.[t.req.principio.id] || 0})`);
+  const nombre = id => traitById(id)?.nombre || id;
+  if (t.req.previo && !owned.includes(t.req.previo)) faltas.push(`requiere ${nombre(t.req.previo)}`);
+  for (const id of t.req.todos || []) if (!owned.includes(id)) faltas.push(`requiere ${nombre(id)}`);
+  if (t.req.alguno && !t.req.alguno.some(id => owned.includes(id)))
+    faltas.push(`requiere ${t.req.alguno.map(nombre).join(" o ")}`);
+  for (const p of [...(t.req.principio ? [t.req.principio] : []), ...(t.req.principios || [])]) {
+    const a = aristaById(p.id);
+    if ((run.aristas?.[p.id] || 0) < p.min) faltas.push(`${a.icon} ${a.label} ${p.min} (tienes ${run.aristas?.[p.id] || 0})`);
   }
   if (filoLevelOf(run) + 1 < (t.req.nivel || 1)) faltas.push(`nivel ${t.req.nivel} de filosofía`);
   if ((run.identityPoints || 0) < 1) faltas.push("1 Punto de Identidad");
@@ -109,6 +116,13 @@ export function buyTrait(run, traitId) {
   addJournal(run, {
     icon: t.icon, tone: "gold", title: `Nueva idea permanente: ${t.nombre}`,
     desc: `${t.desc} Desde hoy es parte del ${f.name}. Su momento: ${t.momento}`,
+  });
+  // LA CONSAGRACIÓN (T3, decisión PO #9): desbloquear un Master es un hito de
+  // torneo — la prensa consagra el estilo con nombre propio (el enchufe narrativo
+  // de F3 "la prensa bautiza tu estilo", ahora en su versión definitiva).
+  if (t.tier === "master") addJournal(run, {
+    icon: "📰", tone: "gold", title: `LA PRENSA CONSAGRA: "${t.nombre}"`,
+    desc: `Los diarios del mundo entero le ponen nombre al fútbol de ${f.name}: muy pocos DTs en la historia de este Mundial llegaron a jugar así. ${t.momento}`,
   });
   return t;
 }

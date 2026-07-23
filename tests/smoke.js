@@ -62,7 +62,11 @@ function smartDayAction(run, opts) {
   if ((run.moral ?? 50) <= 40 && has("bonding")) return has("bonding");
   const f = E.getPhilosophy(run.filoId);
   if (f && E.filoPoints(run) < E.FILO_LEVELS[E.FILO_LEVELS.length - 1].min) {
-    const foco = has(`tactica_${f.firma}`) || has(`tactica_${f.aristas.find(k => k !== f.firma)}`);
+    // T3: el greedy entrena la arista propia MÁS BAJA (empate → la firma). Para el
+    // nivel da igual (es la SUMA), pero el Master exige AMBOS principios a 4 — el
+    // DT del techo construye la doctrina completa, no un monocultivo de firma.
+    const [baja] = [...f.aristas].sort((a, b) => (run.aristas[a] || 0) - (run.aristas[b] || 0) || (a === f.firma ? -1 : 1));
+    const foco = has(`tactica_${baja}`) || has(`tactica_${f.firma}`) || has(`tactica_${f.aristas.find(k => k !== f.firma)}`);
     if (foco) return foco;
   }
   return has("entrenar_defensa") || has("entrenar_ataque") || has("entrenar_pases") || opts[0];
@@ -343,7 +347,10 @@ function playRun(teamId) {
   }
   // Instrumento por ronda (R2): DÓNDE murió la run — la escalada debe sentirse en KO,
   // no en grupos, y este reporte es el termómetro de esa forma.
-  return { champion, journal: run.journal.length, stage: champion ? "champion" : run.stage };
+  // Instrumento del árbol (T3): ¿la run alcanzó un Master? El gate del arco exige que
+  // el azar (piso) casi nunca llegue y el greedy (techo) sí — inversión total.
+  const master = Object.values(run.rasgos).flat().some(id => E.traitById(id)?.tier === "master");
+  return { champion, journal: run.journal.length, stage: champion ? "champion" : run.stage, master };
 }
 
 // ---------- ejecución ----------
@@ -353,22 +360,23 @@ const t0 = Date.now();
 const results = [];
 
 for (const teamId of teamsToRun) {
-  let champs = 0, journalSum = 0;
+  let champs = 0, journalSum = 0, masters = 0;
   const deaths = {}; // instrumento por ronda (R2): dónde mueren las runs
   for (let i = 0; i < RUNS; i++) {
     const id = teamId || playables[Math.floor(Math.random() * playables.length)];
     const r = playRun(id);
     if (r.champion) champs++;
+    if (r.master) masters++;
     journalSum += r.journal;
     deaths[r.stage] = (deaths[r.stage] || 0) + 1;
   }
-  results.push({ team: teamId || "(azar)", champs, journal: journalSum / RUNS, deaths });
+  results.push({ team: teamId || "(azar)", champs, masters, journal: journalSum / RUNS, deaths });
 }
 
 console.log(`\nsmoke: ${teamsToRun.length * RUNS} runs en ${((Date.now() - t0) / 1000).toFixed(1)}s · fallos: ${fails}`);
 const DEATH_COLS = [["groups", "grupos"], ["r32", "16avos"], ["r16", "8vos"], ["qf", "4tos"], ["sf", "semis"], ["final", "final"], ["champion", "🏆"]];
 for (const r of results) {
-  console.log(`  ${r.team.padEnd(7)} campeón ${(100 * r.champs / RUNS).toFixed(1).padStart(5)}%  · diario ~${r.journal.toFixed(0)} entradas`);
+  console.log(`  ${r.team.padEnd(7)} campeón ${(100 * r.champs / RUNS).toFixed(1).padStart(5)}%  · master ${(100 * r.masters / RUNS).toFixed(1)}% · diario ~${r.journal.toFixed(0)} entradas`);
   console.log(`    caídas: ${DEATH_COLS.map(([k, lbl]) => `${lbl} ${(100 * (r.deaths[k] || 0) / RUNS).toFixed(1)}%`).join(" · ")}`);
 }
 console.log(fails ? "❌ smoke con fallos" : "✅ smoke OK");

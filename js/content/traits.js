@@ -326,6 +326,169 @@ export const TRAITS = [
     hooks: { secondBallUpgrade: { bonus: 0.06,
       intro: p => `¡Segunda pelota y POSICIÓN establecida! ${p.name} organiza el ataque en campo rival.` } },
   },
+
+  /* ================= ADVANCED (T3 "La doctrina") =================
+     Convergencia ASIMÉTRICA: Intermediate de la rama líder + Básico de la
+     rama de apoyo + Nivel 6 + Principio a 4 (propio) o 3 (ajeno) + 1 PI.
+     Los anti-matchup NEUTRALIZAN la matriz F2 — la llevan a tablas, JAMÁS
+     la invierten (regla del arco). */
+
+  /* ---------------- 🦁 High Press ---------------- */
+  {
+    id: "asfixia_total", filo: "press", rama: "firma", tier: "advanced", icon: "🌪️",
+    nombre: "Asfixia Total",
+    desc: "El equipo presiona en todas las fases: la salida, el medio, la pérdida. Al rival no le queda fútbol para jugar.",
+    momento: "El rival reventando pelotazos porque no puede salir jugando.",
+    req: { nivel: 6, todos: ["caceria_letal", "asfixia_salida"], principio: { id: "presion", min: 4 } },
+    // El bozal a la firma RIVAL: su identidad se expresa mucho menos (el mult de su
+    // firma en el pool se reduce) — no ataca menos: renuncia a SU fútbol.
+    hooks: { muzzleOppFirma: { factor: 0.6,
+      texto: "El rival ya no intenta jugar SU fútbol: la asfixia lo obligó a renunciar a la idea." } },
+  },
+  {
+    id: "cancha_chica", filo: "press", rama: "respuesta", tier: "advanced", icon: "📦",
+    nombre: "Cancha Chica",
+    desc: "El equipo achica el campo hasta que el rival no encuentra dónde jugar.",
+    momento: "El rival encerrado en su propio tercio durante minutos enteros.",
+    req: { nivel: 6, todos: ["anticipar", "morder"], principio: { id: "solidez", min: 3 } }, // AJENO
+    // Las secuencias rivales pierden continuidad (mueren antes del remate): el mismo
+    // corte del Oficio, pero por achique — la cancha mide cuarenta metros.
+    hooks: { oppLoseActs: { p: 0.25,
+      texto: "¡No hay cancha! El achique ahoga el avance rival antes de que llegue a ser peligro." } },
+  },
+
+  /* ---------------- 🎼 Posesión ---------------- */
+  {
+    id: "juego_posicional", filo: "posesion", rama: "firma", tier: "advanced", icon: "♟️",
+    nombre: "Juego Posicional",
+    desc: "Cada jugador ocupa su altura y su pasillo: el balón siempre encuentra tres opciones de pase.",
+    momento: "El rival corriendo detrás de la pelota sin alcanzarla nunca.",
+    req: { nivel: 6, todos: ["tercer_hombre", "pausa"], principio: { id: "elaboracion", min: 4 } },
+    // El reciclaje del Hombre Libre se vuelve estructura: más seguido y hasta dos veces
+    // por jugada — los fallos de circulación casi nunca son pérdida seca.
+    hooks: { recycleUpgrade: { p: 0.60, max: 2,
+      texto: "Juego posicional puro: siempre hay un pasillo, siempre hay un pie — la posesión no muere." } },
+  },
+  {
+    id: "abrir_lata", filo: "posesion", rama: "respuesta", tier: "advanced", icon: "🥫",
+    nombre: "Abrir la Lata",
+    desc: "Contra bloques cerrados, el equipo combina amplitud, cambios de frente y llegada desde segunda línea.",
+    momento: "El gol de media distancia tras quince pases contra el muro.",
+    req: { nivel: 6, todos: ["cambio_frente", "hombre_libre"], principio: { id: "directo", min: 3 } }, // AJENO
+    // LA NEUTRALIZACIÓN: con Amplitud (×1.25) apilada, la celda posesion|bloque vuelve
+    // a tablas EXACTAS (0.65×1.25×1.23 ≈ 1.0) y el pelotazo forzado desaparece
+    // (1.3×0.77 ≈ 1.0). Empareja el matchup — no lo invierte (regla del arco).
+    hooks: { poolMod: { vsFilo: "bloque", weights: { circulacion: 1.23, pelotazo: 0.77 } } },
+  },
+
+  /* ---------------- ⚡ Contragolpe ---------------- */
+  {
+    id: "invitacion", filo: "contra", rama: "respuesta", tier: "advanced", icon: "🎩",
+    nombre: "La Invitación",
+    desc: "Cuando el rival espera, el equipo mantiene el balón con paciencia para obligarlo a salir — y entonces ataca el espacio.",
+    momento: "Diez minutos de toque paciente y la puñalada cuando el bloque dio dos pasos afuera.",
+    req: { nivel: 6, todos: ["trampa_cerrada", "tres_pases"], principio: { id: "elaboracion", min: 3 } }, // el MÁS ajeno del pool
+    // LA RESPUESTA AL PARTIDO MUERTO: neutraliza las celdas contra|contra y
+    // contra|bloque (0.6×1.67 ≈ 1.0) y la circulación-cebo puede CONVERTIR en
+    // transición cuando el rival que esperaba da un paso al frente.
+    hooks: {
+      poolMod: { vsFilo: ["contra", "bloque"], weights: { transicion: 1.67 } },
+      baitConvert: { vsFilo: ["contra", "bloque"], p: 0.30, bonus: 0.05,
+        texto: "¡LA INVITACIÓN funcionó! El rival dio dos pasos afuera y el espacio a su espalda es una autopista." },
+    },
+  },
+  {
+    id: "campo_abierto", filo: "contra", rama: "firma", tier: "advanced", icon: "🏇",
+    nombre: "A Campo Abierto",
+    desc: "Las contras combinan velocidad máxima y varios corredores: el robo se convierte en avalancha.",
+    momento: "Cuatro camisetas cruzando mediocampo a la vez.",
+    req: { nivel: 6, todos: ["primer_pase", "manada"], principio: { id: "verticalidad", min: 4 } },
+    hooks: { avalancha: { bonus: 0.06,
+      texto: "AVALANCHA a campo abierto: la contra llega en oleada y la defensa no sabe a quién marcar." } },
+  },
+
+  /* ---------------- 🧱 Bloque bajo ---------------- */
+  {
+    id: "la_fortaleza", filo: "bloque", rama: "firma", tier: "advanced", icon: "🏯",
+    nombre: "La Fortaleza",
+    desc: "El área propia se vuelve territorio prohibido: cada centro, cada córner, cada embestida muere en el muro.",
+    momento: "El delantero rival discutiendo con sus compañeros tras la enésima llegada muerta.",
+    req: { nivel: 6, todos: ["duenos_area", "oficio"], principio: { id: "solidez", min: 4 } },
+    // LA NEUTRALIZACIÓN del sitio: la celda opp bloque|posesion vuelve a tablas
+    // (1.35×0.74 ≈ 1.0) y la FRUSTRACIÓN acumulada degrada los remates rivales a
+    // medida que fallan (por remate errado, con tope).
+    hooks: {
+      oppPoolMod: { vsFilo: "posesion", weights: { repliegue: 0.74 } },
+      // perShot = por ataque rival MUERTO en la muralla (contador propio del Match:
+      // el diseño pide ataques frustrados, no tiros — el corte sin remate también suma).
+      frustration: { perShot: 0.02, cap: 0.08,
+        texto: "La frustración rival se palpa: cuanto más ataca sin premio, peor remata — la muralla come moral." },
+    },
+  },
+  {
+    id: "cabeza_playa", filo: "bloque", rama: "expansion", tier: "advanced", icon: "⚓",
+    nombre: "Cabeza de Playa",
+    desc: "El equipo ya no despeja: cada balón largo establece posición en campo rival.",
+    momento: "Tres córners seguidos fabricados desde pelotazos.",
+    req: { nivel: 6, todos: ["plataforma", "jaula"], principio: { id: "directo", min: 4 } },
+    // El pelotazo REACTIVO que muere sin gol puede fabricar córner (balón parado
+    // encadenado): la escasez ofensiva del Bloque compensada por CALIDAD del ciclo
+    // despeje → pelotazo → segunda → córner — cada llegada vale más.
+    hooks: { beachhead: { p: 0.35,
+      texto: "¡Cabeza de playa! El pelotazo no muere: la zaga rival, incómoda, la manda al córner." } },
+  },
+
+  /* ================= MASTER (T3 — el ideal platónico) =================
+     Un Advanced cualquiera + los TRES básicos (presencia en las tres ramas)
+     + Nivel 10 (Consolidada) + ambos Principios propios a 4 + 1 PI.
+     Comprarlo dispara la CONSAGRACIÓN de prensa (game/traits). */
+  {
+    id: "robo_es_pase", filo: "press", rama: "master", tier: "master", icon: "👑",
+    nombre: "El Robo es el Pase",
+    desc: "El equipo ya no distingue entre defender y atacar: cada recuperación es el primer pase del gol.",
+    momento: "Un gol nacido de robo en cada partido — el rival lo sabe y no puede evitarlo.",
+    req: { nivel: 10, alguno: ["asfixia_total", "cancha_chica"], todos: ["morder", "trampa_banda", "asfixia_salida"],
+      principios: [{ id: "presion", min: 4 }, { id: "verticalidad", min: 4 }] },
+    // Toda la familia de la recuperación define mejor (el robo ES creación) y la
+    // mordida caza más seguido (chainPlus sobre la p de Morder).
+    hooks: { masterPress: { bonus: 0.08, chainPlus: 0.15,
+      texto: "No hay creador de juego mejor que una buena recuperación: el robo YA es el pase del gol." } },
+  },
+  {
+    id: "pelota_nuestra", filo: "posesion", rama: "master", tier: "master", icon: "👑",
+    nombre: "La Pelota es Nuestra",
+    desc: "El partido se juega con una sola pelota — y es nuestra. El rival defiende, espera, y casi nunca la ve.",
+    momento: "El rival tocando el balón tres veces en diez minutos.",
+    req: { nivel: 10, alguno: ["juego_posicional", "abrir_lata"], todos: ["hombre_libre", "amplitud", "pausa"],
+      principios: [{ id: "elaboracion", min: 4 }, { id: "presion", min: 4 }] },
+    // El reparto de iniciativa se inclina de raíz (+share): el pool rival se
+    // ESTRANGULA por falta de balón. El costo permanece: perderla sigue doliendo.
+    hooks: { masterPosesion: { shareShift: 0.06 } },
+  },
+  {
+    id: "contragolpe_total", filo: "contra", rama: "master", tier: "master", icon: "👑",
+    nombre: "Contragolpe Total",
+    desc: "Cualquier balón recuperado, en cualquier zona, en cualquier momento, es el inicio de una contra. El rival ataca con miedo.",
+    momento: "La contra que nace de un córner rival.",
+    req: { nivel: 10, alguno: ["invitacion", "campo_abierto"], todos: ["tres_pases", "tender_trampa", "manada"],
+      principios: [{ id: "solidez", min: 4 }, { id: "verticalidad", min: 4 }] },
+    // El córner rival defendido y la salida sobrevivida también encadenan contra;
+    // y el MIEDO: el rival ataca con menos volumen (shareShift a mi favor).
+    hooks: { masterContra: { p: 0.30, shareShift: 0.04, bonus: 0.04,
+      intro: p => `¡CONTRAGOLPE TOTAL! Nadie en el estadio lo esperaba — ${p.name} ya está corriendo y el rival entero quedó a sus espaldas.` } },
+  },
+  {
+    id: "uno_a_cero", filo: "bloque", rama: "master", tier: "master", icon: "👑",
+    nombre: "Uno a Cero",
+    desc: "Con ventaja en el marcador, el equipo convierte el partido en territorio propio: el uno a cero se defiende con oficio, muro y castigo hasta el final.",
+    momento: "Los últimos veinte minutos defendiendo la ventaja sin conceder una sola llegada limpia.",
+    req: { nivel: 10, alguno: ["la_fortaleza", "cabeza_playa"], todos: ["jaula", "segunda_jugada", "oficio"],
+      principios: [{ id: "solidez", min: 4 }, { id: "directo", min: 4 }] },
+    // Rasgo de ESTADO (el único del pool): SOLO con ventaja — la muralla se amplifica
+    // y el castigo directo gana letalidad. Perdiendo no aporta NADA: pura identidad.
+    hooks: { masterBloque: { oppMalus: -0.05, myBonus: 0.05,
+      texto: "El uno a cero es un arte y este equipo lo pinta: muralla atrás, cuchillo adelante, reloj corriendo." } },
+  },
 ];
 
 /** Un rasgo por id (o undefined). */

@@ -37,7 +37,7 @@ import { SEQUENCE_TYPES, ADVANCED_BY_FILO } from "../../content/sequences.js";
 import { FIRMA_TYPE, FILO_LEVELS, FILO_ETAPAS, getPhilosophy } from "../../content/philosophies.js";
 import { rivalFilo } from "../philosophy.js";
 import { buildActDecision } from "./sequence-acts.js";
-import { hookOf, hasTrait } from "./trait-hooks.js";
+import { hookOf, hasTrait, traitHooks, traitMoment } from "./trait-hooks.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
 export const SEQ_MIN = 2, SEQ_MAX = 6;
@@ -189,22 +189,36 @@ function applyFiloWeights(m, side, w, oppFilo) {
   // propia del Bloque: el balón parado ES su gol (el scouting ya lo decía). No es
   // celda de matriz: es su fortaleza incondicional, como la firma.
   if (filo?.id === "bloque" && side === "mine") w.balon_parado *= 1.3;
-  // T1 — los RASGOS también sesgan el pool (Amplitud Máxima vs Bloque): SUAVIZAN
-  // celdas de la matriz, jamás las invierten (regla del arco: neutralizar es de
-  // Advanced, y aun ahí solo empareja). Condicional al rival si el hook lo pide.
-  const pm = hookOf(m, "poolMod");
-  if (pm && side === "mine" && (!pm.vsFilo || pm.vsFilo === oppFilo?.id)) {
-    for (const k of Object.keys(pm.weights)) if (w[k] !== undefined && w[k] > 0) w[k] *= pm.weights[k];
+  // T1/T3 — los RASGOS también sesgan el pool (Amplitud vs Bloque; Abrir la Lata y
+  // La Invitación NEUTRALIZAN celdas — a tablas, jamás invertidas). Se APILAN
+  // (Amplitud ×1.25 × Lata ×1.23 devuelve la celda 0.65 a ≈1.0), condicionales al
+  // rival si el hook lo pide (vsFilo acepta id o lista).
+  if (side === "mine") {
+    for (const pm of traitHooks(m).poolMod || []) {
+      if (pm.vsFilo && ![].concat(pm.vsFilo).includes(oppFilo?.id)) continue;
+      for (const k of Object.keys(pm.weights)) if (w[k] !== undefined && w[k] > 0) w[k] *= pm.weights[k];
+    }
+  }
+  // T3 — La Fortaleza neutraliza el SITIO: la celda opp bloque|posesion vuelve a
+  // tablas (1.35 × 0.74 ≈ 1.0). Mismo mecanismo, lado rival.
+  if (side === "opp") {
+    for (const pm of traitHooks(m).oppPoolMod || []) {
+      if (pm.vsFilo && ![].concat(pm.vsFilo).includes(oppFilo?.id)) continue;
+      for (const k of Object.keys(pm.weights)) if (w[k] !== undefined && w[k] > 0) w[k] *= pm.weights[k];
+    }
   }
   // T2 — Pelota Parada Ensayada: la jugada ensayada también sale MÁS seguido
   // (se apila sobre el ×1.3 incondicional del Bloque: su arma, más afilada).
   const sr = hookOf(m, "setpieceRehearsed");
   if (sr && side === "mine" && w.balon_parado > 0) w.balon_parado *= sr.poolMult;
   // F2 — la firma rival sesga SU lado, con su nivel como magnitud (escala de
-  // ETAPAS: el rival no tiene escalera fina — sus mults F2 quedan exactos, T1)
+  // ETAPAS: el rival no tiene escalera fina — sus mults F2 quedan exactos, T1).
+  // T3 — Asfixia Total le pone BOZAL a esa firma: la identidad rival se expresa
+  // mucho menos (×0.6 sobre su mult) — no ataca menos: renuncia a SU fútbol.
   if (oppFilo && side === "opp") {
     const t = RIVAL_FIRMA_OPP[oppFilo.id];
-    if (t && w[t] !== undefined) w[t] *= FILO_ETAPAS[oppFilo.nivel]?.mult || 1;
+    const muzzle = hookOf(m, "muzzleOppFirma");
+    if (t && w[t] !== undefined) w[t] *= (FILO_ETAPAS[oppFilo.nivel]?.mult || 1) * (muzzle ? muzzle.factor : 1);
     if (oppFilo.id === "bloque") { w.balon_parado_def *= 1.3; w.salida_fondo *= 0.6; }
   }
   // M2 — la secuencia AVANZADA de mi filosofía entra al pool desde En desarrollo
@@ -281,7 +295,11 @@ export function maybeStartSequence(m) {
   const late = m.min >= 75 ? (m.gMy < m.gOpp ? 0.07 : m.gMy > m.gOpp ? -0.05 : 0) : 0;
   const reds = 0.06 * (m.oppLineup.filter(p => p.expulsado).length - m.my.lineup.filter(p => p.expulsado).length);
   // F2: las identidades que esperan CEDEN iniciativa (mi Contra/Bloque; el rival igual)
-  const mineShare = clamp(0.5 + plan.edge * 0.045 + mentShift + late + reds + filoShareShift(m.my.filo, plan.oppFilo), 0.3, 0.72);
+  // T3: los MASTER inclinan el reparto de raíz — La Pelota es Nuestra estrangula al
+  // rival por posesión (+0.06) y Contragolpe Total por MIEDO (+0.04: atacar contra
+  // esa contra es regalarse — el rival se cuida). Suma de todos los shareShift.
+  const traitShift = Object.values(traitHooks(m)).flat().reduce((s, h) => s + (h.shareShift || 0), 0);
+  const mineShare = clamp(0.5 + plan.edge * 0.045 + mentShift + late + reds + filoShareShift(m.my.filo, plan.oppFilo) + traitShift, 0.3, 0.72);
   const side = rnd() < mineShare ? "mine" : "opp";
   const pool = SEQUENCE_TYPES.filter(t => t.side === side);
   const w = typeWeights(m, side, plan);
@@ -351,6 +369,11 @@ export function startSequence(m, type) {
       m.seq.prot = pool.sort((a, b) => (b.stats.pase || 0) - (a.stats.pase || 0))[0];
     }
     m.log("event", `${type.icon} min ${m.min}' — ${type.flavor.intro(m.oppTeam)}`);
+    // T3 — el bozal de Asfixia Total se NARRA de vez en cuando: el rival con identidad
+    // amordazada juega otro fútbol, y el relato lo dice (momento nombrable del rasgo).
+    const muzzle = hookOf(m, "muzzleOppFirma");
+    const oppFilo = m._seqPlan?.oppFilo;
+    if (muzzle && oppFilo && RIVAL_FIRMA_OPP[oppFilo.id] && rnd() < 0.12) traitMoment(m, muzzle.traitId, [muzzle.texto]);
   }
   buildActDecision(m);
 }

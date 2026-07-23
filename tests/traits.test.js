@@ -113,7 +113,7 @@ const assert = (cond, msg, ctx) => { checks++; if (!cond) { fails++; console.err
   const r = E.newRun("BRA");
   E.choosePhilosophy(r, "contra");
   const tree = E.traitTree(r);
-  assert(tree.length === 6, "el árbol del contra trae 3 básicos + 3 intermediate (T2)", tree.length);
+  assert(tree.length === 9, "el árbol del contra trae el arco completo: 3+3+2+1 (T3)", tree.length);
   const buyables = tree.filter(t => t.buyable);
   assert(buyables.length === 3 && buyables.every(t => t.tier === "basic"), "con 1 PI solo los 3 básicos son comprables (el 1-de-3 del inicio)");
   assert(tree.filter(t => t.tier === "intermediate").every(t => !t.buyable && t.faltas.length >= 2), "los intermediate nacen con candado múltiple (previo + nivel + principio)");
@@ -245,7 +245,7 @@ function forcePlay(m, typeId, optIdx = 0) {
 
 // ---------- T2: los 12 Intermediate — catálogo, gating y la regla del ajeno ----------
 {
-  assert(E.TRAITS.length === 24, "24 rasgos en el catálogo (12 Basic + 12 Intermediate)", E.TRAITS.length);
+  assert(E.TRAITS.length === 36, "36 rasgos: el arco COMPLETO (12 Basic + 12 Int + 8 Adv + 4 Master)", E.TRAITS.length);
   const inters = E.TRAITS.filter(t => t.tier === "intermediate");
   assert(inters.length === 12, "12 Intermediate (3 por filosofía)", inters.length);
   for (const filo of ["press", "posesion", "contra", "bloque"]) {
@@ -296,6 +296,48 @@ function forcePlay(m, typeId, optIdx = 0) {
   assert(!anticipar.ok && anticipar.faltas.some(x => x.includes("Solidez")), "Anticipar exige Solidez (AJENA): el candado la nombra", anticipar.faltas.join(" · "));
   r.aristas.solidez = 2;
   assert(E.traitReqs(r, E.traitById("anticipar")).ok, "con Solidez 2 el candado se abre (cubrirse costó pureza)");
+}
+
+// ---------- T3: Advanced y Master — catálogo, convergencias y la doctrina completa ----------
+{
+  const advs = E.TRAITS.filter(t => t.tier === "advanced");
+  const masters = E.TRAITS.filter(t => t.tier === "master");
+  assert(advs.length === 8 && masters.length === 4, "8 Advanced (2×filo) + 4 Master (1×filo)");
+  for (const t of advs) {
+    // Convergencia asimétrica: Int de rama líder + Básico de rama de apoyo, de ramas DISTINTAS
+    const [a, b] = t.req.todos.map(id => E.traitById(id));
+    assert(a && b && a.filo === t.filo && b.filo === t.filo, "convergencia dentro de la filosofía", t.id);
+    assert(a.tier === "intermediate" && b.tier === "basic" && a.rama !== b.rama, "Int líder + Básico apoyo de ramas distintas", t.id);
+    assert(t.req.nivel === 6, "Advanced pide nivel 6", t.id);
+    const propio = E.getPhilosophy(t.filo).aristas.includes(t.req.principio.id);
+    assert(t.req.principio.min === (propio ? 4 : 3), "principio a 4 (propio) o 3 (ajeno)", t.id);
+  }
+  for (const t of masters) {
+    assert(t.req.nivel === 10, "Master pide Consolidada (nivel 10)", t.id);
+    const basicos = t.req.todos.map(id => E.traitById(id));
+    assert(basicos.length === 3 && new Set(basicos.map(x => x.rama)).size === 3 && basicos.every(x => x.tier === "basic" && x.filo === t.filo),
+      "Master exige los 3 básicos: presencia en las TRES ramas", t.id);
+    assert(t.req.alguno.length === 2 && t.req.alguno.every(id => E.traitById(id)?.tier === "advanced"), "Master exige un Advanced cualquiera", t.id);
+    const propias = E.getPhilosophy(t.filo).aristas;
+    assert(t.req.principios.length === 2 && t.req.principios.every(p => propias.includes(p.id) && p.min === 4),
+      "Master exige AMBOS principios propios a 4", t.id);
+  }
+  // La cadena completa hasta el Master (camino mínimo: 6 PI + Consolidada)
+  const r = E.newRun("BRA");
+  E.choosePhilosophy(r, "press");
+  r.aristas.presion = 5; r.aristas.verticalidad = 4; r.aristas.solidez = 3; // Consolidada (9 pts propios)
+  E.syncIdentityPI(r); // nivel 10 → 10 PI en total
+  for (const id of ["morder", "trampa_banda", "asfixia_salida", "caceria_letal", "asfixia_total"]) {
+    assert(E.buyTrait(r, id), `la escalera compra ${id}`);
+  }
+  const reqs = E.traitReqs(r, E.traitById("robo_es_pase"));
+  assert(reqs.ok, "con la doctrina completa el Master se abre", reqs.faltas.join(" · "));
+  const antes = r.journal.length;
+  assert(E.buyTrait(r, "robo_es_pase"), "el Master se compra");
+  assert(r.journal.length === antes + 2 && r.journal[r.journal.length - 1].title.includes("PRENSA CONSAGRA"),
+    "comprar un Master dispara la CONSAGRACIÓN de prensa (dos entradas)");
+  // El camino costó 6 PI de 10: la escasez del Bible sobrevive al arco completo
+  assert(r.identityPoints === 4, "el camino mínimo al Master cuesta 6 PI", r.identityPoints);
 }
 
 // ---------- T2: la migración F2 — el efecto profundo responde al RASGO, no a la etapa ----------

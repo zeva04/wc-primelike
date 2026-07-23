@@ -357,13 +357,35 @@ Posesión) · Expansión = Segunda Jugada.
   si molesta) · --smart sigue sin comprar rasgos (T3: el techo con árbol) · la deuda
   del +1.4pp de T1 sigue abierta para el pase de balance de T3.
 
-### T3 — "La doctrina" (Advanced + Master + consagración)
+### T3 — "La doctrina" (Advanced + Master + consagración) — ✅ CERRADO (23-jul-2026)
 - Los 8 Advanced (convergencias, neutralización de matchups) + los 4 Master.
 - Consagración de prensa al Master (enchufe F3) + relato de rasgos en el post-partido.
 - Balance del arco: testear el ritmo de PI (la deuda declarada de la escalera),
   medir que las neutralizaciones EMPAREJAN (no invierten) la matriz.
 - Gate: win-rate global estable vs baseline · las neutralizaciones mueven el matchup
   hacia tablas y no más allá · una run profunda alcanza Master solo con inversión total.
+
+**Resultados del cierre (ARCO COMPLETO — 36 rasgos vivos):**
+- Requisitos extendidos (`todos`/`alguno`/`principios`) + consagración de prensa al
+  comprar un Master (doble entrada de diario). Camino mínimo al Master: 6 PI +
+  Consolidada + ambos principios propios a 4 (verificado por test).
+- **Neutralización con el instrumento CORRECTO** (lección del Meta, reaprendida: el
+  win-rate de un matchup no mide sesgos de pool): la cuota de circulación de Posesión
+  vs Bloque pasa de 28.9% → 40.1% con el stack (referencia neutra: 38.7%) — recupera
+  la cuota perdida y SE QUEDA en la referencia. El win-rate no se invierte (sanity ✓).
+- **Master: piso vs techo** — el azar alcanza Master en 2.7% de las runs; el greedy
+  (--smart, que desde T3 entrena la arista propia MÁS BAJA para juntar ambos
+  principios) en 99.8%. "Solo con inversión total" ✓.
+- Los 32 momentos narrados SE VEN (la_fortaleza y cabeza_playa exigieron rediseño:
+  frustración por ataques MUERTOS —contador propio, stats.oppTiros solo cuenta
+  ambiente, deuda aparte— y beachhead ampliado a todo pelotazo).
+- **BALANCE FINAL DEL ARCO**: piso 22.7% vs 20.7 pre-arco (+2.0pp) · por filo
+  21.2–24.4 (spread 3.2pp) · techo BRA 47.2% vs 41.9 pre-arco (**+5.3pp: el premio
+  del árbol completo al DT óptimo**). Decisión PO pendiente al cierre: aceptar el
+  premio como recompensa diseñada del arco o afeitar bonus/p's de hooks (~30%).
+- Deudas del arco: ritmo de PI generoso (~10/run al techo — dial: no todos los
+  niveles premian) · sub-conteo de tiros en stats (task aparte) · rivales sin árbol
+  (expansión futura del scouting) · smoke 2× más lento (fútbol real de cadenas).
 
 ---
 

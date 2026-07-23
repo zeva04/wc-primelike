@@ -69,7 +69,29 @@ function treePanel(run) {
         }).join("")}
       </div>`).join("")}
     </div>
+    ${masterPanel(tree)}
   </div>`;
+}
+
+/**
+ * La fila MASTER (T3): el ideal platónico de la doctrina — converge las TRES
+ * ramas (por eso no vive en ninguna columna) y exige Consolidada. Comprarlo
+ * dispara la consagración de prensa.
+ */
+function masterPanel(tree) {
+  const masters = tree.filter(t => t.tier === "master");
+  if (!masters.length) return "";
+  return masters.map(t => `<div class="mt-3 rounded-xl border p-3.5 ${t.owned ? "border-amber-400/70 bg-amber-500/10" : t.buyable ? "border-amber-500/50 bg-slate-800/80" : "border-slate-700 bg-slate-900/50 opacity-80"}">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-sm font-black ${t.owned ? "text-amber-300" : "text-slate-200"}">${t.icon} ${t.nombre}</span>
+      <span class="text-[8px] font-black uppercase tracking-widest ${t.owned ? "text-amber-300" : "text-amber-500/70"}">★ Master — converge las tres ramas</span>
+    </div>
+    <div class="text-[11px] ${t.owned ? "text-slate-200" : "text-slate-400"} leading-snug mt-1">${t.desc}</div>
+    <div class="text-[10px] text-slate-500 italic mt-1">Su momento: ${t.momento}</div>
+    ${t.owned ? `<div class="text-[10px] font-bold text-amber-300 mt-1.5">📰 Consagrado por la prensa: muy pocos DTs llegaron a jugar así.</div>` : ""}
+    ${t.buyable ? `<button data-buy="${t.id}" class="mt-2 w-full px-2 py-2 rounded-lg border border-amber-500/70 bg-amber-500/15 text-amber-200 text-xs font-black cursor-pointer transition-all hover:bg-amber-500/25">👑 CONSAGRAR LA DOCTRINA (1 PI)</button>` : ""}
+    ${!t.owned && !t.buyable && t.faltas.length ? `<div class="text-[9px] text-slate-500 mt-1.5">Falta: ${t.faltas.join(" · ")}</div>` : ""}
+  </div>`).join("");
 }
 
 function renderPhilosophy(opts = {}) {
