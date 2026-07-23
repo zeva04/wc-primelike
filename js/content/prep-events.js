@@ -174,6 +174,7 @@ export const PREP_EVENTS = [
       figura.momento -= 1;
       return `La columna apunta directo a ${figura.name} y la presión le pasa factura: −8 de Moral y su Momento cae.`;
     } },
+  
   { id: "golpe_practica", rareza: "rara", tema: "entrenamiento", icon: "🚑", title: "Golpe en la práctica", tipo: "debuff",
     desc: "Un jugador queda descartado para el próximo partido.",
     teaser: "Los médicos miran con preocupación la intensidad de la práctica.",
@@ -191,6 +192,7 @@ export const PREP_EVENTS = [
     desc: "Todo fluye: +5 a TODAS las stats para el próximo partido.",
     teaser: "Amaneció un día extrañamente luminoso en la concentración.",
     effect: r => ["tiro", "defensa", "atajadas", "pase", "cabezazo", "aura"].forEach(k => buff(r, k, 5)) },
+  
   { id: "clase_magistral", rareza: "legendaria", tema: "entrenamiento", icon: "🎓", title: "Clase magistral", tipo: "buff",
     desc: "Tu mejor delantero da un salto de calidad permanente.",
     teaser: "Dicen que el entrenamiento de hoy tendrá un invitado muy especial.",
@@ -201,16 +203,19 @@ export const PREP_EVENTS = [
       star.stats.tiro = clamp(star.stats.tiro + 3, 1, 99);
       return `${star.name} incorporó un recurso nuevo: +3 de Tiro PERMANENTE (ahora ${star.stats.tiro}).`;
     } },
+  
   { id: "inspiracion", rareza: "legendaria", tema: "entrenamiento", icon: "✨", title: "El día que todo sale", tipo: "buff",
     desc: "Uno de esos días irrepetibles: hoy TODAS las acciones rinden el doble.",
     teaser: "Hay una energía rara en el aire: de esos días que se recuerdan.",
     mod: { mods: { entrenar: 2, recuperar: 2, tactica: 2 }, desc: "Todas las acciones rinden ×2 hoy" }, effect: () => {} },
+  
   { id: "gripe", rareza: "legendaria", tema: "fisico", icon: "🤒", title: "Brote de gripe", tipo: "debuff",
     desc: "Media concentración en cama: −25 de energía para todo el plantel.",
     teaser: "El médico del plantel pidió cerrar el comedor por precaución.",
     effect: r => energia(r, -25) },
-  { id: "motin", rareza: "legendaria", tema: "vestuario", icon: "💥", title: "Motín por los premios", tipo: "debuff",
-    desc: "El plantel se planta por los premios: −12 de Aura y −10 de energía.",
+  
+  { id: "pelea", rareza: "legendaria", tema: "vestuario", icon: "💥", title: "Duelo de egos", tipo: "debuff",
+    desc: "El plantel se pelea luego de la práctica: −12 de Aura y −10 de energía.",
     teaser: "Murmullos en el vestuario: los referentes piden una reunión a puertas cerradas.",
     effect: r => { buff(r, "aura", -12); energia(r, -10); } },
 ];
