@@ -66,6 +66,99 @@
       image-rendering: pixelated;
     }
     .pitch-line { border-color: rgba(255,255,255,.28); pointer-events: none; position: absolute; }
+    /* ---- Pizarra táctica (pantalla de Identidad, ui/board.js) ----
+       Manuscrita SOLO en anotaciones (decisión de sprint): fuentes del sistema,
+       el juego funciona offline y no se traen webfonts. */
+    .tb-hand, .chalk-hand {
+      font-family: "Ink Free", "Segoe Script", "Bradley Hand", "Brush Script MT", cursive;
+      letter-spacing: .2px;
+    }
+    #tb-cam { transition: transform .5s cubic-bezier(.22,.7,.2,1); }
+    .tb-node { transition: opacity .25s ease; }
+    .tb-node:hover circle:nth-of-type(3) { filter: brightness(1.25); }
+    .tb-node text { paint-order: stroke; }
+    /* La cámara con zoom apaga el resto de la pizarra: el foco es el rasgo abierto */
+    #tb-svg.tb-zoomed .tb-node:not(.tb-sel) { opacity: .3; }
+    /* El post-it de lejos solo dice "Notas del DT"; su contenido aparece al hacerle zoom
+       (mismo gesto que un papel garabateado: te acercas para leerlo). */
+    .tb-note-body { opacity: 0; transition: opacity .28s ease .2s; }
+    .tb-note-cover { opacity: 1; transition: opacity .18s ease; }
+    .tb-note.tb-sel .tb-note-body { opacity: 1; }
+    .tb-note.tb-sel .tb-note-cover { opacity: 0; }
+    @keyframes tbpulse { 0%,100% { opacity: .18; transform: scale(1); } 50% { opacity: .6; transform: scale(1.09); } }
+    .tb-pulse { animation: tbpulse 2.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+    /* ---- El RIEL DEL PIZARRÓN: la ficha del rasgo (decisión PO: opción D) ----
+       No es una card flotante ni otro papel: es la franja del tablero reservada
+       para escribir, espejo del riel de "Los 5 principios" de la izquierda. Misma
+       superficie, misma línea de tiza de separación. Entra deslizándose y SIEMPRE
+       aterriza en el mismo sitio — a sangre, de alto completo. */
+    .tb-rail {
+      position: absolute; top: 0; right: 0; bottom: 0;
+      width: 28%; min-width: 262px;
+      display: flex; flex-direction: column;
+      padding: 22px 22px 20px;
+      border-radius: 0 20px 20px 0;
+      border-left: 1px solid rgba(223, 240, 229, .16);
+      background: linear-gradient(205deg, #17482f 0%, #0f3320 48%, #0a2417 100%);
+      box-shadow: -26px 0 44px rgba(0, 0, 0, .5), inset 0 0 70px rgba(0, 0, 0, .35);
+      transform: translateX(101%); opacity: 0; pointer-events: none;
+      transition: transform .42s cubic-bezier(.22, .7, .2, 1), opacity .28s ease;
+    }
+    .tb-rail.open { transform: none; opacity: 1; pointer-events: auto; }
+    .tb-chalkline { height: 1px; background: rgba(223, 240, 229, .18); }
+    /* La ETIQUETA IMANTADA: lo funcional (requisitos, compra) es un objeto sujeto
+       al tablero — es lo único que puede permitirse alto contraste sobre la tiza. */
+    .tb-plate {
+      position: relative; border-radius: 4px; padding: 16px 14px 13px;
+      border: 1px solid rgba(223, 240, 229, .16);
+      background: rgba(223, 240, 229, .055);
+    }
+    .tb-cta {
+      position: relative; width: 100%; border-radius: 4px; padding: 15px 12px 13px;
+      background: var(--ink); color: #0a2417;
+      font-weight: 900; font-size: 12.5px; letter-spacing: .03em; cursor: pointer;
+      box-shadow: 0 5px 16px rgba(0, 0, 0, .45);
+      transition: transform .12s ease, filter .15s ease;
+    }
+    .tb-cta:hover { filter: brightness(1.12); transform: translateY(-1px); }
+    .tb-magnet {
+      position: absolute; top: 6px; width: 7px; height: 7px; border-radius: 50%;
+      background: radial-gradient(circle at 32% 30%, #f6f8f4, #9aa79c 62%, #59665c);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .55);
+    }
+    @media (max-width: 700px) { .tb-rail { width: 100%; border-radius: 20px; } }
+    /* ---- Mini-pizarras del selector de identidad (ui/plays.js) ----
+       Cada filosofía es un pizarrón chico con su jugada firma dibujada. La no
+       elegida se apaga a tiza gris; la elegida se levanta y enciende su marcador. */
+    .filo-board {
+      background: linear-gradient(205deg, #17482f 0%, #0f3320 48%, #0a2417 100%);
+      border: 1px solid rgba(223, 240, 229, .12);
+      border-radius: 14px;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, .45), inset 0 0 50px rgba(0, 0, 0, .3);
+      cursor: pointer;
+      transition: transform .22s cubic-bezier(.22, .7, .2, 1), border-color .2s ease, box-shadow .2s ease, opacity .25s ease;
+    }
+    .filo-board:hover { transform: translateY(-3px); border-color: rgba(223, 240, 229, .3); }
+    /* Sin elección todavía, las cuatro conviven al mismo peso. Elegida una, las
+       otras se apagan: la comparación sigue ahí, pero el foco es inequívoco.
+       Se apagan con OPACITY, no con filter: un filtro CSS sobre SVG se rasteriza
+       en CPU y colgaba el renderer con cuatro canchas en pantalla. */
+    .filo-pick .filo-board:not(.is-sel) { opacity: .34; }
+    .filo-board.is-sel {
+      transform: translateY(-5px) scale(1.03);
+      border-color: var(--ink);
+      box-shadow: 0 16px 34px rgba(0, 0, 0, .55), 0 0 0 1px var(--ink), inset 0 0 50px rgba(0, 0, 0, .25);
+    }
+    /* Las anotaciones solo existen en la elegida: reservarles hueco en las cuatro
+       dejaba media pantalla vacía antes de elegir. La fila del grid crece al
+       seleccionar — que es justo la lectura buscada, "la tarjeta se agranda". */
+    .filo-annot { display: none; }
+    .filo-board.is-sel .filo-annot { display: block; animation: fadein .3s ease; }
+    .board-frame {
+      border-radius: 20px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 18px 50px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
+      overflow: hidden;
+    }
     @keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
     .animate-fadein { animation: fadein 0.3s ease; }
     @keyframes pop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }

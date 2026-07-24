@@ -83,6 +83,13 @@ export function activeTraits(run) {
  *   principios: [{id,min}]— varios (Master: ambos propios a 4)
  *   nivel: n              — nivel de Filosofía mínimo (1-10)
  */
+/**
+ * Lo que cuesta incorporar un rasgo, en Puntos de Identidad. Hoy todos valen 1,
+ * pero el precio vive acá (y no repartido en literales) para que el catálogo
+ * pueda declarar `costo: 2` en un rasgo caro sin tocar validación, cobro ni UI.
+ */
+export const traitCost = (t) => t?.costo ?? 1;
+
 export function traitReqs(run, t) {
   const faltas = [];
   const owned = activeTraitIds(run);
@@ -96,13 +103,14 @@ export function traitReqs(run, t) {
     if ((run.aristas?.[p.id] || 0) < p.min) faltas.push(`${a.icon} ${a.label} ${p.min} (tienes ${run.aristas?.[p.id] || 0})`);
   }
   if (filoLevelOf(run) + 1 < (t.req.nivel || 1)) faltas.push(`nivel ${t.req.nivel} de filosofía`);
-  if ((run.identityPoints || 0) < 1) faltas.push("1 Punto de Identidad");
+  const costo = traitCost(t);
+  if ((run.identityPoints || 0) < costo) faltas.push(`${costo} Punto${costo > 1 ? "s" : ""} de Identidad`);
   return { ok: faltas.length === 0, faltas };
 }
 
 /**
  * Compra un rasgo para la filosofía ACTIVA: valida catálogo, pertenencia,
- * duplicado y requisitos; cobra 1 PI y escribe el diario. Devuelve la fila
+ * duplicado y requisitos; cobra `traitCost` y escribe el diario. Devuelve la fila
  * del rasgo o null (la UI no debería permitir ninguno de los null).
  */
 export function buyTrait(run, traitId) {
@@ -110,7 +118,7 @@ export function buyTrait(run, traitId) {
   if (!t || t.filo !== run.filoId) return null;
   if (activeTraitIds(run).includes(traitId)) return null;
   if (!traitReqs(run, t).ok) return null;
-  run.identityPoints--;
+  run.identityPoints -= traitCost(t);
   run.rasgos[run.filoId] = [...activeTraitIds(run), traitId];
   const f = getPhilosophy(run.filoId);
   addJournal(run, {

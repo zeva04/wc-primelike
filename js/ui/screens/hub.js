@@ -11,8 +11,8 @@ import { dayLabel, advanceDay } from "../../game/calendar.js";
 import { buildDaily } from "../../game/daily.js";
 import { applyDayAction, actionMult, multLabel, dayOpportunity, canjeableBuffs, canjeBuff } from "../../game/day-action.js";
 import { DAY_ACTIONS, ARISTA_FOCUS, TRAIN_BUFF, TRAIN_FATIGUE, CANJE_THRESHOLD, CANJE_PERMANENT, STAT_LABELS } from "../../content/day-actions.js";
-import { PHILOSOPHIES, getPhilosophy, aristaById, FILO_LEVELS, FILO_ETAPAS } from "../../content/philosophies.js";
-import { filoPoints, filoLevel, filoEtapa, changePhilosophy } from "../../game/philosophy.js";
+import { getPhilosophy, aristaById, FILO_LEVELS, FILO_ETAPAS } from "../../content/philosophies.js";
+import { filoPoints, filoLevel, filoEtapa } from "../../game/philosophy.js";
 import { RARITIES } from "../../content/rarities.js";
 import { addJournal } from "../../game/journal.js";
 import { moraleBand } from "../../game/morale.js";
@@ -27,6 +27,7 @@ import { spriteSvg } from "../sprites.js";
 import { mountPitch } from "../pitch.js";
 import { renderGroupTableCard, renderKoInfoCard } from "./worldcup.js";
 import { renderScorersCard, wireScorersCard } from "./scorers.js";
+import { showFiloChange } from "../filo-change.js";
 
 /**
  * Figuras a mostrar del rival: las de mayor nota, sin duplicados y con un solo arquero.
@@ -668,7 +669,7 @@ function renderHub(opts = {}) {
       renderHub();
     });
     const filoBtn = $("#btn-filo-change");
-    if (filoBtn) filoBtn.onclick = showFiloChange;
+    if (filoBtn) filoBtn.onclick = () => showFiloChange(renderHub);
     const oppBtn = $("#da-opp");
     if (oppBtn) oppBtn.onclick = () => {
       const o = dayOpportunity(S.run);
@@ -681,43 +682,6 @@ function renderHub(opts = {}) {
     };
     if (!S.run.actionPending) $("#btn-nextday").onclick = pasarDia;
   }
-}
-
-/**
- * Modal de cambio de filosofía (F1, decisión PO #1): cuesta la Acción del Día y
- * la demolición es ORGÁNICA — las aristas entrenadas quedan, pero cada card
- * muestra cuánto de lo tuyo le sirve a la identidad nueva (el costo hundido, a
- * la vista antes de firmar).
- */
-function showFiloChange() {
-  const run = S.run;
-  const others = PHILOSOPHIES.filter(p => p.id !== run.filoId);
-  const m = modal(`
-    <h3 class="text-lg font-black">🔄 Cambio de identidad</h3>
-    <p class="text-xs text-slate-400 mt-1 mb-3">Cuesta la <b class="text-amber-400">Acción del Día</b>. Lo entrenado no se borra — pero la filosofía nueva vive de otras aristas.</p>
-    <div class="space-y-2">
-      ${others.map(p => {
-        const pts = p.aristas.reduce((s, k) => s + (run.aristas?.[k] || 0), 0);
-        return `<button data-filo="${p.id}" class="w-full text-left rounded-xl border border-slate-600 bg-slate-800/70 hover:border-amber-400 p-3 cursor-pointer transition-all">
-          <div class="flex items-center justify-between">
-            <span class="font-bold text-sm">${p.icon} ${p.name}</span>
-            <span class="text-[10px] font-bold ${pts ? "text-emerald-400" : "text-slate-500"}">${pts ? `arranca con ${+pts.toFixed(2)} pts` : "arranca de cero"}</span>
-          </div>
-          <div class="text-[10px] text-slate-400 mt-0.5">${p.aristas.map(k => `${aristaById(k).icon} ${aristaById(k).label}`).join(" + ")}</div>
-          <div class="text-[10px] text-amber-400/90 mt-0.5">⚠️ ${p.advertencia}</div>
-        </button>`;
-      }).join("")}
-    </div>
-    <button id="filo-cancel" class="mt-3 w-full text-xs font-bold py-2 rounded-lg border border-slate-600 text-slate-400 hover:bg-slate-800 cursor-pointer">Mejor seguimos como estamos</button>
-  `, "max-w-md");
-  m.querySelectorAll("[data-filo]").forEach(b => b.onclick = () => {
-    const f = changePhilosophy(S.run, b.dataset.filo);
-    if (!f) return;
-    closeModal();
-    toast(`${f.icon} Nueva identidad: ${f.name} — el día entero se fue en reinstalar ideas.`);
-    renderHub();
-  });
-  m.querySelector("#filo-cancel").onclick = closeModal;
 }
 
 /**

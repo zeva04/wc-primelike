@@ -9,12 +9,21 @@
 import { getTeam } from "../../data/teams-repo.js";
 import { newRun } from "../../game/run.js";
 import { PHILOSOPHIES, aristaById } from "../../content/philosophies.js";
-import { ADVANCED_BY_FILO } from "../../content/sequences.js";
 import { choosePhilosophy } from "../../game/philosophy.js";
+import { markerColor, PRINCIPLE_COLORS } from "../board.js";
+import { playBoard } from "../plays.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenShell, $, flagImg } from "../components.js";
 import { applyTeamColors } from "../theme.js";
+
+/* El orden en que se muestran las cuatro. Es una decisión de VITRINA, no de datos:
+   content/philosophies mantiene el suyo (lo usan el modal de cambio y el scouting),
+   acá se alternan ofensiva/defensiva — press · contra · posesión · bloque — para que
+   dos identidades vecinas nunca propongan el mismo fútbol. */
+const ORDEN_VITRINA = ["press", "contra", "posesion", "bloque"]
+  .map(id => PHILOSOPHIES.find(p => p.id === id))
+  .filter(Boolean);
 
 /** Inicia una run con el equipo elegido: crea el estado, aplica sus colores y pide la identidad. */
 function startRun(teamId) {
@@ -23,47 +32,78 @@ function startRun(teamId) {
   renderChooseIdentity();
 }
 
-/** Pantalla previa al sorteo: confirmar el equipo (o volver a elegir) y la identidad, en 2×2. */
+/**
+ * Pantalla previa al sorteo: confirmar el equipo y elegir la identidad.
+ *
+ * Sprint de UI del selector: el jugador elige entre cuatro FÚTBOLS distintos, así
+ * que se los dibujamos (ui/plays) en vez de describírselos. La cancha de cada
+ * filosofía con su jugada firma ES la información — se compara de un vistazo.
+ *
+ * Reglas del sprint (decisiones PO):
+ *  · Fortaleza y advertencia SOLO en la elegida — Bible §5 regla 4 se cumple
+ *    igual (ves el precio antes de confirmar) sin el muro de 8 líneas en paralelo.
+ *  · Fuera la línea del fútbol superior / árbol de rasgos: habla de un desbloqueo
+ *    que el jugador no puede usar para decidir, y ya vive en la pizarra grande.
+ *  · La explicación baja de párrafo a una línea de tiza.
+ */
 function renderChooseIdentity() {
   const run = S.run;
   const me = getTeam(run.teamId);
   screenShell(`
-    <div class="text-center mb-6">
-      <div class="flex items-center justify-center gap-2.5 mb-1">
-        ${flagImg(me, "w-9 h-6")}
-        <h1 class="text-2xl font-black">${me.name}</h1>
+    <div class="text-center mb-5">
+      <div class="flex items-center justify-center gap-2.5">
+        ${flagImg(me, "w-8 h-5")}
+        <h1 class="text-lg font-black tracking-tight">${me.name}</h1>
       </div>
-      <div class="tricolor-bar max-w-xs mx-auto mt-2 mb-4"></div>
-      <h2 class="text-xl font-black">🧭 Elige tu identidad</h2>
-      <p class="text-xs text-slate-400 mt-1 max-w-2xl mx-auto">Tu filosofía decide qué fútbol GENERA cada partido — y se entrena día a día. Toda identidad tiene su contra: no hay elección gratis. Podrás cambiarla a mitad de camino, pero cuesta un día entero.</p>
+      <div class="tricolor-bar max-w-[10rem] mx-auto mt-2 mb-4"></div>
+      <h2 class="text-2xl font-black">🧭 Elige tu identidad</h2>
+      <p class="chalk-hand text-[15px] text-slate-400 mt-1.5">Tu filosofía decide qué fútbol genera cada partido — y toda identidad tiene su contra.</p>
     </div>
-    <div class="grid grid-cols-2 gap-3 max-w-3xl mx-auto">
-      ${PHILOSOPHIES.map(p => `
-        <button data-filo="${p.id}" class="filo-card text-left rounded-xl border border-slate-700 bg-slate-800/60 p-3.5 cursor-pointer transition-all hover:border-slate-500 flex flex-col gap-1.5">
-          <div class="font-black text-base">${p.icon} ${p.name}</div>
-          <div class="text-[10px] text-slate-400 italic leading-snug">${p.lema}</div>
-          <div class="flex flex-wrap gap-1 my-0.5">
-            ${p.aristas.map(k => { const a = aristaById(k); return `<span class="px-1.5 py-0.5 rounded-full border border-slate-600 bg-slate-900/60 text-[9px] font-bold text-slate-300">${a.icon} ${a.label}</span>`; }).join("")}
+
+    <div id="filo-grid" class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 items-stretch">
+      ${ORDEN_VITRINA.map(p => {
+        const ink = markerColor(p);
+        return `<div data-filo="${p.id}" class="filo-board flex flex-col overflow-hidden" style="--ink:${ink}">
+          ${playBoard(p)}
+          <div class="px-3.5 pb-3.5 pt-1 flex flex-col flex-1">
+            <div class="flex items-center gap-2">
+              <span class="text-xl leading-none">${p.icon}</span>
+              <span class="font-black text-[15px] leading-tight" style="color:${ink}">${p.name}</span>
+            </div>
+            <p class="chalk-hand text-[13.5px] leading-snug text-[#dff0e5]/60 mt-1.5">${p.lema}</p>
+            <div class="filo-annot mt-auto pt-3">
+              <div class="flex flex-wrap gap-x-3 gap-y-1 mb-2.5">
+                ${p.aristas.map(k => { const a = aristaById(k); return `<span class="text-[10px] font-black uppercase tracking-widest"
+                  style="color:${PRINCIPLE_COLORS[a.id]}">${a.icon} ${a.label}</span>`; }).join("")}
+              </div>
+              <div class="text-[11px] leading-snug text-emerald-300/90">✓ ${p.fuerte}</div>
+              <div class="text-[11px] leading-snug text-amber-300/90 mt-1.5">⚠ ${p.advertencia}</div>
+            </div>
           </div>
-          <div class="text-[10px] text-emerald-400 leading-snug">✓ ${p.fuerte}</div>
-          <div class="text-[10px] text-amber-400 leading-snug">⚠️ ${p.advertencia}</div>
-          <div class="text-[10px] text-slate-500 leading-snug mt-auto">🔓 En desarrollo: ${ADVANCED_BY_FILO[p.id].icon} <b>${ADVANCED_BY_FILO[p.id].name}</b>, tu fútbol superior · 🌳 su profundidad se compra en el árbol de rasgos</div>
-        </button>`).join("")}
+        </div>`;
+      }).join("")}
     </div>
+
     <div class="flex items-center justify-center gap-4 mt-6">
-      <button id="btn-back-team" class="text-slate-400 hover:text-white cursor-pointer">← Volver a elegir equipo</button>
+      <button id="btn-back-team" class="text-sm text-slate-400 hover:text-white cursor-pointer px-3 py-2 rounded-xl border border-slate-700 hover:border-slate-500">← Volver a elegir equipo</button>
       <button id="btn-continue" disabled class="btn-primary opacity-40 cursor-not-allowed" title="Primero elige tu identidad">Confirmar →</button>
     </div>
-  `);
+  `, "max-w-6xl");
   let elegida = null;
-  document.querySelectorAll(".filo-card").forEach(b => b.onclick = () => {
-    elegida = b.dataset.filo;
-    document.querySelectorAll(".filo-card").forEach(x => x.classList.remove("tp-border", "tp-ring", "tp-bg-soft"));
-    b.classList.add("tp-border", "tp-ring", "tp-bg-soft");
+  const grid = $("#filo-grid");
+  // La elección es un TOGGLE: volver a tocar la elegida la suelta y devuelve las
+  // cuatro al mismo peso. Nada obliga a quedarse con la primera que tocaste.
+  grid.querySelectorAll("[data-filo]").forEach(b => b.onclick = () => {
+    const soltar = b.classList.contains("is-sel");
+    grid.querySelectorAll(".is-sel").forEach(x => x.classList.remove("is-sel"));
     const btn = $("#btn-continue");
-    btn.disabled = false;
-    btn.classList.remove("opacity-40", "cursor-not-allowed");
-    btn.title = "";
+    elegida = soltar ? null : b.dataset.filo;
+    grid.classList.toggle("filo-pick", !soltar);           // apaga las no elegidas
+    if (!soltar) b.classList.add("is-sel");
+    btn.disabled = soltar;
+    btn.classList.toggle("opacity-40", soltar);
+    btn.classList.toggle("cursor-not-allowed", soltar);
+    btn.title = soltar ? "Primero elige tu identidad" : "";
   });
   $("#btn-back-team").onclick = () => go("menu");
   $("#btn-continue").onclick = () => {

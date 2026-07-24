@@ -1,195 +1,239 @@
 /* ============================================================
-   ui/screens/philosophy — la pantalla de IDENTIDAD (F3 "La
-   vitrina" + arco de Rasgos T1 "el árbol"): quién eres, cuánto
-   camino llevas, y EL ÁRBOL de rasgos donde se gastan los Puntos
-   de Identidad. El progreso de aristas se construye en la Sesión
-   Táctica y en la cancha; comprar rasgos es gratis en tiempo (los
-   PI ya se pagaron con niveles). El cambio de identidad vive en
-   el hub (cuesta la Acción del Día).
+   ui/screens/philosophy — la pantalla de IDENTIDAD: LA PIZARRA
+   DEL DT (sprint de UI de Identidad, decisiones PO 23-jul-2026).
+
+   Antes esta pantalla apilaba 19 bloques rectangulares y dejaba
+   el árbol —lo único accionable— al fondo del scroll. Ahora hay
+   DOS cosas: una banda superior con el nivel de filosofía, y la
+   pizarra táctica (ui/board.js) donde el árbol se dibuja sobre
+   una cancha. Nada se borró: los 5 principios viven en la regla
+   lateral de la pizarra y los counters + el fútbol superior en
+   las notas del DT.
+
+   El detalle de cada rasgo NO se muestra en reposo (el nodo es
+   ícono + nombre): se abre al tocarlo, la cámara hace zoom sobre
+   él y la ficha aparece a la derecha con desc, momento, faltas y
+   la compra. Esa es la única profundidad de la pantalla.
 
    Doble modo (T1.5): pantalla normal desde el hub, y ONBOARDING
-   en el flujo de inicio (decisión PO: elegir filosofía te trae
-   directo acá con 1 PI para el 1-de-3 de rasgos básicos; el
-   botón sigue al sorteo).
+   en el flujo de inicio (elegir filosofía trae acá con 1 PI para
+   el 1-de-3 de rasgos básicos; el botón sigue al sorteo).
    ============================================================ */
-import { getPhilosophy, aristaById, ARISTAS, FILO_LEVELS, FILO_ETAPAS } from "../../content/philosophies.js";
-import { sequenceType, ADVANCED_BY_FILO } from "../../content/sequences.js";
+import { getPhilosophy, aristaById, FILO_LEVELS, FILO_ETAPAS } from "../../content/philosophies.js";
+import { ADVANCED_BY_FILO } from "../../content/sequences.js";
 import { RAMA_LABELS, DEEP_TRAIT } from "../../content/traits.js";
 import { filoPoints, filoLevel, filoEtapa } from "../../game/philosophy.js";
-import { traitTree, buyTrait } from "../../game/traits.js";
+import { traitTree, buyTrait, traitCost } from "../../game/traits.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenShell, $ } from "../components.js";
+import { showFiloChange } from "../filo-change.js";
+import { tacticBoard, nodePos, camTransform, markerColor, PRINCIPLE_COLORS, TIER_LABEL, NOTES_ID } from "../board.js";
 
-// Escala visual de las barras de arista: 12 puntos = barra llena (Consolidada exige
-// 9 entre DOS aristas; 12 en una sola es una vida entera de foco — el tope visual).
-const BAR_MAX = 12;
+/** Todos los principios que exige un rasgo, marcando los AJENOS a la filosofía. */
+function reqPrinciples(t, f) {
+  const list = [...(t.req.principio ? [t.req.principio] : []), ...(t.req.principios || [])];
+  return list.map(p => ({ ...p, arista: aristaById(p.id), ajeno: !f.aristas.includes(p.id) }));
+}
 
-/** Barra de progreso genérica (ancho 0..100%). */
-const bar = (pct, cls) => `<div class="h-1.5 rounded-full bg-slate-900/80 overflow-hidden"><div class="h-full rounded-full ${cls}" style="width:${Math.min(100, pct)}%"></div></div>`;
+const MAGNETS = `<span class="tb-magnet" style="left:9px"></span><span class="tb-magnet" style="right:9px"></span>`;
 
 /**
- * El ÁRBOL de rasgos (T1.5): las 3 ramas de la filosofía (Firma · Respuesta ·
- * Expansión) con el estado de cada rasgo — owned ✓ · comprable (botón) · con
- * candado (faltas legibles). El PI disponible manda el call-to-action.
+ * La ficha del rasgo, escrita en EL RIEL DEL PIZARRÓN (decisión PO: opción D).
+ * Lo narrativo (nombre, descripción, su momento) va en tiza sobre la misma
+ * superficie del tablero; lo funcional (requisitos y compra) va en una ETIQUETA
+ * IMANTADA — el único objeto que puede permitirse alto contraste, porque es lo
+ * que hay que poder tocar.
+ *
+ * El bloque de acción va PEGADO AL FONDO (`mt-auto`): así el botón aterriza en
+ * el mismo píxel para todos los rasgos, largos o cortos. Esa es la "elegancia
+ * equidistante y firme" — la ficha ya no baila según cuánto texto traiga.
+ *
+ * El requisito de principio AJENO se anota en el color de ESE principio (regla
+ * de color del sprint: el color es información — "esto está escrito con un
+ * marcador que no es el tuyo").
  */
-function treePanel(run) {
-  const f = getPhilosophy(run.filoId);
-  const tree = traitTree(run);
-  const pi = run.identityPoints || 0;
-  const byRama = Object.keys(RAMA_LABELS).map(rama => ({ rama, ...RAMA_LABELS[rama], traits: tree.filter(t => t.rama === rama) }));
-  return `<div class="bg-slate-800/60 border tp-border rounded-2xl p-4 mt-4">
-    <div class="flex items-center justify-between mb-1">
-      <h3 class="font-bold text-sm">🌳 El árbol de rasgos</h3>
-      <span class="px-2 py-0.5 rounded-full border ${pi > 0 ? "border-amber-500/60 bg-amber-500/10 text-amber-300" : "border-slate-700 text-slate-500"} text-[10px] font-black uppercase tracking-widest">🧠 ${pi} PI</span>
-    </div>
-    <p class="text-[11px] text-slate-500 mb-3">Cada nivel de identidad otorga un Punto de Identidad. Un rasgo es una idea futbolística permanente: no te hace más fuerte — te hace jugar distinto.</p>
-    <div class="grid md:grid-cols-3 gap-3">
-      ${byRama.map(r => `<div class="rounded-xl border border-slate-700 bg-slate-900/40 p-3 space-y-2">
-        <div>
-          <div class="text-[10px] font-black uppercase tracking-widest text-slate-400">${r.label}</div>
-          <div class="text-[10px] text-slate-500">${r.desc}</div>
-        </div>
-        ${r.traits.map(t => {
-          // El principio AJENO (regla del arco): el candado avisa que entrenarlo
-          // no acelera tu filosofía — la decisión más cara del sistema, explicada.
-          const ajena = t.req.principio && !f.aristas.includes(t.req.principio.id) ? aristaById(t.req.principio.id) : null;
-          return `<div class="rounded-lg border p-2.5 ${t.owned ? "tp-border tp-bg-soft" : t.buyable ? "border-amber-500/50 bg-slate-800/80" : "border-slate-700 bg-slate-900/50 opacity-70"}">
-          <div class="flex items-center justify-between gap-1">
-            <span class="text-xs font-bold ${t.owned ? "tp-text" : "text-slate-200"}">${t.icon} ${t.nombre}</span>
-            ${t.owned ? `<span class="text-[9px] font-black text-emerald-400 uppercase">✓ tuya</span>` : t.buyable ? "" : `<span class="text-[10px]">🔒</span>`}
-          </div>
-          <div class="text-[8px] font-black uppercase tracking-widest ${t.tier === "basic" ? "text-slate-500" : "text-indigo-300"} mt-0.5">${t.tier === "basic" ? "básico" : "intermedio"}</div>
-          <div class="text-[10px] text-slate-400 leading-snug mt-1">${t.desc}</div>
-          <div class="text-[10px] text-slate-500 italic mt-1">Su momento: ${t.momento}</div>
-          ${t.buyable ? `<button data-buy="${t.id}" class="mt-2 w-full px-2 py-1.5 rounded-lg border border-amber-500/60 bg-amber-500/10 text-amber-300 text-[11px] font-bold cursor-pointer transition-all hover:bg-amber-500/20">Incorporar (1 PI)</button>` : ""}
-          ${!t.owned && !t.buyable && t.faltas.length ? `<div class="text-[9px] text-slate-500 mt-1.5">Falta: ${t.faltas.join(" · ")}</div>` : ""}
-          ${!t.owned && ajena ? `<div class="text-[9px] text-amber-400/90 leading-snug mt-1">⚠️ Pide ${ajena.icon} ${ajena.label}, un principio AJENO: entrenarlo no acelera tu filosofía.</div>` : ""}
-        </div>`;
-        }).join("")}
-      </div>`).join("")}
-    </div>
-    ${masterPanel(tree)}
+function traitCard(t, f, run, color) {
+  const isMaster = t.tier === "master";
+  const ink = isMaster && t.owned ? "#fbbf24" : color;
+  const ajenos = reqPrinciples(t, f).filter(p => p.ajeno);
+
+  // El precio es un dato del rasgo, no del botón: se muestra siempre (tuyo,
+  // comprable o bloqueado) y sale de game/traits — el día que un rasgo valga 2 PI,
+  // la ficha, la validación y el cobro dicen lo mismo sin tocar nada acá.
+  const costo = traitCost(t);
+  const precio = `<div class="flex items-baseline justify-between mb-2.5">
+    <span class="chalk-hand text-[14px] text-[#dff0e5]/55">Costo del rasgo</span>
+    <span class="text-[13px] font-black tracking-wide" style="color:${ink}">${costo} PI</span>
   </div>`;
-}
 
-/**
- * La fila MASTER (T3): el ideal platónico de la doctrina — converge las TRES
- * ramas (por eso no vive en ninguna columna) y exige Consolidada. Comprarlo
- * dispara la consagración de prensa.
- */
-function masterPanel(tree) {
-  const masters = tree.filter(t => t.tier === "master");
-  if (!masters.length) return "";
-  return masters.map(t => `<div class="mt-3 rounded-xl border p-3.5 ${t.owned ? "border-amber-400/70 bg-amber-500/10" : t.buyable ? "border-amber-500/50 bg-slate-800/80" : "border-slate-700 bg-slate-900/50 opacity-80"}">
-    <div class="flex items-center justify-between gap-2">
-      <span class="text-sm font-black ${t.owned ? "text-amber-300" : "text-slate-200"}">${t.icon} ${t.nombre}</span>
-      <span class="text-[8px] font-black uppercase tracking-widest ${t.owned ? "text-amber-300" : "text-amber-500/70"}">★ Master — converge las tres ramas</span>
+  const accion = t.owned
+    ? `<div class="tb-plate">${MAGNETS}
+        <div class="text-[10.5px] font-black uppercase tracking-[.18em]" style="color:${ink}">✓ Ya es parte de tu fútbol</div>
+        ${isMaster ? `<p class="chalk-hand text-[13.5px] text-amber-200/90 leading-snug mt-2">📰 La prensa le puso nombre a tu estilo: muy pocos DTs llegaron a jugar así.</p>` : ""}
+      </div>`
+    : t.buyable
+      ? `<button data-buy="${t.id}" class="tb-cta" style="--ink:${ink}">${MAGNETS}
+          ${isMaster ? "👑 CONSAGRAR LA DOCTRINA" : "INCORPORAR LA IDEA"}</button>`
+      : `<div class="tb-plate">${MAGNETS}
+          <div class="chalk-hand text-[14px] text-[#dff0e5]/55 mb-2">Para dibujarla te falta</div>
+          <ul class="space-y-1.5">${t.faltas.map(x => `<li class="text-[11.5px] text-[#dff0e5]/75 flex gap-2">
+            <span style="color:${ink}">·</span><span>${x}</span></li>`).join("")}</ul>
+        </div>`;
+
+  return `<button id="tb-close" class="absolute top-2.5 right-4 chalk-hand text-[24px] leading-none text-white/30 hover:text-white/80 cursor-pointer">×</button>
+
+    <div class="text-[9px] font-black uppercase tracking-[.22em]" style="color:${ink}a6">
+      ${TIER_LABEL[t.tier]}${isMaster ? " · converge los 3 carriles" : ` · ${RAMA_LABELS[t.rama].label}`}
     </div>
-    <div class="text-[11px] ${t.owned ? "text-slate-200" : "text-slate-400"} leading-snug mt-1">${t.desc}</div>
-    <div class="text-[10px] text-slate-500 italic mt-1">Su momento: ${t.momento}</div>
-    ${t.owned ? `<div class="text-[10px] font-bold text-amber-300 mt-1.5">📰 Consagrado por la prensa: muy pocos DTs llegaron a jugar así.</div>` : ""}
-    ${t.buyable ? `<button data-buy="${t.id}" class="mt-2 w-full px-2 py-2 rounded-lg border border-amber-500/70 bg-amber-500/15 text-amber-200 text-xs font-black cursor-pointer transition-all hover:bg-amber-500/25">👑 CONSAGRAR LA DOCTRINA (1 PI)</button>` : ""}
-    ${!t.owned && !t.buyable && t.faltas.length ? `<div class="text-[9px] text-slate-500 mt-1.5">Falta: ${t.faltas.join(" · ")}</div>` : ""}
-  </div>`).join("");
+    <div class="flex items-center gap-3 mt-2.5">
+      <span class="text-[32px] leading-none">${t.icon}</span>
+      <h2 class="text-[17px] font-black leading-tight" style="color:${t.owned ? "#eef7f1" : ink}">${t.nombre}</h2>
+    </div>
+
+    <div class="tb-chalkline my-4"></div>
+
+    <p class="text-[12.5px] leading-relaxed text-[#dff0e5]/85">${t.desc}</p>
+    <p class="chalk-hand text-[16px] leading-snug mt-4" style="color:${ink}">“${t.momento}”</p>
+
+    <div class="mt-auto pt-5">
+      ${ajenos.map(p => `<p class="chalk-hand text-[13.5px] leading-snug mb-3" style="color:${PRINCIPLE_COLORS[p.id]}">
+        ⚠ Pide ${p.arista.icon} ${p.arista.label}, un principio AJENO: entrenarlo no acelera tu filosofía.</p>`).join("")}
+      ${precio}
+      ${accion}
+    </div>`;
 }
 
-function renderPhilosophy(opts = {}) {
+function renderPhilosophy(opts = {}, selected = null) {
   const run = S.run;
   const f = getPhilosophy(run.filoId);
-  if (!f) { go("hub"); return; } // sin identidad no hay vitrina (no debería pasar post-sorteo)
+  if (!f) { go("hub"); return; }              // sin identidad no hay pizarra
+  const tree = traitTree(run);
+  const color = markerColor(f);
   const pts = filoPoints(run);
-  const lvl = filoLevel(run);           // nivel fino 0..9 (T1)
-  const etapa = filoEtapa(run);         // etapa 0..2 (los hitos de siempre)
+  const lvl = filoLevel(run);                 // nivel fino 0..9 (T1)
+  const etapa = filoEtapa(run);               // etapa 0..2 (los hitos de siempre)
   const nivel = FILO_LEVELS[lvl];
   const next = FILO_LEVELS[lvl + 1] || null;
-  const firma = aristaById(f.firma);
-  const firmaType = sequenceType(firma.tipo);
-  const adv = ADVANCED_BY_FILO[f.id]; // la secuencia avanzada de mi identidad (M2)
-  const deep = DEEP_TRAIT[f.id];      // el rasgo que la profundiza (migración F2, T2)
+  const adv = ADVANCED_BY_FILO[f.id];         // la secuencia avanzada de mi identidad (M2)
+  const deep = DEEP_TRAIT[f.id];              // el rasgo que la profundiza (migración F2, T2)
   const deepOwned = (run.rasgos?.[f.id] || []).includes(deep.id);
-  // Progreso hacia el próximo umbral, desde el piso del nivel actual (para que la barra
+  // Progreso hacia el próximo umbral desde el piso del nivel actual (para que la barra
   // no nazca medio llena al subir de nivel).
   const nivelPct = next ? (100 * (pts - nivel.min)) / (next.min - nivel.min) : 100;
+  const oro = etapa === 2 ? "#fbbf24" : color;
+  // Volver a elegir identidad. En ONBOARDING es gratis y literal (nada se gastó
+  // todavía: se rehace la run del mismo equipo y vuelves al selector). En run
+  // abre el modal compartido, donde la regla manda: changePhilosophy exige y
+  // consume la Acción del Día — si ya la usaste hoy, el enlace lo dice y no miente.
+  const cambioTxt = opts.onboarding
+    ? { label: "Elegir otra identidad", title: "Vuelve al selector — todavía no gastaste nada",
+        cls: "cursor-pointer border-slate-600 bg-slate-800/70 text-slate-300 hover:border-slate-400 hover:text-white hover:bg-slate-700/70" }
+    : run.actionPending
+      ? { label: "Cambiar identidad", title: "Cuesta la Acción del Día",
+          cls: "cursor-pointer border-slate-600 bg-slate-800/70 text-slate-300 hover:border-amber-400 hover:text-amber-300 hover:bg-slate-700/70" }
+      : { label: "Cambiar identidad", title: "Ya usaste la Acción del Día: mañana",
+          cls: "cursor-not-allowed border-slate-800 bg-slate-900/50 text-slate-600" };
 
   screenShell(`
-    <div class="flex items-center justify-between mb-5">
-      <h1 class="text-2xl font-black flex items-center gap-2">${f.icon} Identidad — ${f.name}</h1>
-      ${opts.onboarding
-        ? `<button id="btn-continue" class="btn-primary text-sm">Al sorteo →</button>`
-        : `<button id="btn-back" class="text-sm text-slate-400 hover:text-slate-200 cursor-pointer px-3 py-2 rounded-xl border border-slate-700 hover:border-slate-500">← Volver</button>`}
-    </div>
-    <p class="text-sm text-slate-400 italic -mt-3 mb-5">${f.lema}</p>
-    ${opts.onboarding ? `<div class="rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 mb-5 text-sm text-amber-200">
-      🧠 <b>Tu primera decisión de identidad:</b> tienes 1 Punto de Identidad. Elige UNO de los 3 rasgos básicos — ¿profundizas tu firma, cubres tu debilidad o te ensanchas? Los otros dos seguirán ahí: cada nivel de filosofía te dará otro punto.
-    </div>` : ""}
-
-    <div class="grid md:grid-cols-2 gap-4 items-start">
-      <div class="space-y-4">
-        <!-- Nivel y progreso -->
-        <div class="bg-slate-800/60 border tp-border rounded-2xl p-4">
-          <div class="flex items-center justify-between mb-1">
-            <h3 class="font-bold text-sm">📈 Nivel ${lvl + 1} de identidad</h3>
-            <span class="px-2 py-0.5 rounded-full border ${etapa === 2 ? "border-amber-500/60 bg-amber-500/10 text-amber-300" : "tp-border tp-bg-soft tp-text"} text-[10px] font-black uppercase tracking-widest">${FILO_ETAPAS[etapa].label}</span>
+    <!-- LA BANDA: quién eres y cuánto camino llevas. Una sola fila, sin cajas. -->
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-3 mb-4">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <span class="text-3xl leading-none">${f.icon}</span>
+        <div class="min-w-0">
+          <div class="flex items-baseline gap-2.5">
+            <h1 class="text-xl font-black leading-none tracking-tight">${f.name}</h1>
+            <!-- El cambio de identidad, en la misma línea del nombre: no cuesta
+                 un píxel de alto y queda donde el jugador mira su identidad. -->
+            <button id="btn-filo" class="text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all ${cambioTxt.cls}"
+              title="${cambioTxt.title}">↩ ${cambioTxt.label}</button>
           </div>
-          <p class="text-[11px] text-slate-500 mb-2">Suma de tus 2 aristas: <b class="text-slate-300">${pts} pts</b>${next ? ` · nivel ${lvl + 2} a los ${next.min}` : " · la idea ya es ley"}</p>
-          ${bar(nivelPct, etapa === 2 ? "bg-amber-400" : "tp-gradient")}
-          <p class="text-[10px] text-slate-500 mt-2">Tu jugada firma sale <b class="text-slate-300">×${nivel.mult}</b> más seguido en el pool del partido${etapa < 2 ? ` (al consolidar: ×${FILO_ETAPAS[2].mult})` : ""}.</p>
-        </div>
-
-        <!-- La firma y la secuencia AVANZADA (M2: el rasgo se fusionó acá) -->
-        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-          <h3 class="font-bold text-sm mb-1">${firmaType.icon} Tu jugada firma: ${firmaType.name}</h3>
-          <p class="text-[11px] text-slate-400">Acertar sus actos en partido también te consolida (+0.25 por acierto, tope +0.5 por partido): jugar tu fútbol y que salga ES entrenamiento.</p>
-          <div class="mt-3 rounded-xl border ${etapa >= 1 ? "tp-border tp-bg-soft" : "border-slate-700 bg-slate-900/50"} p-3">
-            <div class="text-[11px] font-bold ${etapa >= 1 ? "tp-text" : "text-slate-400"}">${etapa >= 1 ? "✅ Fútbol superior desbloqueado" : `🔒 Fútbol superior — se conquista En desarrollo (${FILO_ETAPAS[1].min} pts)`}</div>
-            <div class="text-[12px] font-black ${etapa >= 1 ? "text-slate-100" : "text-slate-500"} mt-1">${adv.icon} ${adv.name}</div>
-            <div class="text-[11px] ${etapa >= 1 ? "text-slate-200" : "text-slate-500"} mt-0.5">${adv.vitrina}</div>
-            <div class="mt-2 pt-2 border-t ${deepOwned ? "border-amber-500/40" : "border-slate-700/60"}">
-              <span class="text-[11px] font-bold ${deepOwned ? "text-amber-300" : "text-slate-500"}">${deepOwned ? "✅ Profundizada por el árbol" : "🌳 Su profundidad se COMPRA en el árbol"}</span>
-              <div class="text-[11px] ${deepOwned ? "text-slate-200" : "text-slate-500"} mt-0.5">${deep.icon} <b>${deep.nombre}</b> — ${f.rasgo}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Mi fila de la matriz (cualitativa) -->
-        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-          <h3 class="font-bold text-sm mb-2">⚔️ Tus counters</h3>
-          <div class="text-[11px] text-emerald-400 leading-snug">✓ Brillas ${f.counters.brilla}.</div>
-          <div class="text-[11px] text-amber-400 leading-snug mt-1.5">⚠️ Lo tuyo se paga: ${f.counters.sufre}.</div>
-          <p class="text-[10px] text-slate-500 mt-2">El Informe del Rival te dice a qué juega el próximo: elegir contra qué juegas es parte del juego.</p>
+          <p class="chalk-hand text-[13px] text-slate-500 truncate mt-1">${f.lema}</p>
         </div>
       </div>
 
-      <!-- Las 5 aristas -->
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-        <h3 class="font-bold text-sm mb-1">🧭 Las 5 aristas</h3>
-        <p class="text-[11px] text-slate-500 mb-3">Tu filosofía vive de ${f.aristas.map(k => aristaById(k).label).join(" y ")}. Las demás no se pierden: son la semilla de otra identidad si algún día cambias el rumbo (cuesta la Acción del Día, desde la Sesión Táctica).</p>
-        <div class="space-y-3">
-          ${ARISTAS.map(a => {
-            const own = f.aristas.includes(a.id);
-            const v = run.aristas?.[a.id] || 0;
-            const t = sequenceType(a.tipo);
-            return `<div class="rounded-xl border ${own ? "tp-border tp-bg-soft" : "border-slate-700 bg-slate-900/40"} p-3">
-              <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold ${own ? "tp-text" : "text-slate-300"}">${a.icon} ${a.label}${own ? `<span class="text-[9px] font-black uppercase tracking-widest ml-2 ${a.id === f.firma ? "text-amber-400" : "opacity-70"}">${a.id === f.firma ? "· firma" : "· tuya"}</span>` : ""}</span>
-                <span class="text-xs font-black ${v ? "text-slate-200" : "text-slate-600"}">${v}</span>
-              </div>
-              <div class="mt-1.5">${bar((100 * v) / BAR_MAX, own ? "tp-gradient" : "bg-slate-600")}</div>
-              <div class="text-[10px] text-slate-500 mt-1">${a.desc} · genera: ${t.icon} ${t.name}</div>
-            </div>`;
-          }).join("")}
+      <div class="flex items-center gap-3 ml-auto">
+        <div class="text-right leading-none">
+          <div class="text-[9px] font-black uppercase tracking-[.2em] mb-1" style="color:${oro}b3">${FILO_ETAPAS[etapa].label}</div>
+          <div class="text-[15px] font-black">Nivel ${lvl + 1}<span class="text-slate-600 text-[12px] font-bold">/10</span></div>
         </div>
+        <div class="w-56">
+          <div class="h-[6px] rounded-full bg-black/60 overflow-hidden ring-1 ring-white/10">
+            <div class="h-full rounded-full transition-all duration-500" style="width:${Math.min(100, nivelPct)}%;background:linear-gradient(90deg,${oro}88,${oro})"></div>
+          </div>
+          <div class="text-[9.5px] text-slate-500 mt-1.5">${pts} pts${next ? ` · nivel ${lvl + 2} a los ${next.min}` : " · la idea ya es ley"} · tu firma sale ×${nivel.mult}</div>
+        </div>
+        ${opts.onboarding
+          ? `<button id="btn-continue" class="btn-primary text-sm">Al sorteo →</button>`
+          : `<button id="btn-back" class="text-sm text-slate-400 hover:text-slate-200 cursor-pointer px-3 py-2 rounded-xl border border-slate-700 hover:border-slate-500">← Volver</button>`}
       </div>
     </div>
-    ${treePanel(run)}
-  `, "max-w-4xl");
+
+    <!-- LA PIZARRA. Sin instrucciones escritas: el onboarding se resuelve solo con
+         los tres círculos que laten en campo propio y el contador de PI. El riel
+         de la derecha entra al enfocar un rasgo; la cámara encuadra el nodo al 29%
+         del ancho justamente para dejarle ese cuarto del tablero libre. -->
+    <div class="board-frame relative">
+      ${tacticBoard(run, f, tree, { adv, deep, deepOwned, etapa, selected })}
+      <div id="tb-rail" class="tb-rail"></div>
+    </div>
+  `, "max-w-6xl");
+
+  const svg = $("#tb-svg"), cam = $("#tb-cam"), card = $("#tb-rail");
+
+  /**
+   * Abre un nodo: la cámara le hace zoom. Un rasgo se encuadra a la izquierda y
+   * abre su ficha; el POST-IT va centrado, con más zoom y sin ficha — se lee en
+   * el propio papel. `instant` evita la animación al re-pintar tras una compra.
+   */
+  function open(id, instant) {
+    const notes = id === NOTES_ID;
+    const t = notes ? null : tree.find(x => x.id === id);
+    if (!notes && !t) return;
+    if (instant) cam.style.transition = "none";
+    // El foco es una clase del DOM, no del render: sin esto el nodo abierto se
+    // apagaba junto con los demás al entrar en modo zoom.
+    svg.querySelectorAll(".tb-sel").forEach(n => n.classList.remove("tb-sel"));
+    svg.querySelector(`[data-node="${id}"]`)?.classList.add("tb-sel");
+    cam.setAttribute("transform", camTransform(nodePos(tree, id), notes ? 3.3 : 2.4, notes));
+    if (instant) requestAnimationFrame(() => { cam.style.transition = ""; });
+    svg.classList.add("tb-zoomed");
+    if (notes) { card.classList.remove("open"); return; }   // el post-it se lee en su propio papel
+    card.innerHTML = traitCard(t, f, run, color);
+    card.classList.add("open");
+    wireCard(id);
+  }
+
+  function close() {
+    cam.setAttribute("transform", "translate(0,0) scale(1)");
+    svg.classList.remove("tb-zoomed");
+    svg.querySelectorAll(".tb-sel").forEach(n => n.classList.remove("tb-sel"));
+    card.classList.remove("open");   // el contenido queda: se desliza afuera, no parpadea
+  }
+
+  /** Los dos botones de la ficha. La compra la valida game/traits; acá solo re-pintamos. */
+  function wireCard(id) {
+    const x = $("#tb-close");
+    if (x) x.onclick = close;
+    const buy = card.querySelector("[data-buy]");
+    if (buy) buy.onclick = () => { if (buyTrait(run, buy.dataset.buy)) renderPhilosophy(opts, id); };
+  }
+
+  // Un solo listener en el SVG: si el click no cayó dentro de un nodo, se cierra.
+  // (Escuchar solo el fondo no basta: cualquier trazo pintado encima —grano, líneas
+  // de cancha, regla lateral, notas— se come el evento antes de que llegue al rect.)
+  svg.addEventListener("click", (e) => {
+    const g = e.target.closest("[data-node]");
+    if (g) open(g.dataset.node); else close();
+  });
+  if (selected) open(selected, true);
+
+  $("#btn-filo").onclick = () => {
+    if (opts.onboarding) go("start-run", run.teamId);          // rehace la run: cero estado a medias
+    else if (run.actionPending) showFiloChange(() => renderPhilosophy(opts));
+  };
   if (opts.onboarding) $("#btn-continue").onclick = () => go("draw");
   else $("#btn-back").onclick = () => go("hub");
-  // Comprar un rasgo: la regla vive en game/traits (valida todo); la pantalla solo re-pinta.
-  document.querySelectorAll("[data-buy]").forEach(b => b.onclick = () => {
-    if (buyTrait(run, b.dataset.buy)) renderPhilosophy(opts);
-  });
 }
 
 register("philosophy", renderPhilosophy);
