@@ -13,6 +13,8 @@ import { applyDayAction, actionMult, multLabel, dayOpportunity, canjeableBuffs, 
 import { DAY_ACTIONS, ARISTA_FOCUS, TRAIN_BUFF, TRAIN_FATIGUE, CANJE_THRESHOLD, CANJE_PERMANENT, STAT_LABELS } from "../../content/day-actions.js";
 import { getPhilosophy, aristaById, FILO_LEVELS, FILO_ETAPAS } from "../../content/philosophies.js";
 import { filoPoints, filoLevel, filoEtapa } from "../../game/philosophy.js";
+import { focusPayoff } from "../../game/traits.js";
+import { PRINCIPLE_COLORS } from "../board.js";
 import { RARITIES } from "../../content/rarities.js";
 import { addJournal } from "../../game/journal.js";
 import { moraleBand } from "../../game/morale.js";
@@ -308,6 +310,22 @@ function actionCard() {
   const nivel = FILO_ETAPAS[filoEtapa(run)];
   const tacMult = actionMult(run, tacRows[0]);
   const tacState = !chosen ? "active" : (chosenGroup === "tactica" ? "chosen" : "muted");
+  // La línea de payoff de un foco: hace visible la cadena entrenar → nivel → árbol
+  // (sprint Sesión Táctica). La regla vive en game/traits.focusPayoff; acá solo se
+  // redacta. Se guarda encodeURIComponent en data-payoff y se pinta al hover.
+  const tacPayoff = (a) => {
+    const k = a.id.replace("tactica_", "");
+    const p = focusPayoff(run, k);
+    const col = PRINCIPLE_COLORS[k];
+    const head = `<b style="color:${col}">${a.label} ${p.curr} → ${+(p.curr + ARISTA_FOCUS).toFixed(2)}</b>`;
+    if (!p.owned) return `${head} · <span class="text-slate-500">siembra otra identidad — no acerca tu nivel actual</span>`;
+    const lvl = p.nextAt != null
+      ? `nivel ${p.lvl + 2} a los ${p.nextAt} <span class="text-slate-500">(vas ${p.pts})</span>`
+      : `<span class="text-slate-500">la idea ya es ley</span>`;
+    const u = p.unlocks[0];
+    const unlock = u ? ` · acerca ${u.icon} <b>${u.nombre}</b> <span class="text-slate-500">(falta ${u.falta})</span>` : "";
+    return `${head} · ${lvl}${unlock}`;
+  };
   return `<div class="bg-slate-800/60 border tp-border rounded-2xl p-4 flex-1 flex flex-col">
     <h3 class="font-bold shrink-0">🧭 ${chosen ? "Tu acción de hoy" : "Acción del día"}</h3>
     <p class="text-[10px] text-slate-500 mt-0.5 mb-3">${chosen
@@ -336,31 +354,41 @@ function actionCard() {
         }).join("")}
       </div>
     </div>
-    <div class="rounded-xl border p-3 mb-2 transition-all ${
-      tacState === "chosen" ? "tp-border ring-2 ring-emerald-400/40 bg-slate-800/80"
-      : tacState === "muted" ? "border-slate-700 bg-slate-900/40 opacity-40"
-      : `border-slate-700 bg-slate-900/50 ${tacMult === 0 ? "opacity-50" : ""}`}">
+    <div class="tac-board rounded-xl border p-3 mb-2 transition-all ${
+      tacState === "chosen" ? "tp-border ring-2 ring-emerald-400/40"
+      : tacState === "muted" ? "border-slate-700 opacity-40"
+      : `border-slate-700 ${tacMult === 0 ? "opacity-50" : ""}`}">
       <div class="flex items-center justify-between">
         <span class="font-semibold text-sm">📋 Sesión táctica</span>
         ${tacState === "chosen" ? chosenBadge : tacState === "muted" ? "" : (modBadge(tacMult) || `<span class="text-[10px] font-bold text-slate-500">construye identidad</span>`)}
       </div>
-      <p class="text-[10px] text-slate-500 mt-0.5 mb-2">+${ARISTA_FOCUS} a la arista del foco elegido — tu fútbol sale más seguido en la cancha${opp ? ` (próximo examen: vs ${opp.name})` : ""}.</p>
-      <div class="grid grid-cols-3 gap-2">
+      <!-- Línea de PAYOFF: por defecto la consigna; al pasar el cursor por un foco,
+           muestra qué acerca (nivel + nodo del árbol). Footprint fijo — una línea. -->
+      <p id="tac-payoff" class="chalk-hand text-[12px] leading-snug text-[#dff0e5]/70 mt-1 mb-2.5 min-h-[2.4em]"
+        data-default="+${ARISTA_FOCUS} al principio que entrenes hoy — tu fútbol sale más seguido${opp ? ` (próximo examen: vs ${opp.name})` : ""}. Pasa por un principio para ver qué acerca.">
+        +${ARISTA_FOCUS} al principio que entrenes hoy — tu fútbol sale más seguido${opp ? ` (próximo examen: vs ${opp.name})` : ""}. Pasa por un principio para ver qué acerca.
+      </p>
+      <div class="grid grid-cols-5 gap-1.5">
         ${tacRows.map(a => {
           const k = a.id.replace("tactica_", "");
           const own = !!filo && filo.aristas.includes(k);
+          const isFirma = filo && filo.firma === k;
           const pts = run.aristas?.[k] || 0;
+          const col = PRINCIPLE_COLORS[k];
           const foco = chosen && a.id === chosenId;
           const active = !chosen && tacMult !== 0;
-          return `<button data-action="${a.id}" ${active ? "" : "disabled"} class="${active ? "da-opt " : ""}px-2 py-2 rounded-lg border text-xs font-semibold transition-all ${
-            foco ? "tp-border tp-text bg-slate-700"
-            : chosen ? "border-slate-700 text-slate-500 opacity-60 cursor-not-allowed"
-            : tacMult === 0 ? "border-slate-700 text-slate-500 cursor-not-allowed"
-            : own ? "tp-border tp-text bg-slate-800/80 hover:bg-slate-700 cursor-pointer"
-            : "border-slate-600 bg-slate-700/60 hover:border-amber-400 hover:bg-slate-700 cursor-pointer"}" title="${a.desc}${own ? " · arista de TU filosofía" : ""}">${a.icon} ${a.label}${pts ? ` <span class="text-[9px] opacity-80">· ${pts}</span>` : ""}${foco ? " ✓" : ""}</button>`;
+          const barPct = Math.min(100, (pts / 6) * 100);
+          const dim = own ? col : "#8fae9c";
+          return `<button data-action="${a.id}" data-payoff="${encodeURIComponent(tacPayoff(a))}" ${active ? "" : "disabled"}
+            class="${active ? "da-opt " : ""}tac-mark${foco ? " is-foco" : ""}" style="--pc:${col}" title="${a.desc}">
+            <span class="text-[15px] leading-none">${a.icon}</span>
+            <span class="chalk-hand text-[13px] font-bold leading-none" style="color:${pts ? dim : "#5b6f63"}">${pts}${foco ? " ✓" : ""}</span>
+            <span class="tac-bar"><span style="width:${barPct}%;background:${own ? col : "#64748b"}"></span></span>
+            <span class="chalk-hand text-[10px] leading-tight text-center" style="color:${own ? col : "#8fae9c"}">${a.label}${isFirma ? " ·firma" : ""}</span>
+          </button>`;
         }).join("")}
       </div>
-      ${filo ? `<div class="flex items-center justify-between gap-2 mt-2">
+      ${filo ? `<div class="flex items-center justify-between gap-2 mt-2.5">
         <span class="text-[10px] text-slate-400">${filo.icon} <b class="tp-text">${filo.name}</b> · ${nivel.label} <span class="text-slate-500">(${filoPoints(run)} pts)</span></span>
         ${!chosen ? `<button id="btn-filo-change" class="text-[10px] text-slate-500 hover:text-amber-400 cursor-pointer underline underline-offset-2" title="Cuesta la Acción del Día; las aristas entrenadas quedan">🔄 Cambiar identidad</button>` : ""}
       </div>` : ""}
@@ -667,6 +695,14 @@ function renderHub(opts = {}) {
       if (!a) return;
       toast(`${a.icon} ${a.title}${a.mult !== 1 ? ` (${multLabel(a.mult)} hoy)` : ""}: ${a.desc}.`);
       renderHub();
+    });
+    // Payoff de la Sesión Táctica: al pasar por un foco, la línea muestra qué acerca;
+    // al salir de la grilla, vuelve a la consigna por defecto. Solo lectura — no decide.
+    const payoutEl = $("#tac-payoff");
+    if (payoutEl) document.querySelectorAll(".tac-mark[data-payoff]").forEach(b => {
+      b.addEventListener("mouseenter", () => { payoutEl.innerHTML = decodeURIComponent(b.dataset.payoff); });
+      b.addEventListener("focus", () => { payoutEl.innerHTML = decodeURIComponent(b.dataset.payoff); });
+      b.addEventListener("mouseleave", () => { payoutEl.innerHTML = payoutEl.dataset.default; });
     });
     const filoBtn = $("#btn-filo-change");
     if (filoBtn) filoBtn.onclick = () => showFiloChange(renderHub);

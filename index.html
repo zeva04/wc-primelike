@@ -154,6 +154,23 @@
        seleccionar — que es justo la lectura buscada, "la tarjeta se agranda". */
     .filo-annot { display: none; }
     .filo-board.is-sel .filo-annot { display: block; animation: fadein .3s ease; }
+    /* ---- Sesión Táctica: los 5 principios como marcadores de tiza (hub) ----
+       Trae el idioma del pizarrón a la acción que construye identidad, SIN filtros
+       SVG (el hub ya renderiza mucho): tinte verde + fuente manuscrita + color por
+       principio bastan. Espejo del riel izquierdo de la pizarra grande. */
+    .tac-board { background: linear-gradient(160deg, rgba(23,72,47,.42), rgba(10,36,23,.5)) !important; }
+    .tac-mark {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      padding: 7px 3px 6px; border-radius: 10px;
+      border: 1px solid rgba(223,240,229,.1); background: rgba(2,20,12,.4);
+      transition: transform .14s ease, border-color .15s ease, background .15s ease;
+    }
+    .tac-mark:not(:disabled) { cursor: pointer; }
+    .tac-mark:not(:disabled):hover { border-color: var(--pc); background: rgba(2,20,12,.72); transform: translateY(-2px); }
+    .tac-mark.is-foco { border-color: var(--pc); box-shadow: inset 0 0 0 1px var(--pc); }
+    .tac-mark:disabled { opacity: .5; }
+    .tac-bar { width: 100%; height: 3px; border-radius: 2px; background: rgba(0,0,0,.45); overflow: hidden; }
+    .tac-bar > span { display: block; height: 100%; border-radius: 2px; }
     .board-frame {
       border-radius: 20px;
       box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 18px 50px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);

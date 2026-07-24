@@ -26,7 +26,7 @@
    se acredita en el siguiente beat — nada se pierde.
    ============================================================ */
 import { traitById, traitsOf } from "../content/traits.js";
-import { getPhilosophy, aristaById, filoLevelOf } from "../content/philosophies.js";
+import { getPhilosophy, aristaById, filoLevelOf, filoPointsOf, FILO_LEVELS } from "../content/philosophies.js";
 import { addJournal } from "./journal.js";
 
 /**
@@ -146,4 +146,40 @@ export function traitTree(run) {
     const reqs = traitReqs(run, t);
     return { ...t, owned: owned.includes(t.id), buyable: !owned.includes(t.id) && reqs.ok, faltas: reqs.faltas };
   });
+}
+
+/**
+ * El PAYOFF de entrenar un principio hoy (sprint Sesión Táctica): lo que la
+ * pizarra del hub muestra al elegir un foco — hace visible la cadena
+ * entrenar → nivel → árbol que hasta ahora era ciega. Puro; devuelve DATOS
+ * (la UI compone la línea de tiza).
+ *
+ *  - `owned`: ¿es una de las 2 aristas de mi filosofía? Solo esas mueven el
+ *    nivel (filoPoints suma las 2 propias). Las otras 3 siembran otra identidad:
+ *    entrenarlas NO acerca ningún nivel ni desbloqueo de LA actual.
+ *  - `curr`: cuánto tengo hoy en ese principio.
+ *  - `pts`/`nextAt`: puntos de filosofía y el umbral del próximo nivel (o null si
+ *    ya está en el techo) — solo relevante si `owned`.
+ *  - `unlocks`: nodos BLOQUEADOS del árbol cuyo requisito de principio incluye
+ *    esta arista y estás por debajo del mínimo, ordenados por lo que falta.
+ *    HONESTIDAD (decisión PO): `falta` es cuánto de ESTE principio te falta, no
+ *    "lo desbloquea" — el nodo suele pedir además nivel, PI o un rasgo previo.
+ */
+export function focusPayoff(run, aristaId) {
+  const f = getPhilosophy(run.filoId);
+  const owned = !!f && f.aristas.includes(aristaId);
+  const curr = run.aristas?.[aristaId] || 0;
+  const lvl = filoLevelOf(run);
+  const nextAt = FILO_LEVELS[lvl + 1]?.min ?? null;   // umbral del próximo nivel, o techo
+  const unlocks = [];
+  for (const t of traitTree(run)) {
+    if (t.owned) continue;
+    const reqs = [...(t.req.principio ? [t.req.principio] : []), ...(t.req.principios || [])];
+    for (const p of reqs) {
+      if (p.id === aristaId && curr < p.min)
+        unlocks.push({ id: t.id, nombre: t.nombre, icon: t.icon, falta: +(p.min - curr).toFixed(2) });
+    }
+  }
+  unlocks.sort((a, b) => a.falta - b.falta);
+  return { owned, curr, pts: filoPointsOf(run), lvl, nextAt, unlocks };
 }
