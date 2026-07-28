@@ -402,3 +402,182 @@ Posesión) · Expansión = Segunda Jugada.
 5. **Rivales sin rasgos**: la asimetría DT-con-árbol vs rival-sin-árbol es aceptable en
    este arco (el rival ya tiene nivel + matriz + rasgo F2 narrativo), pero queda anotada
    como expansión futura del scouting.
+
+---
+
+## Rediseño de árboles por filosofía (25-jul-2026) — iteración 1: HIGH PRESS
+
+El PO abrió una fase NUEVA, posterior al arco T1-T3: rediseñar el árbol de cada
+filosofía de a una. **Fase de construcción, sin gate de balance** (decisión
+explícita: "no testees si aumentan la victoria"). Fuente: `Rasgos_Presion_Alta.xlsx`.
+
+**Press pasa de 9 a 19 rasgos.** El árbol viejo se retira entero; donde el concepto
+coincidía se reciclaron los hooks ya construidos, para no tirar motor:
+
+| Rasgo viejo | Dónde vive ahora |
+|---|---|
+| Morder Tras Pérdida (`chainOnMineFail`) | **Gegenpressing** (avanzado Firma) |
+| Asfixia en Salida (`variantDeep`) | **Angriffpressing** (avanzado Firma) |
+| Anticipar la Espalda (`breakawayGuard`) | **Vigilancia Defensiva** (int. Respuesta) |
+| Cacería Letal (`deepPress`, migración F2) | **Gegenpressing** (segundo hook) |
+| El Robo es el Pase (`masterPress`) | **Pressingfalle** (master Firma) |
+| Cancha Chica (`oppLoseActs`) | **Rest Defense** (master Firma) |
+| Trampa en la Banda · Arco a la Vista · Asfixia Total | retirados |
+
+**Tres decisiones estructurales** (tomadas al construir, con ok del PO):
+
+1. **Los nodos de nivel 4 son Master** — Press tiene 7 (las hojas de cada rama).
+   Piden el avanzado previo de SU rama, no convergencia de las tres. La
+   consagración de prensa se narra UNA vez por filosofía, no una por Master
+   (`buyTrait` mide el primer Master antes de sumarlo).
+2. **La pizarra pasa a modo GRAFO.** Un árbol rediseñado declara la `pos` de cada
+   nodo en el catálogo y las aristas salen de los propios `req.previo`; los que no
+   declaran `pos` siguen con la grilla histórica de 3 carriles × 3 tiers. Así cada
+   filosofía puede dibujarse como la táctica que es: la presión alta ocupa la
+   cancha de una manera y el bloque bajo de otra.
+3. **La rama Expansión se bifurca desde el básico** (`Directo` → `Egoístas` /
+   `Contragolpistas`): dos ideas opuestas sobre qué hacer con la pelota robada,
+   quedársela o salir disparado. Es la única lectura que respeta la semántica de
+   los nodos del Excel.
+
+**Correcciones de diseño aplicadas al Excel** (la ley del arco manda sobre el
+número): *Presión Intensificada* y *Mittelfeldpressing* venían como buffs planos
+("+15% efectividad de presión") — se reescribieron como cambios de comportamiento
+con momento nombrable (convertir el acto de presión en recuperación · inclinar el
+pool hacia recuperaciones). Ningún rasgo del árbol es una mejora estadística.
+
+### DEUDA que deja esta iteración
+
+- ~~`pressStamina` (Pulmones de Acero)~~ **PAGADA el 25-jul** con el botón de presión:
+  el rasgo abarata el sobrecosto de los minutos presionados (`press.pressExtraMinutes`)
+  y nada más. Ver docs/CORE.md §Botón de presión.
+- **`iceGame`** (Fríos): rasgo de ESTADO (segundo del catálogo, tras Uno a Cero) que
+  habilita una DECISIÓN NUEVA en partido — devolver la pelota al área propia para
+  comer reloj con ventaja. Es la pieza de motor más cara del rediseño.
+- **`docs/RASGOS-catalogo.md` quedó desactualizado** para Press (describe los 9 viejos).
+- **Balance sin medir, a propósito**: 19 nodos contra 9 de las otras tres filosofías.
+  El techo de Press no se comparó con nada. Va cuando estén las cuatro rediseñadas.
+- Scroll horizontal de 39px en la pantalla de Identidad a 375px — **preexistente**
+  (verificado contra `master` con el árbol de 9), viene de la banda de cabecera.
+
+### Rediseño de espacio de la pizarra (26-jul-2026)
+
+Con 19 rasgos el tablero se saturó. Diagnóstico medido antes de tocar nada: la
+**columna izquierda se llevaba 196px de 1200 (16% del ancho)** entre la regla de
+principios y el post-it de 164×174, mientras el árbol vivía comprimido entre
+x=340 y x=1036. Cuatro decisiones del PO:
+
+1. **Los 5 principios pasan de columna lateral a franja de cabecera** — cinco
+   fichas apaisadas sobre la línea de cal (icono + nombre + valor + barra de 46px).
+   Se pierde la lectura fina del progreso (la barra era de 160px); se gana la
+   cancha entera. `principlesRail` → `principlesBand`.
+2. **El post-it se vuelve chincheta 📌** de 34px y sus notas se leen en EL RIEL,
+   el mismo panel donde ya se leen las fichas de rasgos (cero mecanismo nuevo).
+   `board.notesBlocks()` expone el texto; `philosophy.notesCard()` lo pinta.
+   La chincheta NO hace zoom de cámara: no hay nada que leer en el papel.
+3. **El espacio recuperado va a SEPARAR los nodos, no a agrandarlos** — lo que
+   satura no es el tamaño de cada rasgo sino la cercanía entre ramas.
+4. **Las etiquetas no se tocan**: los 19 nombres siguen visibles siempre. El árbol
+   se despeja por geometría, no escondiendo información.
+
+Resultado medido en navegador: `PITCH` de 950×550 a **1120×588**, viewBox de
+1200×640 a **1200×700**, el ancho que ocupan los nodos de ~700px a **938px**, y
+**cero solapes** entre las 19 cajas (nodo + etiqueta) con nada fuera del tablero.
+La grilla de las 3 filosofías sin rediseñar se reencuadró sobre la cancha nueva
+(9 nodos, cero solapes).
+
+Queda anotado: en móvil (375) el tablero mide 343×200 y 19 nodos ahí no se leen —
+la respuesta sigue siendo el zoom al tocar, como ya era con 9. Y el scroll
+horizontal de 39px de la pantalla es **preexistente** (viene de la banda de
+cabecera, verificado contra `master`).
+
+---
+
+## Rediseño de árboles · iteración 2: POSESIÓN (26-jul-2026)
+
+Fuente: catálogo del PO (15 rasgos, 6 Firma + 4 Respuesta + 5 Expansión). Misma
+fase de construcción que Press: **sin gate de balance**.
+
+### La decisión de diseño grande
+
+La rama Respuesta que trajo el PO responde a la **presión alta** (La Trampa,
+Salida Lavolpiana). Pero el matchup débil declarado de Posesión es el **bloque
+bajo** (`philosophies.advertencia`), y la neutralización de esa celda vivía justo
+ahí: Amplitud ×1.25 → Cambio de Frente → Abrir la Lata ×1.23, el espejo exacto de
+La Fortaleza del Bloque (arco T3). Aplicar el árbol tal cual dejaba a Posesión sin
+respuesta a su propia debilidad y la celda `posesion|bloque` inconquistable.
+
+**Resuelto (decisión PO): el anti-bloque migra a la Firma.** `Osciladores` ES el
+cambio de frente, y carga la neutralización COMPLETA en un solo nodo:
+
+| | circulación | pelotazo |
+|---|---|---|
+| celda cruda `posesion\|bloque` | 0.65 | 1.30 |
+| stack viejo (3 nodos, 3 PI) | ×1.25 ×1.23 → **1.00** | ×0.77 → **1.00** |
+| Osciladores (1 nodo, mismos 3 PI de camino) | ×1.54 → **1.00** | ×0.77 → **1.00** |
+
+Mismo resultado, mismo costo, un nodo. Empareja el matchup; nunca lo invierte
+(fijado por test). La Respuesta queda libre para lo que el PO quiso: aguantar la
+presión rival.
+
+### Las otras tres decisiones
+
+2. **Polivalentes converge con `alguno`**: basta Sorpresivos **o** Desesperantes —
+   las dos maneras de romper una línea (por abajo o por arriba) vuelven a juntarse.
+3. **"Rest Defense" se queda en Posesión y desaparece del Press.** El PO eligió
+   cuál de los dos Masters del Press sobrevivía y **ganó Pressingfalle**: es el
+   ideal platónico de la presión alta (no perseguís el error, lo diseñás), su
+   nombre completa la escuela alemana de la rama, y su hook premia a los DOS
+   caminos de la bifurcación — `bonus` mejora la definición de toda la familia de
+   la recuperación (lo que construye Angriffpressing) y `chainPlus` afila la
+   mordida (lo de Gegenpressing). Por eso ahora **converge**: se llega desde
+   cualquiera de los dos. El hook `oppLoseActs` no se perdió: se fue con el nombre
+   a Posesión, donde el concepto encaja mejor. **Press: 19 → 18 rasgos.**
+4. **El ajeno de Posesión lo paga Osciladores** (Juego directo 3): el cambio de
+   orientación largo ES juego directo, la misma justificación que usaba Cambio de
+   Frente. Posesión paga su pureza en la FIRMA, no en la Respuesta — segunda
+   excepción documentada del arco, junto al Contra.
+
+### Reescrituras por la ley del arco
+
+Tres rasgos venían como buffs planos y se reescribieron como comportamiento:
+*Buen Pie* ("+15% precisión" → el pase seguro que se corta no mata la jugada),
+*Pitagóricos* ("+20% precisión" → la triangulación encuentra al mejor ubicado de
+verdad) y *El Rondo* (el pool se inclina a la circulación: no es un buff, es otro
+partido).
+
+### Regla afinada: el Master con principio ajeno
+
+El test genérico nuevo destapó una inconsistencia propia: en Press, *Elasticidad*
+pedía Solidez 4 y *Fríos* Elaboración **3**. Se normalizó a **4**: un Master pide
+sus dos principios a 4, al menos uno propio, y el ajeno se paga entero — en la
+cima no hay descuento. La regla T3 original ("ambos propios a 4") sigue vigente
+para las filosofías sin rediseñar.
+
+### Hooks reciclados vs. deuda
+
+**Reciclados (funcionan hoy)**: El Tercer Hombre conserva id, nombre, tier y hook
+íntegros · Osciladores ← Amplitud+Abrir la Lata · Hombre Libre ← Pausa
+(`accelFinish`) · La Máquina Colectiva ← La Pelota es Nuestra (`masterPosesion`) ·
+Polivalentes ← Juego Posicional (`recycleUpgrade`) · Rest Defense ← el del Press
+(`oppLoseActs`) · Desesperantes ← Sitio al Área (`deepPosesion`, la migración F2) ·
+La Frontera reusa `breakawayGuard` · Salida Lavolpiana reusa `variantSwitch` ·
+Profundos `skipToFinish` · Sorpresivos `variantDeep` · Pitagóricos `supportUpgrade` ·
+Buen Pie `recycleBuild` · La Trampa `oppShotMalus`.
+
+**Deuda declarada (NO fingida, el Match no las lee)**: `tapIn` (Empujar el balón) ·
+`backPass` (Retroceso de posesión) · `offsideTrap` (Trampa del fuera de juego) ·
+`oppStamina` (El Rondo — hoy el rival nace con energía 100 y nunca baja).
+
+### Verificación
+
+Batería verde (traits pasó a 727+ checks, con una sección genérica que corre sobre
+**las dos** filosofías rediseñadas). En navegador a 1440×900: Posesión 15 nodos /
+14 flechas y Press 18 / 17 — cero solapes, nada fuera del tablero, 3 básicos
+abiertos al arranque en ambos, las dos convergencias dibujan sus dos flechas,
+Polivalentes se compra tanto por Sorpresivos como por Desesperantes, la
+consagración se narra una sola vez, el candado de Osciladores nombra el ajeno
+("🌩️ Juego directo 3"), sin scroll vertical, consola limpia.
+
+**Estado del rediseño: 2 de 4 filosofías (Press 18 · Posesión 15). Faltan Contra y
+Bloque, que siguen con la grilla 3×3 del arco T1-T3.**

@@ -14,34 +14,45 @@
       color a medida que la idea crece.
    3. Plana (sin perspectiva) y manuscrita SOLO en anotaciones:
       nombres de rasgos y requisitos siempre en sans.
-   4. Nada se borra: los 5 principios viven en la regla lateral y
-      los counters + el fútbol superior en las notas del DT.
+   4. Nada se borra: los 5 principios viven en la franja de
+      cabecera y los counters + el fútbol superior en las notas
+      del DT, que se abren desde la chincheta (rediseño de espacio
+      del 26-jul: con 19 rasgos, la columna lateral de 196px y el
+      post-it de 164×174 le estaban comiendo el tablero al árbol).
 
    El ataque va de IZQUIERDA a DERECHA: los básicos nacen en
    campo propio, los avanzados cruzan la mitad y el Master se
-   firma DENTRO del área rival, donde convergen los 3 carriles.
+   firma cerca del área rival.
 
    Módulo puro: recibe el árbol ya resuelto (game/traits.traitTree)
    y devuelve SVG. No lee estado ni toca el DOM.
    ============================================================ */
 import { ARISTAS } from "../content/philosophies.js";
 
-/* ---------- Geometría (viewBox 1200×640) ---------- */
-const VB = { w: 1200, h: 640 };
-const PITCH = { x: 210, y: 50, w: 950, h: 550 };
+/* ---------- Geometría (viewBox 1200×700) ---------- */
+/* REDISEÑO DE ESPACIO (26-jul-2026, decisiones PO): con 19 rasgos el tablero se
+   saturó. Los 5 principios pasaron de una COLUMNA lateral de 196px a una FRANJA
+   horizontal en la cabecera, y el post-it de 164×174 se redujo a una chincheta que
+   abre sus notas en el riel. Entre las dos cosas la cancha recuperó ~170px de ancho,
+   y el viewBox creció de 640 a 700 de alto. Todo ese aire se invirtió en SEPARAR los
+   nodos (decisión PO), no en agrandarlos: lo que satura no es el tamaño de cada
+   rasgo, es la cercanía entre ramas. */
+const VB = { w: 1200, h: 700 };
+const PITCH = { x: 40, y: 78, w: 1120, h: 588 };
 const RIGHT = PITCH.x + PITCH.w;         // línea de fondo rival
 const MIDX = PITCH.x + PITCH.w / 2;
-const MIDY = PITCH.y + PITCH.h / 2;      // 325
-const LANE_Y = { firma: 170, respuesta: 350, expansion: 530 };
-const COL_X = [390, 630, 870];           // básico · intermedio · avanzado
+const MIDY = PITCH.y + PITCH.h / 2;      // 372
+// La GRILLA de las filosofías todavía sin rediseñar, reencuadrada sobre la cancha nueva.
+const LANE_Y = { firma: 190, respuesta: 390, expansion: 590 };
+const COL_X = [230, 520, 810];           // básico · intermedio · avanzado
 const TIERS = ["basic", "intermediate", "advanced"];
-const MASTER = { x: 1072, y: 350, r: 44 };
+const MASTER = { x: 1050, y: 390, r: 44 };
 const R = 30;                            // radio de nodo normal
 
-// Los dos rótulos de cabecera (principios a la izquierda, PI a la derecha) comparten
-// línea base: su subrayado debe quedar POR ENCIMA de la línea de cal (PITCH.y = 50),
-// o se funde con el borde de la cancha en la esquina.
-const HEAD_Y = 36;
+// La línea base de la cabecera: los 5 principios ocupan la franja de la izquierda y
+// los PI se anotan a la derecha. Tiene que quedar POR ENCIMA de la línea de cal
+// (PITCH.y = 78) o se funde con el borde de la cancha.
+const HEAD_Y = 30;
 const BOARD_BG = "#0e2e1f";              // el verde del pizarrón (para tapar líneas bajo los nodos)
 const CHALK = "#dff0e5";                 // tiza blanca
 
@@ -213,34 +224,35 @@ function pitchLines() {
   </g>`;
 }
 
-/* ---------- La regla lateral: LOS 5 PRINCIPIOS ----------
-   Sube por encima de la línea de cal (el título arranca sobre y=50, el borde
-   superior de la cancha) para dejarle el pie de la columna al post-it. Las 5
-   filas quedan equidistantes: 84 + i·78. */
-function principlesRail(run, f) {
-  const rows = ARISTAS.map((a, i) => {
-    const y = 84 + i * 78;
+/* ---------- LOS 5 PRINCIPIOS, en franja de cabecera ----------
+   Antes eran una columna lateral de 196px de ancho por casi todo el alto del
+   tablero: el 16% del pizarrón gastado en cinco filas. Ahora son cinco fichas
+   apaisadas sobre la línea de cal, cada una con icono + valor + una barra corta.
+   Se pierde la lectura fina del progreso (la barra pasó de 160px a 46) y se gana
+   la cancha entera: con 19 rasgos, el espacio vale más que la precisión de una
+   barra que igual se lee mejor en el número de al lado. */
+const CHIP_W = 150;          // paso entre fichas
+const CHIP_X = 26;           // dónde arranca la franja
+function principlesBand(run, f) {
+  return `<g>${ARISTAS.map((a, i) => {
+    const x = CHIP_X + i * CHIP_W;
     const v = run.aristas?.[a.id] || 0;
     const mine = f.aristas.includes(a.id);
     const col = PRINCIPLE_COLORS[a.id];
     const pct = Math.min(100, (v / 6) * 100);   // 6 = el mínimo más alto que pide un rasgo
     return `<g>
-      <text x="26" y="${y}" font-size="15">${a.icon}</text>
-      <text x="48" y="${y}" font-size="11.5" font-weight="${mine ? 800 : 600}"
+      <text x="${x}" y="${HEAD_Y}" font-size="15">${a.icon}</text>
+      <text x="${x + 21}" y="${HEAD_Y}" font-size="11.5" font-weight="${mine ? 800 : 600}"
         fill="${mine ? col : "#8fae9c"}" opacity="${mine ? 1 : 0.75}">${a.label}</text>
-      <text x="186" y="${y}" text-anchor="end" font-size="13" font-weight="900"
+      <text x="${x + 21}" y="${HEAD_Y + 16}" font-size="13" font-weight="900"
         fill="${v ? (mine ? col : CHALK) : "#6f907e"}">${v}</text>
-      <rect x="26" y="${y + 9}" width="160" height="4" rx="2" fill="#000" opacity=".35"/>
-      <rect x="26" y="${y + 9}" width="${(160 * pct) / 100}" height="4" rx="2" fill="${mine ? col : "#8fae9c"}" opacity="${mine ? 0.95 : 0.5}"/>
-      ${a.id === f.firma ? `<text x="48" y="${y + 26}" font-size="9" font-weight="900" fill="${col}" letter-spacing="1.6" opacity=".85">FIRMA</text>` : ""}
+      <rect x="${x + 36}" y="${HEAD_Y + 8}" width="46" height="4" rx="2" fill="#000" opacity=".35"/>
+      <rect x="${x + 36}" y="${HEAD_Y + 8}" width="${(46 * pct) / 100}" height="4" rx="2"
+        fill="${mine ? col : "#8fae9c"}" opacity="${mine ? 0.95 : 0.5}"/>
+      ${a.id === f.firma ? `<text x="${x + 90}" y="${HEAD_Y + 13}" font-size="8.5" font-weight="900"
+        fill="${col}" letter-spacing="1.4" opacity=".85">FIRMA</text>` : ""}
     </g>`;
-  }).join("");
-  return `<g>
-    <text x="26" y="${HEAD_Y}" class="tb-hand" font-size="16" fill="${CHALK}" opacity=".6">Los 5 principios</text>
-    <line x1="26" y1="${HEAD_Y + 8}" x2="186" y2="${HEAD_Y + 8}" stroke="${CHALK}" stroke-width="1.5" opacity=".22"/>
-    ${rows}
-    <line x1="196" y1="30" x2="196" y2="616" stroke="${CHALK}" stroke-width="1" opacity=".13"/>
-  </g>`;
+  }).join("")}</g>`;
 }
 
 /* ---------- LOS PUNTOS DE IDENTIDAD, escritos en la esquina ----------
@@ -263,56 +275,35 @@ function piNote(run, color) {
    hace zoom y queda CENTRADO). Su letra es diminuta a escala 1 — se lee recién
    con el zoom, que es exactamente lo que hace un papel garabateado en una
    pizarra: está ahí, y te acercas cuando lo quieres leer. */
-const NOTES = { x: 18, y: 440, w: 164, h: 174, rot: -2.4 };
+/* ---------- LA CHINCHETA: las notas del DT ----------
+   Era un papel de 164×174 clavado al pie de la columna izquierda — bonito, pero
+   con 19 rasgos ese cuarto de tablero hace falta para el árbol. Ahora es una
+   chincheta de 34px en la esquina, y lo que decía se lee en EL RIEL, el mismo
+   panel donde ya se leen las fichas de rasgos (decisión PO: cero mecanismo nuevo,
+   un solo lugar donde se lee texto largo). El papel sigue estando: es el gesto de
+   "hay una nota acá", no el texto desplegado permanentemente. */
+const NOTES = { x: 74, y: 604, r: 21 };
 export const NOTES_ID = "__notes";
 
-/** Parte un texto en tantas líneas como haga falta (el wrap del post-it, sin tope de 2). */
-function wrapAll(s, max) {
-  const out = [];
-  let cur = "";
-  for (const w of s.split(" ")) {
-    if (cur && (cur + " " + w).length > max) { out.push(cur); cur = w; }
-    else cur = cur ? cur + " " + w : w;
-  }
-  if (cur) out.push(cur);
-  return out;
+/** El texto de las notas, en bloques {tono, txt} — lo pinta la pantalla en el riel. */
+export function notesBlocks(f, adv, deep, deepOwned, etapa) {
+  return [
+    { tone: "ok", txt: `Brillas ${f.counters.brilla}.` },
+    { tone: "warn", txt: `Lo tuyo se paga: ${f.counters.sufre}.` },
+    { tone: "info", txt: etapa >= 1
+      ? `${adv.icon} ${adv.name}: tu fútbol superior ya sale en el partido${deepOwned ? `, y ${deep.nombre} lo profundiza.` : `. Lo profundiza ${deep.nombre}, acá en la pizarra.`}`
+      : `${adv.icon} ${adv.name}: tu fútbol superior se conquista al llegar a En desarrollo (4 pts).` },
+  ];
 }
 
-function postIt(f, adv, deep, deepOwned, etapa, selected) {
-  const cx = NOTES.x + NOTES.w / 2, cy = NOTES.y + NOTES.h / 2;
-  const advTxt = etapa >= 1
-    ? `${adv.icon} ${adv.name}: tu fútbol superior ya sale en el partido${deepOwned ? `, y ${deep.nombre} lo profundiza.` : `. Lo profundiza ${deep.nombre}, acá en la pizarra.`}`
-    : `${adv.icon} ${adv.name}: tu fútbol superior se conquista al llegar a En desarrollo (4 pts).`;
-  const blocks = [
-    { txt: `✓ Brillas ${f.counters.brilla}.`, fill: "#1c6b3c" },
-    { txt: `⚠ Lo tuyo se paga: ${f.counters.sufre}.`, fill: "#9a4a06" },
-    { txt: advTxt, fill: "#4c3c1e" },
-  ];
-  let y = NOTES.y + 48;
-  const body = blocks.map(b => {
-    const ls = wrapAll(b.txt, 36)
-      .map(l => `<text x="${NOTES.x + 11}" y="${(y += 10.5) - 10.5}" class="tb-hand" font-size="8" fill="${b.fill}">${esc(l)}</text>`)
-      .join("");
-    y += 6;
-    return ls;
-  }).join("");
-
-  return `<g class="tb-node tb-note${selected ? " tb-sel" : ""}" data-node="${NOTES_ID}" style="cursor:pointer"
-      transform="rotate(${NOTES.rot} ${cx} ${cy})">
-    <rect x="${NOTES.x + 3}" y="${NOTES.y + 4}" width="${NOTES.w}" height="${NOTES.h}" fill="#000" opacity=".35"/>
-    <rect x="${NOTES.x}" y="${NOTES.y}" width="${NOTES.w}" height="${NOTES.h}" fill="#f6de84"/>
-    <rect x="${NOTES.x}" y="${NOTES.y}" width="${NOTES.w}" height="14" fill="#000" opacity=".05"/>
-    <path d="M${NOTES.x + NOTES.w} ${NOTES.y + NOTES.h - 22} L${NOTES.x + NOTES.w - 22} ${NOTES.y + NOTES.h} L${NOTES.x + NOTES.w} ${NOTES.y + NOTES.h} Z" fill="#d9c069"/>
-    <g class="tb-note-cover">
-      <text x="${cx}" y="${cy - 6}" text-anchor="middle" class="tb-hand" font-size="30" fill="#3d2c10">Notas</text>
-      <text x="${cx}" y="${cy + 30}" text-anchor="middle" class="tb-hand" font-size="30" fill="#3d2c10">del DT</text>
-    </g>
-    <g class="tb-note-body">
-      <text x="${NOTES.x + 11}" y="${NOTES.y + 26}" class="tb-hand" font-size="13" fill="#3d2c10">Notas del DT</text>
-      <line x1="${NOTES.x + 11}" y1="${NOTES.y + 33}" x2="${NOTES.x + NOTES.w - 11}" y2="${NOTES.y + 33}"
-        stroke="#3d2c10" stroke-width="1" opacity=".3"/>
-      ${body}
-    </g>
+function postIt(selected) {
+  const { x, y, r } = NOTES;
+  return `<g class="tb-node tb-note${selected ? " tb-sel" : ""}" data-node="${NOTES_ID}" style="cursor:pointer">
+    <circle cx="${x}" cy="${y}" r="${r + 14}" fill="transparent"/>
+    <rect x="${x - r}" y="${y - r}" width="${r * 2}" height="${r * 2}" rx="3"
+      transform="rotate(-6 ${x} ${y})" fill="#f6de84" stroke="#d9c069" stroke-width="1.5"/>
+    <text x="${x}" y="${y + 7}" text-anchor="middle" font-size="19">📌</text>
+    <text x="${x + r + 10}" y="${y + 5}" class="tb-hand" font-size="15" fill="${CHALK}" opacity=".55">Notas del DT</text>
   </g>`;
 }
 
@@ -325,30 +316,47 @@ function postIt(f, adv, deep, deepOwned, etapa, selected) {
 export function tacticBoard(run, f, tree, { adv, deep, deepOwned, etapa, selected } = {}) {
   const color = markerColor(f);
   const master = tree.find(t => t.tier === "master");
+  const placed = tree.map(t => ({ t, ...layoutOf(tree, t.id) }));
+  const graph = isGraph(tree);
 
-  // Los 3 carriles: cada uno avanza básico → intermedio → avanzado hacia el arco rival.
-  const lanes = ["firma", "respuesta", "expansion"].map(rama => {
-    const nodes = TIERS
-      .map(tier => tree.find(t => t.rama === rama && t.tier === tier))
-      .filter(Boolean)
-      .map(t => ({ t, x: COL_X[TIERS.indexOf(t.tier)], y: LANE_Y[rama], r: R }));
-    return { rama, nodes };
-  });
+  let arrows, nodes;
 
-  const BEND = { firma: [-38, 34], respuesta: [30, -28], expansion: [40, -36] };
-  const CONV = { firma: -52, respuesta: 18, expansion: 52 };
+  if (graph) {
+    // MODO GRAFO (rediseño de Press): cada rasgo trae su posición en la cancha y
+    // sus padres salen de los propios requisitos — el árbol puede bifurcarse
+    // cuantas veces quiera sin tocar geometría acá.
+    const byId = Object.fromEntries(placed.map(n => [n.t.id, n]));
+    arrows = placed.flatMap(n => parentsOf(n.t).map(pid => {
+      const p = byId[pid];
+      if (!p) return "";
+      // La comba sigue el desvío vertical: los tramos rectos apenas se curvan y
+      // las bifurcaciones se abren en abanico, como el trazo de un DT.
+      const bend = Math.abs(n.y - p.y) < 12 ? 26 : (n.y > p.y ? 34 : -34);
+      return arrow(p, n, bend, color, p.t.owned);
+    })).join("");
+    nodes = placed.map(n => node(n.t, n.x, n.y, n.r, color, n.t.tier === "master", selected === n.t.id)).join("");
+  } else {
+    // MODO GRILLA (las 3 filosofías todavía sin rediseñar): 3 carriles que avanzan
+    // básico → intermedio → avanzado y convergen en el Master del área rival.
+    const lanes = ["firma", "respuesta", "expansion"].map(rama => ({
+      rama, nodes: placed.filter(n => n.t.rama === rama && n.t.tier !== "master")
+        .sort((a, b) => a.x - b.x),
+    }));
+    const BEND = { firma: [-38, 34], respuesta: [30, -28], expansion: [40, -36] };
+    const CONV = { firma: -52, respuesta: 18, expansion: 52 };
 
-  const arrows = lanes.flatMap(ln => {
-    const out = [];
-    for (let i = 0; i < ln.nodes.length - 1; i++)
-      out.push(arrow(ln.nodes[i], ln.nodes[i + 1], BEND[ln.rama][i] ?? 30, color, ln.nodes[i].t.owned));
-    const last = ln.nodes[ln.nodes.length - 1];
-    if (master && last) out.push(arrow(last, { ...MASTER }, CONV[ln.rama], color, last.t.owned));
-    return out;
-  }).join("");
+    arrows = lanes.flatMap(ln => {
+      const out = [];
+      for (let i = 0; i < ln.nodes.length - 1; i++)
+        out.push(arrow(ln.nodes[i], ln.nodes[i + 1], BEND[ln.rama][i] ?? 30, color, ln.nodes[i].t.owned));
+      const last = ln.nodes[ln.nodes.length - 1];
+      if (master && last) out.push(arrow(last, { ...MASTER }, CONV[ln.rama], color, last.t.owned));
+      return out;
+    }).join("");
 
-  const nodes = lanes.flatMap(ln => ln.nodes.map(n => node(n.t, n.x, n.y, n.r, color, false, selected === n.t.id))).join("")
-    + (master ? node(master, MASTER.x, MASTER.y, MASTER.r, color, true, selected === master.id) : "");
+    nodes = lanes.flatMap(ln => ln.nodes.map(n => node(n.t, n.x, n.y, n.r, color, false, selected === n.t.id))).join("")
+      + (master ? node(master, MASTER.x, MASTER.y, MASTER.r, color, true, selected === master.id) : "");
+  }
 
   return `<svg id="tb-svg" viewBox="0 0 ${VB.w} ${VB.h}" class="w-full h-auto block select-none" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -375,22 +383,43 @@ export function tacticBoard(run, f, tree, { adv, deep, deepOwned, etapa, selecte
       ${pitchLines()}
       <g filter="url(#chalk)">${AMBIENT.map(ambient).join("")}</g>
       <path d="M${MIDX - 40} ${PITCH.y + 26} q 60 -14 118 0" fill="none" stroke="${CHALK}" stroke-width="1.6" opacity=".22" marker-end="url(#ah-off)"/>
-      ${principlesRail(run, f)}
+      ${principlesBand(run, f)}
       ${piNote(run, color)}
       ${arrows}
       ${nodes}
-      ${postIt(f, adv, deep, deepOwned, etapa, selected === NOTES_ID)}
+      ${postIt(selected === NOTES_ID)}
     </g>
   </svg>`;
 }
 
-/** Posición y radio de un nodo (la usa la pantalla para apuntar la cámara del zoom). */
-export function nodePos(tree, id) {
-  if (id === NOTES_ID) return { x: NOTES.x + NOTES.w / 2, y: NOTES.y + NOTES.h / 2, r: NOTES.w / 2 };
+/* ---------- Dónde cae cada nodo ----------
+   Un árbol REDISEÑADO trae la posición en el propio catálogo (`pos`): así el
+   dibujo puede ser el de una táctica de verdad —la presión alta ocupa la cancha
+   de una manera, el bloque bajo de otra— en vez de una grilla igual para todos.
+   Un árbol sin `pos` cae en la grilla histórica de 3 carriles × 3 tiers. */
+
+/** ¿Este árbol trae su propio dibujo? Basta con que un nodo declare `pos`. */
+const isGraph = (tree) => tree.some(t => t.pos);
+
+/** Los padres de un rasgo, leídos de sus REQUISITOS (no hay tabla de aristas aparte). */
+function parentsOf(t) {
+  return [...(t.req.previo ? [t.req.previo] : []), ...(t.req.todos || []), ...(t.req.alguno || [])];
+}
+
+/** Posición y radio de un nodo. La usa el dibujo y la cámara del zoom. */
+function layoutOf(tree, id) {
   const t = tree.find(x => x.id === id);
   if (!t) return null;
+  // Los Masters se dibujan un poco más grandes: la hoja de la rama se ve venir.
+  if (t.pos) return { x: t.pos.x, y: t.pos.y, r: t.tier === "master" ? R : R - 4 };
   if (t.tier === "master") return { x: MASTER.x, y: MASTER.y, r: MASTER.r };
   return { x: COL_X[TIERS.indexOf(t.tier)], y: LANE_Y[t.rama], r: R };
+}
+
+/** Posición y radio de un nodo (la usa la pantalla para apuntar la cámara del zoom). */
+export function nodePos(tree, id) {
+  if (id === NOTES_ID) return { x: NOTES.x, y: NOTES.y, r: NOTES.r };
+  return layoutOf(tree, id);
 }
 
 /**

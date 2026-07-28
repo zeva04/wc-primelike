@@ -12,6 +12,7 @@
 import { addJournal } from "./journal.js";
 import { scheduleNextMatch } from "./calendar.js";
 import { applyMedicalPostMatch } from "./medical.js";
+import { pressExtraMinutes } from "./match/press.js";
 import { resetOxidacion } from "./oxidation.js";
 import { applyDisciplinePostMatch, clearAmarillas } from "./discipline.js";
 import { applyMomentumPostMatch } from "./momentum.js";
@@ -86,6 +87,11 @@ export function closeMatch(run, match) {
  */
 export function postMatchUpdate(run, match) {
   const minutos = match.minutesByName ? match.minutesByName() : {}; // duck-typed en algunos tests
+  // Minutos presionados (botón de presión): cuestan el doble de energía. Pulmones de
+  // Acero los abarata acá, donde todavía se puede leer el rasgo desde el Match.
+  const presRaw = match.pressMinutesByName ? match.pressMinutesByName() : {};
+  const presionados = {};
+  for (const [name, min] of Object.entries(presRaw)) presionados[name] = pressExtraMinutes(match, min);
   // El costo físico de la identidad (F2: el Press corre y lo paga) se cobra ANTES
   // del loop por jugador: usa los flags usado/sustituido que ese loop resetea.
   const filoCost = applyFiloCosts(run, match);
@@ -96,7 +102,7 @@ export function postMatchUpdate(run, match) {
     // energía como si hubiera descansado (bug reportado por el PO).
     const played = match.my.lineup.includes(p) || p.usado || p.sustituido;
     if (played) p.partidos++;
-    applyMedicalPostMatch(run, p, played, minutos[p.name] || 0);
+    applyMedicalPostMatch(run, p, played, minutos[p.name] || 0, presionados[p.name] || 0);
     applyDisciplinePostMatch(run, p);
     momentum.push(applyMomentumPostMatch(run, p, played, match)); // antes de resetear flags: lee p.sustituido
     p.usado = false;

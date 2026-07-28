@@ -118,6 +118,11 @@ export function buyTrait(run, traitId) {
   if (!t || t.filo !== run.filoId) return null;
   if (activeTraitIds(run).includes(traitId)) return null;
   if (!traitReqs(run, t).ok) return null;
+  // ¿Es el PRIMER Master de esta filosofía? Se mide ANTES de sumarlo. Desde el
+  // rediseño de Press una filosofía puede tener varios Masters (uno por rama):
+  // la consagración es un hito de torneo y se narra UNA vez, no siete.
+  const primerMaster = t.tier === "master"
+    && !activeTraits(run).some(x => x.tier === "master");
   run.identityPoints -= traitCost(t);
   run.rasgos[run.filoId] = [...activeTraitIds(run), traitId];
   const f = getPhilosophy(run.filoId);
@@ -128,7 +133,7 @@ export function buyTrait(run, traitId) {
   // LA CONSAGRACIÓN (T3, decisión PO #9): desbloquear un Master es un hito de
   // torneo — la prensa consagra el estilo con nombre propio (el enchufe narrativo
   // de F3 "la prensa bautiza tu estilo", ahora en su versión definitiva).
-  if (t.tier === "master") addJournal(run, {
+  if (primerMaster) addJournal(run, {
     icon: "📰", tone: "gold", title: `LA PRENSA CONSAGRA: "${t.nombre}"`,
     desc: `Los diarios del mundo entero le ponen nombre al fútbol de ${f.name}: muy pocos DTs en la historia de este Mundial llegaron a jugar así. ${t.momento}`,
   });

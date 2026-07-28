@@ -43,6 +43,7 @@ import * as SeqActs from "./sequence-acts.js";
 import * as Incidents from "./incidents.js";
 import * as Shootout from "./shootout.js";
 import { hookOf, traitMoment } from "./trait-hooks.js";
+import { newPressState, pressOn, tickPress, PRESS_MOD } from "./press.js";
 
 // Frecuencias por tick de los eventos INDEPENDIENTES de las secuencias (Sprint A1). Penal y
 // último hombre se calibraron antes y quedan intactos; acá solo se fija cada cuánto asoman
@@ -106,6 +107,10 @@ export class Match {
     // entran al minuto 0; un cambio cierra los del que sale y arranca los del que entra.
     this._minutes = new Map();                              // jugador → minutos ya acumulados (los que salieron)
     this._enteredAt = new Map(my.lineup.map(p => [p, 0]));  // jugador en cancha → minuto en que entró
+    // EL BOTÓN DE PRESIÓN (match/press.js): estado del DT, no del simulador. Los minutos
+    // presionados se acumulan aparte de los jugados porque cuestan el DOBLE de energía.
+    this.press = newPressState();
+    this._pressMin = new Map();                             // jugador → minutos presionados
   }
 
   // ---------- Estado y consultas ----------
@@ -135,6 +140,9 @@ export class Match {
   powers() {
     const mine = teamPowers(this.my.lineup, this.my.mentalidad, this.my.buffs);
     const opp = teamPowers(this.oppLineup, "normal", {});
+    // La presión encendida se suma por el MISMO caño que la mentalidad: ataca mejor y
+    // se expone atrás. Es una orden del DT con costo (energía), no un rasgo.
+    if (pressOn(this)) { mine.atk = Math.max(0.5, mine.atk + PRESS_MOD.atk); mine.def = Math.max(0.5, mine.def + PRESS_MOD.def); }
     return { mine, opp };
   }
 
@@ -147,6 +155,13 @@ export class Match {
     if (this.min >= end) return this._finishRegular();
 
     this.min += 5;
+    // La ráfaga de presión vence por minutos de partido (no por reloj de pared: una
+    // secuencia congela el relato mientras el DT lee). Se resuelve ANTES de calcular
+    // poderes para que el tick que la apaga ya no la cobre.
+    // Primero se COBRAN los 5 minutos recién jugados (si la ráfaga venía encendida) y
+    // recién después se la vence: al revés, el último tramo de cada ráfaga salía gratis.
+    if (pressOn(this)) for (const p of this.activeMine()) this._pressMin.set(p, (this._pressMin.get(p) || 0) + 5);
+    tickPress(this);
 
     const { mine, opp } = this.powers();
 
@@ -305,6 +320,8 @@ export class Match {
     if (enter === undefined) return;
     this._minutes.set(p, (this._minutes.get(p) || 0) + Math.max(0, this.min - enter));
     this._enteredAt.delete(p);
+    // Los minutos presionados ya viven en _pressMin tick a tick: el que sale se los lleva
+    // acumulados y el que entra arranca en cero sin hacer nada acá.
   }
 
   /**
@@ -317,6 +334,15 @@ export class Match {
     const out = {};
     for (const [p, m] of this._minutes) out[p.name] = m;
     for (const [p, enter] of this._enteredAt) out[p.name] = (out[p.name] || 0) + Math.max(0, this.min - enter);
+    return out;
+  }
+
+  /** Minutos PRESIONADOS por jugador, por NOMBRE: el sobrecosto de energía del botón de
+   *  presión (medical los cobra una vez más — presionar sale el doble). Espejo exacto de
+   *  minutesByName, pero acumulado tick a tick porque la presión se enciende y se apaga. */
+  pressMinutesByName() {
+    const out = {};
+    for (const [p, m] of this._pressMin) out[p.name] = m;
     return out;
   }
 

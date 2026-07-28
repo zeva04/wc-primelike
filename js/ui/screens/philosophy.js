@@ -6,9 +6,10 @@
    el árbol —lo único accionable— al fondo del scroll. Ahora hay
    DOS cosas: una banda superior con el nivel de filosofía, y la
    pizarra táctica (ui/board.js) donde el árbol se dibuja sobre
-   una cancha. Nada se borró: los 5 principios viven en la regla
-   lateral de la pizarra y los counters + el fútbol superior en
-   las notas del DT.
+   una cancha. Nada se borró: los 5 principios viven en la franja
+   de cabecera de la pizarra y los counters + el fútbol superior
+   en las notas del DT, que se leen en el riel al tocar la
+   chincheta (rediseño de espacio del 26-jul-2026).
 
    El detalle de cada rasgo NO se muestra en reposo (el nodo es
    ícono + nombre): se abre al tocarlo, la cámara hace zoom sobre
@@ -28,7 +29,7 @@ import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenShell, $ } from "../components.js";
 import { showFiloChange } from "../filo-change.js";
-import { tacticBoard, nodePos, camTransform, markerColor, PRINCIPLE_COLORS, TIER_LABEL, NOTES_ID } from "../board.js";
+import { tacticBoard, nodePos, camTransform, markerColor, PRINCIPLE_COLORS, TIER_LABEL, NOTES_ID, notesBlocks } from "../board.js";
 
 /** Todos los principios que exige un rasgo, marcando los AJENOS a la filosofía. */
 function reqPrinciples(t, f) {
@@ -84,7 +85,7 @@ function traitCard(t, f, run, color) {
   return `<button id="tb-close" class="absolute top-2.5 right-4 chalk-hand text-[24px] leading-none text-white/30 hover:text-white/80 cursor-pointer">×</button>
 
     <div class="text-[9px] font-black uppercase tracking-[.22em]" style="color:${ink}a6">
-      ${TIER_LABEL[t.tier]}${isMaster ? " · converge los 3 carriles" : ` · ${RAMA_LABELS[t.rama].label}`}
+      ${TIER_LABEL[t.tier]}${RAMA_LABELS[t.rama] ? ` · ${RAMA_LABELS[t.rama].label}` : " · converge los 3 carriles"}
     </div>
     <div class="flex items-center gap-3 mt-2.5">
       <span class="text-[32px] leading-none">${t.icon}</span>
@@ -102,6 +103,29 @@ function traitCard(t, f, run, color) {
       ${precio}
       ${accion}
     </div>`;
+}
+
+/**
+ * Las NOTAS DEL DT en el riel. Desde el rediseño de espacio (26-jul) el post-it
+ * dejó de ser un papel de 164×174 en la cancha: es una chincheta, y su contenido
+ * se lee acá — el mismo panel donde ya se leen las fichas de rasgos, con la misma
+ * tipografía de tiza. Un solo lugar en la pantalla donde vive el texto largo.
+ */
+function notesCard(f, adv, deep, deepOwned, etapa, color) {
+  const TONE = { ok: ["✓", "#86efac"], warn: ["⚠", "#fdba74"], info: ["🎯", "#fde68a"] };
+  return `<button id="tb-close" class="absolute top-2.5 right-4 chalk-hand text-[24px] leading-none text-white/30 hover:text-white/80 cursor-pointer">×</button>
+
+    <div class="text-[9px] font-black uppercase tracking-[.22em]" style="color:${color}a6">apuntes · ${f.name}</div>
+    <div class="flex items-center gap-3 mt-2.5">
+      <span class="text-[32px] leading-none">📌</span>
+      <h2 class="text-[17px] font-black leading-tight text-[#eef7f1]">Notas del DT</h2>
+    </div>
+
+    <div class="tb-chalkline my-4"></div>
+
+    ${notesBlocks(f, adv, deep, deepOwned, etapa).map(b => `<p class="chalk-hand text-[15.5px] leading-snug mb-3.5 flex gap-2.5">
+      <span style="color:${TONE[b.tone][1]}">${TONE[b.tone][0]}</span>
+      <span style="color:${TONE[b.tone][1]}">${b.txt}</span></p>`).join("")}`;
 }
 
 function renderPhilosophy(opts = {}, selected = null) {
@@ -177,7 +201,11 @@ function renderPhilosophy(opts = {}, selected = null) {
       ${tacticBoard(run, f, tree, { adv, deep, deepOwned, etapa, selected })}
       <div id="tb-rail" class="tb-rail"></div>
     </div>
-  `, "max-w-6xl");
+  `, "max-w-5xl");   // 6xl→5xl (26-jul): con 19 rasgos el tablero no entraba sin scroll
+                     // vertical en una notebook típica (1280×720): a 6xl sobraban 48px de
+                     // alto. El SVG escala uniforme (viewBox), así que achicar el ancho del
+                     // contenedor reduce TODO por igual — nodos, texto, huecos — sin riesgo
+                     // de reabrir los solapamientos que ya se verificaron sin él.
 
   const svg = $("#tb-svg"), cam = $("#tb-cam"), card = $("#tb-rail");
 
@@ -195,12 +223,16 @@ function renderPhilosophy(opts = {}, selected = null) {
     // apagaba junto con los demás al entrar en modo zoom.
     svg.querySelectorAll(".tb-sel").forEach(n => n.classList.remove("tb-sel"));
     svg.querySelector(`[data-node="${id}"]`)?.classList.add("tb-sel");
-    cam.setAttribute("transform", camTransform(nodePos(tree, id), notes ? 3.3 : 2.4, notes));
+    // La chincheta no necesita zoom (no hay nada que leer en el papel): solo abre
+    // sus notas en el riel. Los rasgos sí se encuadran.
+    if (!notes) {
+      cam.setAttribute("transform", camTransform(nodePos(tree, id), 2.4, false));
+      svg.classList.add("tb-zoomed");
+    }
     if (instant) requestAnimationFrame(() => { cam.style.transition = ""; });
-    svg.classList.add("tb-zoomed");
-    if (notes) { card.classList.remove("open"); return; }   // el post-it se lee en su propio papel
-    card.innerHTML = traitCard(t, f, run, color);
+    card.innerHTML = notes ? notesCard(f, adv, deep, deepOwned, etapa, color) : traitCard(t, f, run, color);
     card.classList.add("open");
+    if (notes) { $("#tb-close").onclick = close; return; }
     wireCard(id);
   }
 

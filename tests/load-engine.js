@@ -47,6 +47,7 @@ export async function loadEngine() {
     import("../js/game/match/sequences.js"),
     import("../js/game/match/sequence-acts.js"),
     import("../js/game/match/trait-hooks.js"),
+    import("../js/game/match/press.js"),
     import("../js/content/themes.js"),
     import("../js/content/rarities.js"),
     import("../js/content/prep-events.js"),

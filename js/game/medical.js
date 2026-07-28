@@ -73,8 +73,12 @@ export function applyDailyRecovery(run, esDiaDePartido = false) {
  * diario si la lesión de este partido lo deja fuera de los próximos. `minutos` = los que
  * disputó (0 si no jugó), lo calcula el Match.
  */
-export function applyMedicalPostMatch(run, p, played, minutos = 0) {
-  p.energia = clamp(p.energia + (played ? -matchFatigue(minutos) : REST_RECOVERY), 5, 100);
+export function applyMedicalPostMatch(run, p, played, minutos = 0, presionados = 0) {
+  // Los minutos PRESIONADOS cuestan el doble (botón de presión, match/press.js): se cobran
+  // una vez como minutos jugados —ya vienen dentro de `minutos`— y una segunda vez acá.
+  // El sobrecosto llega ya descontado por Pulmones de Acero, si el DT lo compró.
+  const gasto = matchFatigue(minutos) + matchFatigue(presionados);
+  p.energia = clamp(p.energia + (played ? -gasto : REST_RECOVERY), 5, 100);
   if (p.lesionadoPartidos > 0) p.lesionadoPartidos--;
   // Lesión sufrida en este partido con baja real → queda registrada en el diario
   if (p.lesionado && p.lesionadoPartidos > 0) {

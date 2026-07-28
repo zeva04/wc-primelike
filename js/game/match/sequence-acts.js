@@ -255,12 +255,12 @@ export function resolveSequenceAct(m, key) {
       // Cacería total: el rival que la rompe, un % de las veces la rompe CON FALTA —
       // amarilla (acumula) + tiro libre encadenado. El % profundo era el rasgo F2 de
       // Consolidada — desde T2 lo compra Cacería Letal (migración al árbol).
-      if (caza && rnd() < (hasTrait(m, "caceria_letal") ? s.type.adv.foulBreakDeep : s.type.adv.foulBreak)) return advFoulSetPiece(m, f.foulText, s.type.adv.freekickBonus);
+      if (caza && rnd() < (hasTrait(m, "gegenpressing") ? s.type.adv.foulBreakDeep : s.type.adv.foulBreak)) return advFoulSetPiece(m, f.foulText, s.type.adv.freekickBonus);
       return maybeCounter(m, `min ${m.min}' — ${f.pressFail}`, total);
     }
     // El 2º robo de la cacería es en ZONA LETAL (+trapBonus); el deepBonus era el rasgo
     // F2 de Consolidada — desde T2 lo compra Cacería Letal (migración al árbol).
-    s.bonus += (total ? 0.15 : 0.05) + (caza && s.actIdx === 1 ? s.type.adv.trapBonus + (hasTrait(m, "caceria_letal") ? s.type.adv.deepBonus : 0) : 0);
+    s.bonus += (total ? 0.15 : 0.05) + (caza && s.actIdx === 1 ? s.type.adv.trapBonus + (hasTrait(m, "gegenpressing") ? s.type.adv.deepBonus : 0) : 0);
     m.log("event", `min ${m.min}' — ${caza && s.actIdx === 1 ? f.press2Ok : f.pressOk}`);
     if (total) dtOk(m);
     // T1 — Trampa en la Banda: el robo de la recuperación puede CONVERTIRSE en ataque
@@ -328,7 +328,7 @@ export function resolveSequenceAct(m, key) {
     // El penal profundo (y el 4º compás) eran el rasgo F2 de Consolidada — desde T2 los
     // compra Sitio al Área (migración al árbol). Si no hay penal, el remate llega limpio.
     if (s.type.advFor === "posesion" && (s.buildOks || 0) >= planOf(s).filter(k => k === "build").length
-        && rnd() < (hasTrait(m, "sitio_area") ? s.type.adv.penaltyChanceDeep : s.type.adv.penaltyChance)) {
+        && rnd() < (hasTrait(m, "desesperantes") ? s.type.adv.penaltyChanceDeep : s.type.adv.penaltyChance)) {
       m.log("event", `min ${m.min}' — ${f.penaltyText(s.prot)}`);
       closeSilent(m);
       return myPenalty(m);

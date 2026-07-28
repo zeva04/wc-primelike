@@ -10,6 +10,7 @@ import { statLine, playedPos, outOfPosPenalty } from "../../game/ratings.js";
 import { swapAssignments, canPlayAt } from "../../game/lineup.js";
 import { STAGE_LABEL, koRoundOf } from "../../game/tournament/knockout.js";
 import { Match } from "../../game/match/Match.js";
+import { startPress, pressState } from "../../game/match/press.js";
 import { filoCtx } from "../../game/philosophy.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
@@ -56,6 +57,14 @@ function renderMatchScreen() {
         <div class="flex rounded-lg overflow-hidden border border-slate-600 text-xs">
           ${["defensiva", "normal", "ofensiva"].map(mm => `<button data-ment="${mm}" class="ment-btn px-3 py-1.5 font-semibold cursor-pointer transition-colors ${mm === "normal" ? "bg-amber-500 text-slate-900" : "bg-slate-700 hover:bg-slate-600"}">${mm === "defensiva" ? "🛡️" : mm === "ofensiva" ? "⚔️" : "⚖️"} ${mm[0].toUpperCase() + mm.slice(1)}</button>`).join("")}
         </div>
+        <!-- EL BOTÓN DE PRESIÓN: la barra ES el fondo del botón (un span absoluto que crece
+             o se vacía), así el estado se lee sin mirar ningún número. Vacía mientras la
+             ráfaga corre, se llena mientras recarga, y el color vuelve al encenderse. -->
+        <button id="btn-press" class="relative overflow-hidden px-3.5 py-1.5 rounded-lg text-xs font-black cursor-pointer bg-transparent">
+          <span id="press-bg" class="absolute inset-0 rounded-lg border"></span>
+          <span id="press-fill" class="absolute inset-y-0 left-0 transition-[width] duration-700 ease-linear"></span>
+          <span id="press-label" class="relative whitespace-nowrap">🔥 PRESIONAR</span>
+        </button>
         <button id="btn-pause" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">⏸️ Pausa</button>
         <button id="btn-subs" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">🔄 Plantilla (<span id="subs-left">3</span>)</button>
         <button id="btn-speed" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">⏩ Rápido</button>
@@ -81,6 +90,10 @@ function renderMatchScreen() {
     S.match.log("info", `📢 Mentalidad: ${b.dataset.ment.toUpperCase()}.`);
     updateMatchUI();
   });
+  $("#btn-press").onclick = () => {
+    if (!startPress(S.match)) return;   // la regla vive en game/match/press, no en el botón
+    updateMatchUI();
+  };
   $("#btn-pause").onclick = togglePause;
   $("#btn-subs").onclick = () => openSquadModal(); // sin args: el onclick pasaría el MouseEvent como "caído"
   $("#btn-speed").onclick = () => {
@@ -140,6 +153,50 @@ const FEED_STYLE = {
   plain: "text-slate-400",
 };
 
+/**
+ * Pinta el botón de presión desde `pressState` — la UI no conoce ninguna regla: recibe
+ * `on/ready/agotado/pct/restantes` y elige colores. Cuatro estados legibles de un vistazo:
+ *   ENCENDIDA  ámbar lleno, la barra se VACÍA (te queda esto de ráfaga)
+ *   LISTA      ámbar lleno y clickeable — "el botón recupera su color" (pedido del PO)
+ *   RECARGANDO gris, la barra se LLENA en ámbar apagado
+ *   AGOTADA    gris muerto, sin barra
+ */
+function paintPressButton(match) {
+  const btn = $("#btn-press"); if (!btn) return;
+  const st = pressState(match);
+  const bg = $("#press-bg"), fill = $("#press-fill"), label = $("#press-label");
+  fill.style.width = `${Math.round(st.pct)}%`;
+  // TODO el color vive en los <span> de fondo, NUNCA en el <button>: la hoja del tema
+  // fija el background de `button` y le gana hasta a un inline `!important` (verificado
+  // en navegador — al botón se le queda pegado el color del primer estado que pinta).
+  // Con capas, además, la barra ES el fondo: se lee sin mirar ningún número.
+  // Y el color cambia SIN transición a propósito: lo que anima es el ancho de la barra;
+  // el estado (listo / presionando / recargando) tiene que saltar a la vista al instante.
+  const paint = (base, borde, texto, barra, cursor) => {
+    bg.style.background = base;
+    bg.style.borderColor = borde;
+    fill.style.background = barra;
+    label.style.color = texto;
+    btn.style.cursor = cursor;
+  };
+  if (st.on) {
+    paint("rgba(120,53,15,.55)", "#fcd34d", "#fef3c7", "rgba(245,158,11,.8)", "default");
+    label.textContent = "🔥 PRESIONANDO";
+  } else if (st.ready) {
+    // Lleno de ámbar: "el botón recupera su color" (pedido del PO) es literalmente
+    // la barra completa, el mismo objeto que se vació durante la ráfaga.
+    paint("#b45309", "#fbbf24", "#0f172a", "#f59e0b", "pointer");
+    label.textContent = `🔥 PRESIONAR (${st.restantes})`;
+  } else {
+    paint("#1e293b", "#475569", "#94a3b8", "rgba(217,119,6,.35)", "not-allowed");
+    label.textContent = st.agotado ? "🔥 Sin ráfagas" : "🔥 Recargando…";
+  }
+  btn.disabled = !st.ready;
+  btn.title = st.agotado
+    ? `Ya usaste las ${st.usos} ráfagas del partido.`
+    : "Presionar arriba durante 10 minutos: el equipo roba más alto y ataca mejor, pero esos minutos cuestan el DOBLE de energía.";
+}
+
 /** Refresca marcador, minuto, relato (solo líneas nuevas) y panel "En cancha". */
 export function updateMatchUI() {
   if (!$("#score")) return;
@@ -158,6 +215,7 @@ export function updateMatchUI() {
     mom.textContent = sym;
     mom.className = `w-6 text-center font-black ${cls}`;
   }
+  paintPressButton(match);
   const feed = $("#feed");
   while (S.feedRendered < match.feed.length) {
     const f = match.feed[S.feedRendered++];

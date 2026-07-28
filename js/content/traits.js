@@ -79,66 +79,470 @@
                        jugada ensayada (mejor) y sale más seguido en el pool.
    - secondBallUpgrade:{bonus, intro}  la cadena de Segunda Jugada sube de calidad
                        y gana su propia voz (posición establecida).
+
+   Vocabulario del rediseño de Press (25-jul-2026) — PENDIENTE DE MOTOR:
+   - pressStamina:     {factor}        el ACTO de presionar cuesta menos piernas
+                       (decisión PO: jamás la fatiga general del partido — la
+                       economía de energía es el dial más sensible del juego).
+   - iceGame:          {p, texto}      rasgo de ESTADO, solo con ventaja: tras
+                       robar, el equipo puede devolverla al área propia y comer
+                       reloj. Habilita una DECISIÓN NUEVA en el partido.
+   Ambos están declarados en el catálogo y todavía no los lee el Match: son el
+   trabajo de motor que este rediseño deja abierto (ver docs/ROADMAP-rasgos.md).
    ============================================================ */
 
 export const TRAITS = [
-  /* ---------------- 🦁 High Press ---------------- */
+  /* ================= 🦁 HIGH PRESS — el árbol REDISEÑADO =================
+     18 rasgos (rediseño del PO, 25-jul-2026; ajustado el 26-jul, ver abajo). Sustituye al árbol de 9 del
+     arco T1-T3: donde el concepto coincidía se reciclaron los hooks ya
+     construidos (la mordida, el robo alto, el corte a la espalda), y el
+     resto son nodos nuevos.
+
+     La forma del árbol es la de una PRESIÓN ALTA dibujada en la cancha,
+     no una grilla: cada rama nace en su zona y avanza hacia el arco rival
+     por donde le corresponde ocupar el campo.
+       Firma      (arriba)  la presión misma: intensidad → medio → la
+                            bifurcación alemana (arriba del todo el
+                            Angriffpressing; a media altura el Gegenpressing),
+                            y los dos caminos vuelven a juntarse en Pressingfalle.
+                            AJUSTE 26-jul (decisión PO): el Master era doble
+                            (Pressingfalle + Rest Defense) y ganó Pressingfalle —
+                            es el ideal platónico de la presión (no perseguís el
+                            error: lo diseñás) y su hook premia a los DOS caminos.
+                            El nombre y el hook de Rest Defense se mudaron a
+                            Posesión, donde el concepto encaja mejor.
+       Respuesta  (centro)  el precio de presionar: pulmón, vigilancia a la
+                            espalda, repliegue y vuelta a empezar.
+       Expansión  (abajo)   qué hacer con la pelota robada — y se abre en
+                            dos ideas opuestas: quedársela o salir disparado.
+
+     Cada nodo declara su `pos` en el viewBox de la pizarra (ui/board.js):
+     el árbol de Press se dibuja como GRAFO. Las filosofías que todavía no
+     se rediseñaron no declaran `pos` y siguen con la grilla de 3 carriles. */
+
+  /* ---- Firma · la presión misma (círculo, campo alto) ---- */
   {
-    id: "morder", filo: "press", rama: "firma", tier: "basic", icon: "🐺",
-    nombre: "Morder Tras Pérdida",
-    desc: "Tras perder el balón, el equipo intenta recuperarlo inmediatamente antes de reorganizarse.",
-    momento: "La perdió y la cazó al toque.",
-    req: { nivel: 1 },
-    hooks: { chainOnMineFail: { to: "recuperacion", p: 0.30, bonus: 0.03,
-      intro: p => `¡MORDIDA tras pérdida! ${p.name} salta sobre la pelota antes de que el rival respire.` } },
+    id: "presion_intensificada", filo: "press", rama: "firma", tier: "basic", icon: "🔥",
+    nombre: "Presión Intensificada",
+    desc: "El equipo salta sobre el que recibe sin esperar a estar ordenado: presionar deja de ser un recurso y pasa a ser la primera opción.",
+    momento: "El rival tocando de primera porque no lo dejan pensar.",
+    req: { nivel: 1 }, pos: { x: 190, y: 200 },
+    hooks: { convertOnPress: { to: "recuperacion", p: 0.28, bonus: 0.03,
+      texto: "¡La presión no da tregua! El que recibe no tuvo tiempo ni de girar: la pelota es nuestra." } },
   },
   {
-    id: "trampa_banda", filo: "press", rama: "respuesta", tier: "basic", icon: "🕸️",
-    nombre: "Trampa en la Banda",
-    desc: "La presión dirige la salida rival hacia las bandas, donde el equipo cierra el espacio para robar.",
-    momento: "Robo en la raya y ataque inmediato.",
-    req: { nivel: 1 },
-    hooks: { convertOnPress: { to: "transicion", p: 0.30, bonus: 0.04,
-      texto: "¡La trampa de la banda funciona! El robo en la raya ya es ataque." } },
+    id: "mittelfeldpressing", filo: "press", rama: "firma", tier: "intermediate", icon: "🧲",
+    nombre: "Mittelfeldpressing",
+    desc: "La línea de presión se planta en el círculo central: el rival puede salir de su área, pero no puede cruzar la mitad.",
+    momento: "Tres robos seguidos en el círculo central.",
+    req: { nivel: 3, previo: "presion_intensificada", principio: { id: "presion", min: 2 } },
+    pos: { x: 450, y: 200 },
+    // No es "+20% de presión": el partido GENERA más recuperaciones porque el
+    // equipo vive en la zona donde se roba (la ley del arco — cambia el fútbol
+    // que sale, no los números de los jugadores).
+    hooks: { poolMod: { weights: { recuperacion: 1.22 } } },
   },
   {
-    id: "asfixia_salida", filo: "press", rama: "expansion", tier: "basic", icon: "🦁",
-    nombre: "Asfixia en Salida",
-    desc: "El equipo presiona la salida rival desde el saque de meta, buscando robos en campo contrario.",
+    id: "angriffpressing", filo: "press", rama: "firma", tier: "advanced", icon: "🦁",
+    nombre: "Angriffpressing",
+    desc: "La presión se adelanta hasta el saque de meta rival: el error se fuerza en el último tercio, con el arco enfrente.",
     momento: "Robo al central y gol de vestuario.",
-    req: { nivel: 1 },
+    req: { nivel: 6, previo: "mittelfeldpressing", principio: { id: "presion", min: 4 } },
+    pos: { x: 710, y: 128 },
     hooks: { variantDeep: { of: "recuperacion", p: 0.35, bonus: 0.06,
       intro: p => `¡Presión sobre el SAQUE DE META rival! ${p.name} salta sobre el central que recibe.` } },
   },
+  {
+    id: "gegenpressing", filo: "press", rama: "firma", tier: "advanced", icon: "🐺",
+    nombre: "Gegenpressing",
+    desc: "Los cinco segundos siguientes a una pérdida son los más agresivos del partido: recuperar antes de reorganizarse.",
+    momento: "La perdió y la cazó al toque.",
+    req: { nivel: 6, previo: "mittelfeldpressing", principio: { id: "verticalidad", min: 4 } },
+    pos: { x: 710, y: 275 },
+    // deepPress: hereda la migración F2 (la Cacería total rota deja falta —
+    // amarilla + tiro libre — mucho más seguido). Era de Cacería Letal.
+    hooks: {
+      chainOnMineFail: { to: "recuperacion", p: 0.30, bonus: 0.04,
+        intro: p => `¡MORDIDA tras pérdida! ${p.name} salta sobre la pelota antes de que el rival respire.` },
+      deepPress: {},
+    },
+  },
+  {
+    id: "pressingfalle", filo: "press", rama: "firma", tier: "master", icon: "👑",
+    nombre: "Pressingfalle",
+    desc: "La cancha tiene zonas donde entrar es un error: el equipo deja pasar el balón hasta ahí y entonces se cierra la trampa.",
+    momento: "El rival metiéndose solo en la boca del lobo, partido tras partido.",
+    // LA CONVERGENCIA (decisión PO 26-jul): se llega desde CUALQUIERA de los dos
+    // caminos de la bifurcación alemana. Su hook premia a los dos por separado —
+    // `bonus` mejora la definición de toda la familia de la recuperación (lo que
+    // construye Angriffpressing) y `chainPlus` afila la mordida (lo de Gegenpressing).
+    // Absorbió el lugar del viejo Rest Defense, cuyo nombre se fue a Posesión y cuyo
+    // hook (oppLoseActs) se fue con él: allá el concepto encaja mejor.
+    req: { nivel: 10, alguno: ["angriffpressing", "gegenpressing"],
+      principios: [{ id: "presion", min: 4 }, { id: "verticalidad", min: 4 }] },
+    pos: { x: 960, y: 200 },
+    // Hereda el hook del viejo Master (El Robo es el Pase): toda la familia de
+    // la recuperación define mejor, y la mordida caza más seguido.
+    hooks: { masterPress: { bonus: 0.07, chainPlus: 0.12,
+      texto: "La trampa estaba dibujada desde el primer minuto: el rival entró, y entrar ahí es perderla." } },
+  },
+  /* ---- Respuesta · el precio de presionar (cuadrado, eje central) ---- */
+  {
+    id: "pulmones", filo: "press", rama: "respuesta", tier: "basic", icon: "🫁",
+    nombre: "Pulmones de Acero",
+    desc: "El equipo está preparado para correr los noventa minutos: presionar le cuesta menos que a cualquier otro.",
+    momento: "Presionando igual de arriba en el minuto ochenta.",
+    req: { nivel: 1 }, pos: { x: 190, y: 390 },
+    // Decisión PO: abarata SOLO el acto de presionar, jamás la fatiga general
+    // del partido (la economía de energía es el dial más sensible del juego).
+    hooks: { pressStamina: { factor: 0.85 } },
+  },
+  {
+    id: "vigilancia", filo: "press", rama: "respuesta", tier: "intermediate", icon: "🛡️",
+    nombre: "Vigilancia Defensiva",
+    desc: "Los centrales leen el balón largo antes de que salga: la espalda de la presión deja de ser una autopista.",
+    momento: "El central cortando de cabeza el pelotazo que iba a partir al equipo.",
+    req: { nivel: 3, previo: "pulmones", principio: { id: "solidez", min: 2 } }, // AJENO: cubrirse cuesta
+    pos: { x: 450, y: 390 },
+    hooks: { breakawayGuard: { p: 0.40,
+      texto: "El central LEYÓ el pelotazo a la espalda: paso adelante y corte de cabeza. La presión sigue viva." } },
+  },
+  {
+    id: "repliegue", filo: "press", rama: "respuesta", tier: "advanced", icon: "🪃",
+    nombre: "Repliegue",
+    desc: "Cuando la presión se rompe, el equipo entero vuelve corriendo a plantarse: el contragolpe rival se encuentra con todos de vuelta. Cuesta piernas.",
+    momento: "La contra rival muriendo contra once camisetas que llegaron antes.",
+    req: { nivel: 6, previo: "vigilancia", principio: { id: "solidez", min: 3 } }, // AJENO
+    pos: { x: 710, y: 390 },
+    hooks: { oppShotMalus: { seq: "transicion", bonus: -0.06,
+      texto: "El repliegue llegó primero: la contra rival remató desde donde no se hace gol." } },
+  },
+  {
+    id: "elasticidad", filo: "press", rama: "respuesta", tier: "master", icon: "👑",
+    nombre: "Elasticidad",
+    desc: "Replegarse ya no es rendirse: el bloque se estira, aguanta, y en cuanto toca la pelota vuelve a salir a presionar como si nada.",
+    momento: "Repliegue, corte, y el equipo entero otra vez arriba en diez segundos.",
+    req: { nivel: 10, previo: "repliegue",
+      principios: [{ id: "presion", min: 4 }, { id: "solidez", min: 4 }] },
+    pos: { x: 960, y: 390 },
+    hooks: { chainOnContain: { to: "recuperacion", p: 0.32, bonus: 0.05,
+      intro: p => `¡El acordeón se cierra! Contuvieron, y ${p.name} ya está otra vez encima del que la tiene.` } },
+  },
 
-  /* ---------------- 🎼 Posesión ---------------- */
+  /* ---- Expansión · qué hacer con la pelota robada (triángulo, campo bajo
+         que se abre en dos ideas opuestas: quedársela o salir disparado) ---- */
   {
-    id: "hombre_libre", filo: "posesion", rama: "firma", tier: "basic", icon: "🔑",
-    nombre: "Buscar al Hombre Libre",
-    desc: "La circulación prioriza encontrar al jugador desmarcado entre líneas.",
-    momento: "La pared que rompe líneas.",
-    req: { nivel: 1 },
-    hooks: { recycleBuild: { p: 0.40,
-      texto: "El hombre libre aparece de la nada y la posesión se recicla: la jugada sigue viva." } },
+    id: "directo", filo: "press", rama: "expansion", tier: "basic", icon: "🎯",
+    nombre: "Directo",
+    desc: "El primer pase tras el robo mira siempre hacia adelante: nada de asegurar, nada de recircular.",
+    momento: "Robo y pase al espacio en el mismo movimiento.",
+    req: { nivel: 1 }, pos: { x: 190, y: 545 },
+    hooks: { skipToFinish: { of: "recuperacion", p: 0.26, bonus: 0.04,
+      intro: p => `¡Sin pensarlo! El robo y el pase fueron la misma jugada: ${p.name} ya está de cara.` } },
   },
   {
-    id: "amplitud", filo: "posesion", rama: "respuesta", tier: "basic", icon: "↔️",
-    nombre: "Amplitud Máxima",
-    desc: "Los extremos mantienen la máxima amplitud para estirar al bloque defensivo rival.",
-    momento: "El cambio de frente que descoloca al bloque entero.",
-    req: { nivel: 1 },
-    // Suaviza (NO neutraliza — eso es de Advanced) la celda posesion|bloque de la
-    // matriz F2: circulación 0.65 → 0.65×1.25 ≈ 0.81 contra el bloque cerrado.
-    hooks: { poolMod: { vsFilo: "bloque", weights: { circulacion: 1.25 } } },
+    id: "egoistas", filo: "press", rama: "expansion", tier: "intermediate", icon: "🧊",
+    nombre: "Egoístas",
+    desc: "Robada la pelota, el equipo se la queda: el rival, que salió a buscarla, se queda esperando su turno.",
+    momento: "Dos minutos sin que el rival la toque después del robo.",
+    req: { nivel: 3, previo: "directo", principio: { id: "presion", min: 2 } },
+    pos: { x: 400, y: 505 },
+    hooks: { recycleBuild: { p: 0.35,
+      texto: "La pelota es nuestra y se queda: el equipo la esconde, la jugada no muere." } },
   },
   {
-    id: "pausa", filo: "posesion", rama: "expansion", tier: "basic", icon: "🎼",
-    nombre: "Pausa",
-    desc: "El equipo controla el ritmo del partido, alternando posesiones largas con aceleraciones súbitas.",
-    momento: "Veinte pases y puñal.",
-    req: { nivel: 1 },
+    id: "contragolpistas", filo: "press", rama: "expansion", tier: "intermediate", icon: "🏇",
+    nombre: "Contragolpistas",
+    desc: "No hace falta robar arriba: cualquier pelota ganada en el medio o atrás también se convierte en carrera.",
+    momento: "El rechace que cae al pie y ya son cuatro corriendo.",
+    req: { nivel: 3, previo: "directo", principio: { id: "verticalidad", min: 2 } },
+    pos: { x: 400, y: 615 },
+    hooks: { chainOnDuelFail: { to: "transicion", p: 0.28, bonus: 0.03,
+      intro: p => `¡La segunda pelota fue nuestra! ${p.name} la engancha y sale disparado con el rival mal parado.` } },
+  },
+  {
+    id: "pacientes", filo: "press", rama: "expansion", tier: "advanced", icon: "♟️",
+    nombre: "Pacientes",
+    desc: "Con la pelota robada, el equipo elige bien: los pases posteriores a una presión exitosa se juegan con cabeza fría.",
+    momento: "El pase de gol dado sin apuro, con el rival todavía desordenado.",
+    req: { nivel: 6, previo: "egoistas", principio: { id: "presion", min: 4 } },
+    pos: { x: 620, y: 505 },
+    hooks: { supportUpgrade: { bonus: 0.05,
+      texto: "Cabeza fría: el pase busca al mejor ubicado de verdad, y lo encuentra libre." } },
+  },
+  {
+    id: "tres_toques", filo: "press", rama: "expansion", tier: "advanced", icon: "🗡️",
+    nombre: "Tres Toques",
+    desc: "Del robo al remate en el menor número de pases posible: la jugada se resuelve antes de que el rival vuelva a estar en su sitio.",
+    momento: "Robo, pase, gol: ocho segundos.",
+    req: { nivel: 6, previo: "contragolpistas", principio: { id: "verticalidad", min: 4 } },
+    pos: { x: 620, y: 615 },
+    // Afila el salto que abre Directo (mismo par que El Primer Pase / Tres Pases).
+    hooks: { skipUpgrade: { bonus: 0.06,
+      intro: p => `¡TRES TOQUES y afuera! El pase rompe la última línea y ${p.name} queda lanzado.` } },
+  },
+  {
+    id: "frios", filo: "press", rama: "expansion", tier: "master", icon: "👑",
+    nombre: "Fríos",
+    desc: "Con el partido ganado, el equipo que presiona sabe también congelarlo: robar y devolverla atrás es una decisión, no una renuncia.",
+    momento: "Los últimos diez minutos jugados en campo propio, con la ventaja intacta.",
+    req: { nivel: 10, previo: "pacientes",
+      principios: [{ id: "presion", min: 4 }, { id: "elaboracion", min: 4 }] }, // AJENO: congelar es elaborar
+    pos: { x: 840, y: 490 },
+    // RASGO DE ESTADO (el segundo del catálogo, tras Uno a Cero): SOLO con
+    // ventaja en el marcador. Habilita una decisión NUEVA en el partido —
+    // devolver la pelota al área propia para consumir reloj.
+    hooks: { iceGame: { p: 0.35,
+      texto: "Fríos como el hielo: la roban, la devuelven atrás, y el reloj sigue corriendo a favor." } },
+  },
+  {
+    id: "calientes", filo: "press", rama: "expansion", tier: "master", icon: "👑",
+    nombre: "Calientes",
+    desc: "Robada la pelota, el equipo no la suelta más: el rival queda encerrado en su propio bloque y ya no sale de ahí.",
+    momento: "El rival metido en su área durante diez minutos seguidos.",
+    req: { nivel: 10, previo: "pacientes",
+      principios: [{ id: "presion", min: 4 }, { id: "verticalidad", min: 4 }] },
+    pos: { x: 1040, y: 500 },
+    hooks: { oppPoolMod: { weights: { repliegue: 1.28 } } },
+  },
+  {
+    id: "carrilenos", filo: "press", rama: "expansion", tier: "master", icon: "👑",
+    nombre: "Carrileños",
+    desc: "Los laterales son los que más corren del equipo: en cada contra hay siempre una banda libre y un centro esperando.",
+    momento: "El centro del lateral que llegó desde su propia área.",
+    req: { nivel: 10, previo: "tres_toques",
+      principios: [{ id: "verticalidad", min: 4 }, { id: "presion", min: 4 }] },
+    pos: { x: 840, y: 615 },
+    hooks: { deepFinish: { of: "transicion", bonus: 0.06,
+      texto: "El carrilero llegó desde atrás y puso el centro exacto: la contra terminó como se dibuja." } },
+  },
+  {
+    id: "el_jaguar", filo: "press", rama: "expansion", tier: "master", icon: "👑",
+    nombre: "El Jaguar",
+    desc: "En cada contra hay un jugador que sale solo: el equipo lo busca siempre, y el mano a mano es el desenlace natural.",
+    momento: "El delantero solo contra el arquero, otra vez.",
+    req: { nivel: 10, previo: "tres_toques",
+      principios: [{ id: "verticalidad", min: 4 }, { id: "presion", min: 4 }] },
+    pos: { x: 1040, y: 615 },
+    hooks: { accelFinish: { of: "transicion", p: 0.28, bonus: 0.06,
+      intro: p => `¡EL JAGUAR se suelta! ${p.name} arranca solo y ya no lo agarra nadie: mano a mano.` } },
+  },
+
+  /* ================= POSESION — el arbol REDISENADO =================
+     15 rasgos (rediseno del PO, 26-jul-2026). Sustituye al arbol de 9 del
+     arco T1-T3. Igual que en Press, donde el concepto coincidia se reciclaron
+     los hooks ya construidos: El Tercer Hombre conserva id, nombre, tier y
+     hook — es el mismo rasgo de siempre, ahora dentro de otra estructura.
+
+     LA DECISION DE DISENO DEL REDISENO (PO, sobre la mesa antes de construir):
+     la rama Respuesta del PO responde a la PRESION ALTA, pero el matchup debil
+     declarado de Posesion es el BLOQUE BAJO (philosophies.advertencia) y la
+     neutralizacion de esa celda —el espejo de La Fortaleza del Bloque— vivia
+     justamente ahi (Amplitud -> Cambio de Frente -> Abrir la Lata). Se resolvio
+     MIGRANDO el anti-bloque a la Firma: Osciladores ES el cambio de frente, y
+     carga la neutralizacion COMPLETA en un solo nodo. La Respuesta queda libre
+     para lo que el PO quiso: aguantar la presion rival.
+
+     Cuenta de la neutralizacion: la celda posesion|bloque vale 0.65 en
+     circulacion y 1.30 en pelotazo (matriz F2). El stack viejo era
+     0.65 x 1.25 x 1.23 ~ 1.00 y 1.30 x 0.77 ~ 1.00, repartido en 3 nodos
+     (basic + int + adv = 3 PI). Osciladores lo hace de una: 1.54 y 0.77 — el
+     mismo resultado exacto, al mismo costo (buen_pie + tercer_hombre +
+     osciladores = 3 PI). Empareja el matchup; jamas lo invierte.
+
+     La forma en la cancha: la Firma teje por el centro y se abre en dos
+     acabados (empujarla o el mano a mano); la Respuesta baja al eje —es la
+     salida desde el fondo—; la Expansion ocupa el campo rival y se bifurca en
+     las dos maneras de romper una linea (por abajo o por arriba), que vuelven
+     a juntarse en Polivalentes. */
+
+  /* ---- Firma - perfeccionar la estructura ofensiva (circulo) ---- */
+  {
+    id: "buen_pie", filo: "posesion", rama: "firma", tier: "basic", icon: "\u{1F9B6}",
+    nombre: "Buen Pie",
+    desc: "El pase de seguridad deja de ser un tramite: el equipo lo da bien incluso con la presion encima, y una pelota que parecia perdida vuelve a ser suya.",
+    momento: "El pase interceptado que igual termina en un pie propio.",
+    req: { nivel: 1 }, pos: { x: 190, y: 200 },
+    // El "+15% de precision" del diseno original seria un buff plano (ley del arco:
+    // un rasgo NUNCA es una mejora estadistica). Se expresa como comportamiento:
+    // el pase seguro que se corta no mata la jugada — la posesion se recicla.
+    hooks: { recycleBuild: { p: 0.35,
+      texto: "Buen pie: la pelota rebota y vuelve a ser nuestra — la jugada no se muere ahi." } },
+  },
+  {
+    id: "tercer_hombre", filo: "posesion", rama: "firma", tier: "intermediate", icon: "\u{1F53A}",
+    nombre: "El Tercer Hombre",
+    desc: "Las combinaciones de tres jugadores rompen lineas y aseguran la salida bajo presion: siempre aparece uno mas para recibir.",
+    momento: "La pared que deja atras a toda la primera linea de presion.",
+    req: { nivel: 3, previo: "buen_pie", principio: { id: "elaboracion", min: 2 } },
+    pos: { x: 450, y: 200 },
+    // RECICLADO INTEGRO del arbol anterior: mismo id, nombre, tier y hook.
+    hooks: { playoutRescue: { p: 0.40,
+      texto: "El tercer hombre salva la salida: el pase interceptado encuentra al desmarcado y el regalo no existe." } },
+  },
+  {
+    id: "pitagoricos", filo: "posesion", rama: "firma", tier: "advanced", icon: "\u{1F4D0}",
+    nombre: "Pitagoricos",
+    desc: "El equipo triangula con los ojos cerrados: cuando hay que elegir a quien buscar, siempre encuentra al que de verdad esta mejor parado.",
+    momento: "La triangulacion que deja al mejor ubicado solo frente al arco.",
+    req: { nivel: 6, previo: "tercer_hombre", principio: { id: "elaboracion", min: 4 } },
+    pos: { x: 710, y: 128 },
+    hooks: { supportUpgrade: { bonus: 0.05,
+      texto: "Geometria pura: el triangulo encuentra al mejor ubicado de verdad, no al mas cercano." } },
+  },
+  {
+    id: "osciladores", filo: "posesion", rama: "firma", tier: "advanced", icon: "\u{1F30A}",
+    nombre: "Osciladores",
+    desc: "El equipo mueve el balon de un lado al otro hasta que el bloque rival se parte: tras cada cambio de orientacion aparece un hombre sin marca.",
+    momento: "El cambio de cuarenta metros y el bloque entero descolocado.",
+    req: { nivel: 6, previo: "tercer_hombre", principio: { id: "directo", min: 3 } }, // AJENO: el cambio largo ES juego directo
+    pos: { x: 710, y: 275 },
+    // LA NEUTRALIZACION del matchup debil, heredada de Amplitud + Abrir la Lata en
+    // un solo nodo: 0.65 x 1.54 ~ 1.00 (la circulacion vuelve a rendir contra el
+    // bloque) y 1.30 x 0.77 ~ 1.00 (el pelotazo forzado desaparece). A TABLAS —
+    // nunca invertido: sigue siendo el espejo exacto de La Fortaleza del Bloque.
+    hooks: { poolMod: { vsFilo: "bloque", weights: { circulacion: 1.54, pelotazo: 0.77 } } },
+  },
+  {
+    id: "maquina_colectiva", filo: "posesion", rama: "firma", tier: "master", icon: "\u{1F451}",
+    nombre: "La Maquina Colectiva",
+    desc: "Once jugadores moviendose como una sola pieza. El rival deja de disputar el partido: corre detras de una pelota que nunca le pertenece.",
+    momento: "El gol a puerta vacia tras treinta pases, empujandola sin oposicion.",
+    req: { nivel: 10, previo: "pitagoricos",
+      principios: [{ id: "elaboracion", min: 4 }, { id: "presion", min: 4 }] },
+    pos: { x: 960, y: 128 },
+    hooks: {
+      // Hereda el hook del viejo Master (La Pelota es Nuestra): el reparto de
+      // iniciativa se inclina de raiz y el pool rival se estrangula por falta de balon.
+      masterPosesion: { shareShift: 0.06 },
+      tapIn: { p: 0.30, texto: "La maquina la dejo servida: solo hay que empujarla." },  // PENDIENTE DE MOTOR
+    },
+  },
+  {
+    id: "hombre_libre", filo: "posesion", rama: "firma", tier: "master", icon: "\u{1F451}",
+    nombre: "Hombre Libre",
+    desc: "Despues de tanto tejer, siempre termina apareciendo uno solo. El equipo lo encuentra, y lo que sigue es el delantero contra el arquero.",
+    momento: "Veinte pases y el nueve de cara al arquero.",
+    req: { nivel: 10, previo: "osciladores",
+      principios: [{ id: "elaboracion", min: 4 }, { id: "presion", min: 4 }] },
+    pos: { x: 960, y: 275 },
     hooks: { accelFinish: { of: "circulacion", p: 0.30, bonus: 0.06,
-      intro: p => `La pausa era una trampa: ¡${p.name} acelera de golpe y el rival no llega!` } },
+      intro: p => `Ahi esta el hombre libre: ${p.name} se suelta de la marca y queda de cara al arquero.` } },
+  },
+
+  /* ---- Respuesta - neutralizar cualquier intento del rival (cuadrado, eje) ---- */
+  {
+    id: "la_trampa", filo: "posesion", rama: "respuesta", tier: "basic", icon: "\u{1FAA4}",
+    nombre: "La Trampa",
+    desc: "El equipo puede devolver la pelota atras a proposito, para sacar al rival de su bloque y volver a empezar el ataque desde otro sitio.",
+    momento: "El rival saliendo a buscarla y dejando el espacio que se estaba negando.",
+    req: { nivel: 1 }, pos: { x: 190, y: 390 },
+    hooks: {
+      // Retroceder la posesion aleja el robo del arco propio: cuando el rival la
+      // recupera, su ataque nace lejos e incomodo.
+      oppShotMalus: { seq: "recuperacion", bonus: -0.06,
+        texto: "Mordieron el anzuelo y salieron: cuando la recuperan, estan lejos y el remate no asusta." },
+      backPass: { p: 0.30, texto: "El equipo la devuelve atras y vuelve a armar: el rival tiene que salir." },  // PENDIENTE DE MOTOR
+    },
+  },
+  {
+    id: "salida_lavolpiana", filo: "posesion", rama: "respuesta", tier: "intermediate", icon: "\u{1F9E9}",
+    nombre: "Salida Lavolpiana",
+    desc: "Contra la presion alta, un mediocampista baja entre los centrales: de golpe hay un hombre mas para salir y la primera linea rival queda sobrando.",
+    momento: "El cinco entre los centrales y la presion rival saltando al vacio.",
+    req: { nivel: 3, previo: "la_trampa", principio: { id: "elaboracion", min: 2 } },
+    pos: { x: 450, y: 390 },
+    hooks: { variantSwitch: { of: "circulacion", vsFilo: "press", p: 0.30, bonus: 0.07,
+      intro: p => `SALIDA LAVOLPIANA: ${p.name} se descuelga entre los centrales y la presion rival ya no alcanza.` } },
+  },
+  {
+    id: "la_frontera", filo: "posesion", rama: "respuesta", tier: "advanced", icon: "\u{1F6A9}",
+    nombre: "La Frontera",
+    desc: "La linea sube y se sostiene: cuando la pierden arriba y el rival busca la espalda, el equipo levanta la mano en bloque.",
+    momento: "El contragolpe rival muriendo en offside con toda la linea levantando el brazo.",
+    req: { nivel: 6, previo: "salida_lavolpiana", principio: { id: "presion", min: 4 } },
+    pos: { x: 710, y: 390 },
+    hooks: {
+      // El balon a la espalda es exactamente lo que la trampa del offside anula:
+      // el pelotazo ambiente muere leido por la linea.
+      breakawayGuard: { p: 0.40,
+        texto: "La linea sube junta y lo deja en offside: la frontera aguanto y el contragolpe no existio." },
+      offsideTrap: { p: 0.35, texto: "Trampa del offside: el brazo en alto y la jugada anulada." },  // PENDIENTE DE MOTOR
+    },
+  },
+  {
+    id: "rest_defense", filo: "posesion", rama: "respuesta", tier: "master", icon: "\u{1F451}",
+    nombre: "Rest Defense",
+    desc: "Incluso volcado en campo rival el equipo deja el ataque preparado para defender: la transicion del rival se apaga antes de cruzar la mitad.",
+    momento: "El rival recuperando la pelota y no pudiendo dar dos pases seguidos.",
+    req: { nivel: 10, previo: "la_frontera",
+      principios: [{ id: "elaboracion", min: 4 }, { id: "presion", min: 4 }] },
+    pos: { x: 960, y: 390 },
+    // Hereda el hook del Rest Defense que vivia en el Press: el concepto —tener el
+    // ataque ordenado para defender— pertenece a la filosofia que ATACA con la pelota.
+    hooks: { oppLoseActs: { p: 0.28,
+      texto: "El resto defensivo estaba armado: recuperaron, miraron arriba y no habia a quien pasarla." } },
+  },
+
+  /* ---- Expansion - transformar el dominio territorial en ocasiones (triangulo) ---- */
+  {
+    id: "el_rondo", filo: "posesion", rama: "expansion", tier: "basic", icon: "\u{1F504}",
+    nombre: "El Rondo",
+    desc: "El equipo instala el rondo en campo rival y no lo suelta: el partido entero se juega donde el rival no quiere, y las piernas que corren detras no son las nuestras.",
+    momento: "Diez minutos seguidos de toque en campo rival.",
+    req: { nivel: 1 }, pos: { x: 190, y: 545 },
+    hooks: {
+      // El rondo instala el partido en la circulacion: el pool se inclina hacia el
+      // futbol que el rasgo describe (no es un buff, es OTRO partido).
+      poolMod: { weights: { circulacion: 1.20 } },
+      oppStamina: { factor: 1.10 },  // PENDIENTE DE MOTOR: hoy el rival nunca se cansa
+    },
+  },
+  {
+    id: "profundos", filo: "posesion", rama: "expansion", tier: "intermediate", icon: "\u{1F5E1}",
+    nombre: "Profundos",
+    desc: "Tanto toque tiene un para que: cuando la linea rival se descuida un segundo, el pase ya salio hacia el espacio.",
+    momento: "El pase filtrado que parte a la defensa despues de veinte toques.",
+    req: { nivel: 3, previo: "el_rondo", principio: { id: "elaboracion", min: 2 } },
+    pos: { x: 450, y: 545 },
+    hooks: { skipToFinish: { of: "circulacion", p: 0.26, bonus: 0.04,
+      intro: p => `Se acabo la paciencia: ${p.name} la pincha al espacio y saltea todo el tramite.` } },
+  },
+  {
+    id: "sorpresivos", filo: "posesion", rama: "expansion", tier: "advanced", icon: "\u{1FA82}",
+    nombre: "Sorpresivos",
+    desc: "El equipo que toca y toca de pronto la manda por arriba: nadie lo espera, y la linea rival queda partida por el aire.",
+    momento: "El pelotazo aereo tras cuarenta toques, con la defensa adelantada.",
+    req: { nivel: 6, previo: "profundos", principio: { id: "elaboracion", min: 4 } },
+    pos: { x: 710, y: 505 },
+    hooks: { variantDeep: { of: "circulacion", p: 0.30, bonus: 0.06,
+      intro: p => `Sorpresa: tras tanto toque ${p.name} la manda por ARRIBA y la linea rival queda partida.` } },
+  },
+  {
+    id: "desesperantes", filo: "posesion", rama: "expansion", tier: "advanced", icon: "\u{1F624}",
+    nombre: "Desesperantes",
+    desc: "Perseguir la pelota sin tocarla enloquece a cualquiera. El rival termina entrando mal, y eso se cobra en tiros libres y en tarjetas.",
+    momento: "El penal en el minuto ochenta tras diez minutos de sitio.",
+    req: { nivel: 6, previo: "profundos", principio: { id: "presion", min: 4 } },
+    pos: { x: 710, y: 615 },
+    // Migracion F2: el 4o compas de la sinfonia + el penal profundo. La desesperacion
+    // acumulada ES el rasgo declarado de la filosofia (philosophies.rasgo) — vive aca.
+    hooks: { deepPosesion: {} },
+  },
+  {
+    id: "polivalentes", filo: "posesion", rama: "expansion", tier: "master", icon: "\u{1F451}",
+    nombre: "Polivalentes",
+    desc: "Delanteros que arman y mediocampistas que atacan: nadie ocupa el puesto que dice su camiseta, y la defensa rival ya no sabe a quien seguir.",
+    momento: "El mediocampista definiendo de nueve mientras el nueve dio el pase.",
+    // LA CONVERGENCIA de la rama (decision PO): basta con haber profundizado por
+    // CUALQUIERA de las dos maneras de romper una linea — por abajo o por arriba.
+    req: { nivel: 10, alguno: ["sorpresivos", "desesperantes"],
+      principios: [{ id: "elaboracion", min: 4 }, { id: "presion", min: 4 }] },
+    pos: { x: 960, y: 560 },
+    // Hereda el hook del viejo Juego Posicional: siempre hay un pasillo y siempre
+    // hay un pie — con todos jugando de todo, la posesion directamente no muere.
+    hooks: { recycleUpgrade: { p: 0.60, max: 2,
+      texto: "Todos juegan de todo: aparece un pasillo donde no habia nadie y la posesion no muere." } },
   },
 
   /* ---------------- ⚡ Contragolpe ---------------- */
@@ -204,66 +608,6 @@ export const TRAITS = [
      rama Respuesta: cubrirse cuesta pureza de identidad) + 1 PI.
      Los marcados (migrado F2) absorben el efecto que Consolidada
      regalaba automático — ahora se compra. */
-
-  /* ---------------- 🦁 High Press ---------------- */
-  {
-    id: "caceria_letal", filo: "press", rama: "firma", tier: "intermediate", icon: "🩸",
-    nombre: "Cacería Letal",
-    desc: "La presión tras pérdida se vuelve tan intensa que al rival solo le queda frenarla con falta.",
-    momento: "La amarilla al cinco rival antes del minuto veinte.",
-    req: { nivel: 3, previo: "morder", principio: { id: "presion", min: 2 } },
-    // Migración F2: la Cacería total rota deja falta (amarilla + tiro libre) MÁS
-    // seguido — el foulBreakDeep que antes regalaba Consolidada (filoRasgo press).
-    hooks: { deepPress: {} },
-  },
-  {
-    id: "anticipar", filo: "press", rama: "respuesta", tier: "intermediate", icon: "🛡️",
-    nombre: "Anticipar la Espalda",
-    desc: "Los centrales se adelantan para cortar el balón largo que busca superar la presión.",
-    momento: "El central cortando de cabeza el pelotazo que iba a partir al equipo.",
-    req: { nivel: 3, previo: "trampa_banda", principio: { id: "solidez", min: 2 } }, // AJENO: cubrirse cuesta
-    hooks: { breakawayGuard: { p: 0.40,
-      texto: "El central LEYÓ el pelotazo a la espalda: paso adelante y corte de cabeza. La presión sigue viva." } },
-  },
-  {
-    id: "arco_vista", filo: "press", rama: "expansion", tier: "intermediate", icon: "🎯",
-    nombre: "Arco a la Vista",
-    desc: "Los robos en campo rival se convierten inmediatamente en ocasiones de gol.",
-    momento: "Robo y gol en dos toques.",
-    req: { nivel: 3, previo: "asfixia_salida", principio: { id: "verticalidad", min: 2 } },
-    hooks: { deepFinish: { of: "recuperacion", bonus: 0.08,
-      texto: "El robo fue tan arriba que el arco ya está a la vista: definición a quemarropa." } },
-  },
-
-  /* ---------------- 🎼 Posesión ---------------- */
-  {
-    id: "tercer_hombre", filo: "posesion", rama: "firma", tier: "intermediate", icon: "🔺",
-    nombre: "El Tercer Hombre",
-    desc: "Las combinaciones de tres jugadores rompen líneas y aseguran la salida bajo presión.",
-    momento: "La pared que deja atrás a toda la primera línea de presión.",
-    req: { nivel: 3, previo: "hombre_libre", principio: { id: "elaboracion", min: 2 } },
-    // Mitiga el festín del Press rival: la salida jugada que falla puede rescatarse.
-    hooks: { playoutRescue: { p: 0.40,
-      texto: "¡El tercer hombre salva la salida! El pase interceptado encuentra al desmarcado y el regalo no existe." } },
-  },
-  {
-    id: "cambio_frente", filo: "posesion", rama: "respuesta", tier: "intermediate", icon: "🌊",
-    nombre: "Cambio de Frente",
-    desc: "El equipo mueve el balón de banda a banda para desorganizar al bloque rival.",
-    momento: "El cambio de cuarenta metros y centro atrás con el bloque descolocado.",
-    req: { nivel: 3, previo: "amplitud", principio: { id: "directo", min: 2 } }, // AJENO: el cambio largo ES juego directo
-    hooks: { variantSwitch: { of: "circulacion", vsFilo: "bloque", p: 0.30, bonus: 0.07,
-      intro: p => `¡CAMBIO DE FRENTE de ${p.name}! Cuarenta metros de vuelo y el bloque entero descolocado.` } },
-  },
-  {
-    id: "sitio_area", filo: "posesion", rama: "expansion", tier: "intermediate", icon: "🏟️",
-    nombre: "Sitio al Área",
-    desc: "Las posesiones prolongadas acorralan al rival en su área y fuerzan errores.",
-    momento: "El penal en el minuto ochenta tras diez minutos de sitio.",
-    req: { nivel: 3, previo: "pausa", principio: { id: "presion", min: 2 } },
-    // Migración F2: el 4º compás de la sinfonía + el penal profundo (filoRasgo posesion).
-    hooks: { deepPosesion: {} },
-  },
 
   /* ---------------- ⚡ Contragolpe ---------------- */
   {
@@ -333,54 +677,6 @@ export const TRAITS = [
      Los anti-matchup NEUTRALIZAN la matriz F2 — la llevan a tablas, JAMÁS
      la invierten (regla del arco). */
 
-  /* ---------------- 🦁 High Press ---------------- */
-  {
-    id: "asfixia_total", filo: "press", rama: "firma", tier: "advanced", icon: "🌪️",
-    nombre: "Asfixia Total",
-    desc: "El equipo presiona en todas las fases: la salida, el medio, la pérdida. Al rival no le queda fútbol para jugar.",
-    momento: "El rival reventando pelotazos porque no puede salir jugando.",
-    req: { nivel: 6, todos: ["caceria_letal", "asfixia_salida"], principio: { id: "presion", min: 4 } },
-    // El bozal a la firma RIVAL: su identidad se expresa mucho menos (el mult de su
-    // firma en el pool se reduce) — no ataca menos: renuncia a SU fútbol.
-    hooks: { muzzleOppFirma: { factor: 0.6,
-      texto: "El rival ya no intenta jugar SU fútbol: la asfixia lo obligó a renunciar a la idea." } },
-  },
-  {
-    id: "cancha_chica", filo: "press", rama: "respuesta", tier: "advanced", icon: "📦",
-    nombre: "Cancha Chica",
-    desc: "El equipo achica el campo hasta que el rival no encuentra dónde jugar.",
-    momento: "El rival encerrado en su propio tercio durante minutos enteros.",
-    req: { nivel: 6, todos: ["anticipar", "morder"], principio: { id: "solidez", min: 3 } }, // AJENO
-    // Las secuencias rivales pierden continuidad (mueren antes del remate): el mismo
-    // corte del Oficio, pero por achique — la cancha mide cuarenta metros.
-    hooks: { oppLoseActs: { p: 0.25,
-      texto: "¡No hay cancha! El achique ahoga el avance rival antes de que llegue a ser peligro." } },
-  },
-
-  /* ---------------- 🎼 Posesión ---------------- */
-  {
-    id: "juego_posicional", filo: "posesion", rama: "firma", tier: "advanced", icon: "♟️",
-    nombre: "Juego Posicional",
-    desc: "Cada jugador ocupa su altura y su pasillo: el balón siempre encuentra tres opciones de pase.",
-    momento: "El rival corriendo detrás de la pelota sin alcanzarla nunca.",
-    req: { nivel: 6, todos: ["tercer_hombre", "pausa"], principio: { id: "elaboracion", min: 4 } },
-    // El reciclaje del Hombre Libre se vuelve estructura: más seguido y hasta dos veces
-    // por jugada — los fallos de circulación casi nunca son pérdida seca.
-    hooks: { recycleUpgrade: { p: 0.60, max: 2,
-      texto: "Juego posicional puro: siempre hay un pasillo, siempre hay un pie — la posesión no muere." } },
-  },
-  {
-    id: "abrir_lata", filo: "posesion", rama: "respuesta", tier: "advanced", icon: "🥫",
-    nombre: "Abrir la Lata",
-    desc: "Contra bloques cerrados, el equipo combina amplitud, cambios de frente y llegada desde segunda línea.",
-    momento: "El gol de media distancia tras quince pases contra el muro.",
-    req: { nivel: 6, todos: ["cambio_frente", "hombre_libre"], principio: { id: "directo", min: 3 } }, // AJENO
-    // LA NEUTRALIZACIÓN: con Amplitud (×1.25) apilada, la celda posesion|bloque vuelve
-    // a tablas EXACTAS (0.65×1.25×1.23 ≈ 1.0) y el pelotazo forzado desaparece
-    // (1.3×0.77 ≈ 1.0). Empareja el matchup — no lo invierte (regla del arco).
-    hooks: { poolMod: { vsFilo: "bloque", weights: { circulacion: 1.23, pelotazo: 0.77 } } },
-  },
-
   /* ---------------- ⚡ Contragolpe ---------------- */
   {
     id: "invitacion", filo: "contra", rama: "respuesta", tier: "advanced", icon: "🎩",
@@ -441,30 +737,13 @@ export const TRAITS = [
   /* ================= MASTER (T3 — el ideal platónico) =================
      Un Advanced cualquiera + los TRES básicos (presencia en las tres ramas)
      + Nivel 10 (Consolidada) + ambos Principios propios a 4 + 1 PI.
-     Comprarlo dispara la CONSAGRACIÓN de prensa (game/traits). */
-  {
-    id: "robo_es_pase", filo: "press", rama: "master", tier: "master", icon: "👑",
-    nombre: "El Robo es el Pase",
-    desc: "El equipo ya no distingue entre defender y atacar: cada recuperación es el primer pase del gol.",
-    momento: "Un gol nacido de robo en cada partido — el rival lo sabe y no puede evitarlo.",
-    req: { nivel: 10, alguno: ["asfixia_total", "cancha_chica"], todos: ["morder", "trampa_banda", "asfixia_salida"],
-      principios: [{ id: "presion", min: 4 }, { id: "verticalidad", min: 4 }] },
-    // Toda la familia de la recuperación define mejor (el robo ES creación) y la
-    // mordida caza más seguido (chainPlus sobre la p de Morder).
-    hooks: { masterPress: { bonus: 0.08, chainPlus: 0.15,
-      texto: "No hay creador de juego mejor que una buena recuperación: el robo YA es el pase del gol." } },
-  },
-  {
-    id: "pelota_nuestra", filo: "posesion", rama: "master", tier: "master", icon: "👑",
-    nombre: "La Pelota es Nuestra",
-    desc: "El partido se juega con una sola pelota — y es nuestra. El rival defiende, espera, y casi nunca la ve.",
-    momento: "El rival tocando el balón tres veces en diez minutos.",
-    req: { nivel: 10, alguno: ["juego_posicional", "abrir_lata"], todos: ["hombre_libre", "amplitud", "pausa"],
-      principios: [{ id: "elaboracion", min: 4 }, { id: "presion", min: 4 }] },
-    // El reparto de iniciativa se inclina de raíz (+share): el pool rival se
-    // ESTRANGULA por falta de balón. El costo permanece: perderla sigue doliendo.
-    hooks: { masterPosesion: { shareShift: 0.06 } },
-  },
+     Comprarlo dispara la CONSAGRACIÓN de prensa (game/traits).
+
+     OJO: el rediseño de Press (25-jul-2026) usa otra regla — sus Masters son
+     las HOJAS de cada rama (7 en total), piden el avanzado previo de SU rama
+     en vez de converger las tres, y viven arriba en el bloque de Press. La
+     consagración solo dispara con el PRIMERO de la filosofía. Las tres
+     filosofías todavía sin rediseñar conservan la regla original de abajo. */
   {
     id: "contragolpe_total", filo: "contra", rama: "master", tier: "master", icon: "👑",
     nombre: "Contragolpe Total",

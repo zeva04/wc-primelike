@@ -38,6 +38,7 @@ import { FIRMA_TYPE, FILO_LEVELS, FILO_ETAPAS, getPhilosophy } from "../../conte
 import { rivalFilo } from "../philosophy.js";
 import { buildActDecision } from "./sequence-acts.js";
 import { hookOf, hasTrait, traitHooks, traitMoment } from "./trait-hooks.js";
+import { pressOn, PRESS_POOL } from "./press.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
 export const SEQ_MIN = 2, SEQ_MAX = 6;
@@ -125,6 +126,10 @@ function typeWeights(m, side, plan) {
     fortaleza: 0,
   };
   applyFiloWeights(m, side, w, plan.oppFilo);
+  // EL BOTÓN DE PRESIÓN: mientras corre la ráfaga el partido GENERA otro fútbol —
+  // se roba arriba mucho más y no se revienta la pelota. Va DESPUÉS de la filosofía
+  // (mismo criterio que las avanzadas de M2: hereda matriz y firmas ya aplicadas).
+  if (side === "mine" && pressOn(m)) for (const k of Object.keys(PRESS_POOL)) if (w[k] > 0) w[k] *= PRESS_POOL[k];
   // Memoria de secuencias: no repetir el mismo tipo dos veces seguidas (el partido varía).
   if (m._lastSeqType && w[m._lastSeqType] !== undefined) w[m._lastSeqType] = 0;
   return w;
@@ -259,7 +264,7 @@ export function filoShareShift(myFilo, oppFilo) {
 
 /* filoRasgo() MURIÓ en T2 (migración F2, decisión PO #2): el efecto profundo que
    Consolidada regalaba automático ahora se COMPRA en el árbol — el gate es
-   trait-hooks.hasTrait (caceria_letal · sitio_area · trampa_cerrada · duenos_area).
+   trait-hooks.hasTrait (gegenpressing · desesperantes · trampa_cerrada · duenos_area).
    Consolidada da su PI, el mult 2.1 y el share 0.9 de la avanzada — nada más. */
 
 /**
@@ -320,7 +325,7 @@ export function startSequence(m, type) {
     m.seq = { type, prot, actIdx: 0, bonus: 0 };
     // El 4º compás de la sinfonía profunda: era el rasgo F2 de Posesión (Consolidada);
     // desde T2 lo COMPRA Sitio al Área (migración al árbol, decisión PO #2).
-    if (type.id === "sinfonia" && hasTrait(m, "sitio_area")) m.seq.plan = ["build", ...type.plan];
+    if (type.id === "sinfonia" && hasTrait(m, "desesperantes")) m.seq.plan = ["build", ...type.plan];
     // T1 — hooks de ARRANQUE del árbol de rasgos: la secuencia puede nacer en su
     // variante del rasgo, con relato propio (el momento nombrable abre la jugada).
     // Ambos matchean por FAMILIA (gate T1: sin esto el básico moría al consolidar).
@@ -334,8 +339,8 @@ export function startSequence(m, type) {
       m.seq.deepVariant = true; // Arco a la Vista (T2) profundiza ESTE desenlace
       traitIntro = vd.intro;
     }
-    // Cambio de Frente (T2): variante condicional al RIVAL (solo contra el bloque
-    // que la amplitud viene estirando) — mismo mecanismo, otra condición.
+    // Variante condicional al RIVAL: la Salida Lavolpiana de Posesión la usa contra
+    // el Press (el mediocampista que baja deja sobrando a la primera línea).
     const vs = hookOf(m, "variantSwitch");
     if (vs && vs.of === familyOf(type) && vs.vsFilo === seqPlan(m).oppFilo?.id && rnd() < vs.p) {
       m.seq.bonus += vs.bonus;

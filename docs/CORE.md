@@ -1131,3 +1131,43 @@ nadie tiene la copa asegurada, que es exactamente el espíritu roguelike.
 6. Si es gol, `goalMine` lo anota con su asistidor y el VAR puede revisarlo (12% / 30% de anulación;
    los penales no se anulan por offside).
 7. La secuencia cierra, el relato se actualiza y el partido vuelve al ritmo de crucero (§6).
+
+
+## Botón de presión (25-jul-2026)
+
+La primera palanca que el DT acciona **durante** el juego: hasta ahora el partido solo
+ofrecía decisiones puntuales dentro de una secuencia; esto es un ESTADO que se enciende
+y corre solo. Vive en `js/game/match/press.js`.
+
+| Dial | Valor | Qué es |
+|---|---|---|
+| `PRESS_DURATION` | 10' | lo que dura una ráfaga (2 ticks) |
+| `PRESS_COOLDOWN` | 10' | recarga desde que se apaga (2 ticks) |
+| `PRESS_MAX_USES` | 5 | tope duro por partido |
+| `PRESS_MOD` | atk +0.30 · def −0.20 | mismo caño que la mentalidad |
+| `PRESS_POOL` | recuperación ×1.8 · pelotazo ×0.7 | el pool que genera el partido |
+
+**El trato**: mientras corre, el equipo roba mucho más arriba y ataca mejor, y se expone
+atrás. Y **los minutos presionados cuestan el doble de energía** — se cobran una vez como
+minutos jugados y otra vez como sobrecosto (`medical.applyMedicalPostMatch(…, presionados)`).
+La factura no la paga este partido: la paga el siguiente. Con el ciclo de 20', un partido
+de 90' da **4-5 ráfagas**; presionarlas todas son 50' al doble ≈ **+23 de energía** encima
+de los 42 que ya cuesta jugar los 90.
+
+**Se mide en minutos de partido, no en segundos de reloj** — el ritmo del relato no es
+uniforme (un tick de crucero dura ~600 ms pero una secuencia lo congela mientras el DT
+lee y decide). Con un temporizador de pared, la ráfaga se consumiría detrás de un modal
+abierto o se recargaría gratis mientras el jugador piensa. La barra de la UI anima el
+ancho para que igual SE LEA como una recarga en tiempo real.
+
+**Por qué no es un buff plano prohibido**: la ley del arco de Rasgos prohíbe que un RASGO
+sea una mejora estadística. Esto no es un rasgo: es una orden del DT con costo explícito,
+exactamente la misma moneda que salir a mentalidad ofensiva (`powers.MENT_MOD`) — y
+deliberadamente más chica (ofensiva vale +0.6/−0.5).
+
+**Pulmones de Acero** (rasgo básico de la rama Respuesta del Press) abarata SOLO este
+sobrecosto, jamás la fatiga general del partido.
+
+**Sin medir a propósito**: el botón es poder nuevo en manos del humano y el smoke NO lo
+usa (juega sin presionar nunca), así que el win-rate del smoke no lo refleja. Va al
+próximo gate de dificultad, junto con el rediseño de árboles.
