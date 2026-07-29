@@ -16,14 +16,15 @@ import { playedPos } from "../ratings.js";
 import { sequenceType } from "../../content/sequences.js";
 import { protMomentum, noteFiloHit, familyOf } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
 import { hookOf, rollChain, chainMine, traitMoment, hasTrait } from "./trait-hooks.js"; // el árbol de rasgos (T1/T2)
-
-// El plan de actos de la secuencia: el propio si lo tiene (rasgo de Posesión:
-// un acto más de circulación, lo arma startSequence) o el del catálogo.
-const planOf = s => s.plan || s.type.plan;
+import { effStat } from "./powers.js";
 import * as A from "./actions.js";
 import { goalMine, goalOpp, myPenalty, lastManChance } from "./chances.js";
 import { noteCorner } from "./stats.js";
 import { noteMomentum } from "./match-momentum.js";
+
+// El plan de actos de la secuencia: el propio si lo tiene (rasgo de Posesión:
+// un acto más de circulación, lo arma startSequence) o el del catálogo.
+const planOf = s => s.plan || s.type.plan;
 
 /** Crea la decisión del acto actual según su `kind`. Las opciones son reglas (mapean a
  *  Football Actions); el flavor viene del tipo. */
@@ -34,7 +35,7 @@ export function buildActDecision(m) {
       title: `⚡ min ${m.clock()}' — Circulación: ${s.prot.name} tiene la pelota`,
       text: "¿Cómo la hacen circular?",
       options: [
-        { label: "🎩 Pase seguro", hint: `Mantiene la posesión (Pase ${s.prot.stats.pase})`, key: "seguro" },
+        { label: "🎩 Pase seguro", hint: `Mantiene la posesión (Pase corto ${s.prot.stats.pase_corto})`, key: "seguro" },
         { label: "🔑 Pase filtrado", hint: "Arriesgado, pero deja mejor perfil de remate", key: "filtrado" },
         // LA TRAMPA (Posesión): la jugada NUEVA que desbloquea el rasgo — una tercera
         // opción en el acto, no un modificador escondido. Una sola vez por secuencia:
@@ -49,7 +50,7 @@ export function buildActDecision(m) {
       text: "La defensa rival viene a la carrera. ¿Qué hace?",
       options: [
         { label: "🏃 Conducir al espacio", hint: `Puede ganar una falta (Aura ${s.prot.stats.aura})`, key: "conducir" },
-        { label: "🎯 Pase al pie", hint: `Rápido y seguro (Pase ${s.prot.stats.pase})`, key: "pase" },
+        { label: "🎯 Pase al pie", hint: `Rápido y seguro (Pase corto ${s.prot.stats.pase_corto})`, key: "pase" },
       ],
     }),
     finish: () => ({
@@ -112,16 +113,55 @@ export function buildActDecision(m) {
         { label: "🥊 Salir a despejar", hint: "Puede matar la jugada de una… pero si falla, el cabeceador queda solo", key: "salir" },
       ],
     }),
+    // ═══ EL DESBORDE POR LA BANDA (Odisea, 2ª mitad) ═══
+    // Tres opciones = tres fútbols distintos por afuera. La primera pregunta del acto no
+    // es "¿tenés pase?" sino "¿tenés piernas?": el rival que corre con él sale del once
+    // rival y su velocidad DECIDE (actions.actSprint).
+    wing: () => {
+      s.chaser = wingChaser(m);
+      return {
+        title: `🏃 min ${m.clock()}' — Banda: ${s.prot.name} encara a ${s.chaser ? s.chaser.name : "su marca"}`,
+        text: "El pasillo de afuera está abierto. ¿Qué hace?",
+        options: [
+          { label: "🏁 Ir a la línea de fondo", hint: `Velocidad ${s.prot.stats.velocidad} vs ${s.chaser ? s.chaser.stats.velocidad : "el lateral"} — si llega, centra con la zaga de espaldas`, key: "fondo" },
+          { label: "📡 Centrar de primera", hint: "No arriesga el desborde, pero la defensa llega acomodada", key: "primera" },
+          { label: "✂️ Cortar hacia adentro", hint: `Se perfila y busca el remate él mismo (Tiro ${s.prot.stats.tiro})`, key: "adentro" },
+        ],
+      };
+    },
+    // El envío desde la banda: es EL sitio donde el split de pase decide qué jugada se
+    // juega — el centro alto es pase largo y termina en cabezazo; el rasante es pase
+    // corto y termina en remate de frente.
+    cross: () => ({
+      title: `📡 min ${m.clock()}' — ${s.prot.name} levanta la cabeza desde el costado`,
+      text: "El área está poblada. ¿Qué manda?",
+      options: [
+        { label: "📡 Centro al área", hint: `Pase largo ${s.prot.stats.pase_largo} — busca la cabeza del mejor rematador`, key: "centro" },
+        { label: "🎯 Pase atrás rasante", hint: `Pase corto ${s.prot.stats.pase_corto} — al que llega de frente al arco`, key: "atras" },
+      ],
+    }),
     playout: () => ({
       title: `🗼 min ${m.clock()}' — ${m.oppTeam.name} asfixia la salida: la tiene ${s.prot.name}`,
       text: "¿Cómo salen del fondo?",
       options: [
-        { label: "💎 Salir jugando", hint: `Pase ${s.prot.stats.pase} — romper la presión regala una contra tuya`, key: "jugar" },
+        { label: "💎 Salir jugando", hint: `Pase corto ${s.prot.stats.pase_corto} — romper la presión regala una contra tuya`, key: "jugar" },
         { label: "🚀 Reventarla", hint: "Seguro: se pierde la pelota, no se arriesga nada", key: "despeje" },
       ],
     }),
   }[kind]();
   m.decision = { id: "sequence", ...opts };
+}
+
+/**
+ * El lateral que corre la banda con mi extremo (Odisea): un DEF rival en cancha. Se elige
+ * el MÁS RÁPIDO de su zaga — el desborde se juega contra el que puede seguirlo, no contra
+ * el central lento que quedó del otro lado. Sin defensas en pie (equipo diezmado, rojas)
+ * devuelve null y actSprint usa la nota del rival como proxy.
+ */
+function wingChaser(m) {
+  const defs = m.oppLineup.filter(p => !p.expulsado && p.pos === "DEF");
+  const pool = defs.length ? defs : m.oppLineup.filter(p => !p.expulsado && p.pos !== "POR");
+  return pool.sort((a, b) => (b.stats.velocidad || 0) - (a.stats.velocidad || 0))[0] || null;
 }
 
 /**
@@ -358,6 +398,64 @@ export function resolveSequenceAct(m, key) {
     return escalate(m);
   }
 
+  if (kind === "wing") {
+    // CORTAR HACIA ADENTRO: se salta el centro. El extremo se perfila (conducción: aura +
+    // velocidad) y va derecho al desenlace con el pie cambiado. Es la opción del que sabe
+    // rematar; si la pierde encarando hacia el medio, el equipo queda partido → contra.
+    if (key === "adentro") {
+      const r = A.actDribble(m, s.prot, { bonus: 0.04 });
+      if (r.foul) { m.log("event", `min ${m.clock()}' — ¡Lo cruzan cuando entraba al área! ¡PENAL!`); closeSilent(m); return myPenalty(m); }
+      if (!r.ok) return maybeCounter(m, `min ${m.clock()}' — ${s.prot.name} se cierra hacia adentro pero lo achican entre dos.`, true);
+      m.log("plain", `min ${m.clock()}' — ${s.prot.name} se perfila hacia adentro y busca el remate.`);
+      dtOk(m);
+      s.finishStat = "tiro";
+      s.bonus += 0.06;
+      s.actIdx = planOf(s).length - 1;   // saltea el centro: la jugada ya no va por afuera
+      noteFiloHit(m);
+      buildActDecision(m);
+      return false;
+    }
+    // CENTRAR DE PRIMERA: no arriesga el sprint, pero la zaga llega acomodada — el centro
+    // sale peor. Es el trade honesto de la opción segura: llega siempre, vale menos.
+    if (key === "primera") {
+      s.crossBonus = -0.05;
+      m.log("plain", `min ${m.clock()}' — ${s.prot.name} no espera el desborde: levanta la cabeza y prepara el envío.`);
+      return escalate(m);
+    }
+    // LA LÍNEA DE FONDO: el sprint puro contra el lateral. Llegar al fondo deja a la zaga
+    // rival de espaldas a su arco — el centro que sigue es el mejor del juego.
+    const r = A.actSprint(m, s.prot, { chaser: s.chaser, handicap: 0.10 });
+    if (!r.ok) return maybeCounter(m, `min ${m.clock()}' — ${f.wingFail}`, false);
+    m.log("plain", `min ${m.clock()}' — ${f.wingOk(s.prot)}`);
+    dtOk(m);
+    s.crossBonus = 0.07;
+    s.bonus += 0.04;              // la zaga de espaldas: el remate posterior llega mejor
+    return escalate(m);
+  }
+
+  if (kind === "cross") {
+    const rasante = key === "atras";
+    const r = A.actCross(m, s.prot, { rasante, bonus: s.crossBonus || 0 });
+    if (!r.ok) return closeSeq(m, "chance", `min ${m.clock()}' — ${f.crossFail}`);
+    // El centro CAMBIA de protagonista: el que remata es el que atacó el área. El alto
+    // busca al mejor cabezazo (y define de cabeza); el rasante, al mejor tiro de frente.
+    // Quién ataca el área en juego abierto: delanteros y volantes. Los centrales suben
+    // al córner, no al centro desde la banda — si se los deja entrar, el mejor cabezazo
+    // del plantel (que casi siempre es un central) termina rematando todos los centros.
+    const all = m.activeMine().filter(x => x !== s.prot && x.pos !== "POR");
+    const mates = all.filter(x => playedPos(x) !== "DEF").length ? all.filter(x => playedPos(x) !== "DEF") : all;
+    if (mates.length) {
+      s.assistFrom = s.prot;
+      s.prot = mates.sort((a, b) => (b.stats[rasante ? "tiro" : "cabezazo"] || 0) - (a.stats[rasante ? "tiro" : "cabezazo"] || 0))[0];
+    }
+    s.finishStat = rasante ? "tiro" : "cabezazo";
+    s.bonus += rasante ? 0.05 : 0.02;   // el rasante llega de frente al arco: mejor perfil
+    m.log("event", `min ${m.clock()}' — ${rasante
+      ? `${s.assistFrom.name} la pisa y la devuelve atrás: ${s.prot.name} entra de frente.`
+      : `${f.crossOk} La pelea ${s.prot.name}.`}`);
+    return escalate(m);
+  }
+
   if (kind === "finish") {
     // FRÍOS: se cambia MI ocasión por la del rival. La jugada muere sin peligro y el
     // generador le descuenta una llegada al rival (sequences.maybeStartSequence). Es
@@ -544,7 +642,10 @@ export function resolveSequenceAct(m, key) {
     const fortaleza = s.type.advFor === "bloque"; // la avanzada del Bloque (M2)
     // La contención profunda de la fortaleza era el rasgo F2 de Consolidada — desde T2
     // la compra Dueños del Área (migración al árbol); el repliegue base sigue original.
-    const r = A.actContain(m, mine, { press: key === "presionar", bonus: fortaleza && hasTrait(m, "duenos_area") ? s.type.adv.deepContain : 0 });
+    // ODISEA: replegar es LLEGAR — la velocidad media de mi línea de fondo entra al corte.
+    const zaga = m.activeMine().filter(p => playedPos(p) === "DEF");
+    const chase = zaga.length ? zaga.reduce((a, p) => a + effStat(p, "velocidad", m.my.buffs), 0) / zaga.length : null;
+    const r = A.actContain(m, mine, { press: key === "presionar", chase, bonus: fortaleza && hasTrait(m, "duenos_area") ? s.type.adv.deepContain : 0 });
     if (r.ok) {
       // La fortaleza CASTIGA (M2): la contención exitosa convierte — pelotazo inmediato
       // con el rival desarmado (def→of, el patrón de la salida bajo presión). El convert

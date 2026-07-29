@@ -2,57 +2,75 @@
    game/philosophy — la identidad futbolística de la run
    (arco de Filosofía F1, decisiones PO 22-jul-2026).
 
-   Posee `run.filoId` y lee `run.aristas` (que mutan content/
-   day-actions con los focos de la Sesión Táctica y los eventos
-   vía addFiloProgress). Reglas que viven acá:
-   - nivel = f(suma de las 2 aristas propias)  → FILO_LEVELS
-   - elección post-sorteo (gratis, antes del día 1)
-   - cambio a mitad de run: cuesta la Acción del Día; las
-     aristas PERSISTEN (demolición orgánica, decisión PO #1)
-   - progresión por EJECUCIÓN (Bible §5 "successful execution"):
-     acertar actos del tipo firma en partido suma progreso chico
-     a la arista firma, con tope por partido.
+   Posee `run.filoId` (la identidad que se JUEGA), `run.filoInicial`
+   (la escuela de la que viene el DT, fija) y `run.filoXp` (las 4
+   progresiones independientes). Reglas que viven acá:
+   - nivel = f(XP de ESA filosofía) → FILO_LEVELS (1..10 c/u)
+   - elección post-sorteo (gratis, antes del día 1) → 1 PI a gastar
+     obligatoriamente en un rasgo básico de la escuela elegida
+   - cambio de identidad: cuesta la Acción del Día y declara el
+     Plan de Partido (×1.5 de XP para esa idea)
+   - LA PROGRESIÓN (arco de Progresión, 28-jul-2026): toda la XP
+     viene del PARTIDO (70% intención / 30% efectividad) y de los
+     eventos; subir de nivel una filosofía paga XP al Director
+     Técnico (game/coach), que paga Puntos de Identidad.
 
    La filosofía viaja al partido como la moral: matchCtx.filo =
    {id, nivel} (se arma en screens/match.js Y tests/smoke.js);
    el Match no conoce la run (ARQUITECTURA §3.2).
    ============================================================ */
-import { getPhilosophy, aristaById, filoPointsOf, filoLevelOf, filoEtapaOf } from "../content/philosophies.js";
+import { getPhilosophy, PHILOSOPHIES, aristaById, filoPointsOf, filoLevelOf, filoEtapaOf, afinidadMult } from "../content/philosophies.js";
 import { ADVANCED_BY_FILO } from "../content/sequences.js";
 import { TEAM_PHILOSOPHIES } from "../content/team-philosophies.js";
 import { teamRating } from "./ratings.js";
 import { clamp } from "../core/math.js";
 import { addJournal } from "./journal.js";
 import { trackOxidacion } from "./oxidation.js";
-import { syncIdentityPI, creditInheritedPI, activeTraitIds } from "./traits.js";
+import { activeTraitIds } from "./traits.js";
+import { addCoachXp, filoLevelReward } from "./coach.js";
 import { DEEP_TRAIT } from "../content/traits.js";
 
-// Progresión por ejecución: cada ACIERTO de acto en una secuencia del tipo firma
-// (los cuenta el Match en `match.filoHits`) vale FILO_EXEC_GAIN de la arista
-// firma, con tope de FILO_EXEC_CAP aciertos por partido (decisión PO F1:
-// +0.25 y tope +0.5 — dos partidos jugando tu fútbol = un día de Sesión
-// Táctica; la cancha consolida, el entrenamiento sigue siendo la vía principal).
-export const FILO_EXEC_GAIN = 0.25;
-export const FILO_EXEC_CAP = 2;
+// EL PLAN DE PARTIDO (arco de Progresión, decisión PO 28-jul-2026): la vieja
+// Sesión Táctica ya no regala progreso desde el menú — declara QUÉ FÚTBOL vas a
+// intentar. Esa declaración vale ×PLAN_XP_MULT sobre toda la XP que ese partido
+// genere para esa filosofía: el día invertido no compra puntos, compra INTENCIÓN.
+export const PLAN_XP_MULT = 1.5;
 
-/** Suma de las 2 aristas propias de la filosofía activa (0 sin filosofía).
- *  Delegado en content/philosophies desde F3 (el contenido también lo lee). */
+/** XP acumulada de una filosofía de la run (la activa por defecto). */
 export const filoPoints = filoPointsOf;
 
-/** Índice del nivel actual en FILO_LEVELS (0..9 desde T1 — la escalera de PI). */
+/** Índice del nivel actual en FILO_LEVELS (0..9 = nivel 1..10). */
 export const filoLevel = filoLevelOf;
 
 /** Etapa del nivel (0 Aprendiendo · 1 En desarrollo · 2 Consolidada) — la escala
  *  0-2 original de F1: el rival, la brecha R3 y los gates viven acá (T1). */
 export const filoEtapa = filoEtapaOf;
 
-/** La filosofía para matchCtx: `{id, nivel, etapa, rasgos}` o null — la frontera
- *  run→Match, como la moral. `nivel` (0..9) sesga MI pool; `etapa` (0..2) es la
- *  escala de los gates (avanzada, rasgo, brecha R3) y de todo lo que compara
- *  contra el rival; `rasgos` son los ids ACTIVOS del árbol (T1 — el Match los
- *  interpreta vía sus hooks, jamás conoce la run). */
+/**
+ * Multiplicadores de XP del partido, por filosofía: la AFINIDAD de tu escuela
+ * (la filosofía INICIAL de la run) por el Plan de Partido si lo declaraste.
+ * Los aplica el Match al acumular, así la barra que se ve crecer en vivo y la
+ * que se acredita al cerrar son EL MISMO número.
+ */
+export function filoXpMults(run) {
+  const out = {};
+  for (const p of PHILOSOPHIES)
+    out[p.id] = +(afinidadMult(run.filoInicial, p.id) * (run.planFilo === p.id ? PLAN_XP_MULT : 1)).toFixed(2);
+  return out;
+}
+
+/** La filosofía para matchCtx: `{id, nivel, etapa, rasgos, xp, mult}` o null — la
+ *  frontera run→Match, como la moral. `nivel` (0..9) sesga MI pool; `etapa` (0..2)
+ *  es la escala de los gates (avanzada, brecha R3) y de todo lo que compara contra
+ *  el rival; `rasgos` son los ids ACTIVOS del árbol (T1 — todos los comprados desde
+ *  el arco de Progresión: las builds híbridas juegan de verdad); `xp`/`mult` son lo
+ *  que el Match necesita para anunciar EN VIVO la subida de nivel sin conocer la run. */
 export function filoCtx(run) {
-  return run.filoId ? { id: run.filoId, nivel: filoLevel(run), etapa: filoEtapa(run), rasgos: activeTraitIds(run) } : null;
+  if (!run.filoId) return null;
+  return {
+    id: run.filoId, nivel: filoLevel(run), etapa: filoEtapa(run), rasgos: activeTraitIds(run),
+    xp: { ...run.filoXp }, mult: filoXpMults(run), plan: run.planFilo || null,
+  };
 }
 
 /**
@@ -65,15 +83,20 @@ export function choosePhilosophy(run, filoId) {
   const f = getPhilosophy(filoId);
   if (!f) return null;
   run.filoId = f.id;
+  // LA ESCUELA (arco de Progresión): la filosofía inicial no se vuelve a elegir —
+  // es de dónde viene el DT, y de por vida decide a qué velocidad aprende cada
+  // idea (afinidad). Cambiar de identidad cambia lo que JUEGAS, no de dónde vienes.
+  run.filoInicial = f.id;
   run.filoNarrado = 0; // hito de nivel ya narrado (la CONQUISTA de M2 se cuenta una sola vez)
   const nombres = f.aristas.map(k => aristaById(k).label);
   addJournal(run, {
     icon: f.icon, tone: "gold", title: `El equipo abraza una identidad: ${f.name}`,
-    desc: `${f.lema} El plan: entrenar ${nombres.join(" y ")} hasta que ese fútbol salga solo.`,
+    desc: `${f.lema} El plan: jugar ${nombres.join(" y ")} hasta que ese fútbol salga solo.`,
   });
-  // El PI inicial (T1, decisión PO): elegir filosofía ES el nivel 1 — el sync lo
-  // acredita y el flujo de inicio lo gasta en 1 de los 3 rasgos básicos.
-  syncIdentityPI(run);
+  // El PI inicial (GDD): elegir filosofía ES el nivel 1 del DT — el flujo de inicio
+  // OBLIGA a gastarlo en uno de los 3 rasgos básicos de la escuela elegida.
+  run.dtNivel = 1;
+  run.identityPoints = (run.identityPoints || 0) + 1;
   return f;
 }
 
@@ -88,20 +111,18 @@ export function changePhilosophy(run, filoId) {
   const f = getPhilosophy(filoId);
   if (!f || !run.actionPending || f.id === run.filoId) return null;
   const prev = getPhilosophy(run.filoId);
-  syncIdentityPI(run); // niveles pendientes de la identidad SALIENTE: se acreditan antes de soltarla
   run.filoId = f.id;
-  // ANTI-FARMING (T1): la identidad nueva NACE acreditada a su nivel heredado — la
-  // arista compartida cuenta para dos filosofías y premiarla dos veces imprimiría PI.
-  // Los rasgos comprados de la saliente quedan LATENTES en run.rasgos (decisión PO #3).
-  creditInheritedPI(run);
-  // Las aristas persisten: la identidad nueva puede NACER con nivel. Esa etapa heredada
-  // no se narra como conquista (no se conquistó hoy) — la base narrada arranca ahí.
+  // El día invertido ES el Plan de Partido: la identidad nueva cobra el ×1.5 de XP
+  // en el próximo partido (arco de Progresión — declarar cuesta y por eso paga).
+  run.planFilo = f.id;
+  // Cada filosofía tiene su propio nivel: la nueva NO hereda nada, ni pierde nada.
+  // Sus rasgos comprados siguen ACTIVOS (builds híbridas, decisión PO 28-jul).
   run.filoNarrado = filoEtapa(run);
   run.actionPending = false;
   run.lastAction = { day: run.day, id: `filo_${f.id}`, group: null, icon: f.icon, title: `Cambio de identidad: ${f.name}` };
   addJournal(run, {
     icon: "🔄", tone: "neutral", title: `Golpe de timón: de ${prev ? prev.name : "la nada"} a ${f.name}`,
-    desc: `El día entero se fue en reinstalar ideas. Lo entrenado no se borra, pero la nueva identidad vive de ${f.aristas.map(k => aristaById(k).label).join(" y ")}.`,
+    desc: `El día entero se fue en reinstalar ideas. Lo aprendido no se borra —cada idea tiene su propio camino—, pero desde hoy el equipo juega ${f.aristas.map(k => aristaById(k).label).join(" y ")}.`,
   });
   // Oxidación (R1): reinstalar ideas ES trabajo táctico — el día cuenta como entrenado
   // (consume el turno por fuera de applyDayAction, así que registra su día acá).
@@ -226,18 +247,36 @@ export function applyFiloCosts(run, match) {
 }
 
 /**
- * Progresión por ejecución tras el partido (la llama flow.postMatchUpdate, del
- * lado run de la frontera): convierte `match.filoHits` (aciertos de actos del
- * tipo firma, cuenta el Match) en progreso de la arista firma, con tope.
- * Devuelve `{arista, add, hits}` para el relato del post-partido (F3) o null
- * si no hubo nada que sumar.
+ * LA PROGRESIÓN DEL ARCO (la llama flow.postMatchUpdate, del lado run de la
+ * frontera): acredita la XP que el Match repartió por filosofía (`match.filoXp`,
+ * ya multiplicada por afinidad y Plan de Partido), resuelve las subidas de nivel
+ * de cada una y convierte esas subidas en XP del Director Técnico — que a su vez
+ * paga Puntos de Identidad. Se aprende el fútbol que se juega.
+ *
+ * Devuelve el parte para el post-partido:
+ *   {filos: [{id, name, icon, xp, mult, antes, ahora, intentos, aciertos}], dt}
+ * o null si el partido no dejó una sola jugada de identidad.
  */
-export function applyFiloExecution(run, match) {
-  const f = getPhilosophy(run.filoId);
-  const hits = Math.min(match.filoHits || 0, FILO_EXEC_CAP);
-  if (!f || !hits) return null;
-  run.aristas = run.aristas || {};
-  const add = +(hits * FILO_EXEC_GAIN).toFixed(2);
-  run.aristas[f.firma] = +((run.aristas[f.firma] || 0) + add).toFixed(2);
-  return { arista: aristaById(f.firma), add, hits };
+export function applyFiloXp(run, match) {
+  const ganada = match.filoXp || {};
+  const filos = [];
+  let dtXp = 0, subidas = [];
+  run.filoXp = run.filoXp || {};
+  for (const p of PHILOSOPHIES) {
+    const xp = Math.round(ganada[p.id] || 0);
+    if (!xp) continue;
+    const antes = filoLevelOf(run, p.id);
+    run.filoXp[p.id] = (run.filoXp[p.id] || 0) + xp;
+    const ahora = filoLevelOf(run, p.id);
+    for (let n = antes + 2; n <= ahora + 1; n++) { dtXp += filoLevelReward(n); subidas.push(`${p.name} ${n}`); }
+    filos.push({
+      id: p.id, name: p.name, icon: p.icon, xp, antes, ahora,
+      mult: filoXpMults(run)[p.id],
+      intentos: match.filoIntentos?.[p.id] || 0, aciertos: match.filoAciertos?.[p.id] || 0,
+    });
+  }
+  if (!filos.length) return null;
+  filos.sort((a, b) => b.xp - a.xp);
+  const dt = dtXp ? addCoachXp(run, dtXp, subidas.length ? `${subidas.join(" · ")}.` : "") : null;
+  return { filos, dt, dtXp };
 }

@@ -26,6 +26,7 @@
    ============================================================ */
 import { clamp } from "../../core/math.js";
 import { effStat } from "./powers.js";
+import { PASE_MIX } from "../ratings.js";
 
 /** Pases que se juegan por minuto entre los dos equipos (6v6: ~800 en 90'). */
 const PASSES_PER_MIN = 9;
@@ -46,7 +47,10 @@ export const newTally = () => ({
 function passRate(players, buffs) {
   const field = players.filter(p => p.pos !== "POR" && !p.expulsado && !p.lesionado);
   if (!field.length) return 0.6;
-  const q = field.reduce((s, p) => s + effStat(p, "pase", buffs), 0) / field.length;
+  // ODISEA: la precisión del panel mezcla los dos pases (ratings.PASE_MIX) hasta que la
+  // segunda mitad del sprint la calcule por tipo de jugada.
+  const q = field.reduce((s, p) => s + (effStat(p, "pase_corto", buffs) * PASE_MIX.pase_corto
+    + effStat(p, "pase_largo", buffs) * PASE_MIX.pase_largo), 0) / field.length;
   return clamp(0.58 + q * 0.06, 0.5, 0.93);
 }
 

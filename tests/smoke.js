@@ -39,6 +39,12 @@ const FILO = args.filo || null;
 // estrategia dominante y el azar no la ve. Compone con --filo/--team; excluye --action
 // (el greedy YA decide la acción cada día). Heurísticas acordadas con el PO (M1).
 const SMART = !!args.smart;
+// --focus: el DT compra CON INTENCIÓN — solo en el árbol de su escuela y siempre lo más
+// profundo disponible (sube por una rama en vez de esparcir PI). Es el techo REAL del
+// árbol: sin esto el árbitro compra al azar entre los 4 árboles y casi nunca completa
+// una rama hasta el Maestro, así que la tasa de Master del smoke subestima al jugador.
+const FOCUS = !!args.focus;
+const TIER_ORDER = { master: 3, advanced: 2, intermediate: 1, basic: 0 };
 if (SMART && ACTION) { console.error("--smart y --action son excluyentes: el greedy ya decide la acción del día"); process.exit(1); }
 
 let fails = 0;
@@ -60,14 +66,17 @@ function smartDayAction(run, opts) {
   const avg = lineup.reduce((s, p) => s + p.energia, 0) / (lineup.length || 1);
   if (avg < SMART_RECOVER_AT && has("recuperar")) return has("recuperar");
   if ((run.moral ?? 50) <= 40 && has("bonding")) return has("bonding");
-  const f = E.getPhilosophy(run.filoId);
-  if (f && E.filoPoints(run) < E.FILO_LEVELS[E.FILO_LEVELS.length - 1].min) {
-    // T3: el greedy entrena la arista propia MÁS BAJA (empate → la firma). Para el
-    // nivel da igual (es la SUMA), pero el Master exige AMBOS principios a 4 — el
-    // DT del techo construye la doctrina completa, no un monocultivo de firma.
-    const [baja] = [...f.aristas].sort((a, b) => (run.aristas[a] || 0) - (run.aristas[b] || 0) || (a === f.firma ? -1 : 1));
-    const foco = has(`tactica_${baja}`) || has(`tactica_${f.firma}`) || has(`tactica_${f.aristas.find(k => k !== f.firma)}`);
-    if (foco) return foco;
+  // Arco de Progresión: el greedy declara el PLAN DE PARTIDO de su ESCUELA mientras esa
+  // idea no esté en el techo (×2 de afinidad × ×1.5 del plan = la vía más rápida al nivel
+  // 10 y, por la escalera de recompensas, al DT 20). En el techo abre la siguiente más afín.
+  const escuela = run.filoInicial;
+  if (escuela) {
+    const orden = E.PHILOSOPHIES.map(p => p.id).sort((a, b) => E.afinidadMult(escuela, b) - E.afinidadMult(escuela, a));
+    for (const id of orden) {
+      if (E.filoLevel(run, id) >= 9) continue;
+      const plan = has(`plan_${id}`);
+      if (plan) return plan;
+    }
   }
   return has("entrenar_defensa") || has("entrenar_ataque") || has("entrenar_pases") || opts[0];
 }
@@ -228,10 +237,15 @@ function playRun(teamId) {
       // comprable al azar apenas lo tiene (la compra es gratis en tiempo — no consume
       // acción). Con solo los básicos en el pool, el árbol se agota rápido.
       for (let tGuard = 0; run.identityPoints > 0 && tGuard < 10; tGuard++) {
-        const buyables = E.traitTree(run).filter(t => t.buyable);
+        let buyables = E.PHILOSOPHIES.flatMap(p => E.traitTree(run, p.id)).filter(t => t.buyable);
+        if (FOCUS) {
+          const propios = buyables.filter(t => t.filo === run.filoInicial);
+          if (propios.length) buyables = propios.sort((a, b) => TIER_ORDER[b.tier] - TIER_ORDER[a.tier]);
+        }
         if (!buyables.length) break;
         const piAntes = run.identityPoints;
-        assert(E.buyTrait(run, buyables[Math.floor(Math.random() * buyables.length)].id), "el rasgo comprable se compra");
+        const elegido = FOCUS ? buyables[0] : buyables[Math.floor(Math.random() * buyables.length)];
+        assert(E.buyTrait(run, elegido.id), "el rasgo comprable se compra");
         assert(run.identityPoints === piAntes - 1, "cada compra cobra exactamente 1 PI");
       }
       const ev = E.advanceDay(run);
@@ -293,12 +307,15 @@ function playRun(teamId) {
       assert(Number.isInteger(p.momento) && p.momento >= 1 && p.momento <= 7, "momento en rango 1..7", `${p.name}=${p.momento}`);
     }
     assert(Number.isInteger(run.moral) && run.moral >= 1 && run.moral <= 100, "moral en rango 1..100", run.moral);
-    assert(Object.values(run.aristas).every(v => typeof v === "number" && v >= 0), "aristas numéricas y no negativas", JSON.stringify(run.aristas));
+    assert(Object.values(run.filoXp).every(v => typeof v === "number" && v >= 0), "XP de filosofía numérica y no negativa", JSON.stringify(run.filoXp));
+    assert(Number.isInteger(run.dtNivel) && run.dtNivel >= 1 && run.dtNivel <= E.DT_MAX, "nivel de DT en rango 1..20", run.dtNivel);
+    assert(E.dtLevelOf(run.dtXp) === run.dtNivel, "el nivel del DT deriva de su XP acumulada", `${run.dtXp}→${run.dtNivel}`);
     assert(E.filoLevel(run) >= 0 && E.filoLevel(run) <= 9, "nivel de filosofía en rango 0..9 (escalera T1)");
     assert(E.filoEtapa(run) >= 0 && E.filoEtapa(run) <= 2, "etapa de filosofía en rango 0..2");
     assert(E.FILO_LEVELS[E.filoLevel(run)].etapa === E.filoEtapa(run), "nivel y etapa coherentes (vista dual T1)");
     // La economía de Rasgos (T1): PI enteros y no negativos; los comprados son válidos,
-    // sin duplicar y de la filosofía de SU llave (la latencia jamás mezcla árboles).
+    // sin duplicar y de la filosofía de SU llave (cada árbol guarda lo suyo, aunque
+    // TODOS estén activos a la vez desde el arco de Progresión).
     assert(Number.isInteger(run.identityPoints) && run.identityPoints >= 0, "PI enteros y no negativos", run.identityPoints);
     for (const [fid, ids] of Object.entries(run.rasgos)) {
       assert(new Set(ids).size === ids.length, "sin rasgos duplicados", fid);
@@ -350,7 +367,10 @@ function playRun(teamId) {
   // Instrumento del árbol (T3): ¿la run alcanzó un Master? El gate del arco exige que
   // el azar (piso) casi nunca llegue y el greedy (techo) sí — inversión total.
   const master = Object.values(run.rasgos).flat().some(id => E.traitById(id)?.tier === "master");
-  return { champion, journal: run.journal.length, stage: champion ? "champion" : run.stage, master };
+  // Arco de Progresión: el techo alcanzado por la run (para calibrar la curva).
+  const maxFilo = Math.max(...E.PHILOSOPHIES.map(f => E.filoLevel(run, f.id))) + 1;
+  return { champion, journal: run.journal.length, stage: champion ? "champion" : run.stage, master,
+    maxFilo, dt: run.dtNivel, pi: run.identityPoints, rasgos: Object.values(run.rasgos).flat().length };
 }
 
 // ---------- ejecución ----------
@@ -360,23 +380,28 @@ const t0 = Date.now();
 const results = [];
 
 for (const teamId of teamsToRun) {
-  let champs = 0, journalSum = 0, masters = 0;
+  let champs = 0, journalSum = 0, masters = 0, filoSum = 0, dtSum = 0, dtMax = 0, rasgoSum = 0, champFilo = 0, champDt = 0;
   const deaths = {}; // instrumento por ronda (R2): dónde mueren las runs
   for (let i = 0; i < RUNS; i++) {
     const id = teamId || playables[Math.floor(Math.random() * playables.length)];
     const r = playRun(id);
     if (r.champion) champs++;
     if (r.master) masters++;
+    filoSum += r.maxFilo; dtSum += r.dt; dtMax = Math.max(dtMax, r.dt); rasgoSum += r.rasgos;
+    if (r.champion) { champFilo += r.maxFilo; champDt += r.dt; }
     journalSum += r.journal;
     deaths[r.stage] = (deaths[r.stage] || 0) + 1;
   }
-  results.push({ team: teamId || "(azar)", champs, masters, journal: journalSum / RUNS, deaths });
+  results.push({ team: teamId || "(azar)", champs, masters, journal: journalSum / RUNS, deaths,
+    filo: filoSum / RUNS, dt: dtSum / RUNS, dtMax, rasgos: rasgoSum / RUNS,
+    champFilo: champFilo / (champs || 1), champDt: champDt / (champs || 1) });
 }
 
 console.log(`\nsmoke: ${teamsToRun.length * RUNS} runs en ${((Date.now() - t0) / 1000).toFixed(1)}s · fallos: ${fails}`);
 const DEATH_COLS = [["groups", "grupos"], ["r32", "16avos"], ["r16", "8vos"], ["qf", "4tos"], ["sf", "semis"], ["final", "final"], ["champion", "🏆"]];
 for (const r of results) {
   console.log(`  ${r.team.padEnd(7)} campeón ${(100 * r.champs / RUNS).toFixed(1).padStart(5)}%  · master ${(100 * r.masters / RUNS).toFixed(1)}% · diario ~${r.journal.toFixed(0)} entradas`);
+  console.log(`    progresión: filosofía tope ~${r.filo.toFixed(1)}/10 · DT ~${r.dt.toFixed(1)}/20 (máx ${r.dtMax}) · rasgos ~${r.rasgos.toFixed(1)} | CAMPEONES: filo ~${r.champFilo.toFixed(1)} · DT ~${r.champDt.toFixed(1)}`);
   console.log(`    caídas: ${DEATH_COLS.map(([k, lbl]) => `${lbl} ${(100 * (r.deaths[k] || 0) / RUNS).toFixed(1)}%`).join(" · ")}`);
 }
 console.log(fails ? "❌ smoke con fallos" : "✅ smoke OK");

@@ -15,6 +15,7 @@ import { matchStats } from "../../game/match/stats.js";
 import { momentumBars, markMomentum } from "../../game/match/match-momentum.js";
 import { teamPowers } from "../../game/match/powers.js";
 import { filoCtx } from "../../game/philosophy.js";
+import { PHILOSOPHIES, FILO_LEVELS, xpLevelOf } from "../../content/philosophies.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, modal, closeModal, toast, energyBar, momentoChip } from "../components.js";
@@ -94,6 +95,10 @@ function renderMatchScreen() {
             <span id="mom-chip" class="font-black text-slate-500 text-xs" title="Momentum: quién está generando en los últimos 15'">·</span>
           </div>
           <div id="match-stats" class="space-y-3"></div>
+          <!-- LA IDENTIDAD SE APRENDE EN VIVO (arco de Progresión): la XP que cada idea
+               va ganando ESTE partido, con la barra hacia su próximo nivel. El feed grita
+               la subida; esto la deja ver venir. -->
+          <div id="filo-xp" class="mt-3 pt-3 border-t border-slate-700/70 space-y-1.5"></div>
         </div>
         <!-- MATCH MOMENTUM: el gráfico de la transmisión. Barras sólidas, nunca líneas.
              Ocupa TODO el alto que sobre en la columna (flex-1): así no queda hueco muerto
@@ -185,6 +190,7 @@ const FEED_STYLE = {
   chance: "text-slate-200",
   card: "bg-yellow-500/10 border-l-4 border-yellow-500",
   event: "bg-purple-500/10 border-l-4 border-purple-400",
+  filo: "bg-amber-400/15 border-l-4 border-amber-300 font-bold text-amber-200",
   info: "text-amber-300 font-semibold",
   plain: "text-slate-400",
 };
@@ -269,6 +275,34 @@ function paintStats(match) {
 }
 
 /**
+ * LA XP DE IDENTIDAD EN VIVO (arco de Progresión, "skill-up a la Skyrim"): una fila por
+ * filosofía que este partido ejercitó, con lo ganado y la barra hacia su próximo nivel.
+ * Los números salen del Match (`filoXp`, ya multiplicados) y de la foto que trajo el
+ * matchCtx (`filo.xp`): la pantalla no calcula reglas, solo suma foto + partido.
+ */
+function paintFiloXp(match) {
+  const box = $("#filo-xp"); if (!box || !match.my.filo) return;
+  const ganado = match.filoXp || {};
+  const filas = PHILOSOPHIES.filter(p => ganado[p.id]);
+  if (!filas.length) { box.innerHTML = ""; return; }
+  box.innerHTML = filas.map(p => {
+    const total = (match.my.filo.xp?.[p.id] || 0) + ganado[p.id];
+    const lvl = xpLevelOf(total);
+    const piso = FILO_LEVELS[lvl].min, techo = FILO_LEVELS[lvl + 1]?.min ?? null;
+    const pct = techo ? Math.min(100, (100 * (total - piso)) / (techo - piso)) : 100;
+    return `<div>
+      <div class="flex items-baseline justify-between gap-2 text-[10px]">
+        <span class="font-bold text-slate-300">${p.icon} ${p.name}<span class="text-slate-500"> nv ${lvl + 1}</span></span>
+        <b class="tabular-nums text-amber-300">+${Math.round(ganado[p.id])}</b>
+      </div>
+      <div class="h-1 rounded-full overflow-hidden bg-slate-900/80 mt-1">
+        <div class="h-full bg-amber-400 transition-all duration-500" style="width:${pct}%"></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+/**
  * MATCH MOMENTUM: el gráfico de barras de la transmisión. Una barra por minuto cerrado,
  * hacia arriba lo mío (verde) y hacia abajo lo suyo (rojo), con la línea del cero al medio,
  * el corte del entretiempo y las marcas (⚽ 🟨 🟥 🔄 🚑 🔥) sobre el minuto en que pasaron.
@@ -343,6 +377,7 @@ export function updateMatchUI() {
     mom.className = `font-black text-xs ${cls}`;
   }
   paintStats(match);
+  paintFiloXp(match);
   paintMomentum(match);
   paintPressButton(match);
   const feed = $("#feed");

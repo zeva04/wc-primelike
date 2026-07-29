@@ -15,14 +15,23 @@ resultados y estados. Eso permite simular miles de partidas sin navegador
 
 ## 1. Las stats: escala 1–99
 
-Cada jugador tiene **5 stats en escala 1–99** (estilo EA FC). Hay dos juegos de stats según el rol:
+Cada jugador tiene **7 stats en escala 1–99** (estilo EA FC). Hay dos juegos según el rol:
 
 | | Jugador de campo | Arquero (POR) |
 |---|---|---|
 | Ofensiva | **tiro**, **cabezazo** | — |
-| Creación | **pase** | **pase** (juego con los pies) |
+| Creación | **pase corto**, **pase largo** | **pase corto**, **pase largo** (juego con los pies y saque) |
+| Físico | **velocidad** | **velocidad** |
 | Defensa | **defensa** | **atajadas**, **reflejos**, **salidas** |
 | Intangible | **aura** | **aura** |
+
+**LA ODISEA (sprint 1, 29-jul-2026).** Nacieron con la remodelación pedida por el PO: el
+viejo `pase` se partió en **corto** (circulación, el toque que sostiene la posesión) y
+**largo** (el envío que rompe líneas y el pelotazo), y entró la **velocidad** como
+dimensión propia. Los 230 jugadores de las 23 selecciones jugables se recargaron con datos
+reales —velocidad desde las páginas oficiales de EA SPORTS FC 26 (columna PAC), el reparto
+corto/largo por perfil futbolístico— y el resto de sus stats se recalculó para que **la
+media de cada jugador no cambiara** (ver §2).
 
 **Aura** es la stat temática del juego: mezcla carisma, liderazgo y "sangre fría".
 Pesa en los penales, en las jugadas individuales y en la solidez general del equipo.
@@ -42,14 +51,40 @@ La nota 1–99 de un jugador **no es el promedio simple** de sus 5 stats: es un 
 nota = Σ (stat_k × peso_k)     // redondeado
 ```
 
-Pesos por posición (`OVR_WEIGHTS`):
+Pesos por posición (`OVR_WEIGHTS`) — **reescritos por la Odisea**:
 
 | Posición | Pesos |
 |---|---|
-| **POR** | atajadas 0.40 · reflejos 0.25 · salidas 0.10 · pase 0.05 · aura 0.20 |
-| **DEF** | defensa 0.50 · cabezazo 0.20 · pase 0.15 · aura 0.15 |
-| **MED** | pase 0.40 · aura 0.25 · tiro 0.20 · defensa 0.15 |
-| **DEL** | tiro 0.50 · aura 0.25 · cabezazo 0.15 · pase 0.10 |
+| **POR** | atajadas 0.40 · reflejos 0.25 · salidas 0.10 · pase corto 0.05 · pase largo 0.05 · velocidad 0.05 · aura 0.10 |
+| **DEF** | defensa 0.45 · cabezazo 0.18 · velocidad 0.12 · pase corto 0.09 · pase largo 0.06 · aura 0.10 |
+| **MED** | pase corto 0.26 · velocidad 0.18 · tiro 0.18 · pase largo 0.14 · defensa 0.14 · aura 0.10 |
+| **DEL** | tiro 0.45 · velocidad 0.22 · cabezazo 0.13 · pase corto 0.06 · pase largo 0.04 · aura 0.10 |
+
+**Las dos decisiones del PO detrás de estos pesos.** (1) El **aura pesa 10% parejo** en los
+cuatro puestos: antes valía 25% en MED/DEL y era la stat que más media compraba. (2) La
+**velocidad entra como protagonista** (22% en un delantero): un extremo rápido y un central
+lento se separan de verdad.
+
+**Cómo se preservó la media.** Bajar el aura y meter velocidad cambia la nota de todos, así
+que por cada jugador se resolvió la ecuación al revés: fijados velocidad (dato investigado)
+y el reparto corto/largo, **el resto de sus stats se movió lo justo para que su media
+quedara idéntica**, con tope de ±4 (±6 en los que no cerraban) y repartido en proporción al
+peso del puesto. Resultado: **225 de 230 jugadores conservan su media exacta**. Lo que se
+mueve es el retrato: un líder lento con aura alta necesita ser mejor en todo lo demás para
+seguir valiendo lo mismo, y un extremo veloz de aura baja ya no la necesita.
+
+> **Los 5 que no cerraron** (colisión estructural, no error): con la velocidad pesando 18-22%,
+> un jugador muy lento no puede sostener su media aunque el resto se vaya al tope.
+> Casemiro 82→**78** (velocidad 40), Chris Wood 77→76, Harry Kane 87→86, James Rodríguez
+> 82→81, Dailon Livramento 64→65. Diales si el PO los quiere intactos: subirles la velocidad
+> o bajar su peso en `OVR_WEIGHTS` (y recalcular los 230).
+
+**La costura del sprint.** El partido todavía mide UN pase en varios sitios (poder del
+medio, precisión del panel, perfil del rival): usan `ratings.PASE_MIX` (60% corto / 40%
+largo, el reparto con el que se dividió el original). La **segunda mitad del sprint**
+reemplaza cada uno por el pase que corresponda a esa jugada. Lo único que ya distingue de
+verdad es `actions.actPass`: el pase **filtrado** mide `pase_largo` y el de circulación
+`pase_corto`.
 
 > **Por qué ponderar.** Con un promedio plano, Haaland (defensa 40) daría una nota
 > mediocre pese a tener tiro 97. La ponderación hace que cada jugador se mida por lo que
@@ -554,12 +589,61 @@ los actos viven en `sequence-acts.js`, extraído de la máquina por presupuesto 
 |---|---|---|---|
 | 🎼 Circulación posicional | ofensiva | construir · construir · rematar (pesa el Pase) | Posesión |
 | ⚡ Transición rápida | ofensiva | conducir · rematar (vertical, mejor perfil) | Contragolpe |
+| 🏃 **Desborde por la banda** | ofensiva | correr la banda · centrar · rematar — **la jugada de la velocidad** (ver abajo) | Contragolpe |
 | 🦁 Recuperación alta | ofensiva | presionar (+0.10, mi iniciativa) · rematar — presión total roba menos pero en zona letal | High Press |
 | 🌩️ Pelotazo largo | ofensiva | duelo aéreo (¡por fin juega el **Cabezazo**!) · rematar — choque = cabecea él; peinada = habilita a un lanzado | Bloque bajo |
 | 🎯 Balón parado a favor | ofensiva | UNA decisión: centro al mejor cabeceador o jugada preparada | — |
 | 🚨 Balón parado en contra | defensiva | zona (segura) o salir a despejar (mata la jugada o deja solo al cabeceador) | — |
 | 🗼 Salida bajo presión | def→of | reventarla (gratis) o salir jugando: la pérdida regala un remate letal… o la jugada **SE CONVIERTE en transición mía** | — |
 | 🧱 Repliegue defensivo | defensiva | contener · (último hombre o remate rival) | Bloque bajo |
+
+### 🏃 El desborde por la banda (Odisea, 2ª mitad — decisión PO 29-jul-2026)
+
+La jugada que el motor no tenía: el fútbol por afuera. Es la primera secuencia cuya
+**primera pregunta es "¿tenés piernas?"** en vez de "¿tenés pase?".
+
+**Quién la corre.** El tipo declara `protStat: "velocidad"` y `sequences.protStatW` pondera
+el sorteo del protagonista de forma **cuadrática sobre 70** (vel 95 pesa ×1.8, vel 55 ×0.6):
+la banda la encara el extremo rápido, no el central que quedó suelto — sin volverlo
+determinista (medido: Vinícius y Raphinha se reparten el 70% de los desbordes de Brasil, y
+el resto sigue apareciendo).
+
+**Acto 1 — `wing`, tres fútbols distintos:**
+
+| Opción | Qué mide | Trade |
+|---|---|---|
+| 🏁 **Ir a la línea de fondo** | `actSprint`: MI velocidad contra la del lateral rival más rápido, con handicap 0.10 | Si llega, la zaga queda de espaldas: **+0.07 al centro** y +0.04 al remate. Si no, la jugada muere (sin contra: perderla en la banda no parte al equipo) |
+| 📡 **Centrar de primera** | nada: no hay duelo | Llega **siempre**, pero la defensa se acomoda: **−0.05 al centro** |
+| ✂️ **Cortar hacia adentro** | `actDribble` (aura + velocidad) | **Saltea el centro** y va directo al remate con el pie cambiado (+0.06, stat Tiro). Perderla encarando al medio abre contra |
+
+**Acto 2 — `cross`, donde el split de pase decide QUÉ jugada se juega:**
+
+| Opción | Stat | Desenlace |
+|---|---|---|
+| 📡 **Centro al área** | `pase_largo` | Cambia de protagonista al **mejor cabezazo que ataca el área** (los centrales no entran: en juego abierto no están ahí) y el remate es de **cabeza** |
+| 🎯 **Pase atrás rasante** | `pase_corto` | Al **mejor Tiro** que llega de frente al arco: remate normal con **+0.05** de perfil |
+
+El que centra queda como **asistidor** si el remate entra. En el pool pesa
+`1.5 + 1.5·prof.def`: el desborde es la respuesta clásica al rival que se encierra;
+cansado casi no sale (×0.7 — el sprint es lo primero que se pierde) y perdiendo tarde se
+busca más (×1.4). Medido en 120 partidos: **7.5% de los actos de secuencia**.
+
+### La velocidad, ya en la cancha (Odisea, 2ª mitad)
+
+Hasta acá la stat solo pesaba en la media. Ahora decide en cuatro sitios más, elegidos
+porque el fútbol los pide:
+
+| Dónde | Qué cambia |
+|---|---|
+| **Conducción** (`actDribble`) | Era solo aura (carisma). Ahora aura ×0.048 + velocidad ×0.028 — **mismo valor esperado en un jugador promedio**, otro perfil: el extremo veloz conduce mejor que el 10 lento, que antes iban iguales |
+| **Último hombre** (`chances.resolveLastMan`) | Anticipar es leer **y llegar**: ±0.05 por punto de diferencia de velocidad entre el central y el delantero. Es la jugada donde el central lento se desnuda |
+| **Contención del repliegue** (`actContain`) | `chase` = velocidad media de MI línea de fondo; ±0.035 por punto sobre la media. Replegar es llegar |
+| **Desborde por la banda** | La jugada entera (arriba) |
+
+> **Balance:** medido con `--smart --focus` n=600, BRA **47.3%** de campeón contra **46.5%**
+> antes de esta mitad, y MAR **41.8%** contra 43.5% — todo dentro del ruido. La velocidad
+> entró sin mover el gate porque **la media de cada jugador no cambió** (§2): lo que se
+> redistribuyó fue quién es bueno en qué, no cuánto vale nadie.
 
 ### El fallo que encadena (A2, regla 7 del Bible) — bidireccional a propósito
 
@@ -628,13 +712,10 @@ Consolidada — `FILO_LEVELS` en `content/philosophies`). Llega por `matchCtx.fi
 y el smoke). Sesga UN tipo, no el reparto — medido (diag, 400 partidos/celda): la firma sube
 ~+5-7pp de share en Consolidada (contra 17→24% transición, bloque 8→14% pelotazo), el resto
 del contexto dinámico de A3 sigue visible y los goles no se mueven (~1.7): **cambia el fútbol
-que sale, no compra goles** (Bible §5 regla 3). La **progresión por ejecución** cierra el
-círculo: cada acierto de acto en una secuencia firma (`noteFiloHit` — escalar es acertar, más
-el gol que corona si el VAR no lo anula) suma `match.filoHits`, y `flow.postMatchUpdate` lo
-convierte en arista vía `applyFiloExecution` (+0.25 por acierto, tope 2 por partido). Ritmos
-medidos con decisiones al azar: Posesión ~1.5 aciertos/partido, Contragolpe ~1.1, Press ~0.7,
-Bloque ~0.5 — la circulación multi-acto consolida más rápido; se vigila en F2. Desde M2 la
-**avanzada también es firma**: sus aciertos cuentan igual (`noteFiloHit` mira `advFor`).
+que sale, no compra goles** (Bible §5 regla 3). La **progresión** cierra el círculo y desde el
+arco de Progresión (28-jul-2026) ES la única fuente de nivel: ver §La progresión más abajo.
+Desde M2 la **avanzada también es firma**: sus aciertos cuentan igual (`noteFiloHit` mira
+`advFor`).
 
 **[SECUENCIAS AVANZADAS] (arco del Meta M2, diseños PO 22-jul).** Cada filosofía tiene su
 **fútbol superior** (`content/sequences` con `advFor`, números en `adv`): entra al pool desde
@@ -974,9 +1055,9 @@ después el DT decide. No se puede pasar el día sin elegir. Las acciones
 
 | Acción | Efecto | Trade-off |
 |---|---|---|
-| 🎯/🛡️/🎩 **Entrenar** (foco ataque, defensa o pases) | +1 al buff de la stat elegida (`TRAIN_BUFF`) | **−5 de energía** a todo el plantel |
+| 🎯/🛡️/🎩/🏹/💨 **Entrenar** (5 focos: ataque, defensa, pase corto, pase largo, velocidad) | +1 al buff de la stat elegida (`TRAIN_BUFF`) | **−5 de energía** a todo el plantel · el foco de **velocidad cansa −8** (`VELOCIDAD_FATIGUE_EXTRA`: son piques, no un rondo) |
 | 🧘 **Recuperar** | +10 de energía a todo el plantel | No mejora ninguna stat |
-| 📋 **Sesión táctica** (reformada en F1) | **+1 a la arista del foco elegido** (`ARISTA_FOCUS`, 5 focos = las 5 aristas de `content/philosophies`) — construye la identidad, que sesga el pool de secuencias por nivel | **Sin retorno inmediato**: no recupera, no sube stats y el viejo buff atk/def MURIÓ (decisión PO, arco de Filosofía) |
+| 📋 **Plan de partido** (arco de Progresión) | **Declara la identidad del próximo partido** (4 focos = las 4 filosofías): pasa a ser la activa (sesga el pool) y su XP de ese partido rinde **×1.5** (`PLAN_XP_MULT`) | **No otorga NADA por sí mismo**: ni stats ni experiencia — el GDD prohíbe subir filosofías desde el menú. Se cobra jugando |
 | 🤝 **Team Bonding** (Sprint 3) | +10 a la **Moral del equipo** (`BONDING_MORAL`) | **−5 de energía** a todo el plantel (`BONDING_FATIGUE`) |
 
 **Team Bonding** (decisión PO 20-jul-2026) es la palanca para gestionar la Moral a voluntad,
@@ -991,18 +1072,15 @@ Un +1 mueve el poder del equipo apenas ~+0.02 (§5), pero es **elegible** (siemp
 a la stat que quieres), mientras que los eventos de ±5 caen donde caen — a igual magnitud,
 elegible gana.
 
-**La muerte del buff táctico (arco de Filosofía F1, 22-jul-2026).** La Sesión Táctica era
-la acción más fuerte como estrategia fija (41.7% de campeón con BRA vs 34.0% del mixto,
-n=4000/1500) porque +0.1 a atk y def sin costo de energía pagaba todos los días. El PO
-decidió que su valor ya no sea poder inmediato sino **identidad**: elige un FOCO entre las
-5 aristas (como Entrenar elige stat) y suma +1 a esa arista (`run.aristas`; los focos con
-las 2 aristas de tu filosofía se destacan en el hub). Medido en dos etapas (ley del arco):
-la reforma AISLADA derivó el mixto a 31.5/31.8% (−2.3pp — el valor del buff muerto) y
-solo-táctica cayó a 32.2% (ya no domina, pero no gastar energía la sostiene); con el
-sesgo del pool enchufado el mixto volvió a 32.9/33.x% (dentro del gate ±2pp) — con focos
-AL AZAR, que es el PISO: un DT que entrena SUS aristas rinde más. El cambio de filosofía
-a mitad de run también pasa por acá: **cuesta la Acción del Día** (modal en el panel) y
-las aristas persisten (demolición orgánica, decisión PO #1).
+**De Sesión Táctica a PLAN DE PARTIDO (arco de Progresión, 28-jul-2026).** La acción
+nació como buff (+0.1 atk/def) y F1 la convirtió en el motor de la identidad (+1 a una arista).
+El GDD del arco de Progresión prohíbe lo segundo —"las Filosofías ya no pueden mejorarse desde
+el menú de preparación"— así que la acción cambió de trabajo por tercera vez y ahora **no
+otorga nada**: declara qué fútbol va a jugar el equipo. Elegir un plan (1) fija `run.filoId` (la
+identidad activa, que sesga el pool de secuencias) y (2) deja `run.planFilo`, que multiplica
+**×1.5** toda la XP que ese partido le deje a esa idea. El día invertido no compra puntos:
+compra INTENCIÓN, que es exactamente el 70% del GDD. El cambio de identidad a mitad de run
+(modal desde la pantalla de la pizarra) hace lo mismo y cuesta lo mismo: la Acción del Día.
 
 > ✅ **RESUELTO (20-jul-2026) — Entrenar estaba dominado; se arregló con el rebalance del
 > factor de energía (§4).** Se deja abajo el diagnóstico completo porque la metodología es
@@ -1250,6 +1328,158 @@ Promedio medido: ~35 entradas por run. Vive solo en la run (no se persiste en
 `wc26_history`).
 
 ---
+
+## 9b. LA PROGRESIÓN: Filosofías, Director Técnico y Puntos de Identidad
+
+> Arco de Progresión (28-jul-2026, GDD del PO). Reemplaza el modelo de F1/T1 donde el
+> nivel de identidad salía de sumar dos **aristas** entrenadas en el menú. Las aristas
+> murieron como mecánica; sobreviven solo como sabor (los 2 principios que describen a
+> cada filosofía en la vitrina). **La identidad ya no se asigna: se aprende jugando.**
+
+### El modelo, en una frase
+
+Se aprende el fútbol que se juega (Skyrim): cada jugada de un tipo le da XP a la
+filosofía dueña de ese fútbol → la filosofía sube de nivel → cada nivel paga XP al
+Director Técnico → cada nivel del DT imprime 1 Punto de Identidad → los PI compran
+rasgos en el árbol.
+
+### 1. Las 4 filosofías progresan por separado
+
+`run.filoXp = {press, posesion, contra, bloque}`, nivel 1..10 cada una (`FILO_LEVELS`,
+`content/philosophies`). Todas nacen en 1, sea cual sea la elegida. La escalera es de
+**XP acumulada** con costos crecientes `250·300·360·430·510·600·700·810·930` (nivel 10 a
+las **4.890 XP**). `mult` (×1.35→×2.10) y `etapa` (0-2) no se tocaron: el sesgo del pool,
+la brecha R3 y el rival siguen midiendo en ETAPAS, exactamente como antes.
+
+`run.filoId` es la que **se juega** (sesga el pool); `run.filoInicial` es la **escuela**
+del DT: se fija al empezar y no cambia nunca.
+
+### 2. La XP del partido: 70% intención / 30% efectividad
+
+| Fuente | Constante | Cuándo |
+|---|---|---|
+| **Intención** | `XP_INTENCION` = 125 | cada secuencia de ese fútbol que ARRANCA (`noteFiloIntent` en `startSequence`) |
+| **Efectividad** | `XP_ACIERTO` = 55 | cada acto que sale bien + el gol que corona (`noteFiloHit`) |
+
+Con ~2-3 jugadas y ~2-3 aciertos por partido de un mismo tipo el reparto queda ~70/30,
+que es la distribución objetivo del GDD.
+
+Qué filosofía aprende cada tipo de secuencia (`FILO_BY_TIPO`; las avanzadas mandan con
+su `advFor`):
+
+| Tipo | Enseña | Por qué |
+|---|---|---|
+| `recuperacion` · `caceria` | Press | recuperar en campo rival |
+| `circulacion` · `sinfonia` | Posesión | cadenas de pases, romper líneas |
+| `transicion` · `contra_letal` | Contragolpe | robar y atacar el espacio |
+| `pelotazo` | Bloque bajo | el duelo directo |
+| `repliegue` · `fortaleza` | Bloque bajo | defender organizado y neutralizar |
+| `balon_parado`, `salida_fondo` | — | no son identidad de nadie |
+
+`repliegue` y `fortaleza` son `side: "opp"` y aun así enseñan: aguantar el bloque ES el
+fútbol del Bloque bajo (`DEF_XP_TYPES` en `match/sequences`).
+
+### 3. Afinidad: la escuela decide la velocidad
+
+La filosofía **inicial** multiplica toda la XP de la run (`AFINIDAD`). Eje proactivo
+(Press · Posesión) contra eje reactivo (Contra · Bloque):
+
+| Escuela | ×2 | ×1.25 afín | ×1 neutral | ×0.6 opuesta |
+|---|---|---|---|---|
+| Press | Press | Posesión | Contra | Bloque |
+| Posesión | Posesión | Press | Contra | Bloque |
+| Contra | Contra | Bloque | Press | Posesión |
+| Bloque | Bloque | Contra | Posesión | Press |
+
+Encima se aplica el **Plan de Partido** (`PLAN_XP_MULT` = ×1.5). Los dos viajan al Match
+en `matchCtx.filo.mult` **ya calculados**, así la barra que crece en vivo y la que se
+acredita al cerrar son el mismo número.
+
+Los eventos y oportunidades del calendario también enseñan (lo autoriza el GDD): un
+"punto" de evento vale `EVENT_XP` = 80 XP, con la afinidad aplicada
+(`addFiloProgress`, que es lo que ya llamaba todo `content/`).
+
+### 4. El Director Técnico (`game/coach.js`)
+
+No gana XP directa: **solo la pagan las subidas de filosofía**, según el nivel alcanzado
+(tabla exacta del GDD, `FILO_LEVEL_REWARD`):
+
+| Nivel alcanzado | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|
+| XP de DT | 200 | 220 | 250 | 290 | 340 | 400 | 470 | 550 | 650 |
+
+Llevar UNA idea de 1 a 10 paga 3.370. La curva del DT (`DT_STEP` = 100 + 20·(n−1)) pide
+**5.320** para el nivel 20 — a propósito: una sola filosofía al tope NO alcanza, hay que
+abrir una segunda idea. Cada nivel del DT = **+1 PI**. El PI inicial no sale de acá: lo
+paga elegir filosofía (que ES el nivel 1) y el flujo de inicio **obliga** a gastarlo en
+uno de los 3 rasgos básicos de la escuela elegida.
+
+### 5. Rasgos: dos requisitos y la forma del árbol
+
+Los "Principios mínimos" se borraron de los 51 rasgos del catálogo. Queda lo que pide el
+GDD —**nivel de la filosofía DEL RASGO** (básico 1 · intermedio 3 · avanzado 6 · maestro
+10) y **1 PI**— más el recorrido de la rama (`previo` / `todos` / `alguno`), que es lo
+que hace que el árbol sea un árbol y no una lista (decisión PO).
+
+**Sin latencia (decisión PO 28-jul):** todos los rasgos comprados están activos a la vez,
+de cualquier filosofía. `run.rasgos` sigue siendo `{filoId: [ids]}` para saber de qué
+árbol es cada uno, pero `activeTraitIds` los devuelve todos. Es lo que hace real la build
+híbrida del GDD.
+
+### 6. Lo que se ve
+
+- **En el partido**: una fila por idea con la XP que va ganando y su barra al próximo
+  nivel (panel derecho), y el **skill-up en vivo** en el relato: *"🦁 min 63' — ¡HIGH
+  PRESS NIVEL 4!"* (feed tipo `filo`, dorado).
+- **En el post-partido**: una línea por filosofía (XP, jugadas, aciertos, multiplicador,
+  y "→ ¡NIVEL n!" si cruzó) + lo que eso le pagó al DT y los PI que imprimió.
+- **En el hub**: el panel del Plan de Partido con las 4 ideas, su nivel y su barra; y la
+  card de identidad con la barra de la filosofía activa **y** la del DT (nivel n/20).
+- **En la pizarra** (`screens/philosophy`): la franja de cabecera dejó de listar los 5
+  principios y ahora lista las **4 filosofías con su nivel** — y es el selector: se
+  navegan los 4 árboles. En ONBOARDING no se navega (el PI inicial va sí o sí a la
+  escuela elegida) y el botón "Al sorteo" no deja pasar hasta gastarlo.
+
+### ⚠️ Balance del arco (medido, smoke `--smart` n=400)
+
+| | BRA | MAR |
+|---|---|---|
+| HEAD (sistema viejo) | 54.3% campeón · **master 86.3%** | 47.0% · master 87.3% |
+| Arco de Progresión | **44.0%** campeón · master 5.0% | **40.3%** · master 6.7% |
+
+**El juego se puso más difícil: −10.3pp en BRA y −6.7pp en MAR.** No es un efecto
+lateral: es el sistema. En el modelo viejo la Sesión Táctica garantizaba +1 de arista
+por día, así que el nivel 10 y el Master llegaban en el 86% de las runs; ahora el nivel
+depende de cuántas jugadas de TU fútbol genere el partido, y el Master es el premio de
+la run casi perfecta. Progresión medida con el greedy: filosofía tope ~7.8/10 y **DT
+~14.6/20** de media (campeones: ~8.5 y **~16.2**), con el DT 20 alcanzado. Eso cae justo
+en los objetivos del GDD (run promedio 12-15 · muy buena 16-18 · perfecta 20).
+
+**¿Y el Master? La tasa del smoke medía al comprador ESPARCIDO.** Con el flag `--focus`
+(el DT compra en el árbol de su escuela, siempre el nodo más profundo) el Master sale en el
+**21.7%** de las runs al dial actual, no en el 5%. Respuesta del sistema al dial, medida
+(BRA `--smart --focus` n=600):
+
+| dial | Master | filosofía tope | DT medio | campeón |
+|---|---|---|---|---|
+| **125/55 (actual)** | 21.7% | 7.9 | **14.8** | 44.7% |
+| +20% (150/66) | 34.8% | 8.5 | 16.4 | 44.2% |
+| +40% (175/77) | 45.7% | 8.8 | 17.4 | 48.0% |
+| +60% (200/88) | 57.2% | 9.2 | 18.3 | 44.3% |
+| +100% (250/110) | 67.7% | 9.6 | 19.2 | 45.8% |
+
+Cada +20% del dial vale ~+12pp de Master, casi lineal. **El campeón NO se mueve** (44-48%,
+todo ruido): más rasgos no son más victorias — es la ley del arco de Rasgos verificada de
+nuevo. Lo que sí se rompe es la **escala del GDD**: a +20% el DT medio se va a 16.4 (la run
+promedio pasa a leerse como "muy buena") y a +60% a 18.3. Alternativa que NO toca la escala:
+bajar el gate de los 12 Masters de nivel 10 a **9** → Master 34.0% con el DT clavado en 14.9.
+
+**Los diales del arco, por orden de mordida:** `XP_INTENCION`/`XP_ACIERTO` (velocidad de
+todo), `FILO_XP_STEPS` (la escalera), `PLAN_XP_MULT` y `AFINIDAD` (cuánto premia
+especializar), `DT_STEP` (cuántos PI reparte la run). Subir los dos primeros ~25% mueve
+el DT medio ~+1.5 niveles y el campeón ~+1pp (medido: 105/45 → 125/55 dio 13.2→14.6 de
+DT y 45.8→44.0% de campeón, dentro del ruido a n=400).
+
 
 ## 10. Balance actual (medido)
 

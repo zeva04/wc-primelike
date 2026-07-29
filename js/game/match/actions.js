@@ -29,10 +29,15 @@ function oppR(m) { return teamRating(m.oppTeam) / 20; }
  * Pase entre dos de los míos. `hard` = pase filtrado de riesgo (menos probable, pero en
  * una secuencia habilita un remate mejor). Espejo de la rama "pass" de resolveChance
  * (0.35 + pase·0.11), con el filtrado un poco más exigente.
+ *
+ * ODISEA (sprint 1): el pase filtrado es el que ROMPE LÍNEAS — lo mide `pase_largo`; el
+ * pase de circulación lo mide `pase_corto`. Es el primer sitio del motor donde el split
+ * ya significa algo, y el patrón que va a seguir el resto en la segunda mitad del sprint.
  */
 export function actPass(m, from, { hard = false } = {}) {
   const base = hard ? 0.58 : 0.38;
-  const p = clamp(base + effStat(from, "pase", m.my.buffs) * (hard ? 0.06 : 0.11), 0.2, 0.92);
+  const key = hard ? "pase_largo" : "pase_corto";
+  const p = clamp(base + effStat(from, key, m.my.buffs) * (hard ? 0.06 : 0.11), 0.2, 0.92);
   const ok = rnd() < p;
   notePass(m, "mine", ok);   // el pase que el DT eligió también entra al panel de stats
   // Match Momentum: el pase SEGURO no mueve la aguja (pesa 0) y el filtrado que sale la
@@ -48,7 +53,12 @@ export function actPass(m, from, { hard = false } = {}) {
  * letal lo usa (adv.carryEase): el rival partido y de espaldas no es una defensa plantada.
  */
 export function actDribble(m, p, { bonus = 0 } = {}) {
-  const pr = clamp(0.05 + effStat(p, "aura", m.my.buffs) * 0.075 + bonus, 0.05, 0.65);
+  // ODISEA (2ª mitad): conducir al espacio es carisma Y PIERNAS. El aura cedió parte de
+  // su peso a la velocidad manteniendo el mismo valor esperado en un jugador promedio
+  // (aura 70 / vel 70 daba 0.313; ahora 0.323): el que cambia es el perfil, no el ritmo
+  // de gol — el extremo veloz conduce mejor que el 10 lento, que antes iban iguales.
+  const pr = clamp(0.05 + effStat(p, "aura", m.my.buffs) * 0.048
+    + effStat(p, "velocidad", m.my.buffs) * 0.028 + bonus, 0.05, 0.65);
   const roll = rnd();
   const out = { ok: roll < pr, foul: roll >= pr && roll < pr + 0.12 };
   noteMomentum(m, out.ok ? "conduccion" : out.foul ? "paseProgresivo" : "conduccionFallada");
@@ -111,9 +121,45 @@ export function actAerial(m, p, { handicap = 0 } = {}) {
  * recuperación alta (MI iniciativa, con el rival saliendo de su arco) roba más que
  * la contención de emergencia con el rival lanzado. `ok` = corté la jugada.
  */
-export function actContain(m, mine, { press = false, bonus = 0 } = {}) {
+/**
+ * LA CARRERA POR LA BANDA (Odisea, 2ª mitad): el extremo tira el sprint por afuera contra
+ * el lateral que lo persigue. Es el primer duelo del motor que enfrenta VELOCIDAD contra
+ * VELOCIDAD — hasta acá la stat solo pesaba en la media. `chaser` es el rival que corre
+ * con él (sin él, se usa la nota del rival como proxy); `handicap` encarece el intento
+ * (llegar a la línea de fondo es más difícil que ganar un metro y centrar).
+ */
+export function actSprint(m, p, { chaser = null, handicap = 0, bonus = 0 } = {}) {
+  const v = effStat(p, "velocidad", m.my.buffs);
+  const vd = chaser ? effStat(chaser, "velocidad") : oppR(m) * 0.9;
+  const pw = clamp(0.50 + (v - vd) * 0.10 + bonus - handicap, 0.15, 0.88);
+  const ok = rnd() < pw;
+  noteMomentum(m, ok ? "conduccion" : "conduccionFallada");
+  return { ok };
+}
+
+/**
+ * EL CENTRO AL ÁREA (Odisea, 2ª mitad): el envío desde la banda. El centro alto mide
+ * `pase_largo` (y termina en un duelo aéreo); el pase atrás rasante mide `pase_corto`
+ * (y termina en un remate de frente). Es el sitio donde el split de pase decide QUÉ
+ * jugada se juega, no solo con cuánta probabilidad.
+ */
+export function actCross(m, from, { rasante = false, bonus = 0 } = {}) {
+  const q = effStat(from, rasante ? "pase_corto" : "pase_largo", m.my.buffs);
+  const p = clamp((rasante ? 0.40 : 0.34) + q * (rasante ? 0.085 : 0.095) + bonus, 0.2, 0.9);
+  const ok = rnd() < p;
+  notePass(m, "mine", ok);
+  noteMomentum(m, ok ? "centro" : "paseFallado");
+  return { ok, rasante };
+}
+
+export function actContain(m, mine, { press = false, bonus = 0, chase = null } = {}) {
   const base = press ? 0.30 : 0.42;
-  const p = clamp(base + bonus + (mine.def - 2.5) * 0.06, 0.18, 0.78);
+  // ODISEA (2ª mitad): `chase` es la velocidad media de MI línea defensiva (0..5, la
+  // calcula el resolver del acto). Replegar es llegar: una zaga rápida cierra el espacio
+  // que una lenta regala. Pesa poco a propósito —el corte lo sigue decidiendo la
+  // defensa— pero convierte a un central lento en un problema real.
+  const legs = chase === null ? 0 : (chase - 2.5) * 0.035;
+  const p = clamp(base + bonus + legs + (mine.def - 2.5) * 0.06, 0.18, 0.78);
   const ok = rnd() < p;
   // Cortar la jugada rival devuelve el partido; que te la rompan lo entrega.
   noteMomentum(m, ok ? (press ? "presionExitosa" : "recuperacionAlta") : "presionSuperada");

@@ -75,7 +75,7 @@ function jugar(teamId = "BRA", oppId = "MAR") {
   // Mismo partido, mismo acumulado: si el pase de los míos fuera irrelevante, tocar la
   // stat no cambiaría nada. Se rehace el acumulado con el once arruinado.
   const m2 = jugar();
-  for (const p of m2.my.lineup) p.stats.pase = 20;
+  for (const p of m2.my.lineup) { p.stats.pase_corto = 20; p.stats.pase_largo = 20; }
   m2.tally = E.newTally();
   for (let i = 0; i < 30; i++) E.tickStats(m2, m2.powers().mine, m2.powers().opp);
   const malos = E.matchStats(m2)[2].mine;

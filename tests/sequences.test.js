@@ -26,9 +26,9 @@ function makeMatch(oppId = "MAR") {
 }
 
 // ---------- catálogo (A2: los 6 del roadmap + repliegue + la cara defensiva del córner) ----------
-assert(E.SEQUENCE_TYPES.length === 12, "M2 completa el catálogo: 8 base + 4 avanzadas", E.SEQUENCE_TYPES.length);
+assert(E.SEQUENCE_TYPES.length === 13, "catálogo: 9 base (con el desborde de la Odisea) + 4 avanzadas", E.SEQUENCE_TYPES.length);
 const sides = E.SEQUENCE_TYPES.map(t => t.side);
-assert(sides.filter(s => s === "mine").length === 8, "8 tipos ofensivos (mine)", sides.join(","));
+assert(sides.filter(s => s === "mine").length === 9, "9 tipos ofensivos (mine)", sides.join(","));
 assert(sides.filter(s => s === "opp").length === 4, "4 tipos con iniciativa rival (opp)", sides.join(","));
 // Las 4 AVANZADAS (M2): una por filosofía, con sus datos de desenlace
 {
@@ -62,10 +62,10 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
   const rate = (fn, n = 4000) => { let ok = 0; for (let i = 0; i < n; i++) if (fn().ok) ok++; return ok / n; };
 
   // actPass: mejor pase → más completa. Se varía SOLO la stat, el resto constante → monótono.
-  const pase0 = p.stats.pase;
-  p.stats.pase = 20; const passLo = rate(() => E.actPass(m, p));
-  p.stats.pase = 90; const passHi = rate(() => E.actPass(m, p));
-  p.stats.pase = pase0;
+  const pase0 = p.stats.pase_corto;
+  p.stats.pase_corto = 20; const passLo = rate(() => E.actPass(m, p));
+  p.stats.pase_corto = 90; const passHi = rate(() => E.actPass(m, p));
+  p.stats.pase_corto = pase0;
   assert(passHi > passLo, "actPass es monótona en el Pase", `lo=${passLo.toFixed(2)} hi=${passHi.toFixed(2)}`);
   assert(passLo >= 0 && passHi <= 1, "actPass devuelve una probabilidad válida");
 
@@ -464,6 +464,122 @@ function genSample(oppId, mut, n = 4000) {
   const q0 = m2.seq.prot;
   m2.resolveSequenceAct("pase"); // pase al pie: seguro, también se desprende
   assert(m2.seq && m2.seq.prot !== q0, "el pase al pie también cambia de pies la pelota");
+}
+
+
+// ══════════ EL DESBORDE POR LA BANDA + la velocidad en la cancha (Odisea, 2ª mitad) ══════════
+{
+  const t = E.sequenceType("banda");
+  assert(t && t.side === "mine", "el desborde existe y es una jugada MÍA");
+  assert(JSON.stringify(t.plan) === JSON.stringify(["wing", "cross", "finish"]), "sus tres actos: banda → centro → definición", JSON.stringify(t.plan));
+  assert(t.protStat === "velocidad", "declara que la corre el rápido");
+  assert(E.FILO_BY_TIPO.banda === "contra", "jugarla enseña Contragolpe (decisión PO)");
+
+  // El protagonista: la jugada elige piernas, no puestos sueltos
+  {
+    const m = makeMatch();
+    const veces = {};
+    for (let i = 0; i < 300; i++) {
+      m.seq = null; m.decision = null;
+      E.startSequence(m, t);
+      veces[m.seq.prot.name] = (veces[m.seq.prot.name] || 0) + 1;
+    }
+    const orden = Object.entries(veces).sort((a, b) => b[1] - a[1]);
+    const rapido = [...m.my.lineup].filter(p => p.pos !== "POR").sort((a, b) => b.stats.velocidad - a.stats.velocidad)[0];
+    const lento = [...m.my.lineup].filter(p => p.pos !== "POR").sort((a, b) => a.stats.velocidad - b.stats.velocidad)[0];
+    assert((veces[rapido.name] || 0) > (veces[lento.name] || 0),
+      "el más rápido del once corre la banda más que el más lento", `${rapido.name} ${veces[rapido.name] || 0} vs ${lento.name} ${veces[lento.name] || 0}`);
+    assert(orden.length >= 3, "pero no es determinista: varios la corren", orden.length);
+  }
+
+  // Los tres caminos del acto de banda
+  {
+    const m = makeMatch();
+    E.startSequence(m, t);
+    const d = m.decision;
+    assert(d.id === "sequence" && d.options.length === 3, "el acto de banda ofrece los tres caminos", d.options.length);
+    assert(d.options.map(o => o.key).join() === "fondo,primera,adentro", "línea de fondo · centro de primera · cortar hacia adentro", d.options.map(o => o.key).join());
+    assert(/Velocidad \d+ vs \d+/.test(d.options[0].hint), "el hint enfrenta las dos velocidades", d.options[0].hint);
+  }
+
+  // Cortar hacia adentro SALTEA el centro (o cierra); nunca deja la jugada colgada
+  {
+    let vistoFinish = false, colgadas = 0;
+    for (let i = 0; i < 120; i++) {
+      const m = makeMatch();
+      E.startSequence(m, t);
+      m.resolveSequenceAct("adentro");
+      if (m.seq && m.decision) {
+        const kind = (m.seq.plan || m.seq.type.plan)[m.seq.actIdx];
+        if (kind === "finish") vistoFinish = true;
+        if (kind === "cross") colgadas++;   // no debería pasar: cortar adentro no centra
+      }
+    }
+    assert(vistoFinish, "cortar hacia adentro lleva DIRECTO al remate");
+    assert(colgadas === 0, "cortar hacia adentro nunca pasa por el centro", colgadas);
+  }
+
+  // El centro: el alto lo cabecea alguien que ataca el área (no el central), el rasante define de frente
+  {
+    let altos = 0, defs = 0, rasantes = 0;
+    for (let i = 0; i < 200; i++) {
+      const m = makeMatch();
+      E.startSequence(m, t);
+      m.resolveSequenceAct("primera");            // sin riesgo: llega al acto del centro
+      if (!m.seq || (m.seq.plan || m.seq.type.plan)[m.seq.actIdx] !== "cross") continue;
+      const rasante = i % 2 === 0;
+      m.resolveSequenceAct(rasante ? "atras" : "centro");
+      if (!m.seq) continue;
+      if (m.seq.finishStat === "cabezazo") { altos++; if (E.playedPos(m.seq.prot) === "DEF") defs++; }
+      if (m.seq.finishStat === "tiro") rasantes++;
+    }
+    assert(altos > 0 && rasantes > 0, "los dos envíos ocurren", `${altos}/${rasantes}`);
+    assert(defs === 0, "el centro en juego abierto no lo cabecea un central", defs);
+  }
+}
+
+// La velocidad decide duelos (Football Actions nuevas y las de siempre)
+{
+  const m = makeMatch();
+  const p = m.my.lineup.find(x => x.pos !== "POR");
+  const rate = (fn, n = 900) => { let ok = 0; for (let i = 0; i < n; i++) if (fn().ok) ok++; return ok / n; };
+  const v0 = p.stats.velocidad;
+
+  p.stats.velocidad = 25; const sprintLento = rate(() => E.actSprint(m, p));
+  p.stats.velocidad = 95; const sprintRapido = rate(() => E.actSprint(m, p));
+  p.stats.velocidad = v0;
+  assert(sprintRapido > sprintLento + 0.15, "el sprint por la banda lo gana el rápido", `${sprintLento.toFixed(2)} → ${sprintRapido.toFixed(2)}`);
+
+  // El perseguidor también cuenta: el mismo extremo contra un lateral rápido llega menos
+  const lateral = m.oppLineup.find(x => x.pos === "DEF");
+  const vl = lateral.stats.velocidad;
+  lateral.stats.velocidad = 20; const vsLento = rate(() => E.actSprint(m, p, { chaser: lateral }));
+  lateral.stats.velocidad = 95; const vsRapido = rate(() => E.actSprint(m, p, { chaser: lateral }));
+  lateral.stats.velocidad = vl;
+  assert(vsLento > vsRapido + 0.15, "contra un lateral veloz el desborde cuesta", `${vsLento.toFixed(2)} vs ${vsRapido.toFixed(2)}`);
+
+  // El centro mide pase LARGO; el rasante, pase CORTO (el split decide qué jugada se juega)
+  const pc = p.stats.pase_corto, pl = p.stats.pase_largo;
+  p.stats.pase_largo = 20; p.stats.pase_corto = 95;
+  const altoMalo = rate(() => E.actCross(m, p)), rasanteBueno = rate(() => E.actCross(m, p, { rasante: true }));
+  p.stats.pase_largo = 95; p.stats.pase_corto = 20;
+  const altoBueno = rate(() => E.actCross(m, p)), rasanteMalo = rate(() => E.actCross(m, p, { rasante: true }));
+  p.stats.pase_corto = pc; p.stats.pase_largo = pl;
+  assert(altoBueno > altoMalo + 0.15, "el centro al área lo manda el que tiene pase LARGO", `${altoMalo.toFixed(2)} → ${altoBueno.toFixed(2)}`);
+  assert(rasanteBueno > rasanteMalo + 0.15, "el pase atrás rasante lo mide el pase CORTO", `${rasanteMalo.toFixed(2)} → ${rasanteBueno.toFixed(2)}`);
+
+  // La conducción ya no es solo carisma
+  const a0 = p.stats.aura;
+  p.stats.aura = 60; p.stats.velocidad = 20; const condLento = rate(() => E.actDribble(m, p));
+  p.stats.velocidad = 95; const condRapido = rate(() => E.actDribble(m, p));
+  p.stats.aura = a0; p.stats.velocidad = v0;
+  assert(condRapido > condLento, "a igual aura, el rápido conduce mejor", `${condLento.toFixed(2)} → ${condRapido.toFixed(2)}`);
+
+  // Replegar es llegar: la contención mejora con una zaga rápida
+  const { mine } = m.powers();
+  const contLenta = rate(() => E.actContain(m, mine, { chase: 1.5 }));
+  const contRapida = rate(() => E.actContain(m, mine, { chase: 4.5 }));
+  assert(contRapida > contLenta, "una zaga veloz corta más que una lenta", `${contLenta.toFixed(2)} → ${contRapida.toFixed(2)}`);
 }
 
 console.log(`sequences.test: ${checks} checks · fallos: ${fails}`);

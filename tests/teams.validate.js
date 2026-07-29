@@ -30,8 +30,8 @@ const warn = (msg) => { warns++; console.warn("  ⚠️", msg); };
 
 const CONFEDS = new Set(["UEFA", "CONMEBOL", "CONCACAF", "CAF", "AFC", "OFC"]);
 const STYLES = new Set(["short", "buzz", "curly", "long", "bun", "bald"]);
-const FIELD_STATS = ["tiro", "defensa", "cabezazo", "pase", "aura"];
-const GK_STATS = ["atajadas", "reflejos", "salidas", "pase", "aura"];
+const FIELD_STATS = ["tiro", "defensa", "cabezazo", "pase_corto", "pase_largo", "velocidad", "aura"];
+const GK_STATS = ["atajadas", "reflejos", "salidas", "pase_corto", "pase_largo", "velocidad", "aura"];
 const POSITIONS = ["POR", "DEF", "MED", "DEL"];
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 

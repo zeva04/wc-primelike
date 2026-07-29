@@ -82,7 +82,7 @@ export const RANDOM_EVENTS = [
       { label: "Reafirmar la idea", effect: r => {
         const a = addFirmaProgress(r, 1);
         r.moral = clamp((r.moral ?? 50) - 5, 1, 100);
-        return a ? `Doblas la apuesta: sesión extra de lo nuestro (+1 de ${a.label}). El referente se traga el gesto: −5 de Moral.`
+        return a ? `Doblas la apuesta: sesión extra de lo nuestro (+${a.xp} XP de ${a.label}). El referente se traga el gesto: −5 de Moral.`
           : "Doblas la apuesta por el proyecto. El referente se traga el gesto: −5 de Moral.";
       } },
       { label: "Ceder y aflojar", effect: r => { r.moral = clamp((r.moral ?? 50) + 8, 1, 100); return "Le das la razón a medias y aflojas la mano: +8 de Moral… pero la idea no avanzó esta semana."; } },
@@ -93,7 +93,7 @@ export const RANDOM_EVENTS = [
     teaser: "El cuerpo físico y el técnico discuten a los gritos junto al campo.",
     text: "El preparador quiere una doble sesión de carga antes del partido. El plantel viene fundido y algunos referentes ya pusieron cara.",
     options: [
-      { label: "Cargar la pierna", effect: r => { r.squad.forEach(p => p.energia = clamp(p.energia - 18, 5, 100)); const a = addFiloProgress(r, 1); return `Doble sesión a fondo: −18 de energía para todos, pero la identidad progresa${a ? ` (+1 de ${a.label})` : ""}.`; } },
+      { label: "Cargar la pierna", effect: r => { r.squad.forEach(p => p.energia = clamp(p.energia - 18, 5, 100)); const a = addFiloProgress(r, 1); return `Doble sesión a fondo: −18 de energía para todos, pero la identidad progresa${a ? ` (+${a.xp} XP de ${a.label})` : ""}.`; } },
       { label: "Bajar la carga", effect: r => { r.squad.forEach(p => p.energia = clamp(p.energia + 8, 5, 100)); r.buffs.aura = (r.buffs.aura || 0) - 5; return "Se levanta la segunda sesión: +8 de energía, pero el grupo llega blando de cabeza (−5 de Aura el próximo partido)."; } },
     ],
   },

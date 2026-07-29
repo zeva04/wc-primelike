@@ -115,7 +115,8 @@ assert(E.ENERGY_OK > E.FATIGUE_INJURY_FROM, "la banda avisa ANTES que el riesgo 
   const avg = (ps, k) => ps.length ? ps.reduce((s, p) => s + E.effStat(p, k, {}), 0) / ps.length : 1;
   const aura = avg(act, "aura");
   // La fórmula VIEJA, sin ningún factor de bocas
-  const atkViejo = avg(atkP, "tiro") * 0.4 + avg(medP, "pase") * 0.3 + avg(atkP, "cabezazo") * 0.12 + aura * 0.18;
+  const avgPase = ps => avg(ps, "pase_corto") * E.PASE_MIX.pase_corto + avg(ps, "pase_largo") * E.PASE_MIX.pase_largo;
+  const atkViejo = avg(atkP, "tiro") * 0.4 + avgPase(medP) * 0.3 + avg(atkP, "cabezazo") * 0.12 + aura * 0.18;
   const defViejo = avg(defP, "defensa") * 0.52 + E.gkQuality(por, {}) * 0.32 + aura * 0.16;
   const pw = E.teamPowers(lineup, "normal", {});
   assert(Math.abs(pw.atk - atkViejo) < 1e-9, "el 2-1-2 da el MISMO atk que la fórmula sin bocas", `${pw.atk} vs ${atkViejo}`);

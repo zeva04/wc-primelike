@@ -14,7 +14,7 @@
    le sirve a la identidad nueva (el costo hundido, a la vista
    antes de firmar).
    ============================================================ */
-import { PHILOSOPHIES, aristaById } from "../content/philosophies.js";
+import { PHILOSOPHIES, aristaById, filoLevelOf } from "../content/philosophies.js";
 import { changePhilosophy } from "../game/philosophy.js";
 import { S } from "./session.js";
 import { modal, closeModal, toast } from "./components.js";
@@ -28,14 +28,14 @@ export function showFiloChange(onDone) {
   const others = PHILOSOPHIES.filter(p => p.id !== run.filoId);
   const m = modal(`
     <h3 class="text-lg font-black">🔄 Cambio de identidad</h3>
-    <p class="text-xs text-slate-400 mt-1 mb-3">Cuesta la <b class="text-amber-400">Acción del Día</b>. Lo entrenado no se borra — pero la filosofía nueva vive de otras aristas.</p>
+    <p class="text-xs text-slate-400 mt-1 mb-3">Cuesta la <b class="text-amber-400">Acción del Día</b> y vale como <b class="text-amber-400">Plan de Partido</b>. Cada idea guarda su propio nivel: nada se pierde al cambiar.</p>
     <div class="space-y-2">
       ${others.map(p => {
-        const pts = p.aristas.reduce((s, k) => s + (run.aristas?.[k] || 0), 0);
+        const lvl = filoLevelOf(run, p.id) + 1;
         return `<button data-filo="${p.id}" class="w-full text-left rounded-xl border border-slate-600 bg-slate-800/70 hover:border-amber-400 p-3 cursor-pointer transition-all">
           <div class="flex items-center justify-between">
             <span class="font-bold text-sm">${p.icon} ${p.name}</span>
-            <span class="text-[10px] font-bold ${pts ? "text-emerald-400" : "text-slate-500"}">${pts ? `arranca con ${+pts.toFixed(2)} pts` : "arranca de cero"}</span>
+            <span class="text-[10px] font-bold ${lvl > 1 ? "text-emerald-400" : "text-slate-500"}">nivel ${lvl}${p.id === run.filoInicial ? " · tu escuela" : ""}</span>
           </div>
           <div class="text-[10px] text-slate-400 mt-0.5">${p.aristas.map(k => `${aristaById(k).icon} ${aristaById(k).label}`).join(" + ")}</div>
           <div class="text-[10px] text-amber-400/90 mt-0.5">⚠️ ${p.advertencia}</div>

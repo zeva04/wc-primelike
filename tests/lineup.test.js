@@ -52,7 +52,8 @@ const clon = p => ({ ...p, stats: { ...p.stats }, posJugada: null });
   t(E.effectiveStat(p, "aura") === vini.stats.aura, "el aura NO se castiga: no depende del puesto");
   t(E.effectiveStat(clon(vini), "defensa") === vini.stats.defensa, "en su puesto la stat queda intacta");
   const pen = E.statPenalties(p);
-  t(pen.length === 4, "statPenalties lista las 4 stats técnicas afectadas");
+  // Odisea: las técnicas de campo pasaron de 4 a 6 (el pase se partió y entró la velocidad).
+  t(pen.length === 6, "statPenalties lista las 6 stats técnicas afectadas");
   t(pen.every(s => s.delta === -12), "cada delta refleja el castigo");
   t(!pen.some(s => s.key === "aura"), "statPenalties no incluye el aura");
   t(E.statPenalties(clon(vini)).length === 0, "en su puesto no hay nada que mostrar");

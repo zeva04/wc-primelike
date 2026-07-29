@@ -187,6 +187,7 @@ Formato: **propósito · contiene · NUNCA debe contener**.
 | `game/calendar.js` | El tiempo de la run | dayLabel, scheduleNextMatch, advanceDay | Efectos de eventos (viven en content), render |
 | `game/discipline.js` | Tarjetas y sanciones | acumulación, suspensiones, clearAmarillas | Faltas EN partido (eso es `match/incidents`) |
 | `game/medical.js` | Cuerpo y energía | rollInjury, recuperación post-partido | Tabla de lesiones (content/injuries) |
+| `game/coach.js` | El Director Técnico (nivel 1..20) | FILO_LEVEL_REWARD, DT_STEP/DT_LEVELS, dtLevelOf, dtProgress, addCoachXp (imprime PI) | Qué se compra con los PI (eso es game/traits), XP de filosofía (game/philosophy) |
 | `game/momentum.js` | El Momento del jugador (forma 1..7) | momentoPct/momentoMult, momentoLabel/MOMENTO_LABELS, applyMomentumPostMatch (devuelve el resumen anímico) | Render de chips/flechas (ui/components), reglas de moral |
 | `game/morale.js` | La Moral del equipo (1..100) | MORAL_BANDS, moraleBand, bumpMorale, applyMoralePostMatch | Efecto en partido (v1 no tiene; el hook vive comentado en Match.tick) |
 | `game/scorers.js` | Goleadores del torneo | addTournamentGoal, assignScorers, tournamentScorers | Resultados de partido (solo pone autor a goles ya decididos) |
@@ -232,6 +233,12 @@ Este mapa es ley: si un módulo escribe un campo que no le pertenece, es un bug 
 | `rivalBans` | `tournament/world` (limpia `flow` cuando cumplen ante mí) | daily, opponents, ui/match |
 | `day`, `nextMatchDay`, `dayPlan`, `actionPending`, `dayMod` | `calendar.js` (`actionPending` la baja day-action) | ui/hub, day-action |
 | `lastAction` | `day-action.js` | ui/hub |
+| `filoId`, `planFilo` | `philosophy.js` (elección/cambio) · `content/day-actions` (Plan de Partido) · `flow` (limpia `planFilo` al cerrar) | match (matchCtx.filo), ui/hub, ui/philosophy |
+| `filoInicial` | `philosophy.js` (`choosePhilosophy`, una sola vez) | philosophy (afinidad), ui |
+| `filoXp` | `philosophy.js` (`applyFiloXp`, post-partido) · `content/philosophies.addFiloProgress` (eventos) | philosophy (nivel), traits (gates), ui |
+| `dtXp`, `dtNivel` | `coach.js` (`addCoachXp`, solo desde subidas de filosofía) | ui/hub, ui/philosophy |
+| `identityPoints` | `coach.js` (+1 por nivel de DT) · `philosophy.js` (el PI inicial) · `traits.js` (los gasta) | ui/philosophy, ui/hub |
+| `rasgos` | `traits.js` (`buyTrait`, {filoId: [ids]} — todos activos a la vez) | match (vía matchCtx.filo.rasgos), ui |
 | `buffs` | efectos de `content/` (+), `flow` (reset) | match/powers, ui |
 | `peleaEntre`, `filtrador` | efectos de `content/conflicts` (NOMBRES, no referencias — regla de serialización) | el propio conflicto al aplicar la opción elegida |
 | `journal` | `journal.js` (todos anotan vía addJournal) | ui/journal |
@@ -367,7 +374,7 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
 | Nuevo tipo de secuencia | content/sequences (datos) + sequences.js (si necesita un acto nuevo) + actions.js (si el gesto no existe) | esos archivos | Match.js (tick), powers, screens |
 | Nuevo skill moment suelto (no secuencia) | match/chances + contrato §3.2 | match/chances (creador+resolver) + screens/match (ruteo) | Match.js (tick), powers |
 | Nueva pantalla | screens/ vecinas + components | screens/nueva.js + navegación en la pantalla origen | game/** |
-| **Sistema de Filosofía** | Bible §5 + sequences.js + flow | NUEVOS: game/philosophy.js, content/philosophies.js, screens/philosophy.js + hooks: **sequences.js (sesga el pool de secuencias — es un GENERADOR, no un modificador de powers)**, flow (progresión, la alimenta la Sesión Táctica), hub (card) | tournament, discipline, storage, powers (Filosofía NO es un modificador estadístico escondido) |
+| **Sistema de Filosofía** | Bible §5 + sequences.js + flow | NUEVOS: game/philosophy.js, content/philosophies.js, screens/philosophy.js + hooks: **sequences.js (sesga el pool de secuencias — es un GENERADOR, no un modificador de powers)**, flow (progresión, la alimenta el PARTIDO vía applyFiloXp), game/coach.js (el DT y los PI), hub (card) | tournament, discipline, storage, powers (Filosofía NO es un modificador estadístico escondido) |
 | **Mundo vivo / noticias** | tournament/*, calendar | NUEVOS: game/news.js, content/headlines.js + hook en flow.postMatch + card en hub | match/**, discipline |
 | **Conflictos en cadena** | calendar, content/conflicts | calendar (dayPlan multi-acto), content/conflicts (formato cadena), run.js (estado de cadenas) | match/**, tournament |
 | Logros | journal (ya es el log de momentos) | NUEVOS: game/achievements.js, content/achievements.js + hook en flow.endRun + sección en end.js | resto |

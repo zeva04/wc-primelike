@@ -150,7 +150,7 @@ export const TRAITS = [
     nombre: "Mittelfeldpressing",
     desc: "La línea de presión se planta en el círculo central: el rival puede salir de su área, pero no puede cruzar la mitad.",
     momento: "Tres robos seguidos en el círculo central.",
-    req: { nivel: 3, previo: "presion_intensificada", principio: { id: "presion", min: 2 } },
+    req: { nivel: 3, previo: "presion_intensificada" },
     pos: { x: 450, y: 200 },
     // No es "+20% de presión": el partido GENERA más recuperaciones porque el
     // equipo vive en la zona donde se roba (la ley del arco — cambia el fútbol
@@ -162,7 +162,7 @@ export const TRAITS = [
     nombre: "Angriffpressing",
     desc: "La presión se adelanta hasta el saque de meta rival: el error se fuerza en el último tercio, con el arco enfrente.",
     momento: "Robo al central y gol de vestuario.",
-    req: { nivel: 6, previo: "mittelfeldpressing", principio: { id: "presion", min: 4 } },
+    req: { nivel: 6, previo: "mittelfeldpressing" },
     pos: { x: 710, y: 128 },
     hooks: { variantDeep: { of: "recuperacion", p: 0.35, bonus: 0.06,
       intro: p => `¡Presión sobre el SAQUE DE META rival! ${p.name} salta sobre el central que recibe.` } },
@@ -172,7 +172,7 @@ export const TRAITS = [
     nombre: "Gegenpressing",
     desc: "Los cinco segundos siguientes a una pérdida son los más agresivos del partido: recuperar antes de reorganizarse.",
     momento: "La perdió y la cazó al toque.",
-    req: { nivel: 6, previo: "mittelfeldpressing", principio: { id: "verticalidad", min: 4 } },
+    req: { nivel: 6, previo: "mittelfeldpressing" },
     pos: { x: 710, y: 275 },
     // deepPress: hereda la migración F2 (la Cacería total rota deja falta —
     // amarilla + tiro libre — mucho más seguido). Era de Cacería Letal.
@@ -193,8 +193,7 @@ export const TRAITS = [
     // construye Angriffpressing) y `chainPlus` afila la mordida (lo de Gegenpressing).
     // Absorbió el lugar del viejo Rest Defense, cuyo nombre se fue a Posesión y cuyo
     // hook (oppLoseActs) se fue con él: allá el concepto encaja mejor.
-    req: { nivel: 10, alguno: ["angriffpressing", "gegenpressing"],
-      principios: [{ id: "presion", min: 4 }, { id: "verticalidad", min: 4 }] },
+    req: { nivel: 10, alguno: ["angriffpressing", "gegenpressing"] },
     pos: { x: 960, y: 200 },
     // Hereda el hook del viejo Master (El Robo es el Pase): toda la familia de
     // la recuperación define mejor, y la mordida caza más seguido.
@@ -217,7 +216,7 @@ export const TRAITS = [
     nombre: "Vigilancia Defensiva",
     desc: "Los centrales leen el balón largo antes de que salga: la espalda de la presión deja de ser una autopista.",
     momento: "El central cortando de cabeza el pelotazo que iba a partir al equipo.",
-    req: { nivel: 3, previo: "pulmones", principio: { id: "solidez", min: 2 } }, // AJENO: cubrirse cuesta
+    req: { nivel: 3, previo: "pulmones" }, // AJENO: cubrirse cuesta
     pos: { x: 450, y: 390 },
     hooks: { breakawayGuard: { p: 0.40,
       texto: "El central LEYÓ el pelotazo a la espalda: paso adelante y corte de cabeza. La presión sigue viva." } },
@@ -227,7 +226,7 @@ export const TRAITS = [
     nombre: "Repliegue",
     desc: "Cuando la presión se rompe, el equipo entero vuelve corriendo a plantarse: el contragolpe rival se encuentra con todos de vuelta. Cuesta piernas.",
     momento: "La contra rival muriendo contra once camisetas que llegaron antes.",
-    req: { nivel: 6, previo: "vigilancia", principio: { id: "solidez", min: 3 } }, // AJENO
+    req: { nivel: 6, previo: "vigilancia" }, // AJENO
     pos: { x: 710, y: 390 },
     hooks: { oppShotMalus: { seq: "transicion", bonus: -0.06,
       texto: "El repliegue llegó primero: la contra rival remató desde donde no se hace gol." } },
@@ -237,8 +236,7 @@ export const TRAITS = [
     nombre: "Elasticidad",
     desc: "Replegarse ya no es rendirse: el bloque se estira, aguanta, y en cuanto toca la pelota vuelve a salir a presionar como si nada.",
     momento: "Repliegue, corte, y el equipo entero otra vez arriba en diez segundos.",
-    req: { nivel: 10, previo: "repliegue",
-      principios: [{ id: "presion", min: 4 }, { id: "solidez", min: 4 }] },
+    req: { nivel: 10, previo: "repliegue" },
     pos: { x: 960, y: 390 },
     hooks: { chainOnContain: { to: "recuperacion", p: 0.32, bonus: 0.05,
       intro: p => `¡El acordeón se cierra! Contuvieron, y ${p.name} ya está otra vez encima del que la tiene.` } },
@@ -260,7 +258,7 @@ export const TRAITS = [
     nombre: "Egoístas",
     desc: "Robada la pelota, el equipo se la queda: el rival, que salió a buscarla, se queda esperando su turno.",
     momento: "Dos minutos sin que el rival la toque después del robo.",
-    req: { nivel: 3, previo: "directo", principio: { id: "presion", min: 2 } },
+    req: { nivel: 3, previo: "directo" },
     pos: { x: 400, y: 505 },
     hooks: { recycleBuild: { p: 0.35,
       texto: "La pelota es nuestra y se queda: el equipo la esconde, la jugada no muere." } },
@@ -270,7 +268,7 @@ export const TRAITS = [
     nombre: "Contragolpistas",
     desc: "No hace falta robar arriba: cualquier pelota ganada en el medio o atrás también se convierte en carrera.",
     momento: "El rechace que cae al pie y ya son cuatro corriendo.",
-    req: { nivel: 3, previo: "directo", principio: { id: "verticalidad", min: 2 } },
+    req: { nivel: 3, previo: "directo" },
     pos: { x: 400, y: 615 },
     hooks: { chainOnDuelFail: { to: "transicion", p: 0.28, bonus: 0.03,
       intro: p => `¡La segunda pelota fue nuestra! ${p.name} la engancha y sale disparado con el rival mal parado.` } },
@@ -280,7 +278,7 @@ export const TRAITS = [
     nombre: "Pacientes",
     desc: "Con la pelota robada, el equipo elige bien: los pases posteriores a una presión exitosa se juegan con cabeza fría.",
     momento: "El pase de gol dado sin apuro, con el rival todavía desordenado.",
-    req: { nivel: 6, previo: "egoistas", principio: { id: "presion", min: 4 } },
+    req: { nivel: 6, previo: "egoistas" },
     pos: { x: 620, y: 505 },
     hooks: { supportUpgrade: { bonus: 0.05,
       texto: "Cabeza fría: el pase busca al mejor ubicado de verdad, y lo encuentra libre." } },
@@ -290,7 +288,7 @@ export const TRAITS = [
     nombre: "Tres Toques",
     desc: "Del robo al remate en el menor número de pases posible: la jugada se resuelve antes de que el rival vuelva a estar en su sitio.",
     momento: "Robo, pase, gol: ocho segundos.",
-    req: { nivel: 6, previo: "contragolpistas", principio: { id: "verticalidad", min: 4 } },
+    req: { nivel: 6, previo: "contragolpistas" },
     pos: { x: 620, y: 615 },
     // Afila el salto que abre Directo (mismo par que El Primer Pase / Tres Pases).
     hooks: { skipUpgrade: { bonus: 0.06,
@@ -301,8 +299,7 @@ export const TRAITS = [
     nombre: "Fríos",
     desc: "Con el partido ganado, el equipo que presiona sabe también congelarlo: robar y devolverla atrás es una decisión, no una renuncia.",
     momento: "Los últimos diez minutos jugados en campo propio, con la ventaja intacta.",
-    req: { nivel: 10, previo: "pacientes",
-      principios: [{ id: "presion", min: 4 }, { id: "elaboracion", min: 4 }] }, // AJENO: congelar es elaborar
+    req: { nivel: 10, previo: "pacientes" }, // AJENO: congelar es elaborar
     pos: { x: 840, y: 490 },
     // RASGO DE ESTADO (el segundo del catálogo, tras Uno a Cero): SOLO con
     // ventaja en el marcador. Habilita una decisión NUEVA en el partido —
@@ -317,8 +314,7 @@ export const TRAITS = [
     nombre: "Calientes",
     desc: "Robada la pelota, el equipo no la suelta más: el rival queda encerrado en su propio bloque y ya no sale de ahí.",
     momento: "El rival metido en su área durante diez minutos seguidos.",
-    req: { nivel: 10, previo: "pacientes",
-      principios: [{ id: "presion", min: 4 }, { id: "verticalidad", min: 4 }] },
+    req: { nivel: 10, previo: "pacientes" },
     pos: { x: 1040, y: 500 },
     hooks: { oppPoolMod: { weights: { repliegue: 1.28 } } },
   },
@@ -327,8 +323,7 @@ export const TRAITS = [
     nombre: "Carrileños",
     desc: "Los laterales son los que más corren del equipo: en cada contra hay siempre una banda libre y un centro esperando.",
     momento: "El centro del lateral que llegó desde su propia área.",
-    req: { nivel: 10, previo: "tres_toques",
-      principios: [{ id: "verticalidad", min: 4 }, { id: "presion", min: 4 }] },
+    req: { nivel: 10, previo: "tres_toques" },
     pos: { x: 840, y: 615 },
     hooks: { deepFinish: { of: "transicion", bonus: 0.06,
       texto: "El carrilero llegó desde atrás y puso el centro exacto: la contra terminó como se dibuja." } },
@@ -338,8 +333,7 @@ export const TRAITS = [
     nombre: "El Jaguar",
     desc: "En cada contra hay un jugador que sale solo: el equipo lo busca siempre, y el mano a mano es el desenlace natural.",
     momento: "El delantero solo contra el arquero, otra vez.",
-    req: { nivel: 10, previo: "tres_toques",
-      principios: [{ id: "verticalidad", min: 4 }, { id: "presion", min: 4 }] },
+    req: { nivel: 10, previo: "tres_toques" },
     pos: { x: 1040, y: 615 },
     hooks: { accelFinish: { of: "transicion", p: 0.28, bonus: 0.06,
       intro: p => `¡EL JAGUAR se suelta! ${p.name} arranca solo y ya no lo agarra nadie: mano a mano.` } },
@@ -391,7 +385,7 @@ export const TRAITS = [
     nombre: "El Tercer Hombre",
     desc: "Las combinaciones de tres jugadores rompen lineas y aseguran la salida bajo presion: siempre aparece uno mas para recibir.",
     momento: "La pared que deja atras a toda la primera linea de presion.",
-    req: { nivel: 3, previo: "buen_pie", principio: { id: "elaboracion", min: 2 } },
+    req: { nivel: 3, previo: "buen_pie" },
     pos: { x: 450, y: 200 },
     // RECICLADO INTEGRO del arbol anterior: mismo id, nombre, tier y hook.
     hooks: { playoutRescue: { p: 0.40,
@@ -402,7 +396,7 @@ export const TRAITS = [
     nombre: "Pitagoricos",
     desc: "El equipo triangula con los ojos cerrados: cuando hay que elegir a quien buscar, siempre encuentra al que de verdad esta mejor parado.",
     momento: "La triangulacion que deja al mejor ubicado solo frente al arco.",
-    req: { nivel: 6, previo: "tercer_hombre", principio: { id: "elaboracion", min: 4 } },
+    req: { nivel: 6, previo: "tercer_hombre" },
     pos: { x: 710, y: 128 },
     hooks: { supportUpgrade: { bonus: 0.05,
       texto: "Geometria pura: el triangulo encuentra al mejor ubicado de verdad, no al mas cercano." } },
@@ -412,7 +406,7 @@ export const TRAITS = [
     nombre: "Osciladores",
     desc: "El equipo mueve el balon de un lado al otro hasta que el bloque rival se parte: tras cada cambio de orientacion aparece un hombre sin marca.",
     momento: "El cambio de cuarenta metros y el bloque entero descolocado.",
-    req: { nivel: 6, previo: "tercer_hombre", principio: { id: "directo", min: 3 } }, // AJENO: el cambio largo ES juego directo
+    req: { nivel: 6, previo: "tercer_hombre" }, // AJENO: el cambio largo ES juego directo
     pos: { x: 710, y: 275 },
     // LA NEUTRALIZACION del matchup debil, heredada de Amplitud + Abrir la Lata en
     // un solo nodo: 0.65 x 1.54 ~ 1.00 (la circulacion vuelve a rendir contra el
@@ -425,8 +419,7 @@ export const TRAITS = [
     nombre: "La Maquina Colectiva",
     desc: "Once jugadores moviendose como una sola pieza. El rival deja de disputar el partido: corre detras de una pelota que nunca le pertenece.",
     momento: "El gol a puerta vacia tras treinta pases, empujandola sin oposicion.",
-    req: { nivel: 10, previo: "pitagoricos",
-      principios: [{ id: "elaboracion", min: 4 }, { id: "presion", min: 4 }] },
+    req: { nivel: 10, previo: "pitagoricos" },
     pos: { x: 960, y: 128 },
     hooks: {
       // Hereda el hook del viejo Master (La Pelota es Nuestra): el reparto de
@@ -441,8 +434,7 @@ export const TRAITS = [
     nombre: "Hombre Libre",
     desc: "Despues de tanto tejer, siempre termina apareciendo uno solo. El equipo lo encuentra, y lo que sigue es el delantero contra el arquero.",
     momento: "Veinte pases y el nueve de cara al arquero.",
-    req: { nivel: 10, previo: "osciladores",
-      principios: [{ id: "elaboracion", min: 4 }, { id: "presion", min: 4 }] },
+    req: { nivel: 10, previo: "osciladores" },
     pos: { x: 960, y: 275 },
     hooks: { accelFinish: { of: "circulacion", p: 0.30, bonus: 0.06,
       intro: p => `Ahi esta el hombre libre: ${p.name} se suelta de la marca y queda de cara al arquero.` } },
@@ -470,7 +462,7 @@ export const TRAITS = [
     nombre: "Salida Lavolpiana",
     desc: "Contra la presion alta, un mediocampista baja entre los centrales: de golpe hay un hombre mas para salir y la primera linea rival queda sobrando.",
     momento: "El cinco entre los centrales y la presion rival saltando al vacio.",
-    req: { nivel: 3, previo: "la_trampa", principio: { id: "elaboracion", min: 2 } },
+    req: { nivel: 3, previo: "la_trampa" },
     pos: { x: 450, y: 390 },
     hooks: { variantSwitch: { of: "circulacion", vsFilo: "press", p: 0.30, bonus: 0.07,
       intro: p => `SALIDA LAVOLPIANA: ${p.name} se descuelga entre los centrales y la presion rival ya no alcanza.` } },
@@ -480,7 +472,7 @@ export const TRAITS = [
     nombre: "La Frontera",
     desc: "La linea sube y se sostiene: cuando la pierden arriba y el rival busca la espalda, el equipo levanta la mano en bloque.",
     momento: "El contragolpe rival muriendo en offside con toda la linea levantando el brazo.",
-    req: { nivel: 6, previo: "salida_lavolpiana", principio: { id: "presion", min: 4 } },
+    req: { nivel: 6, previo: "salida_lavolpiana" },
     pos: { x: 710, y: 390 },
     hooks: {
       // El balon a la espalda es exactamente lo que la trampa del offside anula:
@@ -495,8 +487,7 @@ export const TRAITS = [
     nombre: "Rest Defense",
     desc: "Incluso volcado en campo rival el equipo deja el ataque preparado para defender: la transicion del rival se apaga antes de cruzar la mitad.",
     momento: "El rival recuperando la pelota y no pudiendo dar dos pases seguidos.",
-    req: { nivel: 10, previo: "la_frontera",
-      principios: [{ id: "elaboracion", min: 4 }, { id: "presion", min: 4 }] },
+    req: { nivel: 10, previo: "la_frontera" },
     pos: { x: 960, y: 390 },
     // Hereda el hook del Rest Defense que vivia en el Press: el concepto —tener el
     // ataque ordenado para defender— pertenece a la filosofia que ATACA con la pelota.
@@ -524,7 +515,7 @@ export const TRAITS = [
     nombre: "Profundos",
     desc: "Tanto toque tiene un para que: cuando la linea rival se descuida un segundo, el pase ya salio hacia el espacio.",
     momento: "El pase filtrado que parte a la defensa despues de veinte toques.",
-    req: { nivel: 3, previo: "el_rondo", principio: { id: "elaboracion", min: 2 } },
+    req: { nivel: 3, previo: "el_rondo" },
     pos: { x: 450, y: 545 },
     hooks: { skipToFinish: { of: "circulacion", p: 0.26, bonus: 0.04,
       intro: p => `Se acabo la paciencia: ${p.name} la pincha al espacio y saltea todo el tramite.` } },
@@ -534,7 +525,7 @@ export const TRAITS = [
     nombre: "Sorpresivos",
     desc: "El equipo que toca y toca de pronto la manda por arriba: nadie lo espera, y la linea rival queda partida por el aire.",
     momento: "El pelotazo aereo tras cuarenta toques, con la defensa adelantada.",
-    req: { nivel: 6, previo: "profundos", principio: { id: "elaboracion", min: 4 } },
+    req: { nivel: 6, previo: "profundos" },
     pos: { x: 710, y: 505 },
     hooks: { variantDeep: { of: "circulacion", p: 0.30, bonus: 0.06,
       intro: p => `Sorpresa: tras tanto toque ${p.name} la manda por ARRIBA y la linea rival queda partida.` } },
@@ -544,7 +535,7 @@ export const TRAITS = [
     nombre: "Desesperantes",
     desc: "Perseguir la pelota sin tocarla enloquece a cualquiera. El rival termina entrando mal, y eso se cobra en tiros libres y en tarjetas.",
     momento: "El penal en el minuto ochenta tras diez minutos de sitio.",
-    req: { nivel: 6, previo: "profundos", principio: { id: "presion", min: 4 } },
+    req: { nivel: 6, previo: "profundos" },
     pos: { x: 710, y: 615 },
     // Migracion F2: el 4o compas de la sinfonia + el penal profundo. La desesperacion
     // acumulada ES el rasgo declarado de la filosofia (philosophies.rasgo) — vive aca.
@@ -557,8 +548,7 @@ export const TRAITS = [
     momento: "El mediocampista definiendo de nueve mientras el nueve dio el pase.",
     // LA CONVERGENCIA de la rama (decision PO): basta con haber profundizado por
     // CUALQUIERA de las dos maneras de romper una linea — por abajo o por arriba.
-    req: { nivel: 10, alguno: ["sorpresivos", "desesperantes"],
-      principios: [{ id: "elaboracion", min: 4 }, { id: "presion", min: 4 }] },
+    req: { nivel: 10, alguno: ["sorpresivos", "desesperantes"] },
     pos: { x: 960, y: 560 },
     // Hereda el hook del viejo Juego Posicional: siempre hay un pasillo y siempre
     // hay un pie — con todos jugando de todo, la posesion directamente no muere.
@@ -636,7 +626,7 @@ export const TRAITS = [
     nombre: "El Primer Pase",
     desc: "El primer pase tras el robo busca directamente romper la última línea.",
     momento: "El pase de cincuenta metros que deja el mano a mano.",
-    req: { nivel: 3, previo: "tres_pases", principio: { id: "verticalidad", min: 2 } },
+    req: { nivel: 3, previo: "tres_pases" },
     hooks: { skipUpgrade: { bonus: 0.06,
       intro: p => `¡El PRIMER PASE rompe la última línea! ${p.name} queda lanzado con cincuenta metros por delante.` } },
   },
@@ -645,7 +635,7 @@ export const TRAITS = [
     nombre: "La Trampa Cerrada",
     desc: "Cuando el rival se vuelca al ataque, el equipo multiplica las contras a campo abierto.",
     momento: "La segunda contra consecutiva con el rival regalado.",
-    req: { nivel: 3, previo: "tender_trampa", principio: { id: "solidez", min: 2 } }, // AJENO: aguantar para cazar
+    req: { nivel: 3, previo: "tender_trampa" }, // AJENO: aguantar para cazar
     // Migración F2: el 1er tramo del Contragolpe letal deja al rival AÚN más partido
     // (deepBonus que antes regalaba Consolidada — filoRasgo contra).
     hooks: { deepContra: {} },
@@ -655,7 +645,7 @@ export const TRAITS = [
     nombre: "Superioridad Numérica",
     desc: "Los contraataques buscan sistemáticamente el dos contra uno en el último tercio.",
     momento: "El dos contra uno resuelto con pase al del área chica.",
-    req: { nivel: 3, previo: "manada", principio: { id: "elaboracion", min: 2 } },
+    req: { nivel: 3, previo: "manada" },
     hooks: { supportUpgrade: { bonus: 0.05, // el pase busca al MEJOR ubicado de verdad (max Tiro)
       texto: "SUPERIORIDAD numérica: el pase encuentra al mejor rematador completamente libre." } },
   },
@@ -666,7 +656,7 @@ export const TRAITS = [
     nombre: "Dueños del Área",
     desc: "El equipo domina el juego aéreo defensivo dentro de su propia área.",
     momento: "El despeje número diez del central y la contra que nace de ahí.",
-    req: { nivel: 3, previo: "jaula", principio: { id: "solidez", min: 2 } },
+    req: { nivel: 3, previo: "jaula" },
     // Migración F2: la fortaleza PROFUNDA (deepContain + convertDeep — filoRasgo bloque:
     // "la muralla contiene mejor y castiga casi siempre") + el córner rival defendido
     // puede encadenar pelotazo propio (comer centros → lanzar).
@@ -678,7 +668,7 @@ export const TRAITS = [
     nombre: "Pelota Parada Ensayada",
     desc: "Cada tiro libre y córner ejecuta una jugada ensayada en el entrenamiento.",
     momento: "El córner ensayado que termina en gol del dos.",
-    req: { nivel: 3, previo: "oficio", principio: { id: "elaboracion", min: 2 } }, // AJENO: ensayar es elaborar
+    req: { nivel: 3, previo: "oficio" }, // AJENO: ensayar es elaborar
     hooks: { setpieceRehearsed: { bonus: 0.06, poolMult: 1.25,
       texto: "Esto se ensayó mil veces: la pizarra del balón parado entra en acción." } },
   },
@@ -687,7 +677,7 @@ export const TRAITS = [
     nombre: "Plataforma",
     desc: "Ganada la segunda pelota, el equipo la convierte en ataque organizado en campo rival.",
     momento: "Peinada, control del diez, llegada limpia.",
-    req: { nivel: 3, previo: "segunda_jugada", principio: { id: "directo", min: 2 } },
+    req: { nivel: 3, previo: "segunda_jugada" },
     hooks: { secondBallUpgrade: { bonus: 0.06,
       intro: p => `¡Segunda pelota y POSICIÓN establecida! ${p.name} organiza el ataque en campo rival.` } },
   },
@@ -704,7 +694,7 @@ export const TRAITS = [
     nombre: "La Invitación",
     desc: "Cuando el rival espera, el equipo mantiene el balón con paciencia para obligarlo a salir — y entonces ataca el espacio.",
     momento: "Diez minutos de toque paciente y la puñalada cuando el bloque dio dos pasos afuera.",
-    req: { nivel: 6, todos: ["trampa_cerrada", "tres_pases"], principio: { id: "elaboracion", min: 3 } }, // el MÁS ajeno del pool
+    req: { nivel: 6, todos: ["trampa_cerrada", "tres_pases"] }, // el MÁS ajeno del pool
     // LA RESPUESTA AL PARTIDO MUERTO: neutraliza las celdas contra|contra y
     // contra|bloque (0.6×1.67 ≈ 1.0) y la circulación-cebo puede CONVERTIR en
     // transición cuando el rival que esperaba da un paso al frente.
@@ -719,7 +709,7 @@ export const TRAITS = [
     nombre: "A Campo Abierto",
     desc: "Las contras combinan velocidad máxima y varios corredores: el robo se convierte en avalancha.",
     momento: "Cuatro camisetas cruzando mediocampo a la vez.",
-    req: { nivel: 6, todos: ["primer_pase", "manada"], principio: { id: "verticalidad", min: 4 } },
+    req: { nivel: 6, todos: ["primer_pase", "manada"] },
     hooks: { avalancha: { bonus: 0.06,
       texto: "AVALANCHA a campo abierto: la contra llega en oleada y la defensa no sabe a quién marcar." } },
   },
@@ -730,7 +720,7 @@ export const TRAITS = [
     nombre: "La Fortaleza",
     desc: "El área propia se vuelve territorio prohibido: cada centro, cada córner, cada embestida muere en el muro.",
     momento: "El delantero rival discutiendo con sus compañeros tras la enésima llegada muerta.",
-    req: { nivel: 6, todos: ["duenos_area", "oficio"], principio: { id: "solidez", min: 4 } },
+    req: { nivel: 6, todos: ["duenos_area", "oficio"] },
     // LA NEUTRALIZACIÓN del sitio: la celda opp bloque|posesion vuelve a tablas
     // (1.35×0.74 ≈ 1.0) y la FRUSTRACIÓN acumulada degrada los remates rivales a
     // medida que fallan (por remate errado, con tope).
@@ -747,7 +737,7 @@ export const TRAITS = [
     nombre: "Cabeza de Playa",
     desc: "El equipo ya no despeja: cada balón largo establece posición en campo rival.",
     momento: "Tres córners seguidos fabricados desde pelotazos.",
-    req: { nivel: 6, todos: ["plataforma", "jaula"], principio: { id: "directo", min: 4 } },
+    req: { nivel: 6, todos: ["plataforma", "jaula"] },
     // El pelotazo REACTIVO que muere sin gol puede fabricar córner (balón parado
     // encadenado): la escasez ofensiva del Bloque compensada por CALIDAD del ciclo
     // despeje → pelotazo → segunda → córner — cada llegada vale más.
@@ -770,8 +760,7 @@ export const TRAITS = [
     nombre: "Contragolpe Total",
     desc: "Cualquier balón recuperado, en cualquier zona, en cualquier momento, es el inicio de una contra. El rival ataca con miedo.",
     momento: "La contra que nace de un córner rival.",
-    req: { nivel: 10, alguno: ["invitacion", "campo_abierto"], todos: ["tres_pases", "tender_trampa", "manada"],
-      principios: [{ id: "solidez", min: 4 }, { id: "verticalidad", min: 4 }] },
+    req: { nivel: 10, alguno: ["invitacion", "campo_abierto"], todos: ["tres_pases", "tender_trampa", "manada"] },
     // El córner rival defendido y la salida sobrevivida también encadenan contra;
     // y el MIEDO: el rival ataca con menos volumen (shareShift a mi favor).
     hooks: { masterContra: { p: 0.30, shareShift: 0.04, bonus: 0.04,
@@ -782,8 +771,7 @@ export const TRAITS = [
     nombre: "Uno a Cero",
     desc: "Con ventaja en el marcador, el equipo convierte el partido en territorio propio: el uno a cero se defiende con oficio, muro y castigo hasta el final.",
     momento: "Los últimos veinte minutos defendiendo la ventaja sin conceder una sola llegada limpia.",
-    req: { nivel: 10, alguno: ["la_fortaleza", "cabeza_playa"], todos: ["jaula", "segunda_jugada", "oficio"],
-      principios: [{ id: "solidez", min: 4 }, { id: "directo", min: 4 }] },
+    req: { nivel: 10, alguno: ["la_fortaleza", "cabeza_playa"], todos: ["jaula", "segunda_jugada", "oficio"] },
     // Rasgo de ESTADO (el único del pool): SOLO con ventaja — la muralla se amplifica
     // y el castigo directo gana letalidad. Perdiendo no aporta NADA: pura identidad.
     hooks: { masterBloque: { oppMalus: -0.05, myBonus: 0.05,

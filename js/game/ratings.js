@@ -5,8 +5,16 @@
 import { clamp } from "../core/math.js";
 import { momentoMult } from "./momentum.js";
 
-export const STAT_KEYS = ["tiro", "defensa", "cabezazo", "pase", "aura"];        // jugadores de campo
-export const GK_STAT_KEYS = ["atajadas", "reflejos", "salidas", "pase", "aura"]; // arqueros
+export const STAT_KEYS = ["tiro", "defensa", "cabezazo", "pase_corto", "pase_largo", "velocidad", "aura"];        // jugadores de campo
+export const GK_STAT_KEYS = ["atajadas", "reflejos", "salidas", "pase_corto", "pase_largo", "velocidad", "aura"]; // arqueros
+
+/* LA MEZCLA DE PASE (arco de la Odisea, sprint 1): mientras el partido no distinga los dos
+   pases acto por acto, todo lo que necesita UN número de pase usa esta mezcla — 60% corto,
+   40% largo, el reparto con el que se dividió el `pase` original. Es la COSTURA declarada
+   del sprint: la segunda mitad reemplaza cada llamada por el pase que corresponda a esa
+   jugada (el filtrado es largo, la circulación es corta) y esta constante desaparece. */
+export const PASE_MIX = { pase_corto: 0.6, pase_largo: 0.4 };
+export const paseMix = (p) => Math.round(p.stats.pase_corto * PASE_MIX.pase_corto + p.stats.pase_largo * PASE_MIX.pase_largo);
 
 // ---------- Jugar fuera de puesto (docs/CORE.md §2b) ----------
 // La línea del fútbol: de atrás hacia adelante. La distancia entre dos posiciones
@@ -73,11 +81,16 @@ export function statPenalties(p) {
 
 // Nota 1-99 ponderada por posición: a un DEL le pesa el tiro, a un POR las atajadas.
 // (Un promedio plano haría que Haaland con defensa 40 pareciera mediocre.)
+// LOS PESOS DE LA ODISEA (sprint 1, decisiones PO 29-jul-2026): el `pase` se partió en
+// corto y largo, entró la `velocidad` como dimensión de primer orden (DEL 22% · MED 18% ·
+// DEF 12% · POR 5%) y el AURA bajó a un 10% PAREJO en los cuatro puestos. Los datos de
+// data/teams.js se recalcularon para que la media de cada jugador NO cambiara con estos
+// pesos nuevos: mover un peso acá sin recalcular los datos mueve a los 230 jugadores.
 export const OVR_WEIGHTS = {
-  POR: { atajadas: 0.4, reflejos: 0.25, salidas: 0.1, pase: 0.05, aura: 0.2 },
-  DEF: { defensa: 0.5, cabezazo: 0.2, pase: 0.15, aura: 0.15 },
-  MED: { pase: 0.4, tiro: 0.2, defensa: 0.15, aura: 0.25 },
-  DEL: { tiro: 0.5, cabezazo: 0.15, pase: 0.1, aura: 0.25 },
+  POR: { atajadas: 0.40, reflejos: 0.25, salidas: 0.10, pase_corto: 0.05, pase_largo: 0.05, velocidad: 0.05, aura: 0.10 },
+  DEF: { defensa: 0.45, cabezazo: 0.18, pase_corto: 0.09, pase_largo: 0.06, velocidad: 0.12, aura: 0.10 },
+  MED: { pase_corto: 0.26, pase_largo: 0.14, tiro: 0.18, defensa: 0.14, velocidad: 0.18, aura: 0.10 },
+  DEL: { tiro: 0.45, cabezazo: 0.13, pase_corto: 0.06, pase_largo: 0.04, velocidad: 0.22, aura: 0.10 },
 };
 
 /**
@@ -159,8 +172,8 @@ export function lineupRating(selected) {
 /** Resumen compacto de stats para tooltips ("T90 D35 ..." / "AT90 RF88 ..."), ya castigado si juega fuera de puesto. */
 export function statLine(p) {
   const s = k => effectiveStat(p, k);
-  if (p.pos === "POR") return `AT${s("atajadas")} RF${s("reflejos")} SA${s("salidas")} P${s("pase")} A${s("aura")}`;
-  return `T${s("tiro")} D${s("defensa")} C${s("cabezazo")} P${s("pase")} A${s("aura")}`;
+  if (p.pos === "POR") return `AT${s("atajadas")} RF${s("reflejos")} SA${s("salidas")} PC${s("pase_corto")} PL${s("pase_largo")} V${s("velocidad")} A${s("aura")}`;
+  return `T${s("tiro")} D${s("defensa")} C${s("cabezazo")} PC${s("pase_corto")} PL${s("pase_largo")} V${s("velocidad")} A${s("aura")}`;
 }
 
 /**

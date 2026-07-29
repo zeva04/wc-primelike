@@ -33,6 +33,7 @@ export async function loadEngine() {
     import("../js/game/morale.js"),
     import("../js/game/philosophy.js"),
     import("../js/game/traits.js"),
+    import("../js/game/coach.js"),
     import("../js/game/oxidation.js"),
     import("../js/game/scorers.js"),
     import("../js/game/assists.js"),

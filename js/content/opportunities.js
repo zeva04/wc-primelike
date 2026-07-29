@@ -67,8 +67,8 @@ export const OPPORTUNITIES = [
 
   // ---------- INFRECUENTES (claramente mejores, o combos con costo) ----------
   { id: "amistoso_puertas", rareza: "infrecuente", icon: "🤝", title: "Amistoso a puertas cerradas",
-    desc: "Un club local ofrece un ensayo de verdad: la identidad progresa (+1 a una arista de tu filosofía), pero cuesta −8 de energía.",
-    effect: r => { const a = addFiloProgress(r, 1); energia(r, -8); return !a ? undefined : `El ensayo puso a prueba las ideas: +1 de ${a.label} y −8 de energía.`; } },
+    desc: "Un club local ofrece un ensayo de verdad: la identidad progresa (experiencia para tu filosofía), pero cuesta −8 de energía.",
+    effect: r => { const a = addFiloProgress(r, 1); energia(r, -8); return !a ? undefined : `El ensayo puso a prueba las ideas: +${a.xp} XP de ${a.label} y −8 de energía.`; } },
 
   { id: "psicologo", rareza: "infrecuente", icon: "🧠", title: "Psicólogo deportivo de élite",
     desc: "Una eminencia ofrece una sesión grupal: borra todos los efectos negativos acumulados para el próximo partido.",
@@ -104,8 +104,8 @@ export const OPPORTUNITIES = [
     effect: r => { r.buffs.penales = (r.buffs.penales || 0) + 0.15; buff(r, "reflejos", 4); } },
 
   { id: "archivo_periodista", rareza: "infrecuente", icon: "📼", title: "El archivo del periodista veterano",
-    desc: "Décadas de apuntes sobre tu próximo rival, sin pedir nada a cambio: la identidad afina detalles (+0.5 a una arista de tu filosofía).",
-    effect: r => { const a = addFiloProgress(r, 0.5); return !a ? undefined : `Los apuntes del veterano afinan el plan: +0.5 de ${a.label}.`; } },
+    desc: "Décadas de apuntes sobre tu próximo rival, sin pedir nada a cambio: la identidad afina detalles (algo de experiencia para tu filosofía).",
+    effect: r => { const a = addFiloProgress(r, 0.5); return !a ? undefined : `Los apuntes del veterano afinan el plan: +${a.xp} XP de ${a.label}.`; } },
 
   // ---------- RARAS (el DT elige al protagonista: calidad permanente o descanso a medida) ----------
   { id: "descanso_dirigido", rareza: "rara", icon: "🛌", title: "Plan de descanso a medida",
@@ -133,8 +133,8 @@ export const OPPORTUNITIES = [
     effect: r => { buff(r, "aura", 10); energia(r, 12); } },
 
   { id: "doble_jornada", rareza: "rara", icon: "📊", title: "Doble jornada con un cuerpo técnico top",
-    desc: "El staff de un grande abre su pizarra un día entero: la identidad da un salto grande (+1.5 a una arista de tu filosofía), a cambio de −10 de energía.",
-    effect: r => { const a = addFiloProgress(r, 1.5); energia(r, -10); return !a ? undefined : `Un día entero de pizarra ajena: +1.5 de ${a.label} y −10 de energía.`; } },
+    desc: "El staff de un grande abre su pizarra un día entero: la identidad da un salto grande (mucha experiencia para tu filosofía), a cambio de −10 de energía.",
+    effect: r => { const a = addFiloProgress(r, 1.5); energia(r, -10); return !a ? undefined : `Un día entero de pizarra ajena: +${a.xp} XP de ${a.label} y −10 de energía.`; } },
 
   // ---------- LEGENDARIAS (~1 cada 5-6 runs: campaña-defining) ----------
   { id: "doctor_milagro", rareza: "legendaria", icon: "🩺", title: "El Doctor Milagro",
@@ -152,10 +152,10 @@ export const OPPORTUNITIES = [
     } },
 
   { id: "genio_tactico", rareza: "legendaria", icon: "🧙", title: "Un genio táctico se suma por 24 horas",
-    desc: "Un entrenador de culto trabaja un día entero con el equipo y a solas con UN jugador que elijas: la identidad da un salto enorme (+2 a una arista de tu filosofía) y el elegido gana +3 de Pase PERMANENTE.",
+    desc: "Un entrenador de culto trabaja un día entero con el equipo y a solas con UN jugador que elijas: la identidad da un salto enorme (experiencia a raudales para tu filosofía) y el elegido gana +3 de Pase PERMANENTE.",
     choose: { label: "¿Quién trabaja mano a mano con el genio?", candidates: r => [...r.squad] },
     effect: (r, p) => {
       const a = addFiloProgress(r, 2);
-      return `El genio dejó su huella: ${a ? `+2 de ${a.label} para la identidad` : "el equipo repensó su fútbol"} y ${p.name} ganó +3 de Pase PERMANENTE (ahora ${perm(p, "pase", 3)}).`;
+      return `El genio dejó su huella: ${a ? `+${a.xp} XP de ${a.label} para la identidad` : "el equipo repensó su fútbol"} y ${p.name} ganó +3 de Pase corto PERMANENTE (ahora ${perm(p, "pase_corto", 3)}).`;
     } },
 ];

@@ -114,8 +114,8 @@ assert(TH === 4 && PERM === 1, "umbral 4 → +1 permanente (constantes; +1 es el
 {
   const run = E.newRun("BRA");
   const j0 = run.journal.length;
-  run.buffs.pase = TH;
-  E.canjeBuff(run, "pase");
+  run.buffs.pase_corto = TH;
+  E.canjeBuff(run, "pase_corto");
   assert(run.journal.length === j0 + 1, "el canje deja una entrada en el diario");
   assert(run.journal.at(-1).tone === "gold", "la entrada del canje es dorada (hito)");
 }

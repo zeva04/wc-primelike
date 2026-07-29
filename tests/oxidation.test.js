@@ -76,7 +76,7 @@ assert(E.OXID_FLOOR_MULT >= 0.8, "el piso castiga pero no anula (oxidarse no es 
   apply("entrenar_ataque");
   assert(run.diasSinEntrenar === 0 && run.squad.every(p => p.oxid === 1), "Entrenar resetea la racha y desestampa el óxido");
   apply("recuperar"); apply("recuperar"); apply("recuperar");
-  apply("tactica_presion");
+  apply("plan_press");
   assert(run.diasSinEntrenar === 0, "la Sesión Táctica también resetea (trabajo de cancha)");
 
   // El cambio de identidad consume el día por fuera de applyDayAction — también es trabajo

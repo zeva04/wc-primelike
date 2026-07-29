@@ -76,6 +76,28 @@ export const SEQUENCE_TYPES = [
     },
   },
   {
+    // LA JUGADA NUEVA DE LA ODISEA (2ª mitad, decisión PO 29-jul-2026): el fútbol por
+    // afuera, que el motor no tenía. Tres actos con decisión propia — correr la banda,
+    // llegar (o no) a la línea de fondo, y el centro — y por fin una jugada cuya primera
+    // pregunta es "¿tenés piernas?" en vez de "¿tenés pase?". Enseña Contragolpe: desbordar
+    // es atacar el espacio, que es exactamente lo que mide su arista Verticalidad.
+    id: "banda", side: "mine", icon: "🏃", name: "Desborde por la banda",
+    protWeight: { DEL: 3, MED: 2, DEF: 1 }, protStat: "velocidad",   // la corre el rápido
+    plan: ["wing", "cross", "finish"],
+    flavor: {
+      intro: p => pick([
+        `${p.name} recibe abierto sobre la banda y encara al lateral.`,
+        `El equipo abre la cancha: ${p.name} tiene el pasillo de afuera para él.`,
+        `¡Se va al mano a mano por la banda! ${p.name} arranca la carrera.`,
+      ]),
+      wingOk: p => `${p.name} se lo lleva por afuera y llega al fondo.`,
+      wingFail: "El lateral aguanta la carrera y lo saca de la jugada.",
+      crossOk: "El centro cruza el área buscando cabeza.",
+      crossFail: "El centro se pasa de largo y muere en el otro costado.",
+      finishStat: "cabezazo", finishBonus: 0.15,
+    },
+  },
+  {
     id: "recuperacion", side: "mine", icon: "🦁", name: "Recuperación alta",
     // Presión alta: cazar la salida rival y definir corto. Mapea a High Press (A3+/Filosofía).
     // La presión total roba más ARRIBA (mejor remate); cerrar líneas roba más seguido pero

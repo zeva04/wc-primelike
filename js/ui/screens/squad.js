@@ -29,7 +29,8 @@ import { mountPitch, POS_NAME, jerseyNum } from "../pitch.js";
 import { spriteSvg } from "../sprites.js";
 
 const STAT_NAME = {
-  tiro: "Tiro", defensa: "Defensa", cabezazo: "Cabezazo", pase: "Pase", aura: "Aura",
+  tiro: "Tiro", defensa: "Defensa", cabezazo: "Cabezazo", aura: "Aura",
+  pase_corto: "Pase corto", pase_largo: "Pase largo", velocidad: "Velocidad",
   atajadas: "Atajadas", reflejos: "Reflejos", salidas: "Salidas",
 };
 
@@ -57,7 +58,9 @@ function renderSquadScreen() {
             <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Formación actual</div>
             <div id="formation-picker" class="relative"></div>
           </div>
-          <div class="flex items-end gap-4">
+          <!-- flex-wrap: los tres badges (energía + moral + media) suman ~400px y a 375
+               desbordaban la pantalla. Envuelven en vez de empujar. -->
+          <div class="flex items-end gap-4 flex-wrap">
             ${squadEnergyBadge()}
             ${moraleBadge()}
             <div class="text-right">

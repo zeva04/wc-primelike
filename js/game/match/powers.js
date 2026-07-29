@@ -3,7 +3,7 @@
    (docs/CORE.md §4-5). Sin estado, sin azar.
    ============================================================ */
 import { clamp } from "../../core/math.js";
-import { effectiveStat, playedPos } from "../ratings.js";
+import { effectiveStat, playedPos, PASE_MIX } from "../ratings.js";
 
 // Modificadores de la mentalidad táctica (en escala normalizada ~0-5)
 export const MENT_MOD = { defensiva: { atk: -0.5, def: +0.6 }, normal: { atk: 0, def: 0 }, ofensiva: { atk: +0.6, def: -0.5 } };
@@ -179,13 +179,17 @@ export function teamPowers(lineup, mentalidad, buffs) {
   const delP = act.filter(p => playedPos(p) === "DEL");
   const defP = act.filter(p => playedPos(p) === "DEF");
   const avg = (ps, k) => ps.length ? ps.reduce((s, p) => s + effStat(p, k, buffs), 0) / ps.length : 1;
+  // ODISEA (sprint 1): el poder del MEDIO sigue midiendo UN pase — la mezcla corto/largo de
+  // ratings.PASE_MIX. La segunda mitad del sprint decidirá si el atk del medio se calcula
+  // por tipo de circulación; cambiar esto AHORA movería el balance sin haberlo medido.
+  const avgPase = (ps) => avg(ps, "pase_corto") * PASE_MIX.pase_corto + avg(ps, "pase_largo") * PASE_MIX.pase_largo;
   const auraAll = avg(act, "aura");
   // Calidad × bocas, línea por línea. El aura y el arquero NO llevan factor: no son
   // una línea (el aura es del equipo entero y el arquero es siempre uno).
   const bAtk = bodies(atkBodies(delP.length, medP.length), LINE_BASE.atk);
   const bMed = bodies(medP.length, LINE_BASE.med, MED_POW);
   const bDef = bodies(defBodies(defP.length, medP.length), LINE_BASE.def);
-  let atk = avg(atkP, "tiro") * 0.4 * bAtk + avg(medP, "pase") * 0.3 * bMed + avg(atkP, "cabezazo") * 0.12 * bAtk + auraAll * 0.18;
+  let atk = avg(atkP, "tiro") * 0.4 * bAtk + avgPase(medP) * 0.3 * bMed + avg(atkP, "cabezazo") * 0.12 * bAtk + auraAll * 0.18;
   let def = avg(defP, "defensa") * 0.52 * bDef + gkQuality(por, buffs) * 0.32 + auraAll * 0.16;
   const m = MENT_MOD[mentalidad] || MENT_MOD.normal;
   atk += m.atk; def += m.def;

@@ -27,7 +27,7 @@
    Módulo puro: recibe el árbol ya resuelto (game/traits.traitTree)
    y devuelve SVG. No lee estado ni toca el DOM.
    ============================================================ */
-import { ARISTAS } from "../content/philosophies.js";
+import { ARISTAS, PHILOSOPHIES, FILO_LEVELS, filoLevelOf, filoPointsOf } from "../content/philosophies.js";
 
 /* ---------- Geometría (viewBox 1200×700) ---------- */
 /* REDISEÑO DE ESPACIO (26-jul-2026, decisiones PO): con 19 rasgos el tablero se
@@ -234,23 +234,26 @@ function pitchLines() {
 const CHIP_W = 150;          // paso entre fichas
 const CHIP_X = 26;           // dónde arranca la franja
 function principlesBand(run, f) {
-  return `<g>${ARISTAS.map((a, i) => {
+  return `<g>${PHILOSOPHIES.map((p, i) => {
     const x = CHIP_X + i * CHIP_W;
-    const v = run.aristas?.[a.id] || 0;
-    const mine = f.aristas.includes(a.id);
-    const col = PRINCIPLE_COLORS[a.id];
-    const pct = Math.min(100, (v / 6) * 100);   // 6 = el mínimo más alto que pide un rasgo
-    return `<g>
-      <text x="${x}" y="${HEAD_Y}" font-size="15">${a.icon}</text>
+    const lvl = filoLevelOf(run, p.id);
+    const xp = filoPointsOf(run, p.id);
+    const piso = FILO_LEVELS[lvl].min, techo = FILO_LEVELS[lvl + 1]?.min ?? null;
+    const pct = techo ? Math.min(100, (100 * (xp - piso)) / (techo - piso)) : 100;
+    const mine = p.id === f.id;
+    const col = markerColor(p);
+    return `<g class="tb-filo" data-filo="${p.id}" style="cursor:pointer">
+      <rect x="${x - 6}" y="${HEAD_Y - 16}" width="${CHIP_W - 8}" height="34" rx="5" fill="${mine ? col : "#000"}" opacity="${mine ? 0.14 : 0.001}"/>
+      <text x="${x}" y="${HEAD_Y}" font-size="15">${p.icon}</text>
       <text x="${x + 21}" y="${HEAD_Y}" font-size="11.5" font-weight="${mine ? 800 : 600}"
-        fill="${mine ? col : "#8fae9c"}" opacity="${mine ? 1 : 0.75}">${a.label}</text>
+        fill="${mine ? col : "#8fae9c"}" opacity="${mine ? 1 : 0.75}">${p.name}</text>
       <text x="${x + 21}" y="${HEAD_Y + 16}" font-size="13" font-weight="900"
-        fill="${v ? (mine ? col : CHALK) : "#6f907e"}">${v}</text>
+        fill="${mine ? col : CHALK}">${lvl + 1}</text>
       <rect x="${x + 36}" y="${HEAD_Y + 8}" width="46" height="4" rx="2" fill="#000" opacity=".35"/>
       <rect x="${x + 36}" y="${HEAD_Y + 8}" width="${(46 * pct) / 100}" height="4" rx="2"
         fill="${mine ? col : "#8fae9c"}" opacity="${mine ? 0.95 : 0.5}"/>
-      ${a.id === f.firma ? `<text x="${x + 90}" y="${HEAD_Y + 13}" font-size="8.5" font-weight="900"
-        fill="${col}" letter-spacing="1.4" opacity=".85">FIRMA</text>` : ""}
+      ${p.id === run.filoInicial ? `<text x="${x + 90}" y="${HEAD_Y + 13}" font-size="8.5" font-weight="900"
+        fill="${col}" letter-spacing="1.2" opacity=".85">ESCUELA</text>` : ""}
     </g>`;
   }).join("")}</g>`;
 }

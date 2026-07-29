@@ -41,75 +41,78 @@ const REDISENADAS = ["press", "posesion"];
   assert(E.traitById("no_existe") === undefined, "traitById devuelve undefined para basura");
 }
 
-// ---------- PI: el inicial y la escalera de la filosofía activa ----------
+// ---------- PI: el inicial y la escalera del Director Técnico ----------
 {
   const r = E.newRun("BRA");
   assert(r.identityPoints === 0 && Object.keys(r.rasgos).length === 0, "la run nace sin PI ni rasgos");
   E.choosePhilosophy(r, "press");
-  assert(r.identityPoints === 1, "elegir filosofía = nivel 1 = 1 PI inmediato (flujo de inicio)", r.identityPoints);
-  assert(r.piCredited.press === 0, "el nivel 1 (índice 0) queda acreditado");
-  assert(E.syncIdentityPI(r) === null, "el sync es idempotente: sin nivel nuevo no regala nada");
-  // La Sesión Táctica sube nivel → PI en el mismo beat (applyDayAction llama al sync)
+  assert(r.identityPoints === 1 && r.dtNivel === 1, "elegir filosofía = nivel 1 del DT = 1 PI inmediato (flujo de inicio)", r.identityPoints);
+  // El menú YA NO imprime PI: subir de nivel una filosofía sí, vía el DT
   r.actionPending = true;
-  E.applyDayAction(r, "tactica_presion");
-  assert(r.aristas.presion === 1 && r.identityPoints === 2, "subir a nivel 2 vía Acción del Día acredita +1 PI", r.identityPoints);
-  // La ejecución también (postMatchUpdate llama al sync): +1 punto de arista = +1 nivel
-  r.aristas.presion = 2;
-  const res = E.syncIdentityPI(r);
-  assert(res && res.gained === 1 && r.identityPoints === 3, "cada nivel de la ACTIVA acredita 1 PI");
-  // Varios niveles de golpe (evento generoso): se acreditan TODOS
-  r.aristas.verticalidad = 3;
-  const multi = E.syncIdentityPI(r);
-  assert(multi && multi.gained === 3 && r.identityPoints === 6, "niveles múltiples acreditan de a varios", multi?.gained);
+  E.applyDayAction(r, "plan_press");
+  assert(r.identityPoints === 1, "el Plan de Partido no regala PI: la progresión es de cancha", r.identityPoints);
+  E.applyFiloXp(r, { filoXp: { press: E.FILO_LEVELS[1].min } });   // press a nivel 2
+  assert(r.identityPoints === 2 && r.dtNivel === 2, "subir una filosofía paga XP al DT y su nivel imprime 1 PI", `${r.dtNivel}/${r.identityPoints}`);
+  // Varios niveles de golpe (partidazo + eventos): se acreditan TODOS
+  E.applyFiloXp(r, { filoXp: { press: E.FILO_LEVELS[5].min } });
+  assert(E.filoLevel(r) === 5 && r.identityPoints > 2, "niveles múltiples acreditan de a varios", r.identityPoints);
 }
 
-// ---------- anti-farming: la herencia no imprime PI ----------
+// ---------- especializar rinde más que repartirse (la tesis del GDD) ----------
 {
-  const r = E.newRun("BRA");
-  E.choosePhilosophy(r, "press");           // 1 PI (nivel 1)
-  r.aristas.presion = 4;                    // arista COMPARTIDA con posesión
-  E.syncIdentityPI(r);                      // press nivel 5: +4 → 5 PI
-  assert(r.identityPoints === 5, "premisa: 5 PI ganados con el press", r.identityPoints);
-  r.actionPending = true;
-  E.changePhilosophy(r, "posesion");        // posesión HEREDA presión 4 → nivel 5
-  assert(r.identityPoints === 5, "cambiar NO imprime PI: la herencia se acredita sin premio", r.identityPoints);
-  assert(r.piCredited.posesion === E.filoLevelOf(r), "la nueva nace acreditada a su nivel heredado");
-  // …pero lo que se construya DESDE hoy sí paga
-  r.aristas.elaboracion = 1;
-  const res = E.syncIdentityPI(r);
-  assert(res && res.gained === 1 && r.identityPoints === 6, "el nivel nuevo de la activa sí acredita");
-  // Y al VOLVER: los niveles que la latente ganó mientras tanto tampoco premian
-  r.aristas.verticalidad = 2;               // sube el nivel del press latente (presión 4 + vertical 2)
-  r.actionPending = true;
-  E.changePhilosophy(r, "press");
-  assert(r.identityPoints === 6, "volver tampoco imprime: PI solo de la filosofía ACTIVA jugándola", r.identityPoints);
+  const foco = E.newRun("BRA"); E.choosePhilosophy(foco, "press");
+  E.applyFiloXp(foco, { filoXp: { press: E.FILO_LEVELS[9].min } });     // una idea al tope
+  const disperso = E.newRun("BRA"); E.choosePhilosophy(disperso, "press");
+  E.applyFiloXp(disperso, { filoXp: {                                   // la misma XP repartida
+    press: E.FILO_LEVELS[9].min / 4, posesion: E.FILO_LEVELS[9].min / 4,
+    contra: E.FILO_LEVELS[9].min / 4, bloque: E.FILO_LEVELS[9].min / 4 } });
+  assert(foco.dtXp > disperso.dtXp, "la misma XP concentrada paga MÁS al DT que repartida en cuatro",
+    `${foco.dtXp} vs ${disperso.dtXp}`);
 }
 
-// ---------- compra y latencia ----------
+// ---------- compra: sin latencia, las builds híbridas juegan ----------
 {
   const r = E.newRun("BRA");
   E.choosePhilosophy(r, "press");           // 1 PI
-  assert(E.buyTrait(r, "hombre_libre") === null, "un rasgo de OTRA filosofía no se puede comprar");
   assert(E.buyTrait(r, "no_existe") === null, "un id basura no se puede comprar");
   const antes = r.journal.length;
   const t = E.buyTrait(r, "presion_intensificada");
   assert(t && t.id === "presion_intensificada" && r.identityPoints === 0, "comprar cobra el PI y devuelve la fila", r.identityPoints);
   assert(r.rasgos.press.includes("presion_intensificada") && r.journal.length === antes + 1, "el rasgo queda en la run y escribe el diario");
-  assert(E.activeTraitIds(r).join() === "presion_intensificada" && E.activeTraits(r)[0].nombre === "Presión Intensificada", "activeTraits lee la filosofía activa");
+  assert(E.activeTraitIds(r).join() === "presion_intensificada" && E.activeTraits(r)[0].nombre === "Presión Intensificada", "activeTraits lee lo comprado");
   assert(E.buyTrait(r, "presion_intensificada") === null, "no se compra dos veces");
   assert(E.buyTrait(r, "pulmones") === null, "sin PI no hay compra");
   const reqs = E.traitReqs(r, E.traitById("pulmones"));
   assert(!reqs.ok && reqs.faltas.some(x => x.includes("Punto de Identidad")), "el candado nombra la falta en lenguaje de jugador", reqs.faltas.join(" · "));
+  assert(!reqs.faltas.some(x => x.includes("Principio") || x.includes("Presión 2")), "los Principios mínimos MURIERON: no quedan en las faltas", reqs.faltas.join(" · "));
   // filoCtx viaja con los rasgos activos (la frontera run→Match)
   assert(E.filoCtx(r).rasgos.includes("presion_intensificada"), "filoCtx lleva los rasgos al matchCtx");
-  // Latencia (decisión PO #3): cambiar apaga, volver revive
+  // HÍBRIDO (decisión PO 28-jul): un rasgo de OTRA filosofía se compra con su propio nivel…
+  r.identityPoints = 1;
+  const otro = E.buyTrait(r, "buen_pie");        // básico de Posesión, nivel 1
+  assert(otro && r.rasgos.posesion.includes("buen_pie"), "un básico de otra filosofía se compra: la build híbrida existe");
+  // …y NO se apaga al cambiar de identidad: si lo compraste, juega
   r.actionPending = true;
   E.changePhilosophy(r, "bloque");
-  assert(E.activeTraitIds(r).length === 0, "con otra filosofía los rasgos comprados se APAGAN (latentes)");
-  assert(r.rasgos.press.includes("presion_intensificada"), "…pero no se pierden");
-  r.actionPending = true;
-  E.changePhilosophy(r, "press");
-  assert(E.activeTraitIds(r).includes("presion_intensificada"), "volver a la filosofía REVIVE sus rasgos");
+  const activos = E.activeTraitIds(r);
+  assert(activos.includes("presion_intensificada") && activos.includes("buen_pie"), "se acabó la latencia: todos los comprados siguen activos");
+  assert(E.filoCtx(r).rasgos.length === 2, "el Match recibe los dos, sea cual sea la identidad que se juega");
+}
+
+// ---------- el nivel se mide en LA FILOSOFÍA DEL RASGO ----------
+{
+  const r = E.newRun("BRA");
+  E.choosePhilosophy(r, "press");
+  r.identityPoints = 5;
+  E.buyTrait(r, "presion_intensificada");
+  const mitte = E.traitById("mittelfeldpressing");   // intermedio del press: nivel 3
+  assert(!E.traitReqs(r, mitte).ok, "en nivel 1 el intermedio está bloqueado");
+  r.filoXp.posesion = E.FILO_LEVELS[9].min;          // subir OTRA filosofía no abre esta rama
+  assert(!E.traitReqs(r, mitte).ok, "el nivel de otra idea no desbloquea la propia");
+  r.filoXp.press = E.FILO_LEVELS[2].min;             // press nivel 3
+  assert(E.traitReqs(r, mitte).ok, "con SU filosofía en nivel 3, el intermedio se abre");
+  const falta = E.traitReqs(E.newRun("BRA"), mitte).faltas.join(" · ");
+  assert(falta.includes("High Press nivel 3"), "la falta nombra la filosofía y su nivel", falta);
 }
 
 // ---------- el árbol para la pantalla ----------
@@ -120,12 +123,16 @@ const REDISENADAS = ["press", "posesion"];
   assert(tree.length === 9, "el árbol del contra trae el arco completo: 3+3+2+1 (T3)", tree.length);
   const buyables = tree.filter(t => t.buyable);
   assert(buyables.length === 3 && buyables.every(t => t.tier === "basic"), "con 1 PI solo los 3 básicos son comprables (el 1-de-3 del inicio)");
-  assert(tree.filter(t => t.tier === "intermediate").every(t => !t.buyable && t.faltas.length >= 2), "los intermediate nacen con candado múltiple (previo + nivel + principio)");
+  assert(tree.filter(t => t.tier === "intermediate").every(t => !t.buyable && t.faltas.length >= 2), "los intermediate nacen con candado múltiple (previo + nivel)");
   E.buyTrait(r, "tres_pases");
   const tree2 = E.traitTree(r);
   assert(tree2.find(t => t.id === "tres_pases").owned, "el comprado figura owned");
   assert(tree2.filter(t => !t.owned).every(t => !t.buyable && t.faltas.length), "sin PI el resto queda con candado y faltas legibles");
+  // El árbol de CUALQUIER filosofía se puede consultar (la pizarra las navega)
+  const ajeno = E.traitTree(r, "bloque");
+  assert(ajeno.length && ajeno.every(t => t.filo === "bloque"), "traitTree(run, filoId) devuelve el árbol pedido");
 }
+
 
 // ---------- T1.3/T1.4: el motor reactivo — los hooks EN el partido ----------
 /** Un Match real BRA vs oppId con filosofía + rasgos en el ctx (como filoCtx los manda). */
@@ -260,30 +267,14 @@ function forcePlay(m, typeId, optIdx = 0) {
     const own = E.traitsOf(filo, "intermediate");
     assert(own.length === 3 && new Set(own.map(t => t.rama)).size === 3, `${filo}: un intermediate por rama`);
   }
-  const filoAristas = id => E.getPhilosophy(id).aristas;
   for (const t of inters) {
-    // Las 4 condiciones del GDD §5: previo en SU rama, principio, nivel 3
+    // Los requisitos vivos (arco de Progresión): previo en SU rama + nivel 3 de su
+    // filosofía. Los "Principios mínimos" murieron con las aristas: el GDD deja dos.
     const prev = E.traitById(t.req.previo);
     assert(prev && prev.filo === t.filo && prev.rama === t.rama && prev.tier === "basic",
       "el previo es el básico de SU rama", `${t.id} ← ${t.req.previo}`);
-    assert(t.req.nivel === 3 && t.req.principio?.min === 2, "gating uniforme: nivel 3 + principio 2", t.id);
-    assert(E.aristaById(t.req.principio.id), "el principio requerido existe", t.id);
-  }
-  // LA REGLA DEL ARCO (tabla aprobada por el PO): toda filosofía paga al menos UN
-  // principio AJENO en sus intermediate (cubrirse/expandirse cuesta pureza). En
-  // Press/Posesión/Bloque el ajeno vive en la Respuesta; el Contra es la excepción
-  // documentada — su Respuesta pide Solidez (que ES suya: aguantar para cazar) y su
-  // ajeno (Elaboración) vive en la Expansión, abriendo el camino que La Invitación
-  // (T3, Elaboración 3) continúa: el Contra aprende a tener la pelota por etapas.
-  const esAjeno = t => !filoAristas(t.filo).includes(t.req.principio.id);
-  for (const [id, ajeno] of [["primer_pase", false], ["trampa_cerrada", false], ["superioridad", true],
-    ["duenos_area", false], ["pelota_ensayada", true], ["plataforma", false]]) {
-    assert(esAjeno(E.traitById(id)) === ajeno, `principio ${ajeno ? "AJENO" : "propio"} según la tabla aprobada`, id);
-  }
-  // Las rediseñadas pagan su ajeno donde su árbol lo pide (Press en la Respuesta,
-  // Posesión en la Firma): eso lo verifica su propia sección, no esta regla T2.
-  for (const filo of ["contra", "bloque"]) {
-    assert(E.traitsOf(filo, "intermediate").some(esAjeno), `${filo} paga al menos un principio ajeno`);
+    assert(t.req.nivel === 3, "gating uniforme: nivel 3", t.id);
+    assert(t.req.principio === undefined && t.req.principios === undefined, "ningún rasgo pide ya Principios", t.id);
   }
 }
 
@@ -292,18 +283,16 @@ function forcePlay(m, typeId, optIdx = 0) {
   const r = E.newRun("BRA");
   E.choosePhilosophy(r, "press");             // 1 PI
   E.buyTrait(r, "presion_intensificada");                    // gasta el inicial
-  r.aristas.presion = 2;                      // nivel 3 (2 pts) y Presión 2
-  E.syncIdentityPI(r);                        // +2 PI (niveles 2 y 3)
+  E.applyFiloXp(r, { filoXp: { press: E.FILO_LEVELS[2].min } });   // press nivel 3 → PI vía DT
   const reqs = E.traitReqs(r, E.traitById("mittelfeldpressing"));
-  assert(reqs.ok, "con previo + nivel 3 + Presión 2 + PI, Cacería Letal se abre", reqs.faltas.join(" · "));
+  assert(reqs.ok, "con previo + nivel 3 + PI, Cacería Letal se abre", reqs.faltas.join(" · "));
   assert(E.buyTrait(r, "mittelfeldpressing"), "la compra intermediate procede");
-  // El ajeno de la rama Respuesta: sin Solidez no hay Anticipar aunque sobren PI
-  E.buyTrait(r, "pulmones");
-  r.aristas.verticalidad = 1; E.syncIdentityPI(r); // repone el PI (nivel 4) para aislar la falta de Solidez
-  const anticipar = E.traitReqs(r, E.traitById("vigilancia"));
-  assert(!anticipar.ok && anticipar.faltas.some(x => x.includes("Solidez")), "Anticipar exige Solidez (AJENA): el candado la nombra", anticipar.faltas.join(" · "));
-  r.aristas.solidez = 2;
-  assert(E.traitReqs(r, E.traitById("vigilancia")).ok, "con Solidez 2 el candado se abre (cubrirse costó pureza)");
+  // El nivel manda: sin nivel 6 no hay avanzada aunque sobren PI
+  r.identityPoints = 5;
+  const ang = E.traitReqs(r, E.traitById("angriffpressing"));
+  assert(!ang.ok && ang.faltas.some(x => x.includes("nivel 6")), "la avanzada pide nivel 6 y el candado lo nombra", ang.faltas.join(" · "));
+  E.applyFiloXp(r, { filoXp: { press: E.FILO_LEVELS[5].min - r.filoXp.press } });
+  assert(E.traitReqs(r, E.traitById("angriffpressing")).ok, "en nivel 6 el candado se abre");
 }
 
 // ---------- T3: Advanced y Master — catálogo, convergencias y la doctrina completa ----------
@@ -317,8 +306,6 @@ function forcePlay(m, typeId, optIdx = 0) {
     assert(a && b && a.filo === t.filo && b.filo === t.filo, "convergencia dentro de la filosofía", t.id);
     assert(a.tier === "intermediate" && b.tier === "basic" && a.rama !== b.rama, "Int líder + Básico apoyo de ramas distintas", t.id);
     assert(t.req.nivel === 6, "Advanced pide nivel 6", t.id);
-    const propio = E.getPhilosophy(t.filo).aristas.includes(t.req.principio.id);
-    assert(t.req.principio.min === (propio ? 4 : 3), "principio a 4 (propio) o 3 (ajeno)", t.id);
   }
   for (const t of masters) {
     assert(t.req.nivel === 10, "Master pide Consolidada (nivel 10)", t.id);
@@ -326,15 +313,13 @@ function forcePlay(m, typeId, optIdx = 0) {
     assert(basicos.length === 3 && new Set(basicos.map(x => x.rama)).size === 3 && basicos.every(x => x.tier === "basic" && x.filo === t.filo),
       "Master exige los 3 básicos: presencia en las TRES ramas", t.id);
     assert(t.req.alguno.length === 2 && t.req.alguno.every(id => E.traitById(id)?.tier === "advanced"), "Master exige un Advanced cualquiera", t.id);
-    const propias = E.getPhilosophy(t.filo).aristas;
-    assert(t.req.principios.length === 2 && t.req.principios.every(p => propias.includes(p.id) && p.min === 4),
-      "Master exige AMBOS principios propios a 4", t.id);
+
   }
   // La cadena completa hasta el Master (camino mínimo: 6 PI + Consolidada)
   const r = E.newRun("BRA");
   E.choosePhilosophy(r, "press");
-  r.aristas.presion = 5; r.aristas.verticalidad = 4; r.aristas.solidez = 3; // Consolidada (9 pts propios)
-  E.syncIdentityPI(r); // nivel 10 → 10 PI en total
+  E.applyFiloXp(r, { filoXp: { press: E.FILO_LEVELS[9].min } }); // Consolidada: nivel 10
+  r.identityPoints = 10;                                          // PI de sobra para aislar el gating
   for (const id of ["presion_intensificada", "mittelfeldpressing", "angriffpressing"]) {
     assert(E.buyTrait(r, id), `la escalera compra ${id}`);
   }
@@ -344,14 +329,14 @@ function forcePlay(m, typeId, optIdx = 0) {
   assert(E.buyTrait(r, "pressingfalle"), "el Master se compra");
   assert(r.journal.length === antes + 2 && r.journal[r.journal.length - 1].title.includes("PRENSA CONSAGRA"),
     "comprar un Master dispara la CONSAGRACIÓN de prensa (dos entradas)");
-  // El camino costó 6 PI de 10: la escasez del Bible sobrevive al arco completo
+  // El camino costó 4 PI: la escasez del Bible sobrevive al arco completo
   assert(r.identityPoints === 6, "el camino mínimo al Master de Press cuesta 4 PI (sube por su rama)", r.identityPoints);
   // Pressingfalle CONVERGE (decisión PO 26-jul): se llega desde Angriffpressing o
   // desde Gegenpressing, cualquiera de los dos. Se comprueba por el otro camino.
   const r2 = E.newRun("BRA");
   E.choosePhilosophy(r2, "press");
-  r2.aristas.presion = 5; r2.aristas.verticalidad = 4;
-  E.syncIdentityPI(r2);
+  E.applyFiloXp(r2, { filoXp: { press: E.FILO_LEVELS[9].min } });
+  r2.identityPoints = 10;
   for (const id of ["presion_intensificada", "mittelfeldpressing", "gegenpressing"]) E.buyTrait(r2, id);
   assert(E.traitReqs(r2, E.traitById("pressingfalle")).ok,
     "al Master del Press también se llega por Gegenpressing (la convergencia)",
@@ -360,8 +345,8 @@ function forcePlay(m, typeId, optIdx = 0) {
   // La consagración se narra UNA vez por filosofía, no una por Master (Posesión tiene 4).
   const rp = E.newRun("BRA");
   E.choosePhilosophy(rp, "posesion");
-  rp.aristas.elaboracion = 5; rp.aristas.presion = 4; rp.aristas.directo = 3;  // Osciladores pide el ajeno
-  E.syncIdentityPI(rp);
+  E.applyFiloXp(rp, { filoXp: { posesion: E.FILO_LEVELS[9].min } });
+  rp.identityPoints = 10;
   for (const id of ["buen_pie", "tercer_hombre", "pitagoricos", "maquina_colectiva"]) {
     assert(E.buyTrait(rp, id), `la escalera de Posesión compra ${id}`);
   }
@@ -435,33 +420,12 @@ function forcePlay(m, typeId, optIdx = 0) {
         }
       }
 
-      // Principios: los Master piden dos propios; el resto uno. Propio a 4 / ajeno a 3
-      // en avanzados — la misma vara de pureza del arco.
-      const reqs = [...(t.req.principio ? [t.req.principio] : []), ...(t.req.principios || [])];
-      assert(reqs.length === (t.tier === "master" ? 2 : t.tier === "basic" ? 0 : 1),
-        "cantidad de principios exigidos según el tier", t.id);
-      for (const pr of reqs) assert(E.aristaById(pr.id), "el principio requerido existe", `${t.id}/${pr.id}`);
-      if (t.tier === "advanced") {
-        const propio = propias.includes(t.req.principio.id);
-        assert(t.req.principio.min === (propio ? 4 : 3), "avanzado: principio propio a 4 / ajeno a 3", t.id);
-      }
-      if (t.tier === "master") {
-        // Un Master pide sus DOS principios a 4 — la vara completa. Al menos uno es
-        // propio; el otro puede ser AJENO cuando la rama entera se construyó pagando
-        // pureza (Elasticidad nace de la Respuesta del Press, que vive de Solidez;
-        // Fríos congela, y congelar es elaborar). El ajeno de un Master se paga
-        // entero: en la cima no hay descuento.
-        assert(t.req.principios.every(pr => pr.min === 4), "Master: los dos principios a 4", t.id);
-        assert(t.req.principios.some(pr => propias.includes(pr.id)), "Master: al menos un principio PROPIO", t.id);
-      }
+      // Los Principios murieron con las aristas (arco de Progresión): lo que queda es
+      // el NIVEL de su filosofía, uniforme por tier — la vara del GDD.
+      assert(t.req.principio === undefined && t.req.principios === undefined, "ningún nodo pide Principios", t.id);
+      assert((t.req.nivel || 1) === NIVEL[t.tier], "el nivel exigido es el de su tier (1·3·6·10)", t.id);
     }
 
-    // Toda filosofía paga al menos un principio AJENO en algún punto del árbol
-    // (el costo de cubrirse). Press lo paga en la Respuesta; Posesión, en la Firma
-    // —Osciladores pide Directo— porque ahí migró su anti-bloque: la segunda
-    // excepción documentada del arco, junto al Contra.
-    const ajenos = arbol.filter(t => t.req.principio && !propias.includes(t.req.principio.id));
-    assert(ajenos.length >= 1, `${filo} paga al menos un principio AJENO`, ajenos.map(t => t.id).join());
 
     // El efecto profundo (migración F2) sigue teniendo dueño tras el rediseño.
     assert(E.DEEP_TRAIT[filo]?.id === f.deep, `deepXxx de ${filo} vive en ${f.deep}`, E.DEEP_TRAIT[filo]?.id);

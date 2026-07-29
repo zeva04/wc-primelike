@@ -57,9 +57,25 @@ const esDecaimiento = m => m.reasons.length > 0 && m.reasons.every(r => r.text.s
  */
 function filoBlock(filo) {
   if (!filo || (!filo.filoExec && !filo.filoCost)) return "";
-  const exec = filo.filoExec
-    ? `<div class="text-[11px] text-slate-300">⚽ Jugaste tu fútbol y salió: <b class="text-emerald-400">+${filo.filoExec.add} de ${filo.filoExec.arista.label}</b> <span class="text-slate-500">(${filo.filoExec.hits} acierto${filo.filoExec.hits > 1 ? "s" : ""} de tu jugada firma)</span></div>`
-    : `<div class="text-[11px] text-slate-500">La jugada firma no salió hoy: la identidad no progresó en la cancha.</div>`;
+  const x = filo.filoExec;
+  // Una línea por filosofía que aprendió algo hoy: cuánta XP, de qué jugadas salió
+  // (intención + aciertos) y si cruzó un nivel. Debajo, lo que eso le pagó al DT.
+  const lineas = x ? x.filos.map(f => {
+    const subio = f.ahora > f.antes;
+    return `<div class="text-[11px] ${subio ? "text-amber-300" : "text-slate-300"} flex items-baseline gap-1.5">
+      <span>${f.icon}</span>
+      <b>${f.name}</b>
+      <span class="${subio ? "text-amber-300" : "text-emerald-400"} font-bold">+${f.xp} XP</span>
+      <span class="text-slate-500">(${f.intentos} jugada${f.intentos === 1 ? "" : "s"} · ${f.aciertos} acierto${f.aciertos === 1 ? "" : "s"}${f.mult !== 1 ? ` · ×${f.mult}` : ""})</span>
+      ${subio ? `<span class="font-black">→ ¡NIVEL ${f.ahora + 1}!</span>` : ""}
+    </div>`;
+  }).join("") : "";
+  const dtLine = x?.dt
+    ? `<div class="text-[11px] mt-1.5 ${x.dt.pi ? "text-amber-300 font-bold" : "text-sky-300"}">🧠 El DT sumó <b>${x.dtXp} XP</b>${x.dt.pi ? ` y subió a nivel ${x.dt.nivel}: +${x.dt.pi} Punto${x.dt.pi > 1 ? "s" : ""} de Identidad para el árbol.` : ` de oficio (nivel ${x.dt.nivel}).`}</div>`
+    : "";
+  const exec = x
+    ? `${lineas}${dtLine}`
+    : `<div class="text-[11px] text-slate-500">Ninguna idea se ejercitó hoy: sin jugadas de identidad no hay experiencia.</div>`;
   const cost = filo.filoCost
     ? `<div class="text-[11px] text-amber-400/90 mt-0.5">🏃 El pressing pasó factura: −${-filo.filoCost.press} de energía extra a los ${filo.filoCost.jugadores} que corrieron.</div>`
     : "";

@@ -198,7 +198,10 @@ export function resolveLastMan(m, key) {
   const edge = dPow - atk;
 
   if (key === "anticipar") {
-    const pCut = clamp(0.46 + edge * 0.14 + effStat(def, "aura", m.my.buffs) * 0.02, 0.25, 0.82);
+    // ODISEA (2ª mitad): anticipar es leer Y llegar. Si el delantero es más rápido, el
+    // adelantamiento sale peor — es justo la jugada donde el central lento se desnuda.
+    const piernas = (effStat(def, "velocidad", m.my.buffs) - effStat(shooter, "velocidad")) * 0.05;
+    const pCut = clamp(0.46 + edge * 0.14 + piernas + effStat(def, "aura", m.my.buffs) * 0.02, 0.25, 0.82);
     if (rnd() < pCut) return lastManStop(m, def, `${def.name} LEE el pase y se anticipa. ¡Corte magistral del último hombre!`);
     m.log("chance", `min ${m.clock()}' — ${def.name} se adelanta pero ${shooter.name} le gana la espalda y queda de cara al arco...`);
     m.stats.oppTiros++; // el mano a mano ES un remate rival (bug T3: no se contaba)

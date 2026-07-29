@@ -57,7 +57,7 @@ export const PREP_EVENTS = [
     effect: r => {
       energia(r, -10);
       if (r.filoId === "press") { energia(r, -5); return "El barro castiga doble al que presiona: −15 de energía para el plantel."; }
-      if (r.filoId === "posesion") { buff(r, "pase", -3); return "−10 de energía, y la cancha pesada le corta el toque a tu idea: −3 de Pase el próximo partido."; }
+      if (r.filoId === "posesion") { buff(r, "pase_corto", -3); return "−10 de energía, y la cancha pesada le corta el toque a tu idea: −3 de Pase corto el próximo partido."; }
     } },
   { id: "molestias",  rareza: "comun", tema: "fisico",        icon: "🤕", title: "Molestias en la zaga",          tipo: "debuff", desc: "−5 de Defensa para el próximo partido.",
     teaser: "Se ven vendas y bolsas de hielo saliendo de la enfermería.",                effect: r => buff(r, "defensa", -5) },
@@ -66,7 +66,7 @@ export const PREP_EVENTS = [
   { id: "piernas",    rareza: "comun", tema: "entrenamiento", icon: "🦵", title: "Piernas cargadas",              tipo: "debuff", desc: "−5 de Tiro para el próximo partido.",
     teaser: "Los fisios advierten que las piernas vienen pesadas.",                      effect: r => buff(r, "tiro", -5) },
   { id: "prensa",     rareza: "comun", tema: "entorno",       icon: "📸", title: "Maratón de prensa y sponsors",  tipo: "debuff", desc: "−5 de Pase para el próximo partido.",
-    teaser: "La agenda del día está tomada por micrófonos y flashes.",                   effect: r => buff(r, "pase", -5) },
+    teaser: "La agenda del día está tomada por micrófonos y flashes.",                   effect: r => buff(r, "pase_corto", -5) },
 
   // ---------- INFRECUENTES (±8, ±12 energía, o modificadores del día) ----------
   { id: "doble_turno", rareza: "infrecuente", tema: "entrenamiento", icon: "🏋️", title: "Doble turno de trabajo", tipo: "buff",
@@ -107,16 +107,16 @@ export const PREP_EVENTS = [
       return "La nota salió con sorna: el proyecto todavía no se ve en la cancha (−5 de Aura el próximo partido).";
     } },
   { id: "ensayo_firma", rareza: "infrecuente", tema: "entrenamiento", icon: "🎬", title: "Ensayo de la jugada firma", tipo: "buff",
-    desc: "La mañana entera dedicada a TU fútbol: +0.5 a la arista firma y un plus en la stat que ese fútbol trabaja.",
+    desc: "La mañana entera dedicada a TU fútbol: experiencia para tu identidad y un plus en la stat que ese fútbol trabaja.",
     teaser: "El cuerpo técnico montó la práctica de hoy alrededor de una sola jugada.",
     effect: r => {
       const a = addFirmaProgress(r, 0.5);
-      if (!a) { buff(r, "pase", 3); return "Sin una idea instalada, el ensayo quedó en fundamentos: +3 de Pase el próximo partido."; }
+      if (!a) { buff(r, "pase_corto", 3); return "Sin una idea instalada, el ensayo quedó en fundamentos: +3 de Pase corto el próximo partido."; }
       buff(r, a.stat, 3);
-      return `Cien repeticiones de lo nuestro: +0.5 de ${a.label} y +3 de ${STAT_LABELS[a.stat]} para el próximo partido.`;
+      return `Cien repeticiones de lo nuestro: +${a.xp} XP de ${a.label} y +3 de ${STAT_LABELS[a.stat]} para el próximo partido.`;
     } },
   { id: "toque_seda",  rareza: "infrecuente", tema: "entrenamiento", icon: "🎩", title: "Toque de seda",            tipo: "buff",   desc: "+8 de Pase para el próximo partido.",
-    teaser: "Los ayudantes arman circuitos de pases en espacios reducidos.",             effect: r => buff(r, "pase", 8) },
+    teaser: "Los ayudantes arman circuitos de pases en espacios reducidos.",             effect: r => buff(r, "pase_corto", 8) },
   { id: "banderazo",   rareza: "infrecuente", tema: "entorno",       icon: "🥁", title: "Banderazo de la hinchada", tipo: "buff",   desc: "+8 de Aura para el próximo partido.",
     teaser: "Se escuchan bombos a lo lejos: la hinchada anda cerca del hotel.",          effect: r => buff(r, "aura", 8) },
   { id: "viaje_pesado",rareza: "infrecuente", tema: "fisico",        icon: "✈️", title: "Viaje pesado",             tipo: "debuff", desc: "−12 de energía para todo el plantel.",
@@ -143,10 +143,10 @@ export const PREP_EVENTS = [
     teaser: "Se rumorea que hoy habrá un ensayo de altísimo nivel.",                     effect: r => { buff(r, "tiro", 8); buff(r, "defensa", 8); } },
   { id: "leyenda",       rareza: "rara", tema: "vestuario",     icon: "👑", title: "Visita de una leyenda",      tipo: "buff",   desc: "+12 de Aura para el próximo partido.",
     teaser: "Hay movimiento raro en recepción: se espera una visita ilustre.",           effect: r => buff(r, "aura", 12) },
-  { id: "video_premium", rareza: "rara", tema: "vestuario",     icon: "🎥", title: "Sesión de video reveladora", tipo: "buff",   desc: "La identidad del equipo da un salto (+1 a una arista de tu filosofía).",
-    teaser: "El analista no durmió: dice que encontró algo grande.",                     effect: r => { const a = addFiloProgress(r, 1); return !a ? undefined : `El video muestra exactamente dónde crecer: +1 de ${a.label} — la identidad da un salto.`; } },
+  { id: "video_premium", rareza: "rara", tema: "vestuario",     icon: "🎥", title: "Sesión de video reveladora", tipo: "buff",   desc: "La identidad del equipo da un salto (experiencia para tu filosofía).",
+    teaser: "El analista no durmió: dice que encontró algo grande.",                     effect: r => { const a = addFiloProgress(r, 1); return !a ? undefined : `El video muestra exactamente dónde crecer: +${a.xp} XP de ${a.label} — la identidad da un salto.`; } },
   { id: "crisis_prensa", rareza: "rara", tema: "entorno",       icon: "🎙️", title: "Crisis con la prensa",       tipo: "debuff", desc: "−10 de Aura y −6 de Pase para el próximo partido.",
-    teaser: "Un rumor feo empieza a circular en los portales deportivos.",               effect: r => { buff(r, "aura", -10); buff(r, "pase", -6); } },
+    teaser: "Un rumor feo empieza a circular en los portales deportivos.",               effect: r => { buff(r, "aura", -10); buff(r, "pase_corto", -6); } },
   { id: "ola_calor",     rareza: "rara", tema: "fisico",        icon: "🥵", title: "Ola de calor", tipo: "debuff",
     desc: "−15 de energía para todo el plantel, y hoy Recuperar rinde la mitad.",
     teaser: "El termómetro amenaza con romper récords hoy.",
@@ -157,12 +157,12 @@ export const PREP_EVENTS = [
       if (r.filoId === "press") { energia(r, -5); return "−20 de energía para el plantel: presionar bajo este sol es un suplicio."; }
     } },
   { id: "visita_maestro", rareza: "rara", tema: "entrenamiento", icon: "🎓", title: "Visita del maestro de tu escuela", tipo: "buff",
-    desc: "Un ídolo de tu filosofía pasa el día con el equipo: +1 a la arista firma de tu identidad.",
+    desc: "Un ídolo de tu filosofía pasa el día con el equipo: una sesión entera de experiencia para tu identidad.",
     teaser: "Corre el rumor de que hoy llega una eminencia del fútbol que juega el equipo.",
     effect: r => {
       const a = addFirmaProgress(r, 1);
       if (!a) { buff(r, "aura", 5); return "Sin una idea declarada, la visita quedó en anécdota inspiradora: +5 de Aura el próximo partido."; }
-      return `El maestro habló el idioma de la casa: +1 de ${a.label} — la identidad se profundiza.`;
+      return `El maestro habló el idioma de la casa: +${a.xp} XP de ${a.label} — la identidad se profundiza.`;
     } },
   { id: "critica_demoledora", rareza: "rara", tema: "entorno", icon: "🗞️", title: "Crítica demoledora", tipo: "debuff",
     desc: "−8 de Moral, y la presión alcanza a tu figura del momento.",
@@ -191,7 +191,7 @@ export const PREP_EVENTS = [
   { id: "dia_perfecto", rareza: "legendaria", tema: "vestuario", icon: "🌟", title: "Día perfecto", tipo: "buff",
     desc: "Todo fluye: +5 a TODAS las stats para el próximo partido.",
     teaser: "Amaneció un día extrañamente luminoso en la concentración.",
-    effect: r => ["tiro", "defensa", "atajadas", "pase", "cabezazo", "aura"].forEach(k => buff(r, k, 5)) },
+    effect: r => ["tiro", "defensa", "atajadas", "pase_corto", "pase_largo", "velocidad", "cabezazo", "aura"].forEach(k => buff(r, k, 5)) },
   
   { id: "clase_magistral", rareza: "legendaria", tema: "entrenamiento", icon: "🎓", title: "Clase magistral", tipo: "buff",
     desc: "Tu mejor delantero da un salto de calidad permanente.",

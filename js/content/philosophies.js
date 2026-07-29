@@ -28,37 +28,81 @@
 // que ese fútbol trabaja (la usa el evento "Ensayo de la firma", F3).
 export const ARISTAS = [
   { id: "presion",      icon: "🦁", label: "Presión",      desc: "cazar arriba",          tipo: "recuperacion", stat: "defensa" },
-  { id: "elaboracion",  icon: "🎼", label: "Elaboración",  desc: "tener y circular",      tipo: "circulacion",  stat: "pase" },
-  { id: "verticalidad", icon: "⚡", label: "Verticalidad", desc: "atacar el espacio",     tipo: "transicion",   stat: "tiro" },
+  { id: "elaboracion",  icon: "🎼", label: "Elaboración",  desc: "tener y circular",      tipo: "circulacion",  stat: "pase_corto" },
+  { id: "verticalidad", icon: "⚡", label: "Verticalidad", desc: "atacar el espacio",     tipo: "transicion",   stat: "velocidad" },
   { id: "solidez",      icon: "🧱", label: "Solidez",      desc: "orden y bloque",        tipo: "repliegue",    stat: "defensa" },
-  { id: "directo",      icon: "🌩️", label: "Juego directo", desc: "el pelotazo y el duelo", tipo: "pelotazo",    stat: "cabezazo" },
+  { id: "directo",      icon: "🌩️", label: "Juego directo", desc: "el pelotazo y el duelo", tipo: "pelotazo",    stat: "pase_largo" },
 ];
 
 export const aristaById = id => ARISTAS.find(a => a.id === id);
 
 /* Las ETAPAS de identidad (los 3 niveles originales de F1, valores EXACTOS —
-   umbrales 0/4/9 y mult ×1.35/×1.7/×2.1 calibrados en F1). Desde el arco de
-   Rasgos (T1) son la vista narrativa Y la escala técnica del RIVAL: rivalFiloLevel,
-   la brecha R3 (identityGapMult), los gates de la avanzada/rasgo y el scouting
-   siguen operando etapa vs etapa — CERO recalibración del Rebalance. */
+   mult ×1.35/×1.7/×2.1 calibrados en F1). Desde el arco de Rasgos (T1) son la
+   vista narrativa Y la escala técnica del RIVAL: rivalFiloLevel, la brecha R3
+   (identityGapMult), los gates de la avanzada y el scouting siguen operando
+   etapa vs etapa — CERO recalibración del Rebalance. */
 export const FILO_ETAPAS = [
   { id: "aprendiendo", label: "Aprendiendo",   min: 0, mult: 1.35 },
   { id: "desarrollo",  label: "En desarrollo", min: 4, mult: 1.7 },
   { id: "consolidada", label: "Consolidada",   min: 9, mult: 2.1 },
 ];
 
-/* La escalera de 10 NIVELES (arco de Rasgos T1, decisión PO #1 — SIN testear:
-   dial abierto): división proporcional de lo aprobado en F1. Umbral = nivel-1
-   puntos (un punto por nivel); `mult` interpola linealmente ×1.35→×2.10 y solo
-   sesga MI tipo firma (el rival usa FILO_ETAPAS). Cada subida de nivel otorga
-   1 Punto de Identidad (game/traits) — el nivel 1 incluido, al elegir filosofía.
-   Las anclas de F1 no se mueven: Desarrollo a 4 pts (nivel 5) · Consolidada a
-   9 (nivel 10) — `etapa` indexa FILO_ETAPAS. */
+/* ============================================================
+   LA ESCALERA DE 10 NIVELES, AHORA POR EXPERIENCIA (arco de
+   Progresión, 28-jul-2026). Las 4 filosofías progresan por
+   SEPARADO y solo con XP ganada EN LA CANCHA (y en eventos):
+   se aprende el fútbol que se juega, como las habilidades de
+   Skyrim. `min` es XP ACUMULADA; `mult` interpola ×1.35→×2.10
+   y sesga MI tipo firma; `etapa` indexa FILO_ETAPAS (Desarrollo
+   nivel 5, Consolidada nivel 10 — las anclas de F1 intactas).
+
+   La curva: costos crecientes 250·300·360·430·510·600·700·810·930.
+   Está calibrada para que una run PERFECTA (8 partidos jugando
+   siempre la misma idea, con el Plan de Partido puesto y la
+   afinidad de la filosofía inicial) llegue al nivel 10 — y una
+   run promedio deje a la principal en 6-8. Es el dial declarado
+   del arco: si el techo se alcanza demasiado fácil, sube acá. */
+const FILO_XP_STEPS = [250, 300, 360, 430, 510, 600, 700, 810, 930];
 export const FILO_LEVELS = Array.from({ length: 10 }, (_, i) => ({
-  min: i,
+  min: FILO_XP_STEPS.slice(0, i).reduce((s, x) => s + x, 0),
   mult: +(1.35 + (i * 0.75) / 9).toFixed(2),
   etapa: i >= 9 ? 2 : i >= 4 ? 1 : 0,
 }));
+
+/* La XP del partido (el 70/30 del GDD): la INTENCIÓN paga por cada jugada de ese
+   fútbol que el equipo propone; la EFECTIVIDAD paga por cada acto que sale bien
+   (y por el gol que la corona). Con ~10 jugadas y ~10 aciertos del tipo propio,
+   el reparto queda 140/60 = 70/30 exacto. Los dos son diales del arco. */
+export const XP_INTENCION = 125;
+export const XP_ACIERTO = 55;
+
+/* Qué filosofía APRENDE cada tipo de secuencia del catálogo (content/sequences):
+   la arista ya mapeaba tipo↔fútbol, esto lo lleva a la filosofía dueña. Las
+   secuencias AVANZADAS traen su `advFor` y mandan sobre esta tabla. El balón
+   parado y la salida de fondo no enseñan nada: no son identidad de nadie. */
+export const FILO_BY_TIPO = {
+  recuperacion: "press",      // cazar arriba
+  circulacion: "posesion",    // tener y circular
+  transicion: "contra",       // atacar el espacio tras robar
+  banda: "contra",            // desbordar es atacar el espacio (Odisea, decisión PO)
+  pelotazo: "bloque",         // el duelo directo
+  repliegue: "bloque",        // defender organizado y neutralizar
+};
+export const filoOfType = (type) => type?.advFor || FILO_BY_TIPO[type?.id] || null;
+
+/* LA AFINIDAD (GDD): la filosofía INICIAL de la run decide a qué velocidad se
+   aprenden las demás. Eje proactivo (Press · Posesión) vs reactivo (Contra ·
+   Bloque): tu vecina de eje te resulta natural, tu cruzada se te resiste.
+   Propia ×2 · cercana ×1.25 · neutral ×1 · opuesta ×0.6. Incentiva especializar
+   sin cerrar ninguna puerta: la opuesta progresa, solo que más lento. */
+export const AFINIDAD = {
+  press:    { press: 2, posesion: 1.25, contra: 1,    bloque: 0.6 },
+  posesion: { posesion: 2, press: 1.25, contra: 1,    bloque: 0.6 },
+  contra:   { contra: 2, bloque: 1.25,  press: 1,     posesion: 0.6 },
+  bloque:   { bloque: 2, contra: 1.25,  posesion: 1,  press: 0.6 },
+};
+export const AFINIDAD_LABEL = { 2: "tu escuela", 1.25: "afín", 1: "neutral", 0.6: "opuesta" };
+export const afinidadMult = (inicial, target) => AFINIDAD[inicial]?.[target] ?? 1;
 
 /* Las 4 filosofías (decisión PO #5): combinación de 2 aristas; `firma` es la
    arista que define su fútbol (su `tipo` es el tipo firma del pool). `fuerte` y
@@ -130,26 +174,29 @@ export const PHILOSOPHIES = [
 export const getPhilosophy = id => PHILOSOPHIES.find(p => p.id === id) || null;
 
 /**
- * Puntos y nivel de la identidad de una run, PUROS y solo sobre datos de este
- * archivo (F3: el contenido también los necesita — "La prensa bautiza tu estilo"
- * lee el nivel — y content/ no importa game/). game/philosophy delega acá:
- * una sola fuente para el umbral, cero divergencia.
+ * XP y nivel de una filosofía, PUROS y solo sobre datos de este archivo (el
+ * contenido también los necesita y content/ no importa game/; y el Match los usa
+ * para anunciar la subida EN VIVO sin conocer la run). game/philosophy delega
+ * acá: una sola fuente para el umbral, cero divergencia.
  */
-export function filoPointsOf(r) {
-  const f = getPhilosophy(r.filoId);
-  if (!f) return 0;
-  return +f.aristas.reduce((s, k) => s + (r.aristas?.[k] || 0), 0).toFixed(2);
-}
-export function filoLevelOf(r) {
-  const pts = filoPointsOf(r);
+/** Índice de nivel (0..9) que corresponde a una XP acumulada. */
+export function xpLevelOf(xp) {
   let lvl = 0;
-  FILO_LEVELS.forEach((l, i) => { if (pts >= l.min) lvl = i; });
+  FILO_LEVELS.forEach((l, i) => { if ((xp || 0) >= l.min) lvl = i; });
   return lvl;
+}
+/** XP acumulada de una filosofía de la run (la activa si no se pasa id). */
+export function filoPointsOf(r, filoId = r.filoId) {
+  return filoId ? Math.round(r.filoXp?.[filoId] || 0) : 0;
+}
+/** Nivel 0..9 de una filosofía de la run (la activa si no se pasa id). */
+export function filoLevelOf(r, filoId = r.filoId) {
+  return filoId ? xpLevelOf(r.filoXp?.[filoId] || 0) : 0;
 }
 /** Etapa (0 Aprendiendo · 1 En desarrollo · 2 Consolidada) del nivel actual —
  *  la vista 0-2 que consumen el rival, la brecha R3 y los gates (T1). */
-export function filoEtapaOf(r) {
-  return FILO_LEVELS[filoLevelOf(r)].etapa;
+export function filoEtapaOf(r, filoId = r.filoId) {
+  return FILO_LEVELS[filoLevelOf(r, filoId)].etapa;
 }
 
 // Tipo firma por filosofía ({press: "recuperacion", ...}): lo que el pool sesga
@@ -157,31 +204,26 @@ export function filoEtapaOf(r) {
 // los datos para que no puedan divergir.
 export const FIRMA_TYPE = Object.fromEntries(PHILOSOPHIES.map(p => [p.id, aristaById(p.firma).tipo]));
 
+/* La otra fuente de XP que autoriza el GDD: los eventos y oportunidades del
+   calendario. Un "punto" de evento vale EVENT_XP: una oportunidad grande (2 pts)
+   equivale a media buena tarde de partido — nunca la reemplaza. */
+export const EVENT_XP = 80;
+
 /**
- * Progreso de identidad desde CONTENIDO (eventos/oportunidades/conflictos que
- * antes regalaban `buffs.tactica`): suma `pts` a la arista MÁS BAJA de la
- * filosofía activa (refuerza donde cojea; empate → la firma). Mutación con
- * primitivas, sin importar game/ (ARQUITECTURA §4, mismo patrón que la moral).
- * Devuelve la arista tocada (para el desc del evento) o null sin filosofía.
+ * Progreso de identidad desde CONTENIDO (eventos/oportunidades/conflictos):
+ * `pts` puntos de evento se vuelven XP de la filosofía ACTIVA, con la afinidad
+ * de tu escuela aplicada igual que en la cancha. Mutación con primitivas, sin
+ * importar game/ (ARQUITECTURA §4, mismo patrón que la moral). Devuelve
+ * {id, label, icon, xp} para el desc del evento, o null sin filosofía.
  */
 export function addFiloProgress(r, pts) {
   const f = getPhilosophy(r.filoId);
   if (!f) return null;
-  r.aristas = r.aristas || {};
-  const [a] = [...f.aristas].sort((x, y) => (r.aristas[x] || 0) - (r.aristas[y] || 0) || (x === f.firma ? -1 : 1));
-  r.aristas[a] = +((r.aristas[a] || 0) + pts).toFixed(2);
-  return aristaById(a);
+  const xp = Math.round(pts * EVENT_XP * afinidadMult(r.filoInicial, f.id));
+  r.filoXp = r.filoXp || {};
+  r.filoXp[f.id] = (r.filoXp[f.id] || 0) + xp;
+  return { id: f.id, label: f.name, icon: f.icon, xp, stat: aristaById(f.firma).stat };
 }
 
-/**
- * Progreso DIRECTO a la arista firma (F3: los eventos de filosofía trabajan la
- * identidad, no el hueco — "Visita del maestro", "Ensayo de la firma"). Misma
- * primitiva de mutación que addFiloProgress; null sin filosofía.
- */
-export function addFirmaProgress(r, pts) {
-  const f = getPhilosophy(r.filoId);
-  if (!f) return null;
-  r.aristas = r.aristas || {};
-  r.aristas[f.firma] = +((r.aristas[f.firma] || 0) + pts).toFixed(2);
-  return aristaById(f.firma);
-}
+/** Alias histórico (F3): los eventos de "la firma" trabajan la misma identidad. */
+export const addFirmaProgress = addFiloProgress;

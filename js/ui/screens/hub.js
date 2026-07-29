@@ -10,11 +10,12 @@ import { currentLineup, validateLineup, getFormation, assignPositions, maxLineup
 import { dayLabel, advanceDay } from "../../game/calendar.js";
 import { buildDaily } from "../../game/daily.js";
 import { applyDayAction, actionMult, multLabel, dayOpportunity, canjeableBuffs, canjeBuff } from "../../game/day-action.js";
-import { DAY_ACTIONS, ARISTA_FOCUS, TRAIN_BUFF, TRAIN_FATIGUE, CANJE_THRESHOLD, CANJE_PERMANENT, STAT_LABELS } from "../../content/day-actions.js";
-import { getPhilosophy, aristaById, FILO_LEVELS, FILO_ETAPAS } from "../../content/philosophies.js";
-import { filoPoints, filoLevel, filoEtapa } from "../../game/philosophy.js";
-import { focusPayoff } from "../../game/traits.js";
-import { PRINCIPLE_COLORS } from "../board.js";
+import { DAY_ACTIONS, PLAN_XP_MULT, TRAIN_BUFF, TRAIN_FATIGUE, CANJE_THRESHOLD, CANJE_PERMANENT, STAT_LABELS } from "../../content/day-actions.js";
+import { getPhilosophy, FILO_LEVELS, FILO_ETAPAS } from "../../content/philosophies.js";
+import { filoPoints, filoLevel, filoEtapa, filoXpMults } from "../../game/philosophy.js";
+import { planPayoff } from "../../game/traits.js";
+import { dtProgress, DT_MAX } from "../../game/coach.js";
+import { markerColor } from "../board.js";
 import { RARITIES } from "../../content/rarities.js";
 import { addJournal } from "../../game/journal.js";
 import { moraleBand } from "../../game/morale.js";
@@ -301,30 +302,29 @@ function actionCard() {
   const stOf = id => !chosen ? "active" : (id === chosenId ? "chosen" : "muted");
   const tMult = actionMult(run, training[0]);
   const trainState = !chosen ? "active" : (chosenGroup === "entrenar" ? "chosen" : "muted");
-  // Sesión Táctica reformada (F1): panel de FOCOS de arista, calcado del de Entrenar.
-  // Las 2 aristas de la filosofía se destacan (tu identidad); las otras 3 quedan
-  // disponibles — pre-entrenar otra filosofía es legal (demolición orgánica, PO #1).
+  // EL PLAN DE PARTIDO (arco de Progresión): panel de las 4 filosofías. Declarar
+  // una la vuelve la identidad que se juega y multiplica la XP que esa idea gane
+  // en el próximo partido. Nada sube desde acá: la experiencia se gana jugando.
   const filo = getPhilosophy(run.filoId);
-  // T1: la etiqueta visible es la ETAPA (Aprendiendo/Desarrollo/Consolidada);
-  // el nivel fino (1-10) vive en la pantalla del árbol.
   const nivel = FILO_ETAPAS[filoEtapa(run)];
   const tacMult = actionMult(run, tacRows[0]);
   const tacState = !chosen ? "active" : (chosenGroup === "tactica" ? "chosen" : "muted");
-  // La línea de payoff de un foco: hace visible la cadena entrenar → nivel → árbol
-  // (sprint Sesión Táctica). La regla vive en game/traits.focusPayoff; acá solo se
-  // redacta. Se guarda encodeURIComponent en data-payoff y se pinta al hover.
+  // La línea de payoff de un plan: hace visible la cadena jugar → XP → nivel → árbol.
+  // La regla vive en game/traits.planPayoff; acá solo se redacta. Se guarda
+  // encodeURIComponent en data-payoff y se pinta al hover.
   const tacPayoff = (a) => {
-    const k = a.id.replace("tactica_", "");
-    const p = focusPayoff(run, k);
-    const col = PRINCIPLE_COLORS[k];
-    const head = `<b style="color:${col}">${a.label} ${p.curr} → ${+(p.curr + ARISTA_FOCUS).toFixed(2)}</b>`;
-    if (!p.owned) return `${head} · <span class="text-slate-500">siembra otra identidad — no acerca tu nivel actual</span>`;
+    const k = a.id.replace("plan_", "");
+    const p = planPayoff(run, k);
+    const col = markerColor(getPhilosophy(k));
+    const mult = filoXpMults(run)[k] * (run.planFilo === k ? 1 : PLAN_XP_MULT);
+    const head = `<b style="color:${col}">${a.label} nivel ${p.lvl + 1}</b> <span class="text-slate-500">(${p.xp} XP)</span>`;
+    const escuela = p.propia ? ` · <span class="text-emerald-400">tu escuela</span>` : "";
     const lvl = p.nextAt != null
-      ? `nivel ${p.lvl + 2} a los ${p.nextAt} <span class="text-slate-500">(vas ${p.pts})</span>`
-      : `<span class="text-slate-500">la idea ya es ley</span>`;
+      ? ` · nivel ${p.lvl + 2} a los ${p.nextAt} XP · el partido rendiría <b class="text-amber-300">×${+mult.toFixed(2)}</b>`
+      : ` · <span class="text-slate-500">la idea ya es ley</span>`;
     const u = p.unlocks[0];
-    const unlock = u ? ` · acerca ${u.icon} <b>${u.nombre}</b> <span class="text-slate-500">(falta ${u.falta})</span>` : "";
-    return `${head} · ${lvl}${unlock}`;
+    const unlock = u ? ` · abre ${u.icon} <b>${u.nombre}</b> <span class="text-slate-500">(nivel ${u.nivel})</span>` : "";
+    return `${head}${escuela}${lvl}${unlock}`;
   };
   return `<div class="bg-slate-800/60 border tp-border rounded-2xl p-4 flex-1 flex flex-col">
     <h3 class="font-bold shrink-0">🧭 ${chosen ? "Tu acción de hoy" : "Acción del día"}</h3>
@@ -359,38 +359,39 @@ function actionCard() {
       : tacState === "muted" ? "border-slate-700 opacity-40"
       : `border-slate-700 ${tacMult === 0 ? "opacity-50" : ""}`}">
       <div class="flex items-center justify-between">
-        <span class="font-semibold text-sm">📋 Sesión táctica</span>
-        ${tacState === "chosen" ? chosenBadge : tacState === "muted" ? "" : (modBadge(tacMult) || `<span class="text-[10px] font-bold text-slate-500">construye identidad</span>`)}
+        <span class="font-semibold text-sm">📋 Plan de partido</span>
+        ${tacState === "chosen" ? chosenBadge : tacState === "muted" ? "" : (modBadge(tacMult) || `<span class="text-[10px] font-bold text-slate-500">declara tu fútbol</span>`)}
       </div>
-      <!-- Línea de PAYOFF: por defecto la consigna; al pasar el cursor por un foco,
-           muestra qué acerca (nivel + nodo del árbol). Footprint fijo — una línea. -->
+      <!-- Línea de PAYOFF: por defecto la consigna; al pasar el cursor por una idea,
+           muestra su nivel, lo que rendiría y qué abre. Footprint fijo — una línea. -->
       <p id="tac-payoff" class="chalk-hand text-[12px] leading-snug text-[#dff0e5]/70 mt-1 mb-2.5 min-h-[2.4em]"
-        data-default="+${ARISTA_FOCUS} al principio que entrenes hoy — tu fútbol sale más seguido${opp ? ` (próximo examen: vs ${opp.name})` : ""}. Pasa por un principio para ver qué acerca.">
-        +${ARISTA_FOCUS} al principio que entrenes hoy — tu fútbol sale más seguido${opp ? ` (próximo examen: vs ${opp.name})` : ""}. Pasa por un principio para ver qué acerca.
+        data-default="Declara qué fútbol va a jugar el equipo${opp ? ` ante ${opp.name}` : ""}: esa idea sale más seguido y rinde ×${PLAN_XP_MULT} de experiencia. Se aprende jugando, no eligiendo.">
+        Declara qué fútbol va a jugar el equipo${opp ? ` ante ${opp.name}` : ""}: esa idea sale más seguido y rinde ×${PLAN_XP_MULT} de experiencia. Se aprende jugando, no eligiendo.
       </p>
-      <div class="grid grid-cols-5 gap-1.5">
+      <div class="grid grid-cols-4 gap-1.5">
         ${tacRows.map(a => {
-          const k = a.id.replace("tactica_", "");
-          const own = !!filo && filo.aristas.includes(k);
-          const isFirma = filo && filo.firma === k;
-          const pts = run.aristas?.[k] || 0;
-          const col = PRINCIPLE_COLORS[k];
+          const k = a.id.replace("plan_", "");
+          const p = getPhilosophy(k);
+          const lvl = filoLevel(run, k);
+          const xp = filoPoints(run, k);
+          const piso = FILO_LEVELS[lvl].min, techo = FILO_LEVELS[lvl + 1]?.min ?? null;
+          const barPct = techo ? Math.min(100, (100 * (xp - piso)) / (techo - piso)) : 100;
+          const col = markerColor(p);
+          const propia = run.filoInicial === k;
+          const activa = run.filoId === k;
           const foco = chosen && a.id === chosenId;
           const active = !chosen && tacMult !== 0;
-          const barPct = Math.min(100, (pts / 6) * 100);
-          const dim = own ? col : "#8fae9c";
           return `<button data-action="${a.id}" data-payoff="${encodeURIComponent(tacPayoff(a))}" ${active ? "" : "disabled"}
-            class="${active ? "da-opt " : ""}tac-mark${foco ? " is-foco" : ""}" style="--pc:${col}" title="${a.desc}">
+            class="${active ? "da-opt " : ""}tac-mark${foco || activa ? " is-foco" : ""}" style="--pc:${col}" title="${a.desc}">
             <span class="text-[15px] leading-none">${a.icon}</span>
-            <span class="chalk-hand text-[13px] font-bold leading-none" style="color:${pts ? dim : "#5b6f63"}">${pts}${foco ? " ✓" : ""}</span>
-            <span class="tac-bar"><span style="width:${barPct}%;background:${own ? col : "#64748b"}"></span></span>
-            <span class="chalk-hand text-[10px] leading-tight text-center" style="color:${own ? col : "#8fae9c"}">${a.label}${isFirma ? " ·firma" : ""}</span>
+            <span class="chalk-hand text-[13px] font-bold leading-none" style="color:${col}">Nv ${lvl + 1}${foco ? " ✓" : ""}</span>
+            <span class="tac-bar"><span style="width:${barPct}%;background:${col}"></span></span>
+            <span class="chalk-hand text-[10px] leading-tight text-center" style="color:${col}">${p.name}${propia ? " ·escuela" : ""}</span>
           </button>`;
         }).join("")}
       </div>
       ${filo ? `<div class="flex items-center justify-between gap-2 mt-2.5">
-        <span class="text-[10px] text-slate-400">${filo.icon} <b class="tp-text">${filo.name}</b> · ${nivel.label} <span class="text-slate-500">(${filoPoints(run)} pts)</span></span>
-        ${!chosen ? `<button id="btn-filo-change" class="text-[10px] text-slate-500 hover:text-amber-400 cursor-pointer underline underline-offset-2" title="Cuesta la Acción del Día; las aristas entrenadas quedan">🔄 Cambiar identidad</button>` : ""}
+        <span class="text-[10px] text-slate-400">Hoy juegas ${filo.icon} <b class="tp-text">${filo.name}</b> · ${nivel.label}${run.planFilo ? ` · <span class="text-amber-300">plan declarado ×${PLAN_XP_MULT}</span>` : ""}</span>
       </div>` : ""}
     </div>
     ${rest.map(a => {
@@ -422,17 +423,25 @@ function filoCard() {
   const f = getPhilosophy(run.filoId);
   if (!f) return "";
   const pts = filoPoints(run);
-  const lvl = filoLevel(run);           // nivel fino 0..9 (T1: la escalera de PI)
+  const lvl = filoLevel(run);           // nivel 0..9 de la identidad que se juega
   const etapa = filoEtapa(run);         // etiqueta visible: la etapa de siempre
   const nivel = FILO_LEVELS[lvl];
   const next = FILO_LEVELS[lvl + 1] || null;
   const pct = next ? Math.min(100, (100 * (pts - nivel.min)) / (next.min - nivel.min)) : 100;
+  // La segunda capa (arco de Progresión): el Director Técnico y su barra propia.
+  // Las filosofías son lo que SABE el equipo; el DT es lo que sabe el entrenador.
+  const dt = dtProgress(run);
   return `<div id="btn-filo" class="rounded-xl border tp-border tp-bg-soft px-3 py-2 mb-3 shrink-0 cursor-pointer transition-all hover:brightness-125" title="Ver la identidad del equipo">
     <div class="flex items-center justify-between gap-2">
       <span class="text-xs font-bold ${etapa === 2 ? "text-amber-300" : "tp-text"}">${f.icon} ${f.name}</span>
-      <span class="text-[9px] uppercase tracking-wider font-black text-slate-400">${run.identityPoints > 0 ? `<span class="text-amber-300">🧠 ${run.identityPoints} PI</span> · ` : ""}Nv ${lvl + 1} · ${FILO_ETAPAS[etapa].label}${next ? ` · ${pts}/${next.min}` : ""}</span>
+      <span class="text-[9px] uppercase tracking-wider font-black text-slate-400">Nv ${lvl + 1} · ${FILO_ETAPAS[etapa].label}${next ? ` · ${pts}/${next.min} XP` : ""}</span>
     </div>
     <div class="h-1 rounded-full bg-slate-900/80 overflow-hidden mt-1.5"><div class="h-full rounded-full ${etapa === 2 ? "bg-amber-400" : "tp-gradient"}" style="width:${pct}%"></div></div>
+    <div class="flex items-center justify-between gap-2 mt-2">
+      <span class="text-[10px] font-bold text-slate-300">🧠 DT nivel ${run.dtNivel || 1}<span class="text-slate-600">/${DT_MAX}</span></span>
+      <span class="text-[9px] uppercase tracking-wider font-black ${run.identityPoints > 0 ? "text-amber-300" : "text-slate-500"}">${run.identityPoints > 0 ? `${run.identityPoints} PI por gastar` : `${dt.need ? `${dt.curr}/${dt.need}` : "tope"}`}</span>
+    </div>
+    <div class="h-1 rounded-full bg-slate-900/80 overflow-hidden mt-1"><div class="h-full rounded-full bg-sky-400" style="width:${dt.pct}%"></div></div>
   </div>`;
 }
 

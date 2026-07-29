@@ -34,7 +34,7 @@ import { clamp } from "../../core/math.js";
 import { playedPos } from "../ratings.js";
 import { moraleBand } from "../morale.js";
 import { SEQUENCE_TYPES, ADVANCED_BY_FILO } from "../../content/sequences.js";
-import { FIRMA_TYPE, FILO_LEVELS, FILO_ETAPAS, getPhilosophy } from "../../content/philosophies.js";
+import { FIRMA_TYPE, FILO_LEVELS, FILO_ETAPAS, getPhilosophy, filoOfType, xpLevelOf, XP_INTENCION, XP_ACIERTO } from "../../content/philosophies.js";
 import { rivalFilo } from "../philosophy.js";
 import { buildActDecision } from "./sequence-acts.js";
 import { hookOf, hasTrait, traitHooks, traitMoment } from "./trait-hooks.js";
@@ -54,6 +54,18 @@ export const SEQ_MIN = 2, SEQ_MAX = 6;
 export function protMomentum(p) { return 1 + 0.12 * ((p.momento ?? 4) - 4); }
 
 /**
+ * Peso por la STAT que la jugada pide (Odisea, 2ª mitad). Un tipo puede declarar
+ * `protStat`: el desborde por la banda lo corre el RÁPIDO, no un central que quedó
+ * suelto. Cuadrático sobre 70 (la media del plantel): vel 95 pesa ×1.8, vel 55 ×0.6 —
+ * inclina fuerte sin volverlo determinista (el segundo más rápido también juega).
+ */
+export function protStatW(type, p) {
+  if (!type.protStat) return 1;
+  const v = (p.stats[type.protStat] ?? 70) / 70;
+  return v * v;
+}
+
+/**
  * Perfil del rival DERIVADO de sus stats (decisión PO A2, #14): sin datos nuevos, cada
  * dimensión se normaliza a 0..1 desde el promedio de sus jugadores de campo. Define qué
  * fútbol te genera (y contra qué fútbol atacas tú): atk = su peligro directo · def = su
@@ -64,7 +76,8 @@ function rivalProfile(m) {
   const field = m.oppLineup.filter(p => p.pos !== "POR");
   const st = k => field.reduce((s, p) => s + (p.stats[k] || 50), 0) / Math.max(1, field.length);
   const N = x => clamp((x - 58) / 28, 0, 1); // ~58 (genéricos débiles) → 0 · ~86 (élite) → 1
-  return { atk: N(st("tiro")), def: N(st("defensa")), pase: N(st("pase")), cab: N(st("cabezazo")) };
+  const pase = st("pase_corto") * 0.6 + st("pase_largo") * 0.4;   // ODISEA: mezcla (ratings.PASE_MIX)
+  return { atk: N(st("tiro")), def: N(st("defensa")), pase: N(pase), cab: N(st("cabezazo")), vel: N(st("velocidad")) };
 }
 
 /**
@@ -139,6 +152,10 @@ function typeWeights(m, side, plan) {
     transicion: (2.5 + 2 * prof.atk) * (losingLate ? 1.5 : 1) * brave,
     recuperacion: (2 + 1.5 * prof.pase) * (ment === "ofensiva" ? 1.6 : 1) * (tired ? 0.6 : 1) * brave * noPress,
     pelotazo: (1.3 + 1.8 * prof.def) * (ment === "defensiva" ? 1.5 : 1) * (losingLate ? 1.5 : 1) * (tired ? 1.4 : 1) * scared,
+    // El desborde (Odisea): la respuesta clásica al rival que se encierra — cuanto más
+    // sólido y junto está el bloque rival, más sentido tiene ir por afuera. Cansado no
+    // sale (el sprint es lo primero que se pierde) y perdiendo tarde se busca más.
+    banda: (1.5 + 1.5 * prof.def) * (losingLate ? 1.4 : 1) * (tired ? 0.7 : 1) * brave,
     balon_parado: 1.5,
     caceria: 0, sinfonia: 0, contra_letal: 0,
   } : {
@@ -289,16 +306,56 @@ export function filoShareShift(myFilo, oppFilo) {
    trait-hooks.hasTrait (gegenpressing · desesperantes · trampa_cerrada · duenos_area).
    Consolidada da su PI, el mult 2.1 y el share 0.9 de la avanzada — nada más. */
 
+/* ============================================================
+   LA EXPERIENCIA SE GANA EN LA CANCHA (arco de Progresión,
+   28-jul-2026). Se aprende el fútbol que se juega: cada secuencia
+   le da XP a LA FILOSOFÍA DUEÑA DE ESE TIPO (filoOfType), sea o no
+   la que declaraste. El reparto del GDD:
+     70% INTENCIÓN   — la jugada se propuso (noteFiloIntent)
+     30% EFECTIVIDAD — el acto salió bien (noteFiloHit)
+   La XP se acumula YA multiplicada por afinidad y Plan de Partido
+   (m.my.filo.mult, que arma game/philosophy.filoXpMults): así la
+   barra que se ve crecer en vivo y la que se acredita al cerrar
+   son el mismo número, y el Match sigue sin conocer la run.
+   ============================================================ */
+
+/** Suma XP de identidad al Match y anuncia la SUBIDA DE NIVEL en vivo. */
+function grantFiloXp(m, filoId, base, campo) {
+  if (!filoId || !m.my.filo) return;
+  const mult = m.my.filo.mult?.[filoId] ?? 1;
+  const add = base * mult;
+  if (!add) return;
+  m.filoXp = m.filoXp || {};
+  m[campo] = m[campo] || {};
+  m[campo][filoId] = (m[campo][filoId] || 0) + 1;
+  const antes = xpLevelOf((m.my.filo.xp?.[filoId] || 0) + (m.filoXp[filoId] || 0));
+  m.filoXp[filoId] = (m.filoXp[filoId] || 0) + add;
+  const ahora = xpLevelOf((m.my.filo.xp?.[filoId] || 0) + m.filoXp[filoId]);
+  // SKILL-UP EN VIVO (decisión PO): el nivel sube EN el partido y el relato lo grita.
+  if (ahora > antes) {
+    const f = getPhilosophy(filoId);
+    m.log("filo", `${f.icon} min ${m.clock()}' — ¡${f.name.toUpperCase()} NIVEL ${ahora + 1}! El equipo entendió algo jugando: esa idea ya se sabe mejor.`);
+  }
+}
+
+/** La INTENCIÓN: el equipo propuso una jugada de ese fútbol (la llama el arranque
+ *  de secuencia). Es el 70% de la XP — jugar tu idea vale aunque no salga. */
+export function noteFiloIntent(m, type) {
+  if (type?.side !== "mine" && !DEF_XP_TYPES.includes(type?.id)) return;
+  grantFiloXp(m, filoOfType(type), XP_INTENCION, "filoIntentos");
+}
+// Las dos secuencias que enseñan defendiendo (son `side: "opp"` pero la identidad
+// que se ejercita es MÍA: aguantar el bloque ES el fútbol del Bloque bajo).
+const DEF_XP_TYPES = ["repliegue", "fortaleza"];
+
 /**
- * Acierto de un acto en una secuencia del TIPO FIRMA de mi filosofía (F1, "successful
- * execution" del Bible §5): lo cuentan sequence-acts (cada acto que progresa) y
- * chances.goalMine (el gol que corona). El contador vive en el Match; la conversión a
- * progreso de arista (con tope) la hace game/philosophy del lado run de la frontera.
+ * La EFECTIVIDAD: un acto de la secuencia salió bien (lo cuentan sequence-acts) o
+ * el gol la coronó (chances.goalMine). Es el 30% restante.
  */
 export function noteFiloHit(m) {
-  const f = m.my.filo, s = m.seq;
-  // La AVANZADA también es tu firma (M2): jugar tu fútbol superior consolida igual.
-  if (f && s && (s.type.id === FIRMA_TYPE[f.id] || s.type.advFor === f.id)) m.filoHits = (m.filoHits || 0) + 1;
+  const s = m.seq;
+  if (!s) return;
+  grantFiloXp(m, filoOfType(s.type), XP_ACIERTO, "filoAciertos");
 }
 
 /**
@@ -354,13 +411,14 @@ export function maybeStartSequence(m) {
 /** Arranca una secuencia de un tipo dado: elige protagonista(s) y crea la decisión del acto 1. */
 export function startSequence(m, type) {
   m._seqCount = (m._seqCount || 0) + 1;
+  noteFiloIntent(m, type);   // la INTENCIÓN: proponer ese fútbol ya enseña (70% de la XP)
   m._lastSeqType = type.id; // memoria del contexto dinámico: no repetir tipo dos veces seguidas
   m._flow.push({ min: m.min, side: type.side, w: 3 }); // posesión/momentum derivados (A3, #11)
   m.stats.decisiones++;
   if (type.side === "mine") {
     const cands = m.activeMine().filter(p => p.pos !== "POR");
     // Momento → protagonista (decisión #15): ver protMomentum.
-    const prot = m._weightedPick(cands, cands.map(p => (type.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
+    const prot = m._weightedPick(cands, cands.map(p => (type.protWeight[playedPos(p)] ?? 1) * protMomentum(p) * protStatW(type, p)));
     m.seq = { type, prot, actIdx: 0, bonus: 0 };
     // El 4º compás de la sinfonía profunda: era el rasgo F2 de Posesión (Consolidada);
     // desde T2 lo COMPRA Sitio al Área (migración al árbol, decisión PO #2).
@@ -412,7 +470,7 @@ export function startSequence(m, type) {
     if (type.plan[0] === "playout") {
       const defs = m.activeMine().filter(p => playedPos(p) === "DEF");
       const pool = defs.length ? defs : m.activeMine().filter(p => p.pos !== "POR");
-      m.seq.prot = pool.sort((a, b) => (b.stats.pase || 0) - (a.stats.pase || 0))[0];
+      m.seq.prot = pool.sort((a, b) => (b.stats.pase_corto || 0) - (a.stats.pase_corto || 0))[0];
     }
     m.log("event", `${type.icon} min ${m.clock()}' — ${type.flavor.intro(m.oppTeam)}`);
     // T3 — el bozal de Asfixia Total se NARRA de vez en cuando: el rival con identidad

@@ -17,8 +17,7 @@ import { resetOxidacion } from "./oxidation.js";
 import { applyDisciplinePostMatch, clearAmarillas } from "./discipline.js";
 import { applyMomentumPostMatch } from "./momentum.js";
 import { applyMoralePostMatch, bumpMorale } from "./morale.js";
-import { applyFiloExecution, applyFiloCosts, noteFiloMilestones } from "./philosophy.js";
-import { syncIdentityPI } from "./traits.js";
+import { applyFiloXp, applyFiloCosts, noteFiloMilestones } from "./philosophy.js";
 import { assignScorers } from "./scorers.js";
 import { assignAssists } from "./assists.js";
 import { qualifyRound32, computeTable } from "./tournament/groups.js";
@@ -110,12 +109,12 @@ export function postMatchUpdate(run, match) {
     p.enCancha = false;
   }
   const morale = applyMoralePostMatch(run, match);
-  // Progresión por ejecución (F1): los aciertos del tipo firma que contó el Match
-  // (match.filoHits) se vuelven progreso de la arista firma, con tope por partido.
-  // `filoExec` viaja en el retorno para que el post-partido lo narre (F3).
-  const filoExec = applyFiloExecution(run, match);
+  // LA PROGRESIÓN (arco de Progresión): la XP que el Match repartió por filosofía se
+  // acredita, sube niveles, paga XP al DT y este imprime PI. `filoExec` viaja en el
+  // retorno para que el post-partido lo narre.
+  const filoExec = applyFiloXp(run, match);
   noteFiloMilestones(run); // la cancha pudo consolidar el umbral: la conquista se narra (M2)
-  syncIdentityPI(run);     // …y la ejecución pudo subir de nivel: el PI se acredita acá (T1)
+  run.planFilo = null;     // el Plan de Partido se consume con el partido
   run.buffs = {};
   // Oxidación (R1): JUGAR devuelve el ritmo ("jugar es ritmo", decisión PO). El reset va
   // acá, en el cierre físico — el partido ya se jugó con la racha que traía el plantel.

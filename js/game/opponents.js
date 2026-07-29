@@ -9,11 +9,14 @@ import { TEAM_PHILOSOPHIES, FILO_FORMATION } from "../content/team-philosophies.
 import { getFormation } from "./lineup.js";
 
 // Desvíos por posición al derivar stats desde el rating del equipo
+// ODISEA (sprint 1): el `pase` se partió en corto/largo y entró la `velocidad`. El perfil
+// de cada puesto se mantiene y se le suma el criterio nuevo: el lateral/extremo rival corre,
+// el central es lento, el arquero no corre y el volante reparte corto mejor que largo.
 export const POS_MODS = {
-  POR: { atajadas: +8, reflejos: +5, salidas: -3, pase: -15, aura: 0 },
-  DEF: { tiro: -30, defensa: +10, cabezazo: +10, pase: -10, aura: 0 },
-  MED: { tiro: -10, defensa: -10, cabezazo: -10, pase: +10, aura: 0 },
-  DEL: { tiro: +10, defensa: -40, cabezazo: +10, pase: -10, aura: +10 },
+  POR: { atajadas: +8, reflejos: +5, salidas: -3, pase_corto: -14, pase_largo: -10, velocidad: -22, aura: 0 },
+  DEF: { tiro: -30, defensa: +10, cabezazo: +10, pase_corto: -10, pase_largo: -12, velocidad: -2, aura: 0 },
+  MED: { tiro: -10, defensa: -10, cabezazo: -10, pase_corto: +11, pase_largo: +7, velocidad: -4, aura: 0 },
+  DEL: { tiro: +10, defensa: -40, cabezazo: +10, pase_corto: -9, pase_largo: -16, velocidad: +8, aura: +10 },
 };
 
 // Los 5 genéricos que completan el plantel rival hasta 10 (Jugador6..Jugador10).

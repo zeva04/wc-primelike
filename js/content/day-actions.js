@@ -7,11 +7,11 @@
    - Entrenar sube una stat (+1 hasta el próximo partido) pero
      CANSA (−5 de energía a todo el plantel).
    - Recuperar devuelve energía pero no mejora a nadie.
-   - La Sesión Táctica elige un FOCO de arista (como Entrenar
-     elige stat) y suma +1 a esa arista de la identidad (arco de
-     Filosofía F1; el viejo buff atk/def MURIÓ por decisión PO:
-     la táctica ya no compra poder inmediato — construye la
-     filosofía, que sesga qué fútbol genera el partido).
+   - El PLAN DE PARTIDO elige QUÉ FÚTBOL va a jugar el equipo
+     (arco de Progresión): no compra nada — ni stats ni progreso
+     (el GDD prohíbe subir filosofías desde el menú) — pero fija
+     la identidad activa y multiplica la experiencia que esa idea
+     gane en el próximo partido. Se paga jugando, no eligiendo.
 
    El CANJE (regla en game/day-action.js) cierra el círculo: un
    boost de entrenamiento acumulado hasta +CANJE_THRESHOLD en una
@@ -25,13 +25,15 @@
    `group: "entrenar"` agrupa los focos de entrenamiento en la UI.
    ============================================================ */
 import { clamp } from "../core/math.js";
-import { ARISTAS } from "./philosophies.js";
+import { PHILOSOPHIES } from "./philosophies.js";
 
 // +1 y no +5: el entrenamiento es elegible (siempre apunta donde quieres),
 // los eventos de ±5 no. Elegible > aleatorio a igual magnitud. El PO lo bajó
 // de +4 a +1 (17-jul): con +4 el buff dominaba y el canje se conseguía en un día.
 export const TRAIN_BUFF = 1;
 export const TRAIN_FATIGUE = 5;
+// El foco de velocidad cansa MÁS: correr piques no es lo mismo que un rondo (Odisea).
+export const VELOCIDAD_FATIGUE_EXTRA = 3;
 const RECOVER_ENERGY = 10;
 // Team Bonding (Sprint 3, decisión PO 20-jul-2026): sube la Moral del equipo pero CUESTA
 // energía — la integración es una jornada más, no un descanso. Es la palanca para gestionar
@@ -46,13 +48,15 @@ export const CANJE_THRESHOLD = 4;
 export const CANJE_PERMANENT = 1;
 // Stats reales que admiten canje: las de campo + las de arquero. Los buffs que NO son
 // stats (penales, antiLesion) nunca se canjean.
-export const CANJEABLE_STATS = ["tiro", "defensa", "cabezazo", "pase", "aura", "atajadas", "reflejos", "salidas"];
+export const CANJEABLE_STATS = ["tiro", "defensa", "cabezazo", "pase_corto", "pase_largo", "velocidad", "aura", "atajadas", "reflejos", "salidas"];
 // Etiquetas de stat para la UI y el diario (fuente única; la UI del hub las reusa).
-export const STAT_LABELS = { tiro: "Tiro", defensa: "Defensa", cabezazo: "Cabezazo", pase: "Pase", aura: "Aura", atajadas: "Atajadas", reflejos: "Reflejos", salidas: "Salidas" };
-// Sesión Táctica reformada (F1): +1 a la arista del foco elegido. Sin costo de
-// energía — su costo es el de siempre: el día no fue ni a entrenar ni a recuperar,
-// y el retorno ya no es inmediato (el sesgo del pool crece con el nivel).
-export const ARISTA_FOCUS = 1;
+export const STAT_LABELS = { tiro: "Tiro", defensa: "Defensa", cabezazo: "Cabezazo", pase_corto: "Pase corto", pase_largo: "Pase largo", velocidad: "Velocidad", aura: "Aura", atajadas: "Atajadas", reflejos: "Reflejos", salidas: "Salidas" };
+// EL PLAN DE PARTIDO (arco de Progresión, decisión PO 28-jul-2026): la Sesión
+// Táctica ya no compra progreso desde el menú — el GDD lo prohíbe. Declara qué
+// fútbol va a intentar el equipo: pasa a ser la identidad activa (sesga qué
+// jugadas genera el partido) y multiplica ×PLAN_XP_MULT la XP que ese partido
+// deje para esa idea. Sin costo de energía: su costo es el día.
+export const PLAN_XP_MULT = 1.5;
 
 const tire = r => r.squad.forEach(p => p.energia = clamp(p.energia - TRAIN_FATIGUE, 5, 100));
 
@@ -73,11 +77,32 @@ export const DAY_ACTIONS = [
     desc: `+${TRAIN_BUFF} de Defensa y Atajadas para el próximo partido · −${TRAIN_FATIGUE} de energía`,
     effect: (r, m = 1) => { const v = Math.round(TRAIN_BUFF * m); r.buffs.defensa = (r.buffs.defensa || 0) + v; r.buffs.atajadas = (r.buffs.atajadas || 0) + v; tire(r); },
   },
+  // ODISEA (sprint 1, decisión PO 29-jul-2026): el viejo foco "Pases" se partió en dos —
+  // la circulación corta y el envío largo son dos entrenamientos distintos — y entró el
+  // trabajo de VELOCIDAD, que ahora es una stat de primer orden en la media.
   {
-    id: "entrenar_pases", group: "entrenar", icon: "🎩", label: "Pases",
+    id: "entrenar_pase_corto", group: "entrenar", icon: "🎩", label: "Pase corto",
     title: "Entrenamiento de circulación",
-    desc: `+${TRAIN_BUFF} de Pase para el próximo partido · −${TRAIN_FATIGUE} de energía`,
-    effect: (r, m = 1) => { r.buffs.pase = (r.buffs.pase || 0) + Math.round(TRAIN_BUFF * m); tire(r); },
+    desc: `+${TRAIN_BUFF} de Pase corto para el próximo partido · −${TRAIN_FATIGUE} de energía`,
+    effect: (r, m = 1) => { r.buffs.pase_corto = (r.buffs.pase_corto || 0) + Math.round(TRAIN_BUFF * m); tire(r); },
+  },
+  {
+    id: "entrenar_pase_largo", group: "entrenar", icon: "🏹", label: "Pase largo",
+    title: "Entrenamiento de envíos largos",
+    desc: `+${TRAIN_BUFF} de Pase largo para el próximo partido · −${TRAIN_FATIGUE} de energía`,
+    effect: (r, m = 1) => { r.buffs.pase_largo = (r.buffs.pase_largo || 0) + Math.round(TRAIN_BUFF * m); tire(r); },
+  },
+  {
+    // La velocidad se entrena corriendo: es el foco que MÁS cansa (decisión de diseño —
+    // el trabajo de piques es el más exigente del microciclo y el único que sube la stat
+    // que más pesa en un delantero).
+    id: "entrenar_velocidad", group: "entrenar", icon: "💨", label: "Velocidad",
+    title: "Trabajo de piques",
+    desc: `+${TRAIN_BUFF} de Velocidad para el próximo partido · −${TRAIN_FATIGUE + VELOCIDAD_FATIGUE_EXTRA} de energía`,
+    effect: (r, m = 1) => {
+      r.buffs.velocidad = (r.buffs.velocidad || 0) + Math.round(TRAIN_BUFF * m);
+      tire(r); r.squad.forEach(p => p.energia = clamp(p.energia - VELOCIDAD_FATIGUE_EXTRA, 5, 100));
+    },
   },
   {
     id: "recuperar", icon: "🧘", label: "Recuperar",
@@ -85,15 +110,15 @@ export const DAY_ACTIONS = [
     desc: `+${RECOVER_ENERGY} de energía para todo el plantel`,
     effect: (r, m = 1) => r.squad.forEach(p => p.energia = clamp(p.energia + Math.round(RECOVER_ENERGY * m), 5, 100)),
   },
-  // Los 5 focos de la Sesión Táctica (F1): uno por arista, generados desde el
-  // catálogo de content/philosophies. Muta run.aristas con primitivas (§4, como
-  // la moral); acepta fracciones (los modificadores del día ×2/×½ escalan igual
-  // que siempre, y la progresión por ejecución también suma en decimales).
-  ...ARISTAS.map(a => ({
-    id: `tactica_${a.id}`, group: "tactica", icon: a.icon, label: a.label,
-    title: `Sesión táctica: ${a.label}`,
-    desc: `+${ARISTA_FOCUS} a ${a.label} (${a.desc}) — la identidad del equipo progresa`,
-    effect: (r, m = 1) => { r.aristas = r.aristas || {}; r.aristas[a.id] = +((r.aristas[a.id] || 0) + ARISTA_FOCUS * m).toFixed(2); },
+  // Los 4 focos del Plan de Partido: uno por filosofía, generados desde el
+  // catálogo de content/philosophies. Muta con primitivas (§4, como la moral):
+  // fija la identidad que se juega y deja declarado el plan. El modificador del
+  // día NO escala nada acá — declarar una idea no admite medias tintas.
+  ...PHILOSOPHIES.map(p => ({
+    id: `plan_${p.id}`, group: "tactica", icon: p.icon, label: p.name,
+    title: `Plan de partido: ${p.name}`,
+    desc: `El equipo sale a jugar ${p.name} — ×${PLAN_XP_MULT} de experiencia de esa idea en el próximo partido`,
+    effect: (r) => { r.filoId = p.id; r.planFilo = p.id; },
   })),
   {
     // El contenido muta la moral con primitivas + clamp, SIN importar game/ (ARQUITECTURA §4):

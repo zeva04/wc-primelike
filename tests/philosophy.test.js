@@ -38,102 +38,139 @@ assert(E.FILO_ETAPAS[0].min === 0 && E.FILO_ETAPAS[1].min === 4 && E.FILO_ETAPAS
 assert(E.FILO_ETAPAS[0].mult === 1.35 && E.FILO_ETAPAS[1].mult === 1.7 && E.FILO_ETAPAS[2].mult === 2.1, "mults de etapa EXACTOS de F1 (el rival no se recalibra)");
 assert(E.FILO_LEVELS[3].etapa === 0 && E.FILO_LEVELS[4].etapa === 1 && E.FILO_LEVELS[8].etapa === 1 && E.FILO_LEVELS[9].etapa === 2, "el mapeo nivel→etapa respeta las anclas 4/9");
 
-// ---------- nacimiento, elección y nivel ----------
+// ---------- nacimiento, elección y nivel (arco de Progresión) ----------
 const run = E.newRun("BRA");
-assert(run.filoId === null && typeof run.aristas === "object", "la run nace sin filosofía y con aristas vacías");
+assert(run.filoId === null && run.filoInicial === null, "la run nace sin filosofía ni escuela");
+assert(Object.values(run.filoXp).every(v => v === 0) && run.dtNivel === 1 && run.identityPoints === 0, "las 4 progresiones nacen en 0 y el DT en nivel 1");
 assert(E.filoCtx(run) === null, "sin filosofía no hay filo en el matchCtx");
 const antes = run.journal.length;
 assert(E.choosePhilosophy(run, "no_existe") === null, "elegir una filosofía inexistente no hace nada");
 const f = E.choosePhilosophy(run, "press");
-// T1: la elección escribe DOS entradas — la identidad y el PI inicial del nivel 1
-assert(f && run.filoId === "press" && run.journal.length === antes + 2, "la elección queda en la run y escribe el diario (identidad + PI)");
+assert(f && run.filoId === "press" && run.filoInicial === "press" && run.journal.length === antes + 1, "la elección queda en la run y escribe el diario");
+assert(run.identityPoints === 1, "elegir filosofía ES el nivel 1 del DT: 1 PI para el rasgo básico obligatorio");
 
-assert(E.filoPoints(run) === 0 && E.filoLevel(run) === 0 && E.filoEtapa(run) === 0, "nace en nivel 1 (índice 0), Aprendiendo, con 0 pts");
-run.aristas.presion = 3; run.aristas.solidez = 99; // solidez NO es del press: no cuenta
-assert(E.filoPoints(run) === 3 && E.filoLevel(run) === 3 && E.filoEtapa(run) === 0, "las aristas ajenas no suman; 3 pts = nivel 4, aún Aprendiendo");
-run.aristas.verticalidad = 1;
-assert(E.filoPoints(run) === 4 && E.filoLevel(run) === 4 && E.filoEtapa(run) === 1, "ancla de En desarrollo (4 pts = nivel 5)");
-run.aristas.presion = 8;
-assert(E.filoLevel(run) === 9 && E.filoEtapa(run) === 2, "ancla de Consolidada (9 pts = nivel 10)");
+assert(E.filoPoints(run) === 0 && E.filoLevel(run) === 0 && E.filoEtapa(run) === 0, "nace en nivel 1 (índice 0), Aprendiendo, con 0 XP");
+run.filoXp.press = E.FILO_LEVELS[3].min; run.filoXp.bloque = 99999; // el bloque NO es la activa
+assert(E.filoLevel(run) === 3 && E.filoEtapa(run) === 0, "la XP de otra filosofía no mueve la activa; nivel 4, aún Aprendiendo");
+assert(E.filoLevel(run, "bloque") === 9, "cada filosofía lleva su propio nivel (el bloque está en 10)");
+run.filoXp.press = E.FILO_LEVELS[4].min;
+assert(E.filoLevel(run) === 4 && E.filoEtapa(run) === 1, "ancla de En desarrollo (nivel 5)");
+run.filoXp.press = E.FILO_LEVELS[9].min;
+assert(E.filoLevel(run) === 9 && E.filoEtapa(run) === 2, "ancla de Consolidada (nivel 10)");
 assert(E.filoCtx(run).id === "press" && E.filoCtx(run).nivel === 9 && E.filoCtx(run).etapa === 2, "filoCtx viaja {id, nivel, etapa}");
-run.aristas.presion = 20; run.aristas.verticalidad = 20;
-assert(E.filoLevel(run) === 9 && E.filoEtapa(run) === 2, "la escalera tiene techo: puntos de sobra no desbordan el índice");
+run.filoXp.press = 999999;
+assert(E.filoLevel(run) === 9, "la escalera tiene techo: XP de sobra no desborda el índice");
 
-// ---------- focos de la Sesión Táctica ----------
+// ---------- afinidad de la escuela ----------
+{
+  for (const [ini, fila] of Object.entries(E.AFINIDAD)) {
+    assert(fila[ini] === 2, "la propia escuela aprende al doble", ini);
+    assert(Object.values(fila).filter(v => v === 0.6).length === 1, "cada escuela tiene EXACTAMENTE una opuesta", ini);
+    assert(Object.keys(fila).length === 4, "la fila cubre las 4 filosofías", ini);
+  }
+  assert(E.afinidadMult("posesion", "press") === 1.25 && E.afinidadMult("posesion", "contra") === 1
+    && E.afinidadMult("posesion", "bloque") === 0.6, "el ejemplo del GDD: desde Posesión, Press afín · Contra neutral · Bloque opuesta");
+  const r = E.newRun("BRA");
+  E.choosePhilosophy(r, "contra");
+  const m = E.filoXpMults(r);
+  assert(m.contra === 2 && m.bloque === 1.25 && m.press === 1 && m.posesion === 0.6, "los mults salen de la ESCUELA, no de lo que juegues", JSON.stringify(m));
+  r.planFilo = "bloque";
+  assert(E.filoXpMults(r).bloque === +(1.25 * E.PLAN_XP_MULT).toFixed(2), "el Plan de Partido multiplica encima de la afinidad");
+}
+
+// ---------- el Plan de Partido (Acción del Día) ----------
 {
   const r = E.newRun("BRA");
   E.choosePhilosophy(r, "posesion");
   r.actionPending = true;
   const energiaAntes = r.squad.map(p => p.energia);
-  const res = E.applyDayAction(r, "tactica_elaboracion");
-  assert(res && r.aristas.elaboracion === 1, "el foco suma +1 a su arista", JSON.stringify(r.aristas));
-  assert(r.buffs.tactica === undefined, "el buff táctico está MUERTO: el foco no lo escribe");
-  assert(r.squad.every((p, i) => p.energia === energiaAntes[i]), "la Sesión Táctica no cuesta energía");
-  assert(!r.actionPending, "el foco consume la Acción del Día");
-  // el modificador del día escala el foco como al resto del grupo
-  r.actionPending = true;
-  r.dayMod = { title: "prueba", mods: { tactica: 2 } };
-  E.applyDayAction(r, "tactica_elaboracion");
-  assert(r.aristas.elaboracion === 3, "el ×2 del día duplica el foco", r.aristas.elaboracion);
+  const res = E.applyDayAction(r, "plan_contra");
+  assert(res && r.filoId === "contra" && r.planFilo === "contra", "declarar el plan cambia la identidad que se juega");
+  assert(Object.values(r.filoXp).every(v => v === 0), "el menú NO regala experiencia (regla del GDD)");
+  assert(r.buffs.tactica === undefined, "el buff táctico sigue MUERTO");
+  assert(r.squad.every((p, i) => p.energia === energiaAntes[i]), "el Plan de Partido no cuesta energía");
+  assert(!r.actionPending, "el plan consume la Acción del Día");
   r.actionPending = true;
   r.dayMod = { title: "prueba", mods: { tactica: 0 } };
-  assert(E.applyDayAction(r, "tactica_presion") === null && r.actionPending, "el bloqueo del día bloquea TODOS los focos");
+  assert(E.applyDayAction(r, "plan_press") === null && r.actionPending, "el bloqueo del día bloquea TODOS los planes");
 }
 
-// ---------- cambio con costo y demolición orgánica ----------
+// ---------- cambio de identidad: cada idea guarda su nivel ----------
 {
   const r = E.newRun("BRA");
   E.choosePhilosophy(r, "press");
-  r.aristas.presion = 5; r.aristas.verticalidad = 2;
+  r.filoXp.press = 900;
   r.actionPending = false;
   assert(E.changePhilosophy(r, "contra") === null, "sin Acción del Día pendiente no hay cambio");
   r.actionPending = true;
   assert(E.changePhilosophy(r, "press") === null && r.actionPending, "cambiar a la misma filosofía no consume nada");
   const g = E.changePhilosophy(r, "contra");
   assert(g && r.filoId === "contra" && !r.actionPending, "el cambio consume la Acción del Día");
-  assert(r.aristas.presion === 5 && r.aristas.verticalidad === 2, "las aristas PERSISTEN (demolición orgánica)");
-  assert(E.filoPoints(r) === 2, "el nivel ahora se calcula sobre las aristas de la filosofía nueva (verticalidad 2 + solidez 0)");
+  assert(r.planFilo === "contra", "el día invertido vale como Plan de Partido");
+  assert(r.filoXp.press === 900 && r.filoXp.contra === 0, "lo aprendido de cada idea queda donde estaba");
+  assert(r.filoInicial === "press", "la ESCUELA no cambia nunca: la afinidad es de por vida");
 }
 
-// ---------- progresión por ejecución ----------
+// ---------- la progresión del partido: XP → nivel → DT → PI ----------
 {
   const r = E.newRun("BRA");
-  E.choosePhilosophy(r, "contra");
-  assert(E.applyFiloExecution(r, { filoHits: 0 }) === null, "sin aciertos no hay progreso");
-  const res = E.applyFiloExecution(r, { filoHits: 1 });
-  assert(res && res.add === E.FILO_EXEC_GAIN && r.aristas.verticalidad === 0.25, "un acierto suma FILO_EXEC_GAIN a la arista firma");
-  const res2 = E.applyFiloExecution(r, { filoHits: 99 });
-  assert(res2.add === E.FILO_EXEC_CAP * E.FILO_EXEC_GAIN && r.aristas.verticalidad === 0.75, "el tope por partido corta la avalancha", r.aristas.verticalidad);
-  assert(E.applyFiloExecution({ ...r, filoId: null }, { filoHits: 5 }) === null, "sin filosofía no hay ejecución que contar");
+  E.choosePhilosophy(r, "press");
+  assert(E.applyFiloXp(r, {}) === null, "un partido sin jugadas de identidad no reporta nada");
+  const parte = E.applyFiloXp(r, { filoXp: { press: 300, bloque: 60 }, filoIntentos: { press: 5 }, filoAciertos: { press: 3 } });
+  assert(r.filoXp.press === 300 && r.filoXp.bloque === 60, "la XP se acredita en CADA filosofía que se ejercitó");
+  assert(parte.filos[0].id === "press" && parte.filos[0].intentos === 5 && parte.filos[0].aciertos === 3, "el parte trae el desglose intención/efectividad");
+  assert(parte.filos[0].antes === 0 && parte.filos[0].ahora === 1, "300 XP cruzan el primer umbral (250)");
+  assert(parte.dtXp === E.FILO_LEVEL_REWARD[2], "la subida a nivel 2 paga la recompensa exacta del GDD");
+  assert(r.dtXp === parte.dtXp && r.identityPoints === 2, "el DT cobró la XP y su subida imprimió el 2º PI");
+  assert(E.FILO_LEVEL_REWARD[10] > 3 * E.FILO_LEVEL_REWARD[2], "llevar una idea de 9 a 10 paga 3× lo que paga de 1 a 2");
 }
 
-// ---------- addFiloProgress / addFirmaProgress (contenido) ----------
+// ---------- el Director Técnico (game/coach) ----------
+{
+  const r = E.newRun("BRA");
+  E.choosePhilosophy(r, "bloque");
+  assert(E.DT_LEVELS.length === E.DT_MAX && E.DT_LEVELS[0] === 0, "20 niveles de DT y el primero es gratis");
+  assert(E.DT_LEVELS.every((v, i) => i === 0 || v > E.DT_LEVELS[i - 1]), "curva de DT estrictamente creciente");
+  assert(E.dtLevelOf(0) === 1 && E.dtLevelOf(E.DT_LEVELS[19]) === 20, "el mapeo XP→nivel cubre los extremos");
+  const res = E.addCoachXp(r, E.DT_LEVELS[4]);
+  assert(res.nivel === 5 && res.pi === 4 && r.identityPoints === 5, "subir 4 niveles de golpe imprime 4 PI (más el inicial)");
+  E.addCoachXp(r, 999999);
+  assert(r.dtNivel === 20, "el DT tiene techo en 20");
+  assert(E.FILO_LEVEL_REWARD.slice(2).reduce((s, x) => s + x, 0) < E.DT_LEVELS[19],
+    "una sola filosofía al tope NO alcanza para el DT 20: hay que abrir una segunda idea");
+}
+
+// ---------- addFiloProgress: los eventos también enseñan ----------
 {
   const r = E.newRun("BRA");
   assert(E.addFiloProgress(r, 1) === null, "sin filosofía el contenido no regala progreso");
   assert(E.addFirmaProgress(r, 1) === null, "tampoco a la firma (F3)");
   E.choosePhilosophy(r, "bloque");
   const a = E.addFiloProgress(r, 1);
-  assert(a && a.id === "directo" && r.aristas.directo === 1, "en empate refuerza la arista firma", a?.id);
-  const b = E.addFiloProgress(r, 0.5);
-  assert(b && b.id === "solidez" && r.aristas.solidez === 0.5, "refuerza la arista más baja de la filosofía", b?.id);
-  const c = E.addFirmaProgress(r, 1);
-  assert(c && c.id === "directo" && r.aristas.directo === 2, "addFirmaProgress va DIRECTO a la firma aunque no sea la más baja (F3)", c?.id);
+  assert(a && a.id === "bloque" && a.xp === E.EVENT_XP * 2, "el evento paga XP a la filosofía activa, con afinidad de escuela", a && a.xp);
+  assert(r.filoXp.bloque === a.xp, "la XP del evento queda acreditada");
+  assert(E.STAT_LABELS[a.stat], "el evento sigue pudiendo tocar la stat de ese fútbol (Ensayo de la firma)");
 }
 
-// ---------- F3: una sola fuente para puntos/nivel (content delega en game) ----------
+// ---------- una sola fuente para XP/nivel (content delega en game) ----------
 {
   const r = E.newRun("BRA");
   E.choosePhilosophy(r, "press");
-  r.aristas.presion = 3; r.aristas.verticalidad = 2;
+  r.filoXp.press = 700;
   assert(E.filoPointsOf(r) === E.filoPoints(r) && E.filoLevelOf(r) === E.filoLevel(r), "filoPointsOf/filoLevelOf (content) ≡ filoPoints/filoLevel (game)");
-  // los datos F3 del catálogo: counters y voces de la firma para el relato
+  assert(E.xpLevelOf(700) === E.filoLevel(r), "xpLevelOf es la misma escalera (la usa el Match para el skill-up en vivo)");
+  for (const [tipo, filo] of Object.entries(E.FILO_BY_TIPO)) {
+    assert(E.SEQUENCE_TYPES.some(t => t.id === tipo), "el tipo existe en el catálogo", tipo);
+    assert(E.PHILOSOPHIES.some(p => p.id === filo), "la filosofía que aprende existe", filo);
+  }
   for (const p of E.PHILOSOPHIES) {
+    assert(Object.values(E.FILO_BY_TIPO).includes(p.id), "las 4 filosofías tienen al menos un fútbol que las enseña", p.id);
     assert(p.counters && p.counters.brilla.length > 15 && p.counters.sufre.length > 15, "counters cualitativos visibles (pantalla de identidad)", p.id);
     assert(Array.isArray(p.firmaIntros) && p.firmaIntros.length >= 2 && p.firmaIntros.every(fn => typeof fn({ name: "X" }) === "string"), "voces de la firma para el relato", p.id);
   }
   for (const a of E.ARISTAS) assert(E.STAT_LABELS[a.stat], "cada arista trabaja una stat real (evento Ensayo de la firma)", a.id);
 }
+
 
 // ---------- F2: la identidad del rival (curación + derivación) ----------
 {

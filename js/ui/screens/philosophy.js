@@ -20,22 +20,17 @@
    en el flujo de inicio (elegir filosofía trae acá con 1 PI para
    el 1-de-3 de rasgos básicos; el botón sigue al sorteo).
    ============================================================ */
-import { getPhilosophy, aristaById, FILO_LEVELS, FILO_ETAPAS } from "../../content/philosophies.js";
+import { getPhilosophy, FILO_LEVELS, FILO_ETAPAS, AFINIDAD_LABEL, afinidadMult } from "../../content/philosophies.js";
 import { ADVANCED_BY_FILO } from "../../content/sequences.js";
 import { RAMA_LABELS, DEEP_TRAIT } from "../../content/traits.js";
 import { filoPoints, filoLevel, filoEtapa } from "../../game/philosophy.js";
+import { dtProgress, DT_MAX } from "../../game/coach.js";
 import { traitTree, buyTrait, traitCost } from "../../game/traits.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenShell, $ } from "../components.js";
 import { showFiloChange } from "../filo-change.js";
-import { tacticBoard, nodePos, camTransform, markerColor, PRINCIPLE_COLORS, TIER_LABEL, NOTES_ID, notesBlocks } from "../board.js";
-
-/** Todos los principios que exige un rasgo, marcando los AJENOS a la filosofía. */
-function reqPrinciples(t, f) {
-  const list = [...(t.req.principio ? [t.req.principio] : []), ...(t.req.principios || [])];
-  return list.map(p => ({ ...p, arista: aristaById(p.id), ajeno: !f.aristas.includes(p.id) }));
-}
+import { tacticBoard, nodePos, camTransform, markerColor, TIER_LABEL, NOTES_ID, notesBlocks } from "../board.js";
 
 const MAGNETS = `<span class="tb-magnet" style="left:9px"></span><span class="tb-magnet" style="right:9px"></span>`;
 
@@ -57,7 +52,6 @@ const MAGNETS = `<span class="tb-magnet" style="left:9px"></span><span class="tb
 function traitCard(t, f, run, color) {
   const isMaster = t.tier === "master";
   const ink = isMaster && t.owned ? "#fbbf24" : color;
-  const ajenos = reqPrinciples(t, f).filter(p => p.ajeno);
 
   // El precio es un dato del rasgo, no del botón: se muestra siempre (tuyo,
   // comprable o bloqueado) y sale de game/traits — el día que un rasgo valga 2 PI,
@@ -98,8 +92,6 @@ function traitCard(t, f, run, color) {
     <p class="chalk-hand text-[16px] leading-snug mt-4" style="color:${ink}">“${t.momento}”</p>
 
     <div class="mt-auto pt-5">
-      ${ajenos.map(p => `<p class="chalk-hand text-[13.5px] leading-snug mb-3" style="color:${PRINCIPLE_COLORS[p.id]}">
-        ⚠ Pide ${p.arista.icon} ${p.arista.label}, un principio AJENO: entrenarlo no acelera tu filosofía.</p>`).join("")}
       ${precio}
       ${accion}
     </div>`;
@@ -130,18 +122,25 @@ function notesCard(f, adv, deep, deepOwned, etapa, color) {
 
 function renderPhilosophy(opts = {}, selected = null) {
   const run = S.run;
-  const f = getPhilosophy(run.filoId);
+  // ARBOLES NAVEGABLES (arco de Progresión): las 4 filosofías progresan a la vez, así
+  // que la pizarra muestra la que estés MIRANDO (`opts.view`), no solo la que juegas.
+  // La franja de cabecera del tablero es el selector.
+  const viewId = opts.view && getPhilosophy(opts.view) ? opts.view : run.filoId;
+  const f = getPhilosophy(viewId);
   if (!f) { go("hub"); return; }              // sin identidad no hay pizarra
-  const tree = traitTree(run);
+  const tree = traitTree(run, viewId);
   const color = markerColor(f);
-  const pts = filoPoints(run);
-  const lvl = filoLevel(run);                 // nivel fino 0..9 (T1)
-  const etapa = filoEtapa(run);               // etapa 0..2 (los hitos de siempre)
+  const pts = filoPoints(run, viewId);
+  const lvl = filoLevel(run, viewId);         // nivel 0..9 de la filosofía mirada
+  const etapa = FILO_LEVELS[lvl].etapa;       // etapa 0..2 (los hitos de siempre)
   const nivel = FILO_LEVELS[lvl];
   const next = FILO_LEVELS[lvl + 1] || null;
-  const adv = ADVANCED_BY_FILO[f.id];         // la secuencia avanzada de mi identidad (M2)
+  const adv = ADVANCED_BY_FILO[f.id];         // la secuencia avanzada de esa identidad (M2)
   const deep = DEEP_TRAIT[f.id];              // el rasgo que la profundiza (migración F2, T2)
   const deepOwned = (run.rasgos?.[f.id] || []).includes(deep.id);
+  const dt = dtProgress(run);
+  const afin = afinidadMult(run.filoInicial, viewId);
+  const jugando = viewId === run.filoId;
   // Progreso hacia el próximo umbral desde el piso del nivel actual (para que la barra
   // no nazca medio llena al subir de nivel).
   const nivelPct = next ? (100 * (pts - nivel.min)) / (next.min - nivel.min) : 100;
@@ -167,6 +166,7 @@ function renderPhilosophy(opts = {}, selected = null) {
         <div class="min-w-0">
           <div class="flex items-baseline gap-2.5">
             <h1 class="text-xl font-black leading-none tracking-tight">${f.name}</h1>
+            <span class="text-[9px] font-black uppercase tracking-[.18em] px-2 py-1 rounded-lg ${jugando ? "text-emerald-300 bg-emerald-500/10" : "text-slate-500 bg-slate-800/70"}">${jugando ? "la que juegas" : "solo mirando"}</span>
             <!-- El cambio de identidad, en la misma línea del nombre: no cuesta
                  un píxel de alto y queda donde el jugador mira su identidad. -->
             <button id="btn-filo" class="text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all ${cambioTxt.cls}"
@@ -177,6 +177,15 @@ function renderPhilosophy(opts = {}, selected = null) {
       </div>
 
       <div class="flex items-center gap-3 ml-auto">
+        <!-- EL DIRECTOR TÉCNICO: la segunda capa. Los PI que gasta el árbol salen de acá. -->
+        <div class="text-right leading-none">
+          <div class="text-[9px] font-black uppercase tracking-[.2em] mb-1 text-sky-400/70">Director técnico</div>
+          <div class="text-[15px] font-black">Nivel ${run.dtNivel || 1}<span class="text-slate-600 text-[12px] font-bold">/${DT_MAX}</span>
+            ${run.identityPoints > 0 ? `<span class="text-amber-300 text-[12px]"> · ${run.identityPoints} PI</span>` : ""}</div>
+          <div class="h-[4px] w-28 ml-auto rounded-full bg-black/60 overflow-hidden ring-1 ring-white/10 mt-1.5">
+            <div class="h-full rounded-full bg-sky-400" style="width:${dt.pct}%"></div>
+          </div>
+        </div>
         <div class="text-right leading-none">
           <div class="text-[9px] font-black uppercase tracking-[.2em] mb-1" style="color:${oro}b3">${FILO_ETAPAS[etapa].label}</div>
           <div class="text-[15px] font-black">Nivel ${lvl + 1}<span class="text-slate-600 text-[12px] font-bold">/10</span></div>
@@ -185,10 +194,11 @@ function renderPhilosophy(opts = {}, selected = null) {
           <div class="h-[6px] rounded-full bg-black/60 overflow-hidden ring-1 ring-white/10">
             <div class="h-full rounded-full transition-all duration-500" style="width:${Math.min(100, nivelPct)}%;background:linear-gradient(90deg,${oro}88,${oro})"></div>
           </div>
-          <div class="text-[9.5px] text-slate-500 mt-1.5">${pts} pts${next ? ` · nivel ${lvl + 2} a los ${next.min}` : " · la idea ya es ley"} · tu firma sale ×${nivel.mult}</div>
+          <div class="text-[9.5px] text-slate-500 mt-1.5">${pts} XP${next ? ` · nivel ${lvl + 2} a los ${next.min}` : " · la idea ya es ley"} · su firma sale ×${nivel.mult} · aprende ×${afin} <span class="opacity-70">(${AFINIDAD_LABEL[afin] || "neutral"})</span></div>
         </div>
         ${opts.onboarding
-          ? `<button id="btn-continue" class="btn-primary text-sm">Al sorteo →</button>`
+          ? `<button id="btn-continue" class="btn-primary text-sm ${run.identityPoints > 0 ? "opacity-40 cursor-not-allowed" : ""}"
+              title="${run.identityPoints > 0 ? "Primero incorpora tu primera idea: elige uno de los tres rasgos básicos" : ""}">Al sorteo →</button>`
           : `<button id="btn-back" class="text-sm text-slate-400 hover:text-slate-200 cursor-pointer px-3 py-2 rounded-xl border border-slate-700 hover:border-slate-500">← Volver</button>`}
       </div>
     </div>
@@ -255,6 +265,11 @@ function renderPhilosophy(opts = {}, selected = null) {
   // (Escuchar solo el fondo no basta: cualquier trazo pintado encima —grano, líneas
   // de cancha, regla lateral, notas— se come el evento antes de que llegue al rect.)
   svg.addEventListener("click", (e) => {
+    // La franja de cabecera es el SELECTOR de árbol: tocar otra filosofía cambia de pizarra.
+    const tab = e.target.closest("[data-filo]");
+    // En ONBOARDING no se navega: el PI inicial se gasta SÍ o SÍ en un básico de la
+    // escuela elegida (GDD). Después, la pizarra entera queda abierta.
+    if (tab) { if (!opts.onboarding) renderPhilosophy({ ...opts, view: tab.dataset.filo }); return; }
     const g = e.target.closest("[data-node]");
     if (g) open(g.dataset.node); else close();
   });
@@ -264,7 +279,7 @@ function renderPhilosophy(opts = {}, selected = null) {
     if (opts.onboarding) go("start-run", run.teamId);          // rehace la run: cero estado a medias
     else if (run.actionPending) showFiloChange(() => renderPhilosophy(opts));
   };
-  if (opts.onboarding) $("#btn-continue").onclick = () => go("draw");
+  if (opts.onboarding) $("#btn-continue").onclick = () => { if (!run.identityPoints) go("draw"); };
   else $("#btn-back").onclick = () => go("hub");
 }
 
