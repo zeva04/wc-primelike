@@ -43,7 +43,7 @@ export function closeMatch(run, match) {
   run.stats.penalesAtajados += match.stats.penalesAtajados;
 
   const stageTxt = run.stage === "groups" ? `Fase de grupos · Fecha ${run.matchday + 1}` : STAGE_LABEL[run.stage];
-  const scorersTxt = match.scorers.map(s => `${s.name} ${s.min}'`).join(", ");
+  const scorersTxt = match.scorers.map(s => `${s.name} ${s.clock ?? s.min}'`).join(", ");
   const pensTxt = res.pens ? ` (${res.pens.myGoals}-${res.pens.oppGoals} en penales)` : "";
   addJournal(run, {
     icon: won ? "🎉" : drew ? "🤝" : "😞",

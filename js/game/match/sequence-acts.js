@@ -22,6 +22,8 @@ import { hookOf, rollChain, chainMine, traitMoment, hasTrait } from "./trait-hoo
 const planOf = s => s.plan || s.type.plan;
 import * as A from "./actions.js";
 import { goalMine, goalOpp, myPenalty, lastManChance } from "./chances.js";
+import { noteCorner } from "./stats.js";
+import { noteMomentum } from "./match-momentum.js";
 
 /** Crea la decisión del acto actual según su `kind`. Las opciones son reglas (mapean a
  *  Football Actions); el flavor viene del tipo. */
@@ -29,15 +31,21 @@ export function buildActDecision(m) {
   const s = m.seq, kind = planOf(s)[s.actIdx];
   const opts = {
     build: () => ({
-      title: `⚡ min ${m.min}' — Circulación: ${s.prot.name} tiene la pelota`,
+      title: `⚡ min ${m.clock()}' — Circulación: ${s.prot.name} tiene la pelota`,
       text: "¿Cómo la hacen circular?",
       options: [
         { label: "🎩 Pase seguro", hint: `Mantiene la posesión (Pase ${s.prot.stats.pase})`, key: "seguro" },
         { label: "🔑 Pase filtrado", hint: "Arriesgado, pero deja mejor perfil de remate", key: "filtrado" },
+        // LA TRAMPA (Posesión): la jugada NUEVA que desbloquea el rasgo — una tercera
+        // opción en el acto, no un modificador escondido. Una sola vez por secuencia:
+        // es un recurso del DT, no una forma de circular eternamente.
+        ...(hookOf(m, "backPass") && !s.backUsed
+          ? [{ label: "🔙 Retroceso de posesión", hint: "Saca al rival de su bloque: mejor perfil, pero la jugada no avanza", key: "atras" }]
+          : []),
       ],
     }),
     carry: () => ({
-      title: `⚡ min ${m.min}' — Transición: ${s.prot.name} conduce`,
+      title: `⚡ min ${m.clock()}' — Transición: ${s.prot.name} conduce`,
       text: "La defensa rival viene a la carrera. ¿Qué hace?",
       options: [
         { label: "🏃 Conducir al espacio", hint: `Puede ganar una falta (Aura ${s.prot.stats.aura})`, key: "conducir" },
@@ -45,15 +53,19 @@ export function buildActDecision(m) {
       ],
     }),
     finish: () => ({
-      title: `🎯 min ${m.min}' — ¡Momento de definir! ${s.prot.name}`,
+      title: `🎯 min ${m.clock()}' — ¡Momento de definir! ${s.prot.name}`,
       text: "¿Cómo resuelve la jugada?",
       options: [
         { label: "💥 Rematar", hint: `Tiro ${s.prot.stats.tiro}`, key: "rematar" },
         { label: "🤝 Buscar al mejor ubicado", hint: "Un pase más para una definición mejor", key: "asistir" },
+        // FRÍOS (Press, Master): la otra jugada NUEVA del catálogo. Solo en el tramo
+        // final y sin ir perdiendo — congelar ganando o empatando es fútbol; hacerlo
+        // en el minuto 20 sería renunciar al partido.
+        ...(canFreeze(m) ? [{ label: "🧊 Congelar el partido", hint: "Renuncias al remate: a cambio, el rival pierde su próxima llegada", key: "congelar" }] : []),
       ],
     }),
     contain: () => ({
-      title: `🧱 min ${m.min}' — ¡${s.shooter.name} encara! Hay que defender`,
+      title: `🧱 min ${m.clock()}' — ¡${s.shooter.name} encara! Hay que defender`,
       text: "¿Cómo lo frena la zaga?",
       options: [
         { label: "🧍 Contener y esperar", hint: "Seguro: baja la peligrosidad", key: "contener" },
@@ -64,8 +76,8 @@ export function buildActDecision(m) {
       // El 2º acto de la Cacería total (M2) es la TRAMPA sobre el reseteo rival — mismo
       // gesto (Football Action de presión), otro momento del fútbol.
       title: s.type.id === "caceria" && s.actIdx === 1
-        ? `🦁 min ${m.min}' — ¡El rival intenta resetear y la trampa se cierra! ${s.prot.name} otra vez encima`
-        : `🦁 min ${m.min}' — ¡Presión alta! ${s.prot.name} achica sobre la salida rival`,
+        ? `🦁 min ${m.clock()}' — ¡El rival intenta resetear y la trampa se cierra! ${s.prot.name} otra vez encima`
+        : `🦁 min ${m.clock()}' — ¡Presión alta! ${s.prot.name} achica sobre la salida rival`,
       text: "¿Cómo cazan la pelota?",
       options: [
         { label: "🔥 Presión total", hint: "Robo en zona letal (remate top)… pero si la rompen, duele", key: "total" },
@@ -73,7 +85,7 @@ export function buildActDecision(m) {
       ],
     }),
     duel: () => ({
-      title: `🌩️ min ${m.min}' — Pelotazo a ${s.prot.name}: se viene el duelo aéreo`,
+      title: `🌩️ min ${m.clock()}' — Pelotazo a ${s.prot.name}: se viene el duelo aéreo`,
       text: "¿Cómo lo juega?",
       options: [
         { label: "🤜 Ir al choque", hint: `Cabezazo ${s.prot.stats.cabezazo} — ganarla es rematar de cabeza`, key: "choque" },
@@ -84,7 +96,7 @@ export function buildActDecision(m) {
       const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
       s.target = mates.sort((a, b) => (b.stats.cabezazo || 0) - (a.stats.cabezazo || 0))[0] || s.prot;
       return {
-        title: `🎯 min ${m.min}' — Balón parado: lo para ${s.prot.name}`,
+        title: `🎯 min ${m.clock()}' — Balón parado: lo para ${s.prot.name}`,
         text: "¿Qué ensayaron en la semana?",
         options: [
           { label: `📡 Centro al área para ${s.target.name}`, hint: `Cabezazo ${s.target.stats.cabezazo}`, key: "centro" },
@@ -93,7 +105,7 @@ export function buildActDecision(m) {
       };
     },
     defend_sp: () => ({
-      title: `🚨 min ${m.min}' — Córner de ${m.oppTeam.name}: ${s.shooter.name} manda en el área`,
+      title: `🚨 min ${m.clock()}' — Córner de ${m.oppTeam.name}: ${s.shooter.name} manda en el área`,
       text: "¿Cómo lo defiende la zaga?",
       options: [
         { label: "🧲 Defensa en zona", hint: "Seguro: cada uno cuida su espacio", key: "zonal" },
@@ -101,7 +113,7 @@ export function buildActDecision(m) {
       ],
     }),
     playout: () => ({
-      title: `🗼 min ${m.min}' — ${m.oppTeam.name} asfixia la salida: la tiene ${s.prot.name}`,
+      title: `🗼 min ${m.clock()}' — ${m.oppTeam.name} asfixia la salida: la tiene ${s.prot.name}`,
       text: "¿Cómo salen del fondo?",
       options: [
         { label: "💎 Salir jugando", hint: `Pase ${s.prot.stats.pase} — romper la presión regala una contra tuya`, key: "jugar" },
@@ -112,11 +124,19 @@ export function buildActDecision(m) {
   m.decision = { id: "sequence", ...opts };
 }
 
+/**
+ * ¿Se puede congelar? Fríos es un rasgo de ESTADO: pide el tramo final (desde el 70')
+ * y NO ir perdiendo — con ventaja o empate (decisión PO: el empate también sirve, y
+ * en fase de grupos a veces es justo lo que hace falta).
+ */
+export const FREEZE_FROM_MIN = 70;
+const canFreeze = m => !!hookOf(m, "iceGame") && m.min >= FREEZE_FROM_MIN && m.gMy >= m.gOpp;
+
 // Feedback del DT (PO 22-jul): solo las decisiones con RIESGO real generan comentario —
 // el relato celebra el acierto de la arriesgada y cobra su fallo. La opción segura no
 // opina: no hay mérito en lo seguro.
-const dtOk = m => m.log("info", `min ${m.min}' — 🎯 ${pick(["La decisión del DT fue la correcta.", "La apuesta del banco sale perfecta.", "El riesgo del DT paga."])}`);
-const dtFail = m => m.log("info", `min ${m.min}' — 💢 ${pick(["La apuesta del DT salió cara.", "El riesgo no pagó esta vez.", "Decisión valiente, castigo inmediato."])}`);
+const dtOk = m => m.log("info", `min ${m.clock()}' — 🎯 ${pick(["La decisión del DT fue la correcta.", "La apuesta del banco sale perfecta.", "El riesgo del DT paga."])}`);
+const dtFail = m => m.log("info", `min ${m.clock()}' — 💢 ${pick(["La apuesta del DT salió cara.", "El riesgo no pagó esta vez.", "Decisión valiente, castigo inmediato."])}`);
 
 /**
  * El que pasa SE DESPRENDE de la pelota (bug PO 22-jul): la recibe un compañero, que pasa a
@@ -144,6 +164,21 @@ export function resolveSequenceAct(m, key) {
   const f = s.type.flavor;
 
   if (kind === "build") {
+    // LA TRAMPA (Posesión): el RETROCESO DE POSESIÓN. La jugada no avanza —se paga un
+    // toque— pero el rival tiene que salir de su bloque, y el ataque queda mejor
+    // perfilado. No es gratis: retroceder con el equipo adelantado es justo cuando la
+    // pérdida más duele, así que el pase se juega de verdad y su fallo abre contra.
+    if (key === "atras") {
+      const bp = hookOf(m, "backPass");
+      s.backUsed = true;                      // se marca ANTES de tirar: el recurso ya se gastó
+      if (!A.actPass(m, s.prot).ok)
+        return maybeCounter(m, `min ${m.clock()}' — ¡Le roban el pase hacia atrás a ${s.prot.name} con el equipo adelantado!`, true);
+      s.bonus += bp.bonus;
+      traitMoment(m, bp.traitId, [bp.texto]);
+      passTo(m, s);
+      buildActDecision(m);                    // el MISMO acto se vuelve a jugar: la jugada se reinicia
+      return false;
+    }
     // La construcción NO es una compuerta de supervivencia: modula la CALIDAD del remate
     // (bonus), no si la jugada muere. El pase seguro siempre progresa; el filtrado arriesga
     // perder la pelota a cambio de mejor perfil. Así el gate de gol es el remate (como las
@@ -165,7 +200,7 @@ export function resolveSequenceAct(m, key) {
           buildActDecision(m);
           return false;
         }
-        return maybeCounter(m, `min ${m.min}' — ${f.buildFail}`, true);
+        return maybeCounter(m, `min ${m.clock()}' — ${f.buildFail}`, true);
       }
       s.bonus += 0.07;
     }
@@ -183,7 +218,7 @@ export function resolveSequenceAct(m, key) {
       return false;
     }
     const recibe = passTo(m, s); // seguro o filtrado: el pase cambia la pelota de pies
-    m.log("plain", `min ${m.min}' — ${f.buildOk}${recibe ? ` La recibe ${s.prot.name}.` : ""}`);
+    m.log("plain", `min ${m.clock()}' — ${f.buildOk}${recibe ? ` La recibe ${s.prot.name}.` : ""}`);
     if (key === "filtrado") dtOk(m);
     return escalate(m);
   }
@@ -196,7 +231,7 @@ export function resolveSequenceAct(m, key) {
         // del área) es la falta desesperada — amarilla + tiro libre encadenado; en el
         // segundo (zona letal) es PENAL, como la conducción de siempre.
         if (s.type.advFor === "contra" && s.actIdx === 0) return advFoulSetPiece(m, f.foulText, s.type.adv.freekickBonus);
-        m.log("event", `min ${m.min}' — ¡Derriban a ${s.prot.name}! ¡PENAL!`); closeSilent(m); return myPenalty(m);
+        m.log("event", `min ${m.clock()}' — ¡Derriban a ${s.prot.name}! ¡PENAL!`); closeSilent(m); return myPenalty(m);
       }
       if (!r.ok) {
         // 2º tramo del letal (M2): el rival YA está partido, replegando a la desesperada.
@@ -210,27 +245,27 @@ export function resolveSequenceAct(m, key) {
             const rival = alive.length ? pick(alive) : null;
             if (rival && rnd() < s.type.adv.despRed) {
               rival.expulsado = true;
-              m.log("card", `min ${m.min}' — 🟥 ${f.redText(rival)}`);
+              m.log("card", `min ${m.clock()}' — 🟥 ${f.redText(rival)}`);
               return chainSetPiece(m, s.type.adv.despFreekickBonus);
             }
             if (rival) {
               rival.amarillaPartido = (rival.amarillaPartido || 0) + 1;
-              m.log("card", `min ${m.min}' — 🟨 ${f.penalFoulText(rival)}`);
-              if (rival.amarillaPartido >= 2) { rival.expulsado = true; m.log("card", `min ${m.min}' — 🟥 ¡Era su segunda amarilla! EXPULSADO.`); }
+              m.log("card", `min ${m.clock()}' — 🟨 ${f.penalFoulText(rival)}`);
+              if (rival.amarillaPartido >= 2) { rival.expulsado = true; m.log("card", `min ${m.clock()}' — 🟥 ¡Era su segunda amarilla! EXPULSADO.`); }
             }
             closeSilent(m);
             return myPenalty(m);
           }
-          m.log("chance", `min ${m.min}' — ${f.carryFail}`); dtFail(m); return closeSilent(m);
+          m.log("chance", `min ${m.clock()}' — ${f.carryFail}`); dtFail(m); return closeSilent(m);
         }
-        return maybeCounter(m, `min ${m.min}' — ${f.carryFail}`, true);
+        return maybeCounter(m, `min ${m.clock()}' — ${f.carryFail}`, true);
       }
       // El Contragolpe letal paga por tramo (adv.carryBonus: el rival partido vale más
       // que la transición simple); el 1er tramo profundo era el rasgo F2 de Consolidada —
       // desde T2 lo compra La Trampa Cerrada (migración al árbol).
       s.bonus += (s.type.advFor === "contra" ? s.type.adv.carryBonus[Math.min(s.actIdx, 1)] : 0.05)
         + (s.type.advFor === "contra" && s.actIdx === 0 && hasTrait(m, "trampa_cerrada") ? s.type.adv.deepBonus : 0);
-      m.log("plain", `min ${m.min}' — ${f.carryOk(s.prot)}`);
+      m.log("plain", `min ${m.clock()}' — ${f.carryOk(s.prot)}`);
       dtOk(m);
     } else {
       // Pase al pie: seguro, siempre progresa. En el Contragolpe letal (M2) TAMBIÉN gana
@@ -238,8 +273,8 @@ export function resolveSequenceAct(m, key) {
       s.bonus += s.type.advFor === "contra" ? s.type.adv.passBonus[Math.min(s.actIdx, 1)] : 0.02;
       const pasador = s.prot;
       m.log("plain", passTo(m, s) // el pase al pie también se desprende de la pelota
-        ? `min ${m.min}' — ${pasador.name} la juega al pie y ${s.prot.name} toma la posta.`
-        : `min ${m.min}' — ${f.carryOk(s.prot)}`);
+        ? `min ${m.clock()}' — ${pasador.name} la juega al pie y ${s.prot.name} toma la posta.`
+        : `min ${m.clock()}' — ${f.carryOk(s.prot)}`);
     }
     return escalate(m);
   }
@@ -256,12 +291,12 @@ export function resolveSequenceAct(m, key) {
       // amarilla (acumula) + tiro libre encadenado. El % profundo era el rasgo F2 de
       // Consolidada — desde T2 lo compra Cacería Letal (migración al árbol).
       if (caza && rnd() < (hasTrait(m, "gegenpressing") ? s.type.adv.foulBreakDeep : s.type.adv.foulBreak)) return advFoulSetPiece(m, f.foulText, s.type.adv.freekickBonus);
-      return maybeCounter(m, `min ${m.min}' — ${f.pressFail}`, total);
+      return maybeCounter(m, `min ${m.clock()}' — ${f.pressFail}`, total);
     }
     // El 2º robo de la cacería es en ZONA LETAL (+trapBonus); el deepBonus era el rasgo
     // F2 de Consolidada — desde T2 lo compra Cacería Letal (migración al árbol).
     s.bonus += (total ? 0.15 : 0.05) + (caza && s.actIdx === 1 ? s.type.adv.trapBonus + (hasTrait(m, "gegenpressing") ? s.type.adv.deepBonus : 0) : 0);
-    m.log("event", `min ${m.min}' — ${caza && s.actIdx === 1 ? f.press2Ok : f.pressOk}`);
+    m.log("event", `min ${m.clock()}' — ${caza && s.actIdx === 1 ? f.press2Ok : f.pressOk}`);
     if (total) dtOk(m);
     // T1 — Trampa en la Banda: el robo de la recuperación puede CONVERTIRSE en ataque
     // inmediato (transición con el bonus a cuestas) en vez de escalar a su desenlace.
@@ -291,7 +326,8 @@ export function resolveSequenceAct(m, key) {
       // balón parado encadenado. La fortaleza casi siempre saca algo.
       if (s.cornerOnDuelFail && rnd() < s.cornerOnDuelFail) {
         if (key === "peinar") dtFail(m);
-        m.log("chance", `min ${m.min}' — ${sequenceType("fortaleza").flavor.cornerText}`);
+        noteCorner(m, "mine"); noteMomentum(m, "corner");   // córner ganado de verdad
+        m.log("chance", `min ${m.clock()}' — ${sequenceType("fortaleza").flavor.cornerText}`);
         return chainSetPiece(m, 0.02);
       }
       // T1 — Segunda Jugada: el duelo perdido no siempre es pérdida — la segunda
@@ -300,15 +336,15 @@ export function resolveSequenceAct(m, key) {
       const sj = rollChain(m, "chainOnDuelFail");
       if (sj) {
         if (key === "peinar") dtFail(m);
-        m.log("chance", `min ${m.min}' — ${f.duelFail}`);
+        m.log("chance", `min ${m.clock()}' — ${f.duelFail}`);
         const up = hookOf(m, "secondBallUpgrade");
         return chainMine(m, sj.to, { bonus: sj.bonus + (up?.bonus || 0), intro: up?.intro || sj.intro, buildDecision: buildActDecision }) ? false : closeSilent(m);
       }
-      const out = closeSeq(m, "chance", `min ${m.min}' — ${f.duelFail}`);
+      const out = closeSeq(m, "chance", `min ${m.clock()}' — ${f.duelFail}`);
       if (key === "peinar") dtFail(m);
       return out;
     }
-    m.log("event", `min ${m.min}' — ${f.duelOk(winner)}`);
+    m.log("event", `min ${m.clock()}' — ${f.duelOk(winner)}`);
     if (key === "peinar") {
       const runners = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
       if (runners.length) s.prot = m._weightedPick(runners, runners.map(p => playedPos(p) === "DEL" ? 3 : 1));
@@ -323,21 +359,41 @@ export function resolveSequenceAct(m, key) {
   }
 
   if (kind === "finish") {
+    // FRÍOS: se cambia MI ocasión por la del rival. La jugada muere sin peligro y el
+    // generador le descuenta una llegada al rival (sequences.maybeStartSequence). Es
+    // una decisión honesta: resignás atacar para proteger el resultado.
+    if (key === "congelar") {
+      const ice = hookOf(m, "iceGame");
+      m._frozen = (m._frozen || 0) + 1;
+      traitMoment(m, ice.traitId, [ice.texto]);
+      return closeSeq(m, "info", `min ${m.clock()}' — ${s.prot.name} la devuelve al área propia. El equipo se queda con la pelota y el reloj corre.`);
+    }
     // La sinfonía (M2): si TODOS los compases sonaron (desesperación llena), un % de las
     // veces el rival ya no llega con las piernas y te baja DENTRO del área — penal.
     // El penal profundo (y el 4º compás) eran el rasgo F2 de Consolidada — desde T2 los
     // compra Sitio al Área (migración al árbol). Si no hay penal, el remate llega limpio.
     if (s.type.advFor === "posesion" && (s.buildOks || 0) >= planOf(s).filter(k => k === "build").length
         && rnd() < (hasTrait(m, "desesperantes") ? s.type.adv.penaltyChanceDeep : s.type.adv.penaltyChance)) {
-      m.log("event", `min ${m.min}' — ${f.penaltyText(s.prot)}`);
+      m.log("event", `min ${m.clock()}' — ${f.penaltyText(s.prot)}`);
       closeSilent(m);
       return myPenalty(m);
+    }
+    // LA MÁQUINA COLECTIVA (Posesión, Master): tras una circulación LARGA en campo
+    // rival —todos los compases sonaron, la misma condición de "desesperación llena"
+    // que abre el penal de la sinfonía— la pelota puede quedar SERVIDA: al atacante
+    // solo le queda empujarla. Acá el premio no es un penal: es el gol hecho.
+    const tap = hookOf(m, "tapIn");
+    if (tap && familyOf(s.type) === "circulacion"
+        && (s.buildOks || 0) >= planOf(s).filter(k => k === "build").length && rnd() < tap.p) {
+      s.bonus += tap.bonus;
+      s.tapIn = true;
+      traitMoment(m, tap.traitId, [tap.texto]);
     }
     // T1 — Pausa: en el desenlace de la circulación, la aceleración súbita — el
     // rival dormido por el tempo no llega al cierre (mejor perfil, relato propio).
     // Por FAMILIA: la sinfonía también acelera (hallazgo del gate T1).
     const acc = hookOf(m, "accelFinish");
-    if (acc && familyOf(s.type) === acc.of && rnd() < acc.p) { s.bonus += acc.bonus; m.log("event", `min ${m.min}' — ${acc.intro(s.prot)}`); }
+    if (acc && familyOf(s.type) === acc.of && rnd() < acc.p) { s.bonus += acc.bonus; m.log("event", `min ${m.clock()}' — ${acc.intro(s.prot)}`); }
     // T2 — Arco a la Vista: si la jugada nació en su variante profunda (la asfixia
     // sobre el saque de meta), el desenlace llega a quemarropa.
     const df = hookOf(m, "deepFinish");
@@ -365,7 +421,7 @@ export function resolveSequenceAct(m, key) {
         : numeric ? [...mates].sort((a, b) => (b.stats.tiro || 0) - (a.stats.tiro || 0))[0]
         : m._weightedPick(mates, mates.map(p => playedPos(p) === "DEL" ? 3 : 1));
       const pass = A.actPass(m, s.prot);
-      if (!pass.ok) return maybeCounter(m, `min ${m.min}' — el pase de ${s.prot.name} no encuentra a nadie.`, true);
+      if (!pass.ok) return maybeCounter(m, `min ${m.clock()}' — el pase de ${s.prot.name} no encuentra a nadie.`, true);
       // T1 — Correr en Manada: en la contra, el "buscar al mejor ubicado" encuentra
       // superioridad de verdad — la definición llega con dos camisetas libres.
       // Por FAMILIA: el contragolpe letal también corre en manada (gate T1).
@@ -376,20 +432,20 @@ export function resolveSequenceAct(m, key) {
       else if (sup && familyOf(s.type) === sup.of) traitMoment(m, sup.traitId, [sup.texto]);
       const shot = A.actShot(m, mate, { stat: "tiro", bonus: s.bonus + f.finishBonus + 0.04 + supBonus });
       if (shot.ok) { goalMine(m, mate, "¡Definición tras la asistencia!", s.prot); return closeSilent(m); }
-      return maybeRebound(m, `min ${m.min}' — ${mate.name} no logra conectar el remate.`);
+      return maybeRebound(m, `min ${m.clock()}' — ${mate.name} no logra conectar el remate.`);
     }
     const shot = A.actShot(m, s.prot, { stat, bonus: s.bonus + f.finishBonus });
-    if (shot.ok) { goalMine(m, s.prot, stat === "cabezazo" ? "¡Cabezazo imparable!" : "¡Culminó la jugada!", s.assistFrom || "open"); return closeSilent(m); }
+    if (shot.ok) { goalMine(m, s.prot, s.tapIn ? "¡Solo tuvo que empujarla!" : stat === "cabezazo" ? "¡Cabezazo imparable!" : "¡Culminó la jugada!", s.assistFrom || "open"); return closeSilent(m); }
     // T3 — Cabeza de Playa: el pelotazo que muere sin gol puede fabricar córner —
     // "el equipo YA NO despeja: cada balón largo establece posición" (gate T3: la
     // versión solo-reactiva era invisible en juego real — cadenas demasiado raras).
     const bh = hookOf(m, "beachhead");
     if (bh && s.type.id === "pelotazo" && rnd() < bh.p) {
-      m.log("chance", `min ${m.min}' — ${s.prot.name} remata pero la defensa rechaza apurada...`);
+      m.log("chance", `min ${m.clock()}' — ${s.prot.name} remata pero la defensa rechaza apurada...`);
       traitMoment(m, bh.traitId, [bh.texto]);
       return chainSetPiece(m, 0.02);
     }
-    return maybeRebound(m, `min ${m.min}' — ${s.prot.name} remata pero ${pick(["ataja el arquero", "se va desviado", "la saca la defensa"])}.`);
+    return maybeRebound(m, `min ${m.clock()}' — ${s.prot.name} remata pero ${pick(["ataja el arquero", "se va desviado", "la saca la defensa"])}.`);
   }
 
   if (kind === "setpiece") {
@@ -405,11 +461,11 @@ export function resolveSequenceAct(m, key) {
       const t = s.target || s.prot;
       const shot = A.actShot(m, t, { stat: "cabezazo", bonus: 0.10 + srB });
       if (shot.ok) { goalMine(m, t, "¡Cabezazo letal en el balón parado!", s.prot); return closeSilent(m); }
-      return maybeRebound(m, `min ${m.min}' — el centro busca a ${t.name} pero ${pick(["gana el arquero en el aire", "la despeja la zaga", "el cabezazo se va por arriba"])}.`);
+      return maybeRebound(m, `min ${m.clock()}' — el centro busca a ${t.name} pero ${pick(["gana el arquero en el aire", "la despeja la zaga", "el cabezazo se va por arriba"])}.`);
     }
     const shot = A.actShot(m, s.prot, { stat: "tiro", bonus: 0.06 + srB });
     if (shot.ok) { goalMine(m, s.prot, "¡La jugada preparada termina en gol!", "open"); return closeSilent(m); }
-    return maybeRebound(m, `min ${m.min}' — la jugada ensayada muere en ${pick(["un rebote", "el achique del arquero", "un despeje al córner"])}.`);
+    return maybeRebound(m, `min ${m.clock()}' — la jugada ensayada muere en ${pick(["un rebote", "el achique del arquero", "un despeje al córner"])}.`);
   }
 
   if (kind === "defend_sp") {
@@ -428,7 +484,7 @@ export function resolveSequenceAct(m, key) {
     if (key === "salir") {
       const r = A.actContain(m, mine, { press: true, bonus: 0.06 });
       if (r.ok) {
-        m.log("event", `min ${m.min}' — 🥊 ¡La zaga sale con todo y despeja el córner de una!`);
+        m.log("event", `min ${m.clock()}' — 🥊 ¡La zaga sale con todo y despeja el córner de una!`);
         dtOk(m);
         if (chainDS()) return false;
         return closeSilent(m);
@@ -436,11 +492,11 @@ export function resolveSequenceAct(m, key) {
       dtFail(m);
       const shot = A.actOppShot(m, s.shooter, mine, { stat: "cabezazo", bonus: 0.08 + frustMalus(m) + leadMalus(m) });
       if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
-      return closeSeq(m, "chance", `min ${m.min}' — ¡${s.shooter.name} cabecea SOLO pero ${mine.por ? mine.por.name : "el arquero"} la saca de milagro!`);
+      return closeSeq(m, "chance", `min ${m.clock()}' — ¡${s.shooter.name} cabecea SOLO pero ${mine.por ? mine.por.name : "el arquero"} la saca de milagro!`);
     }
     const shot = A.actOppShot(m, s.shooter, mine, { stat: "cabezazo", bonus: -0.05 + frustMalus(m) + leadMalus(m) }); // área poblada
     if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
-    m.log("chance", `min ${m.min}' — la zona aguanta: el cabezazo de ${s.shooter.name} ${pick(["se va desviado", "muere en las manos del arquero", "lo saca la defensa"])}.`);
+    m.log("chance", `min ${m.clock()}' — la zona aguanta: el cabezazo de ${s.shooter.name} ${pick(["se va desviado", "muere en las manos del arquero", "lo saca la defensa"])}.`);
     noteOppDead(m);
     if (chainDS()) return false;
     return closeSilent(m);
@@ -450,7 +506,7 @@ export function resolveSequenceAct(m, key) {
     // Salida bajo presión (def→of): reventarla es gratis; salir jugando arriesga un regalo
     // letal… o CONVIERTE la secuencia en una transición mía (la misma jugada sigue).
     if (key === "despeje") {
-      const out = closeSeq(m, "plain", `min ${m.min}' — ${f.playoutSafe}`);
+      const out = closeSeq(m, "plain", `min ${m.clock()}' — ${f.playoutSafe}`);
       // T3 — Contragolpe Total (Master): hasta el despeje de la salida asfixiada
       // puede ser el inicio de una contra (cualquier balón, cualquier zona).
       const mc = rollChain(m, "masterContra");
@@ -463,15 +519,15 @@ export function resolveSequenceAct(m, key) {
       // a tiempo y el regalo letal no existe (la posesión se pierde sin sangre). La
       // vacuna comprable contra el festín del Press rival.
       const th = hookOf(m, "playoutRescue");
-      if (th && rnd() < th.p) return closeSeq(m, "plain", `min ${m.min}' — ${th.texto}`);
-      m.log("chance", `min ${m.min}' — ${f.playoutFail(s.prot)}`);
+      if (th && rnd() < th.p) return closeSeq(m, "plain", `min ${m.clock()}' — ${th.texto}`);
+      m.log("chance", `min ${m.clock()}' — ${f.playoutFail(s.prot)}`);
       dtFail(m);
       const { mine } = m.powers();
       const shot = A.actOppShot(m, s.shooter, mine, { bonus: 0.12 });
       if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
-      return closeSeq(m, "chance", `min ${m.min}' — ${s.shooter.name} remata el regalo pero ${mine.por ? mine.por.name : "el arquero"} responde. Se salvaron.`);
+      return closeSeq(m, "chance", `min ${m.clock()}' — ${s.shooter.name} remata el regalo pero ${mine.por ? mine.por.name : "el arquero"} responde. Se salvaron.`);
     }
-    m.log("event", `min ${m.min}' — ${f.playoutOk(s.prot)}`);
+    m.log("event", `min ${m.clock()}' — ${f.playoutOk(s.prot)}`);
     dtOk(m);
     const t = sequenceType("transicion");
     const cands = m.activeMine().filter(p => p.pos !== "POR");
@@ -495,7 +551,7 @@ export function resolveSequenceAct(m, key) {
       // profundo era el rasgo F2 de Consolidada — desde T2 lo compra Dueños del Área.
       if (fortaleza && rnd() < (hasTrait(m, "duenos_area") ? s.type.adv.convertDeep : s.type.adv.convert)) {
         if (r.press) dtOk(m);
-        m.log("event", `min ${m.min}' — ${f.convertText(m.oppTeam)}`);
+        m.log("event", `min ${m.clock()}' — ${f.convertText(m.oppTeam)}`);
         const t = sequenceType("pelotazo");
         const cands = m.activeMine().filter(p => p.pos !== "POR");
         const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
@@ -507,14 +563,14 @@ export function resolveSequenceAct(m, key) {
       // (el rival quedó estirado a propósito) — el patrón def→of, ahora comprable.
       const tt = s.type.id === "repliegue" ? rollChain(m, "chainOnContain") : null;
       if (tt) {
-        m.log("event", `min ${m.min}' — 🧱 ${f.containOk}`);
+        m.log("event", `min ${m.clock()}' — 🧱 ${f.containOk}`);
         if (r.press) dtOk(m);
         return chainMine(m, tt.to, { bonus: tt.bonus, intro: tt.intro, buildDecision: buildActDecision }) ? false : closeSilent(m);
       }
-      const out = closeSeq(m, "event", `min ${m.min}' — 🧱 ${f.containOk}`); if (r.press) dtOk(m); noteOppDead(m); return out;
+      const out = closeSeq(m, "event", `min ${m.clock()}' — 🧱 ${f.containOk}`); if (r.press) dtOk(m); noteOppDead(m); return out;
     }
     if (r.press) s.bonus = 0.05; // presión fallida: el rival queda mejor perfilado
-    m.log("chance", `min ${m.min}' — ${f.containFail(m.oppTeam)}`);
+    m.log("chance", `min ${m.clock()}' — ${f.containFail(m.oppTeam)}`);
     if (r.press) dtFail(m);
     // T1 — Oficio de Trinchera: el avance rival puede morir CORTADO (falta táctica,
     // ritmo roto) antes de llegar al remate — el partido se corta, la jugada muere.
@@ -545,7 +601,7 @@ export function resolveSequenceAct(m, key) {
   const lead = leadMalus(m);
   const r = A.actOppShot(m, s.shooter, mine, { bonus: s.bonus + malus + frust + lead });
   if (r.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
-  const out = closeSeq(m, "chance", `min ${m.min}' — ${s.shooter.name} remata pero ${pick([`ataja ${mine.por ? mine.por.name : "el arquero"}`, "se va afuera", "la bloquea la zaga"])}.`);
+  const out = closeSeq(m, "chance", `min ${m.clock()}' — ${s.shooter.name} remata pero ${pick([`ataja ${mine.por ? mine.por.name : "el arquero"}`, "se va afuera", "la bloquea la zaga"])}.`);
   if (malus && rnd() < 0.4) traitMoment(m, jl.traitId, [jl.texto]); // el momento se narra a veces (sin spamear)
   else noteOppDead(m);
   return out;
@@ -623,7 +679,7 @@ function maybeRebound(m, failText) {
   const p2 = m._weightedPick(pool, pool.map(p => playedPos(p) === "DEL" ? 3 : 1));
   const shot = A.actShot(m, p2, { bonus: -0.03 });
   if (shot.ok) { goalMine(m, p2, "¡REBOTE y gol! Cazó la pelota viva en el área."); return closeSilent(m); }
-  return closeSeq(m, "chance", `min ${m.min}' — ¡el rebote le queda a ${p2.name}! pero su remate ${pick(["lo tapa el arquero", "se va por arriba", "muere en la zaga"])}.`);
+  return closeSeq(m, "chance", `min ${m.clock()}' — ¡el rebote le queda a ${p2.name}! pero su remate ${pick(["lo tapa el arquero", "se va por arriba", "muere en la zaga"])}.`);
 }
 
 /**
@@ -646,7 +702,15 @@ function maybeCounter(m, failText, risky = false) {
   }
   m.log("chance", failText);
   if (risky) dtFail(m);
-  m.log("event", `min ${m.min}' — ¡${m.oppTeam.name} sale de CONTRA con el equipo partido!`);
+  noteMomentum(m, "contraataque", "opp");
+  m.log("event", `min ${m.clock()}' — ¡${m.oppTeam.name} sale de CONTRA con el equipo partido!`);
+  // LA FRONTERA (Posesión): la línea alta sube junta y la transición muere en offside.
+  // Es el espejo exacto de su otro hook, breakawayGuard, que ya mata el pelotazo
+  // AMBIENTE a la espalda: el mismo rasgo cubre los DOS canales por los que llega ese
+  // fútbol —el balón largo suelto y la contra tras mi pérdida—, que es justo lo que
+  // significa sostener una línea adelantada.
+  const ot = hookOf(m, "offsideTrap");
+  if (ot && rnd() < ot.p) { traitMoment(m, ot.traitId, [ot.texto]); return closeSilent(m); }
   // La mitad de las contras terminan en el mano a mano del último hombre (absorción A2,
   // calibración del Sprint 1 intacta); la otra mitad, en remate directo del que se escapó.
   if (rnd() < LASTMAN_FROM_COUNTER && lastManChance(m)) { closeSilent(m); return true; }
@@ -656,7 +720,7 @@ function maybeCounter(m, failText, risky = false) {
   const sh = fast.length ? pick(fast) : pick(alive);
   const shot = A.actOppShot(m, sh, mine, { bonus: 0.10 });
   if (shot.ok) { goalOpp(m, sh); return closeSilent(m); }
-  return closeSeq(m, "chance", `min ${m.min}' — ${sh.name} remata la contra pero ${mine.por ? mine.por.name : "el arquero"} responde enorme.`);
+  return closeSeq(m, "chance", `min ${m.clock()}' — ${sh.name} remata la contra pero ${mine.por ? mine.por.name : "el arquero"} responde enorme.`);
 }
 
 // ---------- Desenlaces nuevos de las AVANZADAS (M2) ----------
@@ -686,10 +750,10 @@ function advFoulSetPiece(m, foulText, bonus = 0) {
   if (alive.length) {
     const p = pick(alive);
     p.amarillaPartido = (p.amarillaPartido || 0) + 1;
-    m.log("card", `min ${m.min}' — 🟨 ${foulText(p)}`);
+    m.log("card", `min ${m.clock()}' — 🟨 ${foulText(p)}`);
     if (p.amarillaPartido >= 2) {
       p.expulsado = true;
-      m.log("card", `min ${m.min}' — 🟥 ¡Segunda amarilla y EXPULSIÓN de ${p.name}! ${m.oppTeam.name} queda con uno menos.`);
+      m.log("card", `min ${m.clock()}' — 🟥 ¡Segunda amarilla y EXPULSIÓN de ${p.name}! ${m.oppTeam.name} queda con uno menos.`);
     }
   }
   return chainSetPiece(m, bonus);

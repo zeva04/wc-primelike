@@ -138,7 +138,7 @@ function renderPostMatch(res, advanced, momentum, morale, filo) {
   const won = res.winner === "my";
   const pensTxt = res.pens ? ` (${res.pens.myGoals}-${res.pens.oppGoals} en penales)` : "";
   const headline = won ? "🎉 ¡VICTORIA!" : res.winner === "opp" ? "😞 Derrota" : "🤝 Empate";
-  const myScorers = match.scorers.map(s => `⚽ ${s.name} ${s.min}'`).join(" · ") || "Sin goles propios";
+  const myScorers = match.scorers.map(s => `⚽ ${s.name} ${s.clock ?? s.min}'`).join(" · ") || "Sin goles propios";
   const analysis = analisisCard(momentum, morale, filo);
 
   screenShell(`

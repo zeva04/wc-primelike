@@ -95,12 +95,12 @@ export function chainMine(m, typeId, { bonus = 0, intro = null, buildDecision } 
   const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
   m._flow.push({ min: m.min, side: "mine", w: 3 }); // el fútbol reactivo también pesa en posesión/momentum
   m.seq = { type: t, prot, actIdx: 0, bonus, reactive: true };
-  m.log("event", `${t.icon} min ${m.min}' — ${intro ? intro(prot) : t.flavor.intro(prot)}`);
+  m.log("event", `${t.icon} min ${m.clock()}' — ${intro ? intro(prot) : t.flavor.intro(prot)}`);
   buildDecision(m); // lo inyecta sequence-acts (evita el ciclo de imports)
   return true;
 }
 
 /** Narración del momento de un rasgo (una voz por llamada, prefijada con su icono). */
 export function traitMoment(m, traitId, lines) {
-  m.log("event", `min ${m.min}' — ${traitById(traitId)?.icon || "✨"} ${pick(lines)}`);
+  m.log("event", `min ${m.clock()}' — ${traitById(traitId)?.icon || "✨"} ${pick(lines)}`);
 }

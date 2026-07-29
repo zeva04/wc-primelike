@@ -26,6 +26,7 @@
    estado del juego dependa de cuánto tarda el jugador en leer.
    ============================================================ */
 import { hookOf } from "./trait-hooks.js";
+import { markMomentum } from "./match-momentum.js";
 
 /** Cuánto dura una ráfaga, en minutos de partido (2 ticks de simulación). */
 export const PRESS_DURATION = 10;
@@ -66,7 +67,10 @@ export function startPress(m) {
   m.press.on = true;
   m.press.usos += 1;
   m.press.hasta = m.min + PRESS_DURATION;
-  m.log("info", `🔥 min ${m.min}' — ¡A PRESIONAR! El banco manda salir a apretar arriba: el equipo sube veinte metros de golpe.`);
+  // MARCA en el gráfico, NUNCA puntos: el Match Momentum solo sube si la presión
+  // produce mejores secuencias (regla de oro de match-momentum.js).
+  markMomentum(m, "🔥");
+  m.log("info", `🔥 min ${m.clock()}' — ¡A PRESIONAR! El banco manda salir a apretar arriba: el equipo sube veinte metros de golpe.`);
   return true;
 }
 
@@ -79,7 +83,7 @@ export function tickPress(m) {
   if (!p?.on || m.min < p.hasta) return;
   p.on = false;
   p.listoEn = m.min + PRESS_COOLDOWN;
-  m.log("plain", `😮‍💨 min ${m.min}' — La presión afloja: el equipo recupera la línea y toma aire.`);
+  m.log("plain", `😮‍💨 min ${m.clock()}' — La presión afloja: el equipo recupera la línea y toma aire.`);
 }
 
 /**

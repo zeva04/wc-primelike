@@ -30,7 +30,7 @@ export const REST_RECOVERY = 30;
 // la pasiva no discrimina — le devuelve el bache post-partido también al que recupera a
 // diario (cerró ~0.4pp de gap por punto) y solo infló el global abriendo el spread. El
 // gate se cerró por el umbral de la banda (match/powers.ENERGY_OK), no por acá.
-export const DAILY_RECOVERY = 8;
+export const DAILY_RECOVERY = 7;
 // La VÍSPERA del partido rinde menos (Sprint 4): el día de partido también cobra descanso
 // pasivo —antes no cobraba nada, bug reportado por el PO— pero a tasa reducida: viaje al
 // estadio, charla técnica y nervios no son una jornada de recuperación. Es además el dial
@@ -56,6 +56,32 @@ export function fatigueInjuryMult(energia) {
 
 /** Energía perdida por disputar `minutos` (proporcional: −14 cada 30'). */
 export function matchFatigue(minutos) { return Math.round(minutos / 30 * FATIGUE_PER_30); }
+
+/**
+ * FATIGA DEL RIVAL (decisión PO 26-jul-2026) — el mismo dial, cobrado en otro momento.
+ *
+ * Hasta hoy el once rival nacía al 100% y JAMÁS bajaba: mi plantel llegaba con la
+ * energía que arrastra del torneo (55-70 en un titular fijo) y enfrente siempre había
+ * once tipos frescos. La asimetría era deliberada, pero desbalanceada en la dirección
+ * equivocada — el rival no paga NADA por jugar.
+ *
+ * Ahora el rival se cansa DENTRO del partido. No lleva su energía al siguiente (se
+ * genera nuevo cada vez, `opponents.genOpponentLineup`), así que el único sitio donde
+ * su costo puede morder es el partido en curso. Con el mismo dial que mi equipo, un
+ * rival llega al 90' cerca de 58 — arranca más fresco que mis titulares y termina más
+ * gastado. Esa es la lectura buscada: al rival fresco hay que aguantarlo; si llegás
+ * descansado, lo pasás por arriba en el tramo final.
+ *
+ * `factor` lo sube El Rondo (Posesión): hacerlos correr detrás de la pelota cuesta
+ * piernas de verdad.
+ */
+export function drainOppEnergy(lineup, minutos, factor = 1) {
+  const gasto = (minutos / 30) * FATIGUE_PER_30 * factor;
+  for (const p of lineup) {
+    if (p.expulsado || p.lesionado) continue;
+    p.energia = clamp((p.energia ?? 100) - gasto, 5, 100);
+  }
+}
 
 /**
  * Descanso pasivo de un día: +DAILY_RECOVERY a todo el plantel, o +MATCHDAY_RECOVERY si el

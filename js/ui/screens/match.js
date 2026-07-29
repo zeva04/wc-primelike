@@ -7,16 +7,18 @@
    ============================================================ */
 import { getTeam } from "../../data/teams-repo.js";
 import { statLine, playedPos, outOfPosPenalty } from "../../game/ratings.js";
-import { swapAssignments, canPlayAt } from "../../game/lineup.js";
+import { swapAssignments, canPlayAt, assignToFormation, FORMATIONS } from "../../game/lineup.js";
 import { STAGE_LABEL, koRoundOf } from "../../game/tournament/knockout.js";
 import { Match } from "../../game/match/Match.js";
 import { startPress, pressState } from "../../game/match/press.js";
+import { matchStats } from "../../game/match/stats.js";
+import { momentumBars, markMomentum } from "../../game/match/match-momentum.js";
+import { teamPowers } from "../../game/match/powers.js";
 import { filoCtx } from "../../game/philosophy.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, modal, closeModal, toast, numTag, posBadge, energyBar, momentoChip } from "../components.js";
+import { screenShell, $, flagImg, modal, closeModal, toast, energyBar, momentoChip } from "../components.js";
 import { mountPitch, POS_NAME } from "../pitch.js";
-import { spriteSvg } from "../sprites.js";
 
 /** Crea la instancia Match con el once elegido y arranca el reloj del relato. */
 function startMatch(oppId) {
@@ -39,7 +41,7 @@ function startMatch(oppId) {
 function renderMatchScreen() {
   const me = S.matchCtx.team, opp = S.match.oppTeam;
   screenShell(`
-    <div class="bg-slate-800/90 border border-slate-600 tp-topbar rounded-2xl p-4 mb-4 sticky top-2 z-30 backdrop-blur">
+    <div class="bg-slate-800/90 border border-slate-600 tp-topbar rounded-2xl p-3 mb-3 sticky top-2 z-30 backdrop-blur shrink-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2.5 text-lg font-black">${flagImg(me, "w-10 h-7", true)}<span class="hidden sm:inline tp-text">${me.name}</span></div>
         <div class="text-center">
@@ -47,11 +49,6 @@ function renderMatchScreen() {
           <div id="minute" class="text-amber-400 font-bold text-sm">0'</div>
         </div>
         <div class="flex items-center gap-2.5 text-lg font-black"><span class="hidden sm:inline">${opp.name}</span>${flagImg(opp, "w-10 h-7", true)}</div>
-      </div>
-      <div class="flex items-center justify-center gap-2 mt-2 text-xs" title="Posesión y momentum, derivados del juego generado">
-        <span id="mom-chip" class="w-6 text-center font-black text-slate-500">·</span>
-        <div class="w-40 sm:w-64 h-1.5 rounded-full overflow-hidden bg-red-400/60"><div id="poss-bar" class="h-full bg-emerald-400 transition-all duration-500" style="width:50%"></div></div>
-        <span id="poss-pct" class="tabular-nums font-bold text-slate-300 w-9 text-left">50%</span>
       </div>
       <div class="flex items-center justify-center gap-2 mt-3 flex-wrap">
         <div class="flex rounded-lg overflow-hidden border border-slate-600 text-xs">
@@ -70,23 +67,57 @@ function renderMatchScreen() {
         <button id="btn-speed" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer">⏩ Rápido</button>
       </div>
     </div>
-    <div class="grid md:grid-cols-3 gap-4">
-      <div class="md:col-span-2">
-        <div id="feed" class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 h-[420px] overflow-y-auto space-y-1.5 text-sm"></div>
-        <div id="match-footer" class="mt-3 text-center"></div>
+    <!-- FLEX y no GRID a propósito (y sin backticks en este comentario: vive dentro de un
+         template literal y lo cortaría). Una fila de grid se dimensiona por su CONTENIDO,
+         así que el alto nunca llegaba definido a las columnas y el flex-1 del relato caía a
+         la altura de todo el texto: medido, 898 px en una ventana de 698. Con flex-row el
+         alto de la fila SÍ es definido —viene del flex-1 de la columna de arriba— y las
+         columnas lo heredan al estirarse. La proporción 2:1 la dan flex-[2] / flex-[1]. -->
+    <div class="flex flex-col md:flex-row gap-4 md:flex-1 md:min-h-0">
+      <div class="flex flex-col min-w-0 md:flex-[2] md:min-h-0">
+        <!-- El relato ESTIRA para llenar lo que sobre: es la pieza elástica del partido.
+             En móvil vuelve a una altura fija (no hay alto de ventana que repartir). -->
+        <div id="feed" class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 h-[420px] md:h-auto md:flex-1 md:min-h-0 overflow-y-auto space-y-1.5 text-sm"></div>
+        <div id="match-footer" class="mt-3 text-center shrink-0"></div>
       </div>
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-3">
-        <h3 class="font-bold text-sm mb-2 tp-text">Equipo en cancha</h3>
-        <div id="oncourt" class="space-y-1"></div>
-        <h3 class="font-bold text-sm mb-2 mt-4 text-slate-400">Rival en cancha</h3>
-        <div id="oppcourt" class="space-y-1"></div>
+      <!-- COLUMNA DE LECTURA (PO 28-jul): las estadísticas arriba y el Match Momentum
+           justo debajo. Las dos responden la misma pregunta —cómo va el partido— y el
+           gráfico se lee mejor pegado a los números que lo explican. -->
+      <div class="flex flex-col gap-3 min-w-0 md:flex-[1] md:min-h-0">
+        <!-- ESTADÍSTICAS DEL PARTIDO: reemplazaron a las dos alineaciones. La posesión se
+             mudó acá desde el marcador —con su chip de momentum al lado del título, que es
+             lo que ese ▲▼ siempre midió— y la acompañan tiros, precisión de pase y córners.
+             El motor las sirve ya masticadas (match/stats.matchStats). -->
+        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-3 shrink-0">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-sm tp-text">📊 Estadísticas del partido</h3>
+            <span id="mom-chip" class="font-black text-slate-500 text-xs" title="Momentum: quién está generando en los últimos 15'">·</span>
+          </div>
+          <div id="match-stats" class="space-y-3"></div>
+        </div>
+        <!-- MATCH MOMENTUM: el gráfico de la transmisión. Barras sólidas, nunca líneas.
+             Ocupa TODO el alto que sobre en la columna (flex-1): así no queda hueco muerto
+             debajo y el gráfico gana altura, que es lo que lo hace legible. Las barras se
+             posicionan en %, así que escalan solas con el contenedor. -->
+        <div class="bg-slate-900/80 border border-slate-700 rounded-2xl px-3 pt-3 pb-2 flex flex-col md:flex-1 md:min-h-0">
+          <div class="flex items-center justify-between mb-1.5 shrink-0">
+            <h3 class="text-[10px] uppercase tracking-[0.2em] font-black text-slate-400">Match Momentum</h3>
+            <div class="flex items-center gap-2 text-[9px] font-bold">
+              <span class="flex items-center gap-1 text-emerald-400"><i class="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></i>${me.name}</span>
+              <span class="flex items-center gap-1 text-red-400"><i class="w-2 h-2 rounded-sm bg-red-400 inline-block"></i>${opp.name}</span>
+            </div>
+          </div>
+          <div id="mm-chart" class="relative w-full h-24 md:h-auto md:flex-1 md:min-h-[4.5rem]"></div>
+          <div id="mm-axis" class="relative h-3 w-full text-[8.5px] text-slate-500 font-bold shrink-0"></div>
+        </div>
       </div>
     </div>
-  `);
+  `, "max-w-6xl md:h-dvh md:py-3 md:flex md:flex-col");
   document.querySelectorAll(".ment-btn").forEach(b => b.onclick = () => {
     S.matchCtx.mentalidad = b.dataset.ment;
     document.querySelectorAll(".ment-btn").forEach(x => { x.className = x.className.replace("bg-amber-500 text-slate-900", "bg-slate-700 hover:bg-slate-600"); });
     b.className = b.className.replace("bg-slate-700 hover:bg-slate-600", "bg-amber-500 text-slate-900");
+    markMomentum(S.match, "⚙️");   // decisión táctica: marca, no puntos
     S.match.log("info", `📢 Mentalidad: ${b.dataset.ment.toUpperCase()}.`);
     updateMatchUI();
   });
@@ -110,8 +141,13 @@ function renderMatchScreen() {
 // que se registre. El reloj se auto-agenda con setTimeout para poder variar el ritmo por paso.
 // Ajuste PO 22-jul ("no asfixiar"): todo más lento, y AIRE entre actos encadenados — el
 // desenlace de un acto se LEE antes de que el modal siguiente lo tape.
-const CRUISE = () => (S.speed === 1 ? 600 : 260);
-const GOAL_HOLD = 1600;
+// EL RELOJ CONTINUO (PO 27-jul): un tick ES un minuto de partido, y se ve correr —
+// 2 segundos por minuto en velocidad normal (un partido dura ~3'30" de reloj de pared
+// más lo que el DT tarde en decidir). "Rápido" comprime a 0,8 s/minuto para quien ya
+// vio el partido. El congelado en las decisiones lo hace solo el motor: tick() corta
+// con decisión pendiente y el reloj no se reagenda hasta resolverla.
+const CRUISE = () => (S.speed === 1 ? 2000 : 800);
+const GOAL_HOLD = 2600;
 const SEQ_INTRO_HOLD = 900; // la intro de la secuencia se lee antes de abrir su primer modal
 const ACT_HOLD = 1300;      // entre actos encadenados: el resultado del acto respira
 const SEQ_END_HOLD = 900;   // tras el desenlace, antes de que el reloj retome
@@ -197,24 +233,117 @@ function paintPressButton(match) {
     : "Presionar arriba durante 10 minutos: el equipo roba más alto y ataca mejor, pero esos minutos cuestan el DOBLE de energía.";
 }
 
-/** Refresca marcador, minuto, relato (solo líneas nuevas) y panel "En cancha". */
+/**
+ * Pinta las Estadísticas del partido desde `matchStats` — la vista no conoce ninguna
+ * regla: recibe [{label, mine, opp, txt}] y arma la fila de transmisión (número mío ·
+ * etiqueta · número suyo, y debajo la barra repartida). Reutiliza el idioma visual de la
+ * vieja barra de posesión: verde lo mío, rojo lo suyo.
+ *
+ * Se pinta con innerHTML solo la PRIMERA vez y después se actualizan los nodos: así la
+ * transición CSS de las barras se ve (un innerHTML nuevo cada tick las haría saltar).
+ */
+function paintStats(match) {
+  const box = $("#match-stats"); if (!box) return;
+  const rows = matchStats(match);
+  if (!box.firstChild) {
+    box.innerHTML = rows.map(r => `
+      <div>
+        <div class="flex items-baseline justify-between gap-2 text-[11px] mb-1">
+          <b data-v="${r.id}-mine" class="tabular-nums text-emerald-300 text-sm">–</b>
+          <span class="text-slate-400 uppercase tracking-wider text-[9.5px] font-bold">${r.label}</span>
+          <b data-v="${r.id}-opp" class="tabular-nums text-red-300 text-sm">–</b>
+        </div>
+        <div class="h-1.5 rounded-full overflow-hidden bg-red-400/60">
+          <div data-bar="${r.id}" class="h-full bg-emerald-400 transition-all duration-500" style="width:50%"></div>
+        </div>
+      </div>`).join("");
+  }
+  for (const r of rows) {
+    box.querySelector(`[data-v="${r.id}-mine"]`).textContent = r.txt[0];
+    box.querySelector(`[data-v="${r.id}-opp"]`).textContent = r.txt[1];
+    // Sin datos todavía (0 a 0 tiros) la barra queda al medio: no insinuar un dominio que
+    // no existe. Es el mismo criterio del prior neutral de la posesión.
+    const tot = r.mine + r.opp;
+    box.querySelector(`[data-bar="${r.id}"]`).style.width = `${tot > 0 ? Math.round((100 * r.mine) / tot) : 50}%`;
+  }
+}
+
+/**
+ * MATCH MOMENTUM: el gráfico de barras de la transmisión. Una barra por minuto cerrado,
+ * hacia arriba lo mío (verde) y hacia abajo lo suyo (rojo), con la línea del cero al medio,
+ * el corte del entretiempo y las marcas (⚽ 🟨 🟥 🔄 🚑 🔥) sobre el minuto en que pasaron.
+ *
+ * El motor lo sirve masticado (`momentumBars`: altura ya normalizada 0..1 y de qué lado va);
+ * acá no se decide nada del partido, solo se dibuja. Se repinta cuando aparece una barra
+ * nueva —una vez por minuto—, no en cada refresco: son ~95 nodos.
+ *
+ * El eje se ancla al MINUTO de fútbol, no al índice de la barra: con el descuento hay más
+ * de 90 barras, y si se repartiera por índice el "HT" caería en cualquier lado.
+ */
+const MM_AXIS = [0, 15, 30, "HT", 60, 75, 90];
+function paintMomentum(match) {
+  const box = $("#mm-chart"); if (!box) return;
+  const bars = momentumBars(match);
+  if (box.dataset.n === String(bars.length)) return;   // nada nuevo que dibujar
+  box.dataset.n = String(bars.length);
+  if (!bars.length) { box.innerHTML = ""; return; }
+  const w = 100 / bars.length;
+  // Índice de la primera barra del segundo tiempo: ahí va la línea del entretiempo.
+  const htIdx = bars.findIndex(b => b.half > 45);
+  const cuerpo = bars.map((b, i) => {
+    const alto = Math.max(2, b.h * 100);          // un mínimo visible: 0 exacto no se ve
+    const lado = b.mine
+      ? `bottom:50%;height:${alto / 2}%;background:#34d399`
+      : `top:50%;height:${alto / 2}%;background:#f87171`;
+    // La marca va sobre la PUNTA de su barra, no sobre la línea del cero. Se posiciona con
+    // `calc(50% + N%)`: en `top`/`bottom` los porcentajes se resuelven contra la ALTURA del
+    // contenedor, que es lo que queremos. (Con `margin-bottom:N%` se resolvían contra el
+    // ANCHO de la columna —3 píxeles—, así que las marcas quedaban todas pegadas al cero:
+    // se vio en el navegador.)
+    const marcas = b.marks.length
+      ? `<span class="absolute left-1/2 -translate-x-1/2 text-[9px] leading-none whitespace-nowrap pointer-events-none"
+           style="${b.mine ? `bottom:calc(50% + ${alto / 2}%);margin-bottom:2px` : `top:calc(50% + ${alto / 2}%);margin-top:2px`}">${b.marks.join("")}</span>`
+      : "";
+    return `<div class="absolute" style="left:${i * w}%;width:${w}%;top:0;bottom:0">
+      <div class="absolute rounded-[1px]" style="left:8%;right:8%;${lado}"></div>${marcas}</div>`;
+  }).join("");
+  box.innerHTML = `
+    ${cuerpo}
+    <div class="absolute left-0 right-0 top-1/2 h-px bg-slate-600"></div>
+    ${htIdx > 0 ? `<div class="absolute top-0 bottom-0 w-px bg-slate-600/70" style="left:${htIdx * w}%"></div>` : ""}`;
+  // El eje: cada marca se planta sobre la primera barra que alcanza ese minuto.
+  const eje = $("#mm-axis");
+  if (eje) eje.innerHTML = MM_AXIS.map(t => {
+    const i = t === "HT" ? htIdx : bars.findIndex(b => b.min >= t);
+    if (i < 0) return "";
+    const x = t === 90 ? 100 : i * w;
+    return `<span class="absolute" style="left:${x}%;transform:translateX(${t === 0 ? "0" : t === 90 ? "-100%" : "-50%"})">${t === "HT" ? "HT" : t + "'"}</span>`;
+  }).join("");
+}
+
+/** Refresca marcador, minuto, relato (solo líneas nuevas) y las estadísticas. */
 export function updateMatchUI() {
   if (!$("#score")) return;
   const match = S.match, matchCtx = S.matchCtx;
   $("#score").textContent = `${match.gMy} - ${match.gOpp}`;
-  $("#minute").textContent = `${match.min}'${match.phase === "extra" ? " (prórroga)" : ""}`;
+  // El reloj corre minuto a minuto y canta el descuento como la tele ("90+3'").
+  const enDescuento = match.min > match.nominal;
+  const min = $("#minute");
+  min.textContent = `${match.clock()}'${match.phase === "extra" ? " (prórroga)" : ""}`;
+  min.className = `font-bold text-sm ${enDescuento ? "text-red-400" : "text-amber-400"}`;
   $("#subs-left").textContent = match.subsLeft;
-  // Posesión y momentum (A3): el Match los deriva de lo generado (flow); acá solo se pintan.
+  // Momentum (A3): quién está generando en los últimos 15'. Vive junto al panel porque
+  // es la lectura dinámica de las mismas estadísticas.
   const fl = match.flow();
-  const bar = $("#poss-bar"); if (bar) bar.style.width = `${fl.pos}%`;
-  const pct = $("#poss-pct"); if (pct) pct.textContent = `${fl.pos}%`;
   const mom = $("#mom-chip");
   if (mom) {
     const [sym, cls] = fl.net > 4 ? ["▲▲", "text-emerald-400"] : fl.net > 1 ? ["▲", "text-emerald-400"]
       : fl.net < -4 ? ["▼▼", "text-red-400"] : fl.net < -1 ? ["▼", "text-red-400"] : ["·", "text-slate-500"];
     mom.textContent = sym;
-    mom.className = `w-6 text-center font-black ${cls}`;
+    mom.className = `font-black text-xs ${cls}`;
   }
+  paintStats(match);
+  paintMomentum(match);
   paintPressButton(match);
   const feed = $("#feed");
   while (S.feedRendered < match.feed.length) {
@@ -225,29 +354,6 @@ export function updateMatchUI() {
     feed.appendChild(div);
   }
   feed.scrollTop = feed.scrollHeight;
-  // Alineaciones en cancha, siempre en orden POR → DEF → MED → DEL (incluso tras cambios).
-  // Los míos se ordenan y etiquetan por el puesto que JUEGAN: tras una reubicación, un
-  // delantero puesto de defensa aparece en la línea de atrás, con ❗ y su nota castigada.
-  const POS_RANK = { POR: 0, DEF: 1, MED: 2, DEL: 3 };
-  const byPos = (a, b) => POS_RANK[a.pos] - POS_RANK[b.pos];
-  const byPlayed = (a, b) => POS_RANK[playedPos(a)] - POS_RANK[playedPos(b)];
-  const oc = $("#oncourt");
-  if (oc) oc.innerHTML = matchCtx.lineup.slice().sort(byPlayed).map(p => `
-    <div class="flex items-center gap-2 text-xs px-2 py-1 rounded-lg ${p.expulsado ? "opacity-30 line-through" : p.lesionado ? "opacity-30" : "bg-slate-800/60"}">
-      ${spriteSvg(p, matchCtx.team, "w-5 h-6")}
-      ${numTag(p)}
-      ${posBadge(playedPos(p))}
-      <span class="flex-1 truncate">${p.name} ${momentoChip(p)}${outOfPosPenalty(p) > 0 ? `<span class="text-orange-400 font-black" title="Fuera de puesto: es ${p.pos}">!</span>` : ""}${p.usado ? "🔄" : ""}${p.amarillaPartido ? "🟨" : ""}${p.expulsado ? "🟥" : ""}${p.lesionado ? "🚑" : ""}</span>
-      <span class="w-12">${energyBar(p.energia)}</span>
-    </div>`).join("");
-  const opc = $("#oppcourt");
-  if (opc) opc.innerHTML = match.oppLineup.slice().sort(byPos).map(p => `
-    <div class="flex items-center gap-2 text-xs px-2 py-1 rounded-lg ${p.expulsado ? "opacity-30 line-through" : "bg-slate-800/40"}">
-      ${spriteSvg(p, match.oppTeam, "w-5 h-6")}
-      ${p.num ? numTag(p) : ""}
-      ${posBadge(p.pos)}
-      <span class="flex-1 truncate text-slate-300">${p.name} ${p.amarillaPartido ? "🟨" : ""}${p.expulsado ? "🟥" : ""}</span>
-    </div>`).join("");
 }
 
 // --- Decisiones en partido ---
@@ -352,6 +458,20 @@ function openSquadModal(caido = null) {
   let banco = match.my.bench.slice();
   const pendientes = [];                    // [{ sale, entra }] cambios por confirmar
 
+  // EL DIBUJO (PO 28-jul): la formación no se guarda en ningún lado durante el partido —
+  // se DERIVA de dónde está parado cada uno (`playedPos`), que es la única verdad acá.
+  // Así sigue siendo correcta tras un cambio, una reubicación a mano o una expulsión,
+  // sin un campo más que mantener sincronizado.
+  const dibujo = () => {
+    const c = { DEF: 0, MED: 0, DEL: 0 };
+    once.forEach(p => { if (c[playedPos(p)] !== undefined) c[playedPos(p)]++; });
+    return `${c.DEF}-${c.MED}-${c.DEL}`;
+  };
+  const dibujoInicial = dibujo();
+  // Poder del once tal como está AHORA (antes de que la vista previa toque un solo
+  // posJugada): es el punto de comparación de todo lo que el DT pruebe en el modal.
+  const poderPrevio = teamPowers(S.matchCtx.lineup, S.matchCtx.mentalidad, S.matchCtx.buffs);
+
   const enOnce = p => once.includes(p);
   /** En el once previsualizado y en condiciones de jugar: un expulsado o lesionado no se mueve. */
   const activo = p => enOnce(p) && !p.expulsado && !p.lesionado;
@@ -408,6 +528,23 @@ function openSquadModal(caido = null) {
       <span class="text-xs text-slate-400">Cambios restantes: <b id="modal-subs" class="text-amber-300">${match.subsLeft}</b> de 3</span>
     </div>
     ${caido ? `<div class="p-2.5 rounded-lg border border-red-400/60 bg-red-500/10 text-sm text-red-300 font-bold mb-3">🚑 ${caido.name} no puede continuar: arrastra un suplente sobre su ficha y confirma el cambio (o sal y juegan con uno menos).</div>` : ""}
+    <!-- CAMBIAR EL DIBUJO EN PARTIDO (PO 28-jul): las 6 formaciones a un clic. No gasta
+         cambio —es una reubicación masiva, la misma moneda que arrastrar una ficha— y
+         tampoco toca QUIÉN juega: solo dónde se para cada uno. A diferencia del hub, acá
+         NINGUNA está deshabilitada: si no tienes defensas para un 3-1-1, alguien juega
+         fuera de puesto y paga su ❗ — que es exactamente la decisión del DT. -->
+    <div class="flex items-center gap-1.5 mb-3 flex-wrap">
+      <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mr-1">Dibujo</span>
+      ${FORMATIONS.map(f => `<button data-form="${f.id}" title="${f.def} defensa(s) · ${f.med} medio(s) · ${f.del} delantero(s)"
+        class="form-btn px-2 py-1 rounded-lg text-[11px] font-black border cursor-pointer transition-colors"></button>`).join("")}
+      <!-- El SALDO real del dibujo, en vivo (OJO: nada de backticks en estos comentarios,
+           que viven dentro de un template literal y lo cortan). Nació como mitigación de un
+           bug —el dial de formación estaba invertido— y se queda ahora que está arreglado,
+           porque sigue siendo la información que el DT necesita: el nombre del dibujo dice
+           la INTENCIÓN, el saldo dice lo que ESTE plantel puede ejecutar. Con dos defensas
+           de verdad, un 3-1-1 puede salir peor que un 2-2-1, y eso solo se ve acá. -->
+      <span id="poder-delta" class="text-[10px] font-bold ml-auto tabular-nums"></span>
+    </div>
     <div class="grid sm:grid-cols-[minmax(0,1fr)_11rem] gap-3 items-start">
       <div id="match-pitch" class="pitch relative w-full h-[22rem] rounded-xl overflow-hidden border-2 border-slate-900"></div>
       <div>
@@ -475,7 +612,30 @@ function openSquadModal(caido = null) {
       },
     });
     wrap.querySelector("#modal-subs").textContent = restantes();
+    paintFormBtns();
     renderPlan();
+  };
+
+  /**
+   * Los 6 botones del dibujo (el vigente resaltado, derivado de la cancha) y el SALDO de
+   * poder que deja la vista previa. El saldo se pinta siempre, no solo al tocar el dibujo:
+   * mover una ficha a mano tiene el mismo efecto y merece la misma transparencia.
+   */
+  const paintFormBtns = () => {
+    const ahora = teamPowers(once, S.matchCtx.mentalidad, S.matchCtx.buffs);
+    const delta = (k, lbl) => {
+      const d = ahora[k] - poderPrevio[k];
+      if (Math.abs(d) < 0.005) return `<span class="text-slate-500">${lbl} =</span>`;
+      return `<span class="${d > 0 ? "text-emerald-400" : "text-red-400"}">${lbl} ${d > 0 ? "+" : ""}${d.toFixed(2)}</span>`;
+    };
+    wrap.querySelector("#poder-delta").innerHTML = `${delta("atk", "⚔️")} &nbsp; ${delta("def", "🛡️")}`;
+    const actual = dibujo();
+    wrap.querySelectorAll(".form-btn").forEach(b => {
+      const cur = b.dataset.form === actual;
+      b.textContent = b.dataset.form;
+      b.className = `form-btn px-2 py-1 rounded-lg text-[11px] font-black border cursor-pointer transition-colors ${
+        cur ? "border-sky-400 bg-sky-400/20 text-sky-200" : "border-slate-600 bg-slate-800 text-slate-400 hover:border-sky-400/60 hover:text-slate-200"}`;
+    });
   };
 
   /** Resumen de lo que está por aplicarse: nada de esto pasó todavía. */
@@ -485,6 +645,7 @@ function openSquadModal(caido = null) {
       ? `<p class="text-[11px] text-slate-500 text-center">Arrastra las fichas para armar los cambios. Nada se aplica hasta que confirmes.</p>`
       : `<div class="p-2 rounded-lg border border-amber-400/50 bg-amber-400/10 space-y-0.5">
           <div class="text-[10px] uppercase tracking-wider text-amber-300 font-black mb-1">Sin aplicar</div>
+          ${dibujo() !== dibujoInicial ? `<div class="text-[11px] text-slate-200">📐 Dibujo: <b>${dibujoInicial}</b> → <b class="text-sky-300">${dibujo()}</b></div>` : ""}
           ${pendientes.map(c => `<div class="text-[11px] text-slate-200">🔄 Entra <b>${c.entra.name}</b> por <b>${c.sale.name}</b>${
             outOfPosPenalty(c.entra) > 0 ? ` <span class="text-orange-400">— ❗ jugaría de ${POS_NAME[playedPos(c.entra)].toLowerCase()}</span>` : ""}</div>`).join("")}
           ${reubicados.map(p => `<div class="text-[11px] text-slate-200">📢 <b>${p.name}</b> pasa a ${POS_NAME[playedPos(p)].toLowerCase()}${
@@ -508,7 +669,10 @@ function openSquadModal(caido = null) {
     let fallidos = 0;
     for (const c of pendientes) if (!match.makeSub(c.sale, c.entra.name)) fallidos++;
     for (const [p, pos] of posFinal) p.posJugada = pos;
-    for (const p of movidos) match.log("info", `📢 min ${match.min}' — ${p.name} pasa a ${POS_NAME[playedPos(p)].toLowerCase()}.`);
+    // Un cambio de dibujo mueve hasta 5 fichas: se narra como UNA orden del banco, no como
+    // cinco reubicaciones sueltas (que es como sigue narrándose mover a uno solo).
+    if (dibujo() !== dibujoInicial) match.log("info", `📢 min ${match.clock()}' — El banco cambia el dibujo: ${dibujoInicial} → ${dibujo()}.`);
+    else for (const p of movidos) match.log("info", `📢 min ${match.clock()}' — ${p.name} pasa a ${POS_NAME[playedPos(p)].toLowerCase()}.`);
     closeModal();
     S.paused = wasPaused;
     updateMatchUI();
@@ -528,6 +692,15 @@ function openSquadModal(caido = null) {
   };
 
   paint();
+  wrap.querySelectorAll(".form-btn").forEach(b => b.onclick = () => {
+    // La regla vive en game/lineup: quién va a qué puesto. Acá solo se escribe la vista
+    // previa (posJugada), igual que una reubicación a mano — y como todo el plan, no toca
+    // el partido hasta Confirmar.
+    const map = assignToFormation(once, b.dataset.form);
+    if (!map) return toast("Con este once no se puede armar ese dibujo.");
+    for (const [p, pos] of map) p.posJugada = pos;
+    paint();
+  });
   wrap.querySelector("#squad-ok").onclick = () => { if (hayPlan()) confirmar(); };
   wrap.querySelector("#squad-cancel").onclick = cancelar;
 }

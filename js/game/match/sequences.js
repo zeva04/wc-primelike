@@ -39,6 +39,8 @@ import { rivalFilo } from "../philosophy.js";
 import { buildActDecision } from "./sequence-acts.js";
 import { hookOf, hasTrait, traitHooks, traitMoment } from "./trait-hooks.js";
 import { pressOn, PRESS_POOL } from "./press.js";
+import { noteCorner as noteCornerStat } from "./stats.js";
+import { noteMomentum } from "./match-momentum.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
 export const SEQ_MIN = 2, SEQ_MAX = 6;
@@ -66,6 +68,26 @@ function rivalProfile(m) {
 }
 
 /**
+ * LOS MOMENTOS DEL PARTIDO (fix del PO 28-jul-2026): CUÁNDO sale cada secuencia, repartido.
+ *
+ * Antes se sorteaba tick a tick con una probabilidad sin memoria (`faltan / ticksQuedan`).
+ * El NÚMERO por partido salía perfecto, pero los huecos eran exponenciales: medido en 300
+ * partidos KOR vs ESP, mediana de **15 minutos** sin una sola jugada y p90 de **42**. Con
+ * ticks de 5' eso no se veía (17 minutos eran ~2 segundos de reloj de pared); con el reloj
+ * continuo son 34 segundos mirando correr el minutero, y el PO lo reportó como bug.
+ *
+ * Ahora los minutos se sortean UNA vez por fase: una VENTANA por secuencia y un minuto al
+ * azar dentro de su ventana (con margen en los bordes para que no se peguen entre sí).
+ * Misma cuenta por partido —el objetivo no se toca, el balance no se mueve—, sin sequías.
+ * TODO lo que decide QUÉ secuencia sale (lado, tipo, protagonista, contexto A3/F2/T1/presión)
+ * sigue pasando al DISPARARLA, no acá: esto solo reemplaza el "¿ahora?" del sorteo.
+ */
+function seqSlots(count, desde, hasta) {
+  const L = (hasta - desde) / count;
+  return Array.from({ length: count }, (_, i) => desde + L * (i + 0.15 + 0.7 * rnd()));
+}
+
+/**
  * Objetivo de secuencias del partido, ventaja y perfil rival. Se calcula UNA vez por partido
  * (cacheado en m._seqPlan). El favorito bien preparado recibe más secuencias y más ofensivas;
  * el superado, menos y más defensivas — es el pago visible de prepararse (Bible §7).
@@ -80,7 +102,7 @@ function seqPlan(m) {
   // la filosofía multiplica encima, no lo reemplaza (un bloque de élite sigue
   // siendo más sólido que un bloque débil).
   // R2: la identidad rival MADURA con la profundidad del torneo (desde cuartos +1 nivel)
-  m._seqPlan = { target, edge, prof: rivalProfile(m), oppFilo: rivalFilo(m.oppTeam, m.koRound) };
+  m._seqPlan = { target, edge, prof: rivalProfile(m), oppFilo: rivalFilo(m.oppTeam, m.koRound), slots: seqSlots(target, 0, 90) };
   return m._seqPlan;
 }
 
@@ -280,19 +302,24 @@ export function noteFiloHit(m) {
 }
 
 /**
- * ¿Arranca una secuencia en este tick? Sobre la marcha: la probabilidad reparte las
- * secuencias que faltan entre los ticks que quedan, así el partido tiende al objetivo sin
- * agolparlas. Devuelve true (y deja m.decision) si arrancó una.
+ * ¿Arranca una secuencia en este tick? Cada secuencia tiene su MINUTO sorteado en el plan
+ * (ventanas repartidas — ver seqSlots): arranca al pisarlo. Devuelve true (y deja
+ * m.decision) si arrancó una. Todo el contexto —lado, tipo, protagonista— se decide acá,
+ * en el momento, exactamente como antes.
  */
 export function maybeStartSequence(m) {
   if (m.seq) return false; // ya hay una en curso (no debería: la decisión bloquea el tick)
   const plan = seqPlan(m);
   const done = m._seqCount || 0;
+  // La PRÓRROGA es tiempo nuevo: se le sortean sus propios momentos, a prorrata de los 30'
+  // que dura (un partido de 120' no puede quedarse con el cupo de uno de 90').
+  if (m.phase === "extra" && !plan.extra) {
+    plan.extra = Math.max(1, Math.round(plan.target / 3));
+    plan.slots.push(...seqSlots(plan.extra, 90, 120));
+    plan.target += plan.extra;
+  }
   if (done >= plan.target) return false;
-  const end = m.phase === "extra" ? 120 : 90;
-  const ticksLeft = Math.max(1, Math.ceil((end - m.min) / 5));
-  const pStart = (plan.target - done) / ticksLeft;
-  if (rnd() >= pStart) return false;
+  if (m.min < plan.slots[done]) return false;
   const mentShift = m.my.mentalidad === "ofensiva" ? 0.10 : m.my.mentalidad === "defensiva" ? -0.10 : 0;
   // Contexto dinámico (A3): el partido inclina el reparto EN VIVO — perder tarde te vuelca
   // al ataque (+0.07, y te expones: el rival gana repliegues/contras), ganar tarde te
@@ -306,6 +333,18 @@ export function maybeStartSequence(m) {
   const traitShift = Object.values(traitHooks(m)).flat().reduce((s, h) => s + (h.shareShift || 0), 0);
   const mineShare = clamp(0.5 + plan.edge * 0.045 + mentShift + late + reds + filoShareShift(m.my.filo, plan.oppFilo) + traitShift, 0.3, 0.72);
   const side = rnd() < mineShare ? "mine" : "opp";
+  // FRÍOS (Press, Master): el DT congeló el partido renunciando a un remate, y lo que
+  // compró fue esto — la próxima llegada rival NO ocurre. Se descuenta del objetivo del
+  // partido, no se pospone: si solo se retrasara, no habría comprado nada.
+  if (side === "opp" && (m._frozen || 0) > 0) {
+    m._frozen--;
+    // Se descuenta el objetivo Y se consume su MOMENTO: sin sacarlo de la agenda, el
+    // minuto ya vencido volvería a dispararse en el tick siguiente (y otra vez, y otra).
+    plan.slots.splice(done, 1);
+    plan.target = Math.max(done, plan.target - 1);
+    m.log("plain", `min ${m.clock()}' — El equipo la hace circular sin apuro: ${m.oppTeam.name} no la ve pasar.`);
+    return false;
+  }
   const pool = SEQUENCE_TYPES.filter(t => t.side === side);
   const w = typeWeights(m, side, plan);
   startSequence(m, m._weightedPick(pool, pool.map(t => w[t.id] ?? 1)));
@@ -358,10 +397,12 @@ export function startSequence(m, type) {
     // [RELATO CON IDENTIDAD] (F3): cuando la secuencia es MI tipo firma, la narra la
     // filosofía ("el pressing que entrenamos toda la semana") en vez del intro genérico.
     const filoIntros = m.my.filo && FIRMA_TYPE[m.my.filo.id] === type.id ? getPhilosophy(m.my.filo.id).firmaIntros : null;
-    m.log("event", `${type.icon} min ${m.min}' — ${traitIntro ? traitIntro(prot) : filoIntros ? pick(filoIntros)(prot) : type.flavor.intro(prot)}`);
+    m.log("event", `${type.icon} min ${m.clock()}' — ${traitIntro ? traitIntro(prot) : filoIntros ? pick(filoIntros)(prot) : type.flavor.intro(prot)}`);
   } else {
     // El atacante rival: en un córner en contra manda su mejor cabeceador; si no, un DEL/MED.
     const alive = m.oppLineup.filter(p => !p.expulsado);
+    // El balón parado en contra ES un córner (así lo narra el acto): al panel de stats.
+    if (type.plan[0] === "defend_sp") { noteCornerStat(m, "opp"); noteMomentum(m, "corner", "opp"); }
     const shooter = type.plan[0] === "defend_sp"
       ? alive.filter(p => p.pos !== "POR").sort((a, b) => (b.stats.cabezazo || 0) - (a.stats.cabezazo || 0))[0] || pick(alive)
       : (() => { const s = alive.filter(p => p.pos === "DEL" || p.pos === "MED"); return s.length ? pick(s) : pick(alive); })();
@@ -373,7 +414,7 @@ export function startSequence(m, type) {
       const pool = defs.length ? defs : m.activeMine().filter(p => p.pos !== "POR");
       m.seq.prot = pool.sort((a, b) => (b.stats.pase || 0) - (a.stats.pase || 0))[0];
     }
-    m.log("event", `${type.icon} min ${m.min}' — ${type.flavor.intro(m.oppTeam)}`);
+    m.log("event", `${type.icon} min ${m.clock()}' — ${type.flavor.intro(m.oppTeam)}`);
     // T3 — el bozal de Asfixia Total se NARRA de vez en cuando: el rival con identidad
     // amordazada juega otro fútbol, y el relato lo dice (momento nombrable del rasgo).
     const muzzle = hookOf(m, "muzzleOppFirma");

@@ -35,6 +35,21 @@ export function energyMult(en) {
   return 1 - (1 - ENERGY_FLOOR_MULT) * x * x;
 }
 
+// LA CURVA DE ENERGÍA DEL RIVAL (decisión PO 26-jul-2026) — deliberadamente DISTINTA.
+// La banda verde de arriba existe para arreglar MI economía: sin ella, Recuperar era
+// comprar rendimiento universal a diario y dominaba como estrategia del día (44-47% vs
+// mixto 30.5). Pero el rival NO tiene acciones del día, ni recuperación pasiva, ni
+// plantel que rotar — se genera nuevo en cada partido. Aplicarle la misma curva
+// indulgente era un error de categoría: su fatiga en partido lo dejaba en ~58, y la
+// banda valora eso en ×0.9966, o sea nada (medido: la mecánica no se sentía).
+// Acá la energía pesa LINEAL desde el primer punto: al 100% rinde igual que siempre y
+// se va apagando de verdad según lo hacés correr. Mi banda verde queda intacta.
+export const OPP_ENERGY_FLOOR_MULT = 0.81;   // con el tanque vacío (energía 5)
+export function oppEnergyMult(en) {
+  const e = en !== undefined ? en : 100;
+  return 1 - (1 - OPP_ENERGY_FLOOR_MULT) * (clamp(100 - e, 0, 95) / 95);
+}
+
 // OXIDACIÓN (arco del Rebalance R1, decisión PO 22-jul-2026): el ESPEJO de la banda
 // verde — un plantel que no trabaja pierde filo. La racha de días de preparación sin
 // Entrenar ni Sesión Táctica (game/oxidation la trackea en run.diasSinEntrenar y la
@@ -78,7 +93,10 @@ export function effStat(p, key, buffs = {}) {
   if (buffs[key]) v += buffs[key];
   // p.forma (R2): la FORMA DE TORNEO del rival en KO (opponents.tourneyFormaMult) — la
   // asimetría espejo de p.oxid: solo el once rival la lleva, mis jugadores nunca.
-  return clamp(v / 20, 0.05, 5.5) * energyMult(p.energia) * (p.oxid || 1) * (p.forma || 1);
+  // `p.rival` marca al once generado (opponents.genOpponentLineup): la asimetría vive en
+  // los DATOS, igual que `oxid` y `forma`. Cada lado tiene su curva de energía.
+  const enMult = p.rival ? oppEnergyMult(p.energia) : energyMult(p.energia);
+  return clamp(v / 20, 0.05, 5.5) * enMult * (p.oxid || 1) * (p.forma || 1);
 }
 
 /** Calidad global del arquero: atajadas manda (60%), reflejos (25%) y salidas (15%) complementan. */
@@ -87,6 +105,69 @@ export function gkQuality(por, buffs) {
   return effStat(por, "atajadas", buffs) * 0.6 + effStat(por, "reflejos", buffs) * 0.25 + effStat(por, "salidas", buffs) * 0.15;
 }
 
+/* ── CUÁNTAS BOCAS TIENE CADA LÍNEA (fix del dial de formación, 28-jul-2026) ──────
+   EL BUG: cada línea entraba solo PROMEDIADA, así que sumarle un hombre únicamente
+   podía BAJAR su promedio (el que entra es peor, o juega fuera de puesto y cobra
+   `outOfPosPenalty`) y quitarlo lo SUBÍA, porque quedaba el mejor solo. Resultado
+   medido sobre 6 planteles: el dibujo más defensivo daba el mayor `def` en 0 de 6, y
+   el más ofensivo el mayor `atk` en 0 de 6 — en 4 de 6 el que más atacaba era el
+   3-1-1. Los `hint` de lineup.FORMATIONS ("Todo al ataque", "Defensiva") decían
+   exactamente lo contrario de lo que pasaba, y el selector de formación en partido
+   dejó el problema a un clic de distancia.
+
+   EL ARREGLO: la fuerza de una línea es CALIDAD × BOCAS. La calidad sigue siendo el
+   promedio de siempre (misma fórmula, mismos pesos); las bocas entran con rendimiento
+   DECRECIENTE — el tercer defensa suma, pero menos que el segundo. Así el dibujo
+   vuelve a ser la palanca que su nombre promete sin convertirse en "meter a todos
+   atrás siempre gana".
+
+   Normalizado al 2-1-2 (la "Equilibrada"): con ese dibujo los factores valen 1 y el
+   poder es EXACTAMENTE el de antes. Lo que cambia es cómo se desvían los otros cinco.
+   ───────────────────────────────────────────────────────────────────────────────── */
+/** Exponente del rendimiento decreciente: 0 = las bocas no cuentan (el bug), 1 = lineal. */
+export const LINE_POW = 0.5;
+/**
+ * El MEDIO pesa menos por boca (decisión PO 28-jul): el pase es calidad, no cantidad —
+ * tres mediocampistas circulan mejor que uno, pero no el triple. Sin esto el término de
+ * pase se comía el atk y el dibujo más ofensivo terminaba siendo el 1-3-1, no el 1-1-3.
+ * Con 0.25 todavía ganaba el 1-2-2 en 5 de 10 planteles; con 0.15 el 1-1-3 manda claro.
+ */
+const MED_POW = 0.15;
+/**
+ * CUÁNTA GENTE EMPUJA DE VERDAD HACIA ADELANTE: el delantero cuenta entero y el
+ * mediocampista la mitad. Es la pieza que hace verdadero el "Todo al ataque" del 1-1-3
+ * (decisión PO): amontonar delanteros TIENE que ser el dibujo más ofensivo. Antes no lo
+ * era —ni siquiera con el arreglo de bocas— porque los seis dibujos con un solo defensa
+ * mandan los mismos cinco hombres arriba, y el promedio de tiro no sube al empujarlos
+ * (el plantel tiene 2-3 delanteros de verdad; el resto sube castigado por fuera de puesto).
+ */
+const MED_ATK_SHARE = 0.35;
+const atkBodies = (nDel, nMed) => nDel + MED_ATK_SHARE * nMed;
+/**
+ * Y EL ESPEJO ATRÁS: el mediocampista también TAPA. Sin esto los tres dibujos de un solo
+ * defensa daban exactamente la misma defensa (3.47 medido), como si tres delanteros
+ * protegieran igual que tres medios — y el 1-3-1 quedaba estrictamente DOMINADO por el
+ * 2-1-2 (peor atk y peor def a la vez), o sea una opción trampa que nadie debería elegir.
+ *
+ * 0.45 salió de barrer los diales (60 combinaciones × 10 planteles) contra cuatro
+ * criterios a la vez: el 1-1-3 el que más ataca (10/10) y el que menos defiende (10/10),
+ * el 3-1-1 entre los dos que más defienden (10/10) y por encima de TODOS los dibujos de
+ * un defensa (9/10), y NINGÚN dibujo dominado. Es alto a propósito: tres medios tapan
+ * de verdad. Que el 2-2-1 le gane la defensa al 3-1-1 en 4 de 10 planteles no es un
+ * error — es que sin un tercer central de verdad, poner tres atrás sale peor.
+ */
+const MED_DEF_SHARE = 0.45;
+const defBodies = (nDef, nMed) => nDef + MED_DEF_SHARE * nMed;
+/**
+ * Tamaño de línea de REFERENCIA: el 2-1-2, la "Equilibrada". Con ese dibujo los tres
+ * factores valen exactamente 1 y el poder es idéntico al de antes del arreglo — lo que
+ * cambia es cómo se desvían los otros cinco. El de ataque se DERIVA de atkBodies para
+ * que no se desincronice si algún día se toca MED_ATK_SHARE.
+ */
+const LINE_BASE = { def: defBodies(2, 1), atk: atkBodies(2, 1), med: 1 };
+/** Factor de bocas de una línea de `n` hombres contra su tamaño de referencia. */
+const bodies = (n, base, pow = LINE_POW) => (n <= 0 ? 0 : (n / base) ** pow);
+
 /** Poder ofensivo y defensivo (~0-5) de una alineación, con mentalidad y castigo por expulsados. */
 export function teamPowers(lineup, mentalidad, buffs) {
   // Reparto por el puesto que JUEGA cada uno (no el natural): si el DT paró a un
@@ -94,11 +175,18 @@ export function teamPowers(lineup, mentalidad, buffs) {
   const act = lineup.filter(p => !p.expulsado && !p.lesionado);
   const por = act.find(p => playedPos(p) === "POR");
   const atkP = act.filter(p => playedPos(p) === "DEL" || playedPos(p) === "MED");
+  const medP = act.filter(p => playedPos(p) === "MED");
+  const delP = act.filter(p => playedPos(p) === "DEL");
   const defP = act.filter(p => playedPos(p) === "DEF");
   const avg = (ps, k) => ps.length ? ps.reduce((s, p) => s + effStat(p, k, buffs), 0) / ps.length : 1;
   const auraAll = avg(act, "aura");
-  let atk = avg(atkP, "tiro") * 0.4 + avg(act.filter(p => playedPos(p) === "MED"), "pase") * 0.3 + avg(atkP, "cabezazo") * 0.12 + auraAll * 0.18;
-  let def = avg(defP, "defensa") * 0.52 + gkQuality(por, buffs) * 0.32 + auraAll * 0.16;
+  // Calidad × bocas, línea por línea. El aura y el arquero NO llevan factor: no son
+  // una línea (el aura es del equipo entero y el arquero es siempre uno).
+  const bAtk = bodies(atkBodies(delP.length, medP.length), LINE_BASE.atk);
+  const bMed = bodies(medP.length, LINE_BASE.med, MED_POW);
+  const bDef = bodies(defBodies(defP.length, medP.length), LINE_BASE.def);
+  let atk = avg(atkP, "tiro") * 0.4 * bAtk + avg(medP, "pase") * 0.3 * bMed + avg(atkP, "cabezazo") * 0.12 * bAtk + auraAll * 0.18;
+  let def = avg(defP, "defensa") * 0.52 * bDef + gkQuality(por, buffs) * 0.32 + auraAll * 0.16;
   const m = MENT_MOD[mentalidad] || MENT_MOD.normal;
   atk += m.atk; def += m.def;
   // El buff de la Sesión Táctica MURIÓ acá (arco de Filosofía F1, decisión PO):

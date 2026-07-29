@@ -160,6 +160,39 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
   assert(sawLastMan, "el último hombre sigue apareciendo (absorbido en secuencias + pelotazo a la espalda)");
 }
 
+// ---------- SIN SEQUÍAS: los momentos del partido están REPARTIDOS (bug PO 28-jul-2026) ----------
+// El sorteo memoryless viejo (`faltan / ticksQuedan`) daba el número correcto de secuencias
+// pero huecos exponenciales: medido, p90 de 42' y máximos de 77' sin una sola jugada. Con
+// ticks de 5' no se veía; con el reloj continuo son 84 segundos de reloj de pared mirando
+// correr el minutero. `seqSlots` reparte una ventana por secuencia. Esto FIJA la propiedad:
+// el hueco máximo tiene que quedar acotado por el ancho de ventana, no por la suerte.
+{
+  const gaps = [];
+  for (let t = 0; t < 40; t++) {
+    const m = makeMatch(t % 2 ? "ARG" : "MAR");
+    const mins = [];
+    let guard = 0, prevCount = 0;
+    while (!m.finished && guard++ < 500) {
+      m.tick();
+      if ((m._seqCount || 0) > prevCount) { mins.push(m.min); prevCount = m._seqCount; }
+      if (m.decision) {
+        const d = m.decision;
+        if (d.id === "sequence") m.resolveSequenceAct(d.options[Math.floor(Math.random() * d.options.length)].key);
+        else m.decision = null;
+      }
+    }
+    let prev = 0;
+    for (const mn of mins) { gaps.push(mn - prev); prev = mn; }
+    gaps.push(90 - prev);  // y el hueco final, hasta el pitazo
+  }
+  const max = Math.max(...gaps);
+  const largos = gaps.filter(g => g >= 40).length;
+  // Cota generosa a propósito (el objetivo mínimo son 2 secuencias = ventanas de 45'): lo que
+  // se está prohibiendo es la COLA del sorteo memoryless, que llegaba a 77'.
+  assert(max <= 55, "ningún partido pasa 55 minutos sin una jugada", `max ${max}'`);
+  assert(largos / gaps.length < 0.05, "los huecos de 40'+ son raros (<5%)", `${largos}/${gaps.length}`);
+}
+
 // ---------- M2: el gating por nivel de las avanzadas, y sus desenlaces nuevos ----------
 {
   const withFilo = (filoId, etapa, oppId = "MAR") => {
@@ -283,13 +316,15 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
 }
 
 // ---------- A3: contexto dinámico en la generación ----------
-// Muestrea la generación bajo un estado dado: fuerza el plan a target infinito (pStart ≥ 1)
-// y cuenta lados y tipos. La memoria "no repetir" se resetea por muestra para no sesgar.
+// Muestrea la generación bajo un estado dado: fuerza el plan a target infinito Y vacía la
+// AGENDA de momentos (28-jul: las secuencias arrancan en el minuto sorteado por seqSlots —
+// sin vaciarla, el muestreo se frena en el primer momento aún futuro) y cuenta lados y
+// tipos. La memoria "no repetir" se resetea por muestra para no sesgar.
 function genSample(oppId, mut, n = 4000) {
   const m = makeMatch(oppId);
   m.min = 50;
   E.maybeStartSequence(m); // primera llamada: crea m._seqPlan (target/edge/prof cacheados)
-  m._seqPlan.target = 1e9;
+  m._seqPlan.target = 1e9; m._seqPlan.slots = [];
   mut?.(m);
   const out = { mine: 0, total: 0, types: {} };
   for (let i = 0; i < n; i++) {
@@ -334,7 +369,7 @@ function genSample(oppId, mut, n = 4000) {
   const m = makeMatch("ARG");
   m.min = 50;
   E.maybeStartSequence(m);
-  m._seqPlan.target = 1e9;
+  m._seqPlan.target = 1e9; m._seqPlan.slots = [];
   let prev = null, repeats = 0, gen = 0;
   for (let i = 0; i < 800; i++) {
     m.seq = null; m.decision = null;

@@ -294,6 +294,35 @@ const clon = p => ({ ...p, stats: { ...p.stats }, posJugada: null });
   t(E.playedPos(gkBanco) === "POR" && E.teamPowers(m.my.lineup, "normal", {}).por === gkBanco, "y el suplente queda como arquero");
 }
 
+// ---------- assignToFormation: cambiar el DIBUJO sin cambiar el once (PO 28-jul-2026) ----------
+{
+  const run = E.newRun("BRA");
+  const { lineup } = E.currentLineup(run.squad, null, null);
+  for (const f of E.FORMATIONS) {
+    const map = E.assignToFormation(lineup, f.id);
+    t(!!map, `el dibujo ${f.id} se puede armar con cualquier once de 6`, f.id);
+    t(map.size === 6, `${f.id} reparte a los 6`, map.size);
+    // NO cambia quiénes juegan: exactamente el mismo once, otro reparto
+    t(lineup.every(p => map.has(p)), `${f.id} no deja a nadie afuera`);
+    // Los puestos son EXACTAMENTE los que pide la formación
+    const c = { POR: 0, DEF: 0, MED: 0, DEL: 0 };
+    for (const pos of map.values()) c[pos]++;
+    t(c.POR === 1 && c.DEF === f.def && c.MED === f.med && c.DEL === f.del,
+      `${f.id} deja las líneas que pide`, JSON.stringify(c));
+    // El arco es innegociable: solo un arquero (regla canPlayAt)
+    const alArco = [...map].find(([, pos]) => pos === "POR")[0];
+    t(alArco.pos === "POR", `${f.id} manda un arquero al arco`, alArco.name);
+  }
+  // Un dibujo que el once no cubre naturalmente se PERMITE (a diferencia del hub): alguien
+  // juega fuera de puesto y paga su castigo — eso es la decisión del DT en partido.
+  const tresAtras = E.assignToFormation(lineup, "3-1-1");
+  const defs = lineup.filter(p => p.pos === "DEF").length;
+  if (defs < 3) {
+    const fuera = [...tresAtras].filter(([p, pos]) => pos !== "POR" && p.pos !== pos).length;
+    t(fuera > 0, "si faltan defensas, alguien queda fuera de puesto (no se bloquea)", fuera);
+  }
+}
+
 console.log(`lineup.test: ${checks} checks`);
 console.log(fails ? `❌ ${fails} fallo(s)` : "✅ alineación y fuera de puesto OK");
 process.exit(fails ? 1 : 0);

@@ -581,3 +581,56 @@ consagración se narra una sola vez, el candado de Osciladores nombra el ajeno
 
 **Estado del rediseño: 2 de 4 filosofías (Press 18 · Posesión 15). Faltan Contra y
 Bloque, que siguen con la grilla 3×3 del arco T1-T3.**
+
+### Deuda pagada: las 3 mecánicas de Posesión (26-jul-2026)
+
+Las tres que el rediseño dejó declaradas ya las lee el Match.
+
+**`backPass` — La Trampa (Basic, Respuesta).** Es la única de las tres que NO se
+sortea: es una **tercera opción en el acto de construcción**, "🔙 Retroceso de
+posesión", junto al pase seguro y el filtrado. Una sola vez por secuencia.
+El acto **no avanza** (se paga un toque) pero el ataque queda mejor perfilado
+(+0.05 de bonus) porque el rival tuvo que salir de su bloque. Y tiene costo real:
+el pase se juega de verdad, y perderlo con el equipo adelantado abre contra —
+verificado en vivo ("¡Le roban el pase hacia atrás a Vinícius con el equipo
+adelantado!"). Sin ese costo la opción habría dominado al pase seguro, que es el
+espejo del pecado que el arco prohíbe: la opción que NUNCA conviene, y también la
+que SIEMPRE conviene.
+
+**`tapIn` — La Máquina Colectiva (Master, Firma).** En el desenlace de la familia
+circulación, si **todos los compases sonaron** (la misma condición de "desesperación
+llena" que abre el penal de la sinfonía), la pelota queda servida: +0.22 de bonus y
+relato propio. Cuando entra, el gol se narra "¡Solo tuvo que empujarla!".
+
+**`offsideTrap` — La Frontera (Advanced, Respuesta).** En `maybeCounter`: la contra
+que nace de mi pérdida muere en fuera de juego. Es el **espejo exacto de su otro
+hook**, `breakawayGuard`, que ya mataba el pelotazo AMBIENTE a la espalda — juntos
+cubren los dos canales por los que llega ese fútbol, que es justo lo que significa
+sostener una línea adelantada.
+
+**Balance**: techo de Posesión (`--smart --filo=posesion --team=BRA`, n=4000)
+**46.5% → 47.1% = +0.6pp**, dentro del ruido (σ≈0.8pp). Ojo con la lectura: el
+smoke juega las secuencias AL AZAR, así que **sub-mide `backPass` por diseño** —
+es una decisión del DT, y su valor real lo pone quien la usa bien. Consistente con
+el hallazgo del Rebalance: la brecha mixto↔smart vive en la preparación, no en el
+partido jugado al azar.
+
+### Deuda pagada del todo: `iceGame` y `oppStamina` (26-jul-2026)
+
+**`iceGame` — Fríos (Press, Master, Expansión).** "Comer reloj" no existía en este
+motor: las secuencias no consumen minutos y el reloj avanza 5' por tick pase lo que
+pase. Se tradujo a una decisión honesta: **cambiar mi ocasión por la del rival**. En
+el desenlace aparece "🧊 Congelar el partido" — renunciás al remate y, a cambio, la
+próxima llegada rival NO ocurre (se descuenta del objetivo del partido, no se
+pospone: si solo se retrasara, no habrías comprado nada). Disponible **desde el
+minuto 70 y sin ir perdiendo** — con ventaja o empate (decisión PO: en fase de
+grupos el punto a veces es justo lo que hace falta). Congelar en el minuto 20 sería
+renunciar al partido, no cerrarlo.
+
+**`oppStamina` — El Rondo (Posesión, Basic).** El rasgo asumía una fatiga rival de
+base que no existía. Se construyó (ver docs/CORE.md §Fatiga del rival): el rival se
+cansa dentro del partido, con **curva propia distinta de mi banda verde**, y El Rondo
+acelera ese drenaje. Costó ~4pp de dificultad, compensados con `DAILY_RECOVERY` 8→7.
+
+**El catálogo ya no tiene deuda de motor**: los 51 rasgos que declaran hooks los lee
+el Match.

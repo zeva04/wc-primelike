@@ -64,6 +64,34 @@ export function swapAssignments(a, b) {
 }
 
 /**
+ * Reparte a estos titulares en los puestos de una formación SIN cambiar quiénes juegan:
+ * devuelve un Map jugador → puesto. Cada slot se lleva primero a alguien de su posición
+ * natural y, cuando no queda, a quien sobre — que jugará fuera de puesto y pagará
+ * `ratings.outOfPosPenalty`, exactamente como una reubicación a mano. El arco es
+ * innegociable (`canPlayAt`): lo ocupa el arquero.
+ *
+ * La usa la Gestión de plantilla EN PARTIDO (PO 28-jul-2026: cambiar el dibujo con el
+ * partido en juego). Es la hermana de `assignPositions` para el caso donde el once ya
+ * está dado y lo único que se mueve es el dibujo — por eso no toca el resto del plantel
+ * ni reordena nada: en el partido `posJugada` es la única verdad (ver swapAssignments).
+ */
+export function assignToFormation(lineup, formationId) {
+  const slots = formationSlots(formationId);
+  if (slots.length !== lineup.length) return null;
+  const pool = lineup.slice();
+  const out = new Map();
+  const take = pred => { const i = pool.findIndex(pred); return i >= 0 ? pool.splice(i, 1)[0] : null; };
+  for (const pos of slots) {
+    const p = pos === "POR"
+      ? take(x => x.pos === "POR")
+      : take(x => x.pos === pos && canPlayAt(x, pos)) || take(x => canPlayAt(x, pos));
+    if (p) out.set(p, pos);
+  }
+  for (const p of pool) out.set(p, p.pos);   // sin arquero en el once: cada uno a lo suyo
+  return out;
+}
+
+/**
  * Fija en qué puesto juega cada titular (`posJugada`) según la formación y se lo borra
  * al resto del plantel. Es la única pluma de ese campo (ARQUITECTURA §3.1) y hay que
  * llamarla cada vez que el once cambia: de ahí salen el castigo por jugar fuera de

@@ -382,13 +382,76 @@ Ajustes finales:
 > defensa más y daba casi lo mismo tener a Alisson o a un arquero flojo. Ahora un gran
 > arquero sostiene defensas mediocres, como en el fútbol real.
 
+> ### EL DIAL DE FORMACIÓN (bug encontrado y ARREGLADO el 28-jul-2026)
+> **El bug.** Cada línea entraba solo **promediada**, así que agregarle un hombre solo podía
+> BAJAR su promedio (el que entra es peor, o juega fuera de puesto y cobra
+> `outOfPosPenalty`) y quitarlo lo SUBÍA, porque quedaba el mejor solo. Medido entonces
+> sobre 6 planteles: el dibujo **más defensivo daba el mayor `def` en 0 de 6** y el **más
+> ofensivo el mayor `atk` en 0 de 6** — en 4 de 6 el que más atacaba era el 3-1-1. Los
+> `hint` de `FORMATIONS` decían lo contrario de lo que pasaba. No era nuevo
+> (`swapAssignments` siempre funcionó así); lo destapó el selector de formación en partido.
+>
+> **El arreglo: la fuerza de una línea es CALIDAD × BOCAS.** La calidad sigue siendo el
+> promedio de siempre, con los mismos pesos; las bocas entran con **rendimiento
+> decreciente** (`LINE_POW = 0.5`: el tercer defensa suma, pero menos que el segundo). Y el
+> mediocampista cuenta en las dos direcciones — **0.35 hacia adelante** (`MED_ATK_SHARE`) y
+> **0.45 hacia atrás** (`MED_DEF_SHARE`)—, porque tres medios tapan de verdad y sin eso los
+> tres dibujos de un solo defensa daban exactamente la misma defensa. El término de pase
+> escala flojo con el número de medios (`MED_POW = 0.15`): el pase es calidad, no cantidad.
+>
+> **El 2-1-2 es la REFERENCIA**: con la "Equilibrada" los tres factores valen exactamente 1
+> y el poder es idéntico al de la fórmula vieja (fijado en `powers.test.js`). Lo que cambió
+> es cómo se desvían los otros cinco, no el nivel general del juego.
+>
+> Resultado medido sobre 10 planteles (medias):
+>
+> | | 1-1-3 | 1-2-2 | 1-3-1 | 2-1-2 | 2-2-1 | 3-1-1 |
+> |---|---|---|---|---|---|---|
+> | **atk** | **4.15** | 4.04 | 3.83 | 3.95 | 3.76 | 3.46 |
+> | **def** | 3.60 | 3.84 | 4.05 | 4.02 | 4.20 | **4.24** |
+>
+> El 1-1-3 es el de más ataque **10/10** y el de menos defensa **10/10**; el 3-1-1 está
+> entre los dos que más defienden **10/10** y supera a todo dibujo de un defensa **9/10**;
+> **ningún dibujo queda dominado** (peor atk Y peor def que otro), que sería una opción
+> trampa. Los diales salieron de barrer 60 combinaciones contra esos cuatro criterios.
+>
+> Que el **2-2-1 le gane la defensa al 3-1-1 en 4 de 10 planteles no es un error**: sin un
+> tercer central de verdad, poner tres atrás sale peor que dos con dos medios tapando.
+>
+> **Balance: 24.1% n=2000**, sin movimiento (baseline 24.3-24.6). El arreglo salió gratis
+> porque el smoke juega con el dibujo automático y ambos lados se desplazan igual.
+
 ---
 
 ## 6. El partido, minuto a minuto (`Match.tick`)
 
-El partido avanza en **ticks de 5 minutos** (90 min = 18 ticks). Desde el **Sprint A1** (rework
-del partido) la columna interactiva son las **Key Sequences** (Bible §7); lo demás se simula.
-En cada tick, en orden:
+**EL RELOJ CONTINUO (PO 27-jul-2026).** El partido avanza en **ticks de 1 minuto** y el minuto
+**se ve correr** (~2 s por minuto; ver §Ritmo). Antes eran ticks de 5' (18 por partido) y el
+marcador saltaba de a cinco. Toda la calibración del juego sigue expresada **por cada 5
+minutos** —la unidad histórica de balance— y se reescala en un único lugar, `Match._roll(p5)`:
+los diales de abajo no cambian de significado, cambia cuántas veces se los pregunta. El
+congelado en las decisiones no necesita nada nuevo: `tick()` corta con decisión pendiente y el
+reloj de la UI no se reagenda hasta resolverla.
+
+**EL DESCUENTO (misma decisión).** Cada tiempo termina en su minuto **nominal** (45 · 90 · 105 ·
+120) y sigue hasta `nominal + added`, con `added` calculado UNA vez en el nominal por
+`Match._stoppage()` y **tope duro de 6'**:
+
+- **más momentos → más tiempo**: pesa todo lo generado en el tramo (el mismo `_flow` de
+  posesión/momentum: secuencia 3 · penal 2 · ambiente 1) más las **paradas largas** (goles y
+  tarjetas, que frenan el reloj de verdad);
+- el tiempo que **cierra** cada fase (90' / 120') arranca de una base mayor (los cambios, la
+  pérdida de tiempo) y **se estira +1.2 si el partido está empatado o a un gol**;
+- los tiempos de 15' de la prórroga escalan por su largo (nunca cobran un descuento de 45').
+
+El reloj se **canta como en la tele** (`Match.clock()` → `"90+3"`) y todo el relato lo usa;
+`m.min` sigue siendo el número crudo (91, 92…) para la matemática. Al empezar un tiempo nuevo
+(`_startHalf`) el reloj **vuelve al nominal**: el descuento no se acumula —el segundo tiempo
+empieza 45'— así los minutos jugados, la energía y las ventanas de contexto (`min >= 75`)
+siguen valiendo exactamente lo mismo.
+
+Desde el **Sprint A1** (rework del partido) la columna interactiva son las **Key Sequences**
+(Bible §7); lo demás se simula. En cada tick, en orden (probabilidades **por cada 5 minutos**):
 
 1. **¿Arranca una secuencia?** (`sequences.maybeStartSequence`) — la capa interactiva.
 2. **¿Penal a favor?** ~1.6% · **¿Último hombre?** ~5% (si hay un DEF mío) · **¿Penal en contra?** ~1%
@@ -400,6 +463,75 @@ En cada tick, en orden:
 Penal y último hombre eran ramas internas de las viejas ocasiones (`myChance`/`oppChance`,
 retiradas en A1); ahora asoman como **eventos independientes** a baja frecuencia, con su
 resolución del Sprint 1 **intacta** (A1 no toca su matemática).
+
+### Estadísticas del partido (`game/match/stats.js`) — PO 28-jul-2026
+
+El panel derecho del partido pasó de mostrar las dos alineaciones a mostrar **Posesión ·
+Tiros · % Pases con éxito · Córners** (la barra de posesión se mudó ahí desde el marcador,
+con el chip de momentum ▲▼ al lado del título). Dos ya existían y **no se tocaron**: la
+posesión la deriva `Match.flow()` de lo generado (A3, #11) y los tiros son
+`stats.misTiros/oppTiros` (punto único en `actShot`/`actOppShot`).
+
+**Pases y córners no existían.** Se resuelven con la misma licencia que los remates
+ambiente del Bible §7 ("el resto se simula"): un 6v6 no juega 400 pases a mano, así que el
+VOLUMEN se simula por minuto desde la posesión y el `pase` promedio de cada once (vía
+`effStat`, así que la energía y la forma también pesan), y **lo que sí es una jugada real
+se suma encima**: cada `actPass` que el DT eligió en una secuencia, el balón parado en
+contra (que ES un córner) y el córner que gana la Fortaleza.
+
+> **El volumen simulado de pases es DETERMINISTA a propósito: no consume `rnd()`.** El % de
+> pase de un equipo es genuinamente estable partido a partido (lo que varía es de quién es
+> la pelota, y eso ya lo modula la posesión), y así el panel **no le mueve ni un dial al
+> balance calibrado** — el flujo del RNG queda intacto. La varianza visible la ponen los
+> pases reales de las secuencias. Los córners sí sortean (2 tiradas por minuto).
+> Verificado: campeón 24.6% n=2000, idéntico al de antes del panel.
+
+### Match Momentum (`game/match/match-momentum.js`) — PO 28-jul-2026
+
+El gráfico de barras de las transmisiones, debajo del relato: **quién está ejerciendo más
+peligro AHORA**. No es posesión, no son tiros, no es xG — es la respuesta continua a "¿quién
+tiene más probabilidad de convertir en este momento?".
+
+> ⚠️ **No confundir con `game/momentum.js`** (sin `match-`), que es el **Momento del jugador**
+> (§2c: su racha 1..7, que sí escala stats). Son dos sistemas distintos que no se tocan.
+
+**El modelo.** Una variable `now` en **[-100, +100]** (+ = mi equipo). Nunca se escribe a
+mano: cada acción del simulador la empuja según `MM_W` (pase seguro **0** · pase progresivo 3
+· romper líneas 6 · conducción 2 · duelo 4 · presión 3 · córner 4 · **remate 8** · atajada 6 ·
+contra 8 · penal 12 · **gol 25** · roja 10), con el signo del lado que la ejecutó. Los
+enganches viven donde vive el fútbol: las seis Football Actions de `actions.js`, los remates
+ambiente y goles de `chances.js`, el córner y la contra de `sequences`/`sequence-acts`, y las
+tarjetas de `incidents.js`.
+
+**Valor de posesión, sin código aparte.** Diez pases laterales no suman nada (el pase seguro
+pesa 0); la escalera *pase progresivo → romper líneas → conducción → remate* acumula sola
+porque cada acto suma. La cadena de actos del Bible §7 **ya es** la cadena de valor.
+
+**Ventana móvil = decaimiento.** Cada minuto `now *= 0.78`, lo que deja la ventana efectiva en
+~5 minutos (0.78⁵ ≈ 0.29): un cambio táctico se ve enseguida y nadie domina eternamente por
+una sola jugada. Al cerrar el minuto se guarda una barra con el **promedio** de la variable
+durante ese minuto (no su último valor) más sus **marcas** (⚽ 🟨 🟥 🔄 🚑 🔥 ⚙️), que se
+deduplican dentro del minuto para no apilar iconos sobre una barra de 3 píxeles.
+
+`MM_DISPLAY = 50` es la escala del DIBUJO, no del modelo: medido en 400 partidos, el pico
+máximo de un partido tiene mediana 29 y tope 60, así que dividir por 100 dejaba el gráfico
+planchado contra el cero.
+
+**El asistente técnico** (`assistantLine`) lee la tendencia de los últimos 5 minutos y la
+traduce a fútbol — "Nos están encerrando desde hace varios minutos", "Estamos dominando pero
+no conseguimos finalizar" — **nunca un número**, con un silencio mínimo de 12' entre frases.
+
+> ### 🔒 LA REGLA DE ORO: el Match Momentum es una SALIDA, no una regla
+> - **No consume `rnd()`.** Ni una tirada — verificado en `match-momentum.test.js` contando
+>   `Math.random` (el único origen de azar del juego, §1.1). Si consumiera azar correría el
+>   flujo del RNG y le movería los diales al balance calibrado.
+> - **No escribe nada que el simulador lea**: vive entero en `m.mm`. El test fotografía
+>   marcador/stats/feed/decision/seq/press/flow antes y después y exige que no cambien.
+> - **No sube porque el DT apretó un botón.** Presionar y cambiar la mentalidad dejan una
+>   **marca** en el gráfico, jamás puntos: el momentum sube solo si esa decisión produjo
+>   mejores secuencias. También verificado en el test.
+>
+> Medido: campeón 24.3% n=2000, sin cambio respecto de antes de la feature.
 
 ### Key Sequences (`game/match/sequences.js` + `content/sequences.js` + `actions.js`)
 
@@ -537,13 +669,34 @@ del mundo vivo, como las lesiones rivales).
 **Generación** (`sequences.seqPlan` + `maybeStartSequence`): **2-6 por partido**, objetivo modulado
 por la **preparación** (ventaja atk+def sobre el rival) y la mentalidad. El favorito recibe más
 secuencias y más ofensivas; el superado, menos y más defensivas — el pago visible de prepararse
-(Bible §7). Se decide **sobre la marcha** (por tick, repartiendo las que faltan entre los ticks
-restantes) para que el **Sprint A3** pueda meter contexto dinámico (marcador, minuto, fatiga,
-expulsados) sin reescribir el generador.
+(Bible §7).
 
-**Ritmo** (`screens/match.js`, decisión PO "ráfaga"): entre secuencias la simulación **corre**
-(~600 ms/tick — 22-jul: era 360 y asfixiaba; ~260 en Rápido) y **frena en seco** al llegar una secuencia; un
-gol hace una pausa breve. El reloj se auto-agenda con `setTimeout` para variar el paso.
+**CUÁNDO sale cada una (`seqSlots`, fix del PO 28-jul-2026).** Antes se sorteaba tick a tick con
+una probabilidad **sin memoria** (`faltan / ticksQuedan`). El número por partido salía perfecto,
+pero los huecos eran **exponenciales**: medido en 300 partidos KOR vs ESP, mediana de **15'** sin
+una sola jugada, **p90 de 42'** y máximos de **77'**. Con ticks de 5' no se notaba (17 minutos
+eran ~2 s de reloj de pared); con el reloj continuo son 34 s mirando correr el minutero, y el PO
+lo reportó como bug. Ahora los minutos se **sortean una vez por fase**: una **ventana** por
+secuencia y un minuto al azar dentro de ella (con margen en los bordes). Resultado medido: p90
+42'→**31'**, máximo 77'→**50'**, campeón 23.9%→24.6% n=2000 (ruido). La prórroga recibe sus
+propios momentos a prorrata de sus 30'. Lo que decide **QUÉ** secuencia sale (lado, tipo,
+protagonista, contexto A3/F2/T1/presión) sigue pasando **al dispararla** — el Sprint A3 no se
+tocó; solo se reemplazó el "¿ahora?" del sorteo.
+
+> **Deuda abierta — la DENSIDAD.** Repartir arregla la cola, no la media: con 2-6 secuencias en
+> 90', el hueco medio es ~24' pase lo que pase (mediana medida 19' = ~38 s de reloj de pared).
+> El reloj continuo diluyó la interactividad: las secuencias pasaron de ser ~2/3 del reloj de
+> pared del partido a ~1/9. Subir el rango a 4-10 lo arregla de verdad (mediana 12', máx 25')
+> pero **mueve el balance +8pp de campeón (23.9 → 32.0, n=2000)** — es un sprint de calibración
+> como A1/A2/A3, no un ajuste suelto. **Decisión del PO, pendiente.**
+
+**Ritmo** (`screens/match.js`, decisión PO "ráfaga" + reloj continuo 27-jul): un tick **es un
+minuto** y se ve correr — **2000 ms/minuto** en normal (un partido son ~3'30" de reloj de pared
+más lo que el DT tarde en decidir), **800 ms** en Rápido. Frena en seco al llegar una secuencia;
+un gol hace una pausa de 2,6 s. El reloj se auto-agenda con `setTimeout` para variar el paso.
+Con el partido durando 15× más en tiempo real, el **relato de ambiente** subió de 0.35 a 0.55
+por cada 5' (`AMBIENT_LINE`): es narración pura, no toca el balance, pero sin eso el relato
+quedaba muerto entre jugada y jugada.
 
 > **La ventaja del DT humano.** El favorito recibe más y mejores secuencias, pero **ejecutarlas**
 > es del jugador: elegir bien el riesgo de cada acto rinde por encima del rating puro. El smoke,
@@ -1171,3 +1324,56 @@ sobrecosto, jamás la fatiga general del partido.
 **Sin medir a propósito**: el botón es poder nuevo en manos del humano y el smoke NO lo
 usa (juega sin presionar nunca), así que el win-rate del smoke no lo refleja. Va al
 próximo gate de dificultad, junto con el rediseño de árboles.
+
+## Fatiga del rival (26-jul-2026)
+
+Hasta hoy el once rival nacía al 100% de energía y **jamás bajaba**: mi plantel llegaba
+con lo que arrastra del torneo (55-70 en un titular fijo) y enfrente siempre había once
+tipos frescos. La asimetría era deliberada pero apuntaba al lado equivocado — el rival
+no pagaba nada por jugar.
+
+Ahora **el rival se cansa dentro del partido** (`medical.drainOppEnergy`, llamado por
+`Match.tick`). No lleva energía al partido siguiente —se genera nuevo cada vez— así que
+el único sitio donde su costo puede morder es el partido en curso. Con el mismo dial que
+mi equipo (`FATIGUE_PER_30`), llega al 90' cerca de 58. Lectura buscada: **al rival
+fresco hay que aguantarlo; si llegás descansado, lo pasás por arriba en el tramo final.**
+
+### Dos curvas de energía distintas, a propósito
+
+| energía | mi curva (banda verde) | curva del rival |
+|---|---|---|
+| 100 | ×1.000 | ×1.000 |
+| 80 | ×1.000 | ×0.960 |
+| 65 | ×1.000 | ×0.930 |
+| 58 | ×0.997 | ×0.916 |
+| 40 | ×0.957 | ×0.880 |
+| 5 | ×0.750 | ×0.810 |
+
+La banda verde (`energyMult`, M1) existe para arreglar **mi** economía: sin ella,
+Recuperar era comprar rendimiento universal a diario y dominaba como estrategia. Pero el
+rival no tiene acciones del día, ni recuperación pasiva, ni plantel que rotar. Aplicarle
+la misma curva indulgente resultó ser un error de categoría, y se midió: con la banda
+compartida su fatiga valía **×0.9966 — o sea nada**, y la mecánica no se sentía (mixto
+30.3 → 30.9, puro ruido). Con curva propia y lineal (`oppEnergyMult`) sí muerde.
+
+La asimetría vive en los DATOS: `p.rival` marca al once generado, igual que `p.oxid` y
+`p.forma`. `effStat` elige la curva por ese campo.
+
+### El costo en dificultad, y su compensación
+
+Quitarle al rival una ventaja que tenía gratis ablandó el juego ~4pp y sacó al mixto del
+gate 29-31 del arco del Rebalance. Compensado (decisión PO) por el mismo canal:
+**`DAILY_RECOVERY` 8 → 7** — ahora se cansan los dos.
+
+| estrategia | antes | final | gate |
+|---|---|---|---|
+| siempre Recuperar | 11.4% | **14.1%** | 10-15 ✓ |
+| siempre Entrenar | 16.2% | **15.5%** | ~15 ✓ |
+| mixto (azar) | 30.3% | **31.0 / 31.1%** | 29-31 ✓ (borde superior, 2 mediciones) |
+| smart (techo) | 45.0% | **49.4%** | — |
+| CPV (colista) | ~5.7% | **6.3%** | ≥3 ✓ |
+
+**A vigilar**: la compensación favorece levemente al recuperador (repone activamente, así
+que la pasiva le importa menos). La brecha Recuperar↔Entrenar se comprimió de 4.8pp a
+1.4pp. La tesis del arco se sostiene —Recuperar sigue siendo el piso— pero con menos
+margen que antes.

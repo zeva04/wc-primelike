@@ -7,6 +7,7 @@
    vive en game/discipline.js y game/flow.js.)
    ============================================================ */
 import { rnd, pick } from "../../core/rng.js";
+import { noteMomentum, markMomentum } from "./match-momentum.js";
 import { statLine } from "../ratings.js";
 import { rollInjury, fatigueInjuryMult } from "../medical.js";
 
@@ -17,9 +18,10 @@ export function foulEvent(m) {
     const p = pick(m.oppLineup.filter(x => !x.expulsado));
     if (rnd() < 0.4) {
       p.amarillaPartido = 1; // persiste toda la partida (se muestra en el panel del rival)
-      m.log("card", `min ${m.min}' — 🟨 Amarilla a ${p.name} (${m.oppTeam.name}) por falta dura.`);
+      markMomentum(m, "🟨");
+      m.log("card", `min ${m.clock()}' — 🟨 Amarilla a ${p.name} (${m.oppTeam.name}) por falta dura.`);
     } else {
-      m.log("card", `min ${m.min}' — Falta dura de ${p.name} (${m.oppTeam.name}). El árbitro deja seguir.`);
+      m.log("card", `min ${m.clock()}' — Falta dura de ${p.name} (${m.oppTeam.name}). El árbitro deja seguir.`);
     }
     return false;
   }
@@ -29,25 +31,30 @@ export function foulEvent(m) {
     if (rnd() < 0.06) {
       p.expulsado = true;
       m.stats.tarjetas++;
-      m.log("card", `min ${m.min}' — 🟥 ¡EXPULSADO ${p.name}! Roja directa. Juegan con ${m.activeMine().length}.`);
+      // Quedarse con uno menos ENTREGA el partido: es de lo poco que mueve el momentum
+      // sin ser una jugada (el gráfico tiene que explicar el quiebre que viene después).
+      noteMomentum(m, "roja", "opp"); markMomentum(m, "🟥");
+      m.log("card", `min ${m.clock()}' — 🟥 ¡EXPULSADO ${p.name}! Roja directa. Juegan con ${m.activeMine().length}.`);
       return p.pos === "POR" ? forceGkReplacement(m) : false;
     }
     p.amarillaPartido = (p.amarillaPartido || 0) + 1;
     m.stats.tarjetas++;
     if (p.amarillaPartido >= 2) {
       p.expulsado = true;
-      m.log("card", `min ${m.min}' — 🟥 Segunda amarilla y EXPULSIÓN de ${p.name}.`);
+      noteMomentum(m, "roja", "opp"); markMomentum(m, "🟥");
+      m.log("card", `min ${m.clock()}' — 🟥 Segunda amarilla y EXPULSIÓN de ${p.name}.`);
       return p.pos === "POR" ? forceGkReplacement(m) : false;
     }
     // La amarilla solo NARRA (PO 22-jul: el popup de "protegerlo" se eliminó — cambiar al
     // amonestado es una decisión que el DT toma solo, desde la Gestión de plantilla en vivo).
-    m.log("card", `min ${m.min}' — 🟨 Amarilla para ${p.name}. Queda condicionado: otra falta y se va.`);
+    markMomentum(m, "🟨");
+    m.log("card", `min ${m.clock()}' — 🟨 Amarilla para ${p.name}. Queda condicionado: otra falta y se va.`);
     // Si venía apercibido del torneo, esta amarilla lo suspende para el próximo partido
     if ((p.amarillas || 0) >= 1) {
       m.log("card", `⚠️ ${p.name} estaba apercibido: acumula su segunda amarilla del torneo y se perderá el PRÓXIMO partido.`);
     }
   } else {
-    m.log("plain", `min ${m.min}' — Falta de ${p.name}, el árbitro cobra pero no amonesta.`);
+    m.log("plain", `min ${m.clock()}' — Falta de ${p.name}, el árbitro cobra pero no amonesta.`);
   }
   return false;
 }
@@ -77,11 +84,11 @@ export function forceGkReplacement(m) {
 export function injuryEvent(m) {
   const mineInjured = rnd() < 0.5;
   if (!mineInjured) {
-    m.log("plain", `min ${m.min}' — Un jugador de ${m.oppTeam.name} recibe atención médica. Se reincorpora.`);
+    m.log("plain", `min ${m.clock()}' — Un jugador de ${m.oppTeam.name} recibe atención médica. Se reincorpora.`);
     return false;
   }
   if (m.my.buffs.antiLesion) {
-    m.log("event", `min ${m.min}' — Golpe fuerte a uno de los tuyos, pero el cuerpo médico de élite lo deja como nuevo. 🧑‍⚕️`);
+    m.log("event", `min ${m.clock()}' — Golpe fuerte a uno de los tuyos, pero el cuerpo médico de élite lo deja como nuevo. 🧑‍⚕️`);
     return false;
   }
   const p = pick(m.activeMine());
@@ -89,7 +96,7 @@ export function injuryEvent(m) {
   const grave = rnd() < 0.45 * fatigueInjuryMult(p.energia);
   if (!grave) {
     p.energia = Math.max(10, p.energia - 20);
-    m.log("event", `min ${m.min}' — ${p.name} recibe un golpe. Sigue, pero está tocado (−energía).`);
+    m.log("event", `min ${m.clock()}' — ${p.name} recibe un golpe. Sigue, pero está tocado (−energía).`);
     return false;
   }
   const inj = rollInjury();
@@ -99,7 +106,8 @@ export function injuryEvent(m) {
   const baja = inj.partidos === 0
     ? "sale del partido pero llega al próximo"
     : `${inj.partidos} partido${inj.partidos > 1 ? "s" : ""} de baja`;
-  m.log("event", `min ${m.min}' — 🚑 ¡${p.name} sufre ${inj.name} (${inj.severidad})! No puede continuar — ${baja}.`);
+  markMomentum(m, "🚑");
+  m.log("event", `min ${m.clock()}' — 🚑 ¡${p.name} sufre ${inj.name} (${inj.severidad})! No puede continuar — ${baja}.`);
   if (m.subsLeft > 0 && m.eligibleFor(p).length > 0) {
     // El reemplazo es MANUAL (PO 22-jul): nada de lista de recomendados — la UI abre la
     // Gestión de plantilla en vivo con el caído marcado y el DT arma el cambio a mano.

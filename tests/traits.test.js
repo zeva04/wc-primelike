@@ -488,6 +488,221 @@ function forcePlay(m, typeId, optIdx = 0) {
   assert(osc.weights.circulacion * 0.65 < 1.05, "empareja el matchup, NO lo invierte (regla del arco)");
 }
 
+// ---------- Las 3 mecanicas del arbol de Posesion (26-jul-2026) ----------
+// Eran deuda declarada del rediseno: el catalogo las nombraba y el Match no las leia.
+// Aca se fija que OCURREN de verdad en un partido, no solo que el hook existe.
+{
+  // --- LA TRAMPA: el Retroceso de posesion es una OPCION NUEVA del acto ---
+  {
+    const sin = makeMatch("ARG", "posesion", []);
+    E.startSequence(sin, E.sequenceType("circulacion"));
+    assert(sin.decision.options.length === 2, "sin el rasgo, la construccion ofrece 2 opciones", sin.decision.options.length);
+    assert(!sin.decision.options.some(o => o.key === "atras"), "sin La Trampa no existe el retroceso");
+
+    const con = makeMatch("ARG", "posesion", ["la_trampa"]);
+    E.startSequence(con, E.sequenceType("circulacion"));
+    assert(con.decision.options.length === 3, "con La Trampa la construccion ofrece 3", con.decision.options.length);
+    const back = con.decision.options.find(o => o.key === "atras");
+    assert(back && /Retroceso/.test(back.label), "la opcion nueva se llama por su nombre", back?.label);
+
+    // Se usa UNA vez por secuencia: tras retroceder, la opcion ya no vuelve a aparecer.
+    let usos = 0, reaparecio = false, guard = 0;
+    while (con.seq && guard++ < 25) {
+      if (!con.decision) { con.resolveSequenceAct(null); continue; }
+      if (con.decision.id !== "sequence") break;
+      const hay = con.decision.options.find(o => o.key === "atras");
+      if (hay && usos >= 1) reaparecio = true;
+      if (hay) { usos++; con.resolveSequenceAct("atras"); }
+      else con.resolveSequenceAct("seguro");
+    }
+    assert(usos === 1, "el retroceso se ofrece una sola vez por secuencia", usos);
+    assert(!reaparecio, "gastado el recurso, la opcion desaparece del acto");
+  }
+
+  // El retroceso NO avanza la jugada (paga un toque) pero sube el perfil del ataque.
+  {
+    let vistoTexto = false, subioBonus = false, guard = 0;
+    while (guard++ < 200 && !(vistoTexto && subioBonus)) {
+      const m = makeMatch("ARG", "posesion", ["la_trampa"]);
+      m.min = 30;
+      E.startSequence(m, E.sequenceType("circulacion"));
+      const actAntes = m.seq.actIdx, bonusAntes = m.seq.bonus;
+      m.resolveSequenceAct("atras");
+      if (!m.seq) continue;                      // se la robaron: el fallo abre contra (tiene costo)
+      if (m.seq.actIdx === actAntes) {
+        if (m.seq.bonus > bonusAntes) subioBonus = true;
+        if (m.feed.some(f => /vuelve a armar/.test(f.text))) vistoTexto = true;
+      }
+    }
+    assert(subioBonus, "el retroceso deja el ataque mejor perfilado sin avanzar el acto");
+    assert(vistoTexto, "el momento del retroceso SE VE en el relato");
+  }
+
+  // Y su costo es real: perder el pase hacia atras con el equipo adelantado abre contra.
+  {
+    let perdida = false;
+    for (let i = 0; i < 400 && !perdida; i++) {
+      const m = makeMatch("ARG", "posesion", ["la_trampa"]);
+      m.min = 30;
+      E.startSequence(m, E.sequenceType("circulacion"));
+      m.resolveSequenceAct("atras");
+      if (m.feed.some(f => /roban el pase hacia atr/.test(f.text))) perdida = true;
+    }
+    assert(perdida, "retroceder tiene costo: el pase se juega de verdad y se puede perder");
+  }
+
+  // --- LA MAQUINA COLECTIVA: la pelota servida tras la circulacion larga ---
+  {
+    let servida = false, empujada = false;
+    for (let i = 0; i < 400 && !(servida && empujada); i++) {
+      const m = makeMatch("ARG", "posesion", ["maquina_colectiva"]);
+      m.min = 30;
+      const feed = forcePlay(m, "circulacion", 0);   // pase seguro: todos los compases suenan
+      if (/solo hay que empujarla/.test(feed)) servida = true;
+      if (/Solo tuvo que empujarla/.test(feed)) empujada = true;
+    }
+    assert(servida, "La Maquina Colectiva deja la pelota servida (el momento SE VE)");
+    assert(empujada, "y cuando entra, el relato del gol lo reconoce");
+
+    // Sin el rasgo, jamas ocurre.
+    let nunca = true;
+    for (let i = 0; i < 200 && nunca; i++) {
+      const m = makeMatch("ARG", "posesion", []);
+      m.min = 30;
+      if (/empujarla/.test(forcePlay(m, "circulacion", 0))) nunca = false;
+    }
+    assert(nunca, "sin el Master la pelota nunca queda servida");
+  }
+
+  // --- LA FRONTERA: la contra tras mi perdida muere en offside ---
+  {
+    let anulada = false, guard = 0;
+    while (guard++ < 600 && !anulada) {
+      const m = makeMatch("ARG", "posesion", ["la_frontera"]);
+      m.min = 30;
+      const feed = forcePlay(m, "circulacion", 1);   // filtrado: la perdida arriesgada abre contra
+      if (/sale de CONTRA/.test(feed) && /offside/.test(feed)) anulada = true;
+    }
+    assert(anulada, "La Frontera anula la contra rival con la trampa del offside");
+
+    // El otro hook del MISMO rasgo sigue vivo: el pelotazo ambiente a la espalda.
+    const t = E.traitById("la_frontera");
+    assert(t.hooks.offsideTrap && t.hooks.breakawayGuard,
+      "La Frontera cubre los DOS canales del balon a la espalda (contra + pelotazo ambiente)");
+  }
+
+  // --- Ninguna de las tres sigue siendo deuda ---
+  for (const [id, hook] of [["maquina_colectiva", "tapIn"], ["la_trampa", "backPass"], ["la_frontera", "offsideTrap"]]) {
+    assert(E.traitById(id).hooks[hook], `${id} declara ${hook}`);
+  }
+}
+
+// ---------- Fatiga del rival + Congelar (26-jul-2026) ----------
+{
+  // --- El rival se cansa DENTRO del partido (antes nacia al 100% y no bajaba) ---
+  {
+    const m = makeMatch("ARG", "posesion", []);
+    const antes = m.oppLineup.map(p => p.energia);
+    assert(antes.every(e => e === 100), "el once rival arranca al 100%");
+    for (let g = 0; !m.finished && g < 400; g++) { m.decision = null; m.seq = null; m.tick(); }
+    const fin = m.oppLineup.filter(p => !p.expulsado && !p.lesionado).map(p => p.energia);
+    assert(fin.every(e => e < 100), "tras los 90 minutos el rival YA no esta fresco", fin[0]);
+    assert(fin.every(e => e > 40 && e < 70), "termina cerca de 58: el mismo dial que paga mi equipo", fin[0]);
+  }
+
+  // --- El Rondo acelera ese drenaje (y es lo UNICO que hace hoy en el motor) ---
+  {
+    const drena = rasgos => {
+      const m = makeMatch("ARG", "posesion", rasgos);
+      for (let g = 0; !m.finished && g < 400; g++) { m.decision = null; m.seq = null; m.tick(); }
+      const vivos = m.oppLineup.filter(p => !p.expulsado && !p.lesionado);
+      return vivos.reduce((a, p) => a + p.energia, 0) / Math.max(1, vivos.length);
+    };
+    const sin = drena([]), con = drena(["el_rondo"]);
+    assert(con < sin, "El Rondo deja al rival mas gastado al final", `sin=${sin.toFixed(1)} con=${con.toFixed(1)}`);
+  }
+
+  // --- La fatiga rival llega a sus duelos por el MISMO cano que la mia (effStat) ---
+  {
+    const m = makeMatch("ARG", "posesion", []);
+    const fresco = m.powers().opp.def;
+    for (const p of m.oppLineup) p.energia = 20;      // rival fundido
+    const fundido = m.powers().opp.def;
+    assert(fundido < fresco, "un rival sin piernas defiende peor (energyMult, sin canaria nueva)",
+      `${fresco.toFixed(3)} -> ${fundido.toFixed(3)}`);
+  }
+
+  // --- CONGELAR: solo desde el minuto 70 y sin ir perdiendo ---
+  {
+    const conFrios = (min, gMy, gOpp) => {
+      const m = makeMatch("ARG", "press", ["frios"]);
+      m.min = min; m.gMy = gMy; m.gOpp = gOpp;
+      E.startSequence(m, E.sequenceType("circulacion"));
+      let guard = 0;
+      while (m.seq && guard++ < 20) {
+        if (!m.decision) { m.resolveSequenceAct(null); continue; }
+        const opts = m.decision.options.map(o => o.key);
+        if (opts.includes("rematar")) return opts;    // llegamos al desenlace
+        m.resolveSequenceAct("seguro");
+      }
+      return null;
+    };
+    assert(conFrios(75, 1, 0)?.includes("congelar"), "ganando en el minuto 75 se puede congelar");
+    assert(conFrios(75, 1, 1)?.includes("congelar"), "empatando en el tramo final tambien (decision PO)");
+    assert(!conFrios(75, 0, 1)?.includes("congelar"), "perdiendo NO se congela");
+    assert(!conFrios(40, 1, 0)?.includes("congelar"), "ganando temprano tampoco: es un recurso de cierre");
+    const sinRasgo = (() => {
+      const m = makeMatch("ARG", "press", []);
+      m.min = 80; m.gMy = 1;
+      E.startSequence(m, E.sequenceType("circulacion"));
+      let guard = 0;
+      while (m.seq && guard++ < 20) {
+        if (!m.decision) { m.resolveSequenceAct(null); continue; }
+        const opts = m.decision.options.map(o => o.key);
+        if (opts.includes("rematar")) return opts;
+        m.resolveSequenceAct("seguro");
+      }
+      return null;
+    })();
+    assert(sinRasgo && !sinRasgo.includes("congelar"), "sin Frios la opcion no existe");
+  }
+
+  // --- Congelar CAMBIA mi ocasion por la del rival: le descuenta una llegada ---
+  {
+    let visto = false, guard = 0;
+    while (guard++ < 60 && !visto) {
+      const m = makeMatch("ARG", "press", ["frios"]);
+      m.min = 75; m.gMy = 1;
+      E.maybeStartSequence(m); m.seq = null; m.decision = null;   // fuerza el plan del partido
+      E.startSequence(m, E.sequenceType("circulacion"));
+      let steps = 0;
+      while (m.seq && steps++ < 20) {
+        if (!m.decision) { m.resolveSequenceAct(null); continue; }
+        const opts = m.decision.options.map(o => o.key);
+        if (opts.includes("congelar")) {
+          const target = m._seqPlan.target;
+          m.resolveSequenceAct("congelar");
+          assert(m._frozen === 1, "congelar deja el credito anotado", m._frozen);
+          assert(!m.seq, "la jugada muere sin remate: se resigno el ataque");
+          assert(m.feed.some(f => /reloj/.test(f.text)), "el momento SE VE en el relato");
+          // y la proxima llegada RIVAL se descuenta del objetivo del partido
+          // El generador corta al alcanzar el objetivo del partido: se reinicia el
+          // contador en cada vuelta para que siga sorteando lados hasta que salga "opp".
+          let g2 = 0;
+          while (m._frozen > 0 && g2++ < 400) { m.seq = null; m.decision = null; m._seqCount = 0; E.maybeStartSequence(m); }
+          assert(m._frozen === 0, "el credito se consume contra una secuencia rival", m._frozen);
+          assert(m._seqPlan.target < target, "la llegada rival se PIERDE, no se pospone",
+            `${target} -> ${m._seqPlan.target}`);
+          visto = true;
+          break;
+        }
+        m.resolveSequenceAct("seguro");
+      }
+    }
+    assert(visto, "el camino de congelar se ejercita de punta a punta");
+  }
+}
+
 console.log(`\ntraits: ${checks} checks · fallos: ${fails}`);
 console.log(fails ? "❌ traits con fallos" : "✅ traits OK");
 process.exit(fails ? 1 : 0);

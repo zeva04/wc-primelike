@@ -19,6 +19,8 @@ import { rnd } from "../../core/rng.js";
 import { clamp } from "../../core/math.js";
 import { teamRating } from "../ratings.js";
 import { effStat } from "./powers.js";
+import { notePass } from "./stats.js";
+import { noteMomentum } from "./match-momentum.js";
 
 /** Nota de ataque del rival, escala 0..5 (misma que usaban las ocasiones sueltas). */
 function oppR(m) { return teamRating(m.oppTeam) / 20; }
@@ -31,7 +33,12 @@ function oppR(m) { return teamRating(m.oppTeam) / 20; }
 export function actPass(m, from, { hard = false } = {}) {
   const base = hard ? 0.58 : 0.38;
   const p = clamp(base + effStat(from, "pase", m.my.buffs) * (hard ? 0.06 : 0.11), 0.2, 0.92);
-  return { ok: rnd() < p, hard };
+  const ok = rnd() < p;
+  notePass(m, "mine", ok);   // el pase que el DT eligió también entra al panel de stats
+  // Match Momentum: el pase SEGURO no mueve la aguja (pesa 0) y el filtrado que sale la
+  // mueve mucho. Ahí está el "possession value": diez laterales no son una jugada.
+  noteMomentum(m, ok ? (hard ? "romperLineas" : "paseProgresivo") : "paseFallado");
+  return { ok, hard };
 }
 
 /**
@@ -43,7 +50,9 @@ export function actPass(m, from, { hard = false } = {}) {
 export function actDribble(m, p, { bonus = 0 } = {}) {
   const pr = clamp(0.05 + effStat(p, "aura", m.my.buffs) * 0.075 + bonus, 0.05, 0.65);
   const roll = rnd();
-  return { ok: roll < pr, foul: roll >= pr && roll < pr + 0.12 };
+  const out = { ok: roll < pr, foul: roll >= pr && roll < pr + 0.12 };
+  noteMomentum(m, out.ok ? "conduccion" : out.foul ? "paseProgresivo" : "conduccionFallada");
+  return out;
 }
 
 /**
@@ -57,6 +66,7 @@ export function actDribble(m, p, { bonus = 0 } = {}) {
  */
 export function actShot(m, p, { stat = "tiro", bonus = 0 } = {}) {
   m.stats.misTiros++;
+  noteMomentum(m, "remate");   // el pico del gráfico (el gol suma aparte, en chances)
   const q = effStat(p, stat, m.my.buffs);
   // El remate de definición de una secuencia es una ocasión construida: base más alta que el
   // remate ambiente (espejo del antiguo "shoot" interactivo, 0.14 + q·0.09).
@@ -72,10 +82,13 @@ export function actShot(m, p, { stat = "tiro", bonus = 0 } = {}) {
  */
 export function actOppShot(m, shooter, mine, { stat = "tiro", bonus = 0 } = {}) {
   m.stats.oppTiros++;
+  noteMomentum(m, "remate", "opp");
   const q = effStat(shooter, stat);
   const porQ = mine.por ? (effStat(mine.por, "atajadas", m.my.buffs) * 0.65 + effStat(mine.por, "reflejos", m.my.buffs) * 0.35) : 1;
   const pg = clamp(0.12 + q * 0.08 + bonus - porQ * 0.06 - (mine.def - 2.5) * 0.04, 0.05, 0.6);
-  return { ok: rnd() < pg };
+  const ok = rnd() < pg;
+  if (!ok) noteMomentum(m, "atajada");   // el peligro se apaga: el mérito vuelve a ser mío
+  return { ok };
 }
 
 /**
@@ -86,7 +99,9 @@ export function actOppShot(m, shooter, mine, { stat = "tiro", bonus = 0 } = {}) 
 export function actAerial(m, p, { handicap = 0 } = {}) {
   const q = effStat(p, "cabezazo", m.my.buffs);
   const pw = clamp(0.42 + q * 0.08 - oppR(m) * 0.03 - handicap, 0.15, 0.78);
-  return { ok: rnd() < pw };
+  const ok = rnd() < pw;
+  noteMomentum(m, ok ? "duelo" : "dueloPerdido");
+  return { ok };
 }
 
 /**
@@ -99,5 +114,8 @@ export function actAerial(m, p, { handicap = 0 } = {}) {
 export function actContain(m, mine, { press = false, bonus = 0 } = {}) {
   const base = press ? 0.30 : 0.42;
   const p = clamp(base + bonus + (mine.def - 2.5) * 0.06, 0.18, 0.78);
-  return { ok: rnd() < p, press };
+  const ok = rnd() < p;
+  // Cortar la jugada rival devuelve el partido; que te la rompan lo entrega.
+  noteMomentum(m, ok ? (press ? "presionExitosa" : "recuperacionAlta") : "presionSuperada");
+  return { ok, press };
 }

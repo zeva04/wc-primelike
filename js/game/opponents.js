@@ -108,7 +108,7 @@ export function genOpponentLineup(team, banned = [], koRound = 0) {
   const pool = (team.players || genOpponentSquad(team)).filter(p => !banned.includes(p.name));
   const shape = curatedShape(team);
   const forma = tourneyFormaMult(koRound);
-  return (shape ? bestSixShaped(pool, shape) : bestSix(pool)).map(p => ({ name: p.name, pos: p.pos, num: p.num, stats: { ...p.stats }, look: p.look, energia: 100, forma, amarilla: false, expulsado: false, lesionado: false }));
+  return (shape ? bestSixShaped(pool, shape) : bestSix(pool)).map(p => ({ name: p.name, pos: p.pos, num: p.num, stats: { ...p.stats }, look: p.look, energia: 100, forma, rival: true, amarilla: false, expulsado: false, lesionado: false }));
 }
 
 /**

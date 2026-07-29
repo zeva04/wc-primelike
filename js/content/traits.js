@@ -80,15 +80,30 @@
    - secondBallUpgrade:{bonus, intro}  la cadena de Segunda Jugada sube de calidad
                        y gana su propia voz (posición establecida).
 
-   Vocabulario del rediseño de Press (25-jul-2026) — PENDIENTE DE MOTOR:
+   Vocabulario de los rediseños (Press 25-jul · Posesión 26-jul):
    - pressStamina:     {factor}        el ACTO de presionar cuesta menos piernas
                        (decisión PO: jamás la fatiga general del partido — la
                        economía de energía es el dial más sensible del juego).
-   - iceGame:          {p, texto}      rasgo de ESTADO, solo con ventaja: tras
-                       robar, el equipo puede devolverla al área propia y comer
-                       reloj. Habilita una DECISIÓN NUEVA en el partido.
-   Ambos están declarados en el catálogo y todavía no los lee el Match: son el
-   trabajo de motor que este rediseño deja abierto (ver docs/ROADMAP-rasgos.md).
+   - tapIn:            {p, bonus, texto} tras una circulación LARGA (todos los
+                       compases sonaron), el desenlace llega SERVIDO: solo hay
+                       que empujarla. Misma condición que el penal de la sinfonía.
+   - backPass:         {bonus, texto}  LA JUGADA NUEVA: una tercera opción en el
+                       acto de construcción (Retroceso de posesión). No se
+                       sortea: la elige el DT, una vez por secuencia. La jugada
+                       no avanza, pero el rival sale de su bloque.
+   - offsideTrap:      {p, texto}      la contra que nace de MI pérdida muere en
+                       fuera de juego. Espejo de breakawayGuard (el otro hook de
+                       La Frontera): juntos cubren los dos canales del balón a
+                       la espalda.
+   - iceGame:          {texto}         LA OTRA JUGADA NUEVA: "Congelar el partido",
+                       una opción del desenlace desde el minuto 70 sin ir
+                       perdiendo. Cambia MI ocasión por la del rival: se resigna
+                       el remate y la próxima llegada rival no ocurre. Tampoco se
+                       sortea — la elige el DT (match/sequence-acts.canFreeze).
+   - oppStamina:       {factor}        el rival se cansa MÁS RÁPIDO dentro del
+                       partido (El Rondo: el rondo son ELLOS corriendo). Escala
+                       medical.drainOppEnergy — ver docs/CORE.md §Fatiga del rival.
+   El catálogo YA NO tiene deuda de motor: todo hook declarado lo lee el Match.
    ============================================================ */
 
 export const TRAITS = [
@@ -292,8 +307,10 @@ export const TRAITS = [
     // RASGO DE ESTADO (el segundo del catálogo, tras Uno a Cero): SOLO con
     // ventaja en el marcador. Habilita una decisión NUEVA en el partido —
     // devolver la pelota al área propia para consumir reloj.
-    hooks: { iceGame: { p: 0.35,
-      texto: "Fríos como el hielo: la roban, la devuelven atrás, y el reloj sigue corriendo a favor." } },
+    // Sin `p`: no se sortea, la ELIGE el DT — una opción nueva del desenlace, disponible
+    // desde el minuto 70 sin ir perdiendo (ver match/sequence-acts.canFreeze).
+    hooks: { iceGame: {
+      texto: "Fríos como el hielo: la devuelven atrás y el reloj empieza a jugar para nosotros." } },
   },
   {
     id: "calientes", filo: "press", rama: "expansion", tier: "master", icon: "👑",
@@ -415,7 +432,8 @@ export const TRAITS = [
       // Hereda el hook del viejo Master (La Pelota es Nuestra): el reparto de
       // iniciativa se inclina de raiz y el pool rival se estrangula por falta de balon.
       masterPosesion: { shareShift: 0.06 },
-      tapIn: { p: 0.30, texto: "La maquina la dejo servida: solo hay que empujarla." },  // PENDIENTE DE MOTOR
+      // La circulación larga deja la pelota servida: el remate llega casi hecho.
+      tapIn: { p: 0.30, bonus: 0.22, texto: "La máquina la dejó servida: solo hay que empujarla." },
     },
   },
   {
@@ -442,7 +460,9 @@ export const TRAITS = [
       // recupera, su ataque nace lejos e incomodo.
       oppShotMalus: { seq: "recuperacion", bonus: -0.06,
         texto: "Mordieron el anzuelo y salieron: cuando la recuperan, estan lejos y el remate no asusta." },
-      backPass: { p: 0.30, texto: "El equipo la devuelve atras y vuelve a armar: el rival tiene que salir." },  // PENDIENTE DE MOTOR
+      // Sin `p`: esta no se sortea, la ELIGE el DT — es una opción nueva del acto de
+      // construcción, una sola vez por secuencia (ver match/sequence-acts).
+      backPass: { bonus: 0.05, texto: "El equipo la devuelve atrás y vuelve a armar: el rival tiene que salir de su bloque." },
     },
   },
   {
@@ -467,7 +487,7 @@ export const TRAITS = [
       // el pelotazo ambiente muere leido por la linea.
       breakawayGuard: { p: 0.40,
         texto: "La linea sube junta y lo deja en offside: la frontera aguanto y el contragolpe no existio." },
-      offsideTrap: { p: 0.35, texto: "Trampa del offside: el brazo en alto y la jugada anulada." },  // PENDIENTE DE MOTOR
+      offsideTrap: { p: 0.35, texto: "¡Trampa del offside! La línea sube junta, el brazo en alto y la contra queda anulada." },
     },
   },
   {
@@ -495,7 +515,8 @@ export const TRAITS = [
       // El rondo instala el partido en la circulacion: el pool se inclina hacia el
       // futbol que el rasgo describe (no es un buff, es OTRO partido).
       poolMod: { weights: { circulacion: 1.20 } },
-      oppStamina: { factor: 1.10 },  // PENDIENTE DE MOTOR: hoy el rival nunca se cansa
+      // Acelera el drenaje de energía del once rival (medical.drainOppEnergy).
+      oppStamina: { factor: 1.10 },
     },
   },
   {

@@ -24,7 +24,7 @@
    la reprocesan solos porque tick() corta con decisión pendiente.)
 
    La UI lo maneja así:
-     1. `tick()` cada ~1s → avanza 5 min y devuelve false | true (hay decisión) | "halftime" | "pens" | "end"
+     1. `tick()` cada ~2s → avanza 1 min y devuelve false | true (hay decisión) | "halftime" | "pens" | "end"
      2. Si hay `decision`, la UI muestra el modal y llama al resolve* correspondiente según decision.id
      3. En "pens": startShootout() + shootMyPen()/shootOppPen() hasta shootoutStatus().done
      4. Al final: result()
@@ -44,6 +44,9 @@ import * as Incidents from "./incidents.js";
 import * as Shootout from "./shootout.js";
 import { hookOf, traitMoment } from "./trait-hooks.js";
 import { newPressState, pressOn, tickPress, PRESS_MOD } from "./press.js";
+import { newTally, tickStats } from "./stats.js";
+import { newMomentum, closeMinute, assistantLine, noteMomentum, markMomentum } from "./match-momentum.js";
+import { drainOppEnergy } from "../medical.js";
 
 // Frecuencias por tick de los eventos INDEPENDIENTES de las secuencias (Sprint A1). Penal y
 // último hombre se calibraron antes y quedan intactos; acá solo se fija cada cuánto asoman
@@ -63,6 +66,20 @@ const PEN_OPP_TICK = 0.010;    // ≈0.18/partido, como cuando vivía en oppChan
 const BREAKAWAY_TICK = 0.025;
 const AMBIENT_MINE = 0.85;     // el remate simulado propio cede algo de terreno a las secuencias
 const AMBIENT_OPP = 0.70;
+// Relato de ambiente: es NARRACIÓN pura (no toca el balance). Subió 0.35 → 0.55 con el
+// reloj continuo: el partido dura ahora ~3 minutos de reloj de pared en vez de ~15
+// segundos, y con la frecuencia vieja el relato quedaba muerto entre jugada y jugada.
+const AMBIENT_LINE = 0.55;
+
+// EL RELOJ CONTINUO (decisión PO 27-jul-2026). Antes cada tick avanzaba 5 minutos de
+// golpe; ahora avanza 1 y el minuto CORRE a la vista. TODA la calibración del juego
+// (penales, breakaway, faltas, remates ambiente) está expresada por CADA 5 MINUTOS —la
+// unidad histórica— y se reescala en un solo lugar, `_roll`: los diales de arriba no se
+// tocan y siguen significando lo mismo por partido.
+const MIN_PER_TICK = 1;
+
+// EL DESCUENTO (misma decisión): tope duro de minutos agregados al final de cada tiempo.
+const ADDED_MAX = 6;
 
 export class Match {
   /**
@@ -85,6 +102,12 @@ export class Match {
     if (gapMult !== 1) for (const p of this.oppLineup) p.forma *= gapMult;
     this.knockout = knockout;
     this.min = 0;
+    // EL RELOJ: `min` es el minuto que corre; `nominal` el minuto en que termina el tiempo
+    // EN CURSO (45 · 90 · 105 · 120) y `added` su descuento (null = todavía no se calculó).
+    // Mientras min > nominal se juega el descuento y el reloj se canta 45+2 (ver clock()).
+    this.halfStart = 0;        // minuto en que arrancó el tiempo en curso (para medir sus momentos)
+    this.nominal = 45;
+    this.added = null;
     this.gMy = 0; this.gOpp = 0;
     this.feed = [];
     this.decision = null;      // decisión pendiente {id, title, text, options:[{label, hint, key}]}
@@ -93,6 +116,12 @@ export class Match {
     this.phase = "regular";    // regular | extra | pens | done
     this.pens = null;
     this.stats = { misTiros: 0, oppTiros: 0, decisiones: 0, penalesAtajados: 0 };
+    // Panel de estadísticas del partido (match/stats.js): pases y córners, que el motor
+    // no llevaba. Los tiros siguen en `stats` y la posesión la deriva `flow()`.
+    this.tally = newTally();
+    // MATCH MOMENTUM (match/match-momentum.js): el gráfico de barras de la transmisión.
+    // Es una SALIDA del simulador — nada de lo que hay acá abajo lo lee.
+    this.mm = newMomentum();
     this.scorers = [];
     this.assists = [];         // asistencias de MIS goles [{name, min}] (chances.goalMine)
     // Señales por protagonista para el cierre post-partido (momentum/morale):
@@ -115,8 +144,14 @@ export class Match {
 
   // ---------- Estado y consultas ----------
 
-  /** Agrega una línea al relato del partido (kind define el estilo visual en la UI). */
-  log(kind, text) { this.feed.push({ min: Math.min(this.min, this.phase === "extra" ? 120 : 90), kind, text }); }
+  /** Agrega una línea al relato del partido (kind define el estilo visual en la UI).
+   *  `min` es el minuto CRUDO (91, 92…): lo lee el cálculo del descuento. Lo que se
+   *  muestra al jugador lo canta clock() dentro del texto. */
+  log(kind, text) { this.feed.push({ min: this.min, kind, text }); }
+
+  /** El minuto como lo canta la tele: "45+2" durante el descuento, "63" en juego corrido.
+   *  TODO el relato lo usa (`min ${m.clock()}'`); `m.min` sigue siendo el número crudo. */
+  clock() { return this.min > this.nominal ? `${this.nominal}+${this.min - this.nominal}` : `${this.min}`; }
 
   /** Mis jugadores actualmente en cancha (sin expulsados ni lesionados). */
   activeMine() { return this.my.lineup.filter(p => !p.expulsado && !p.lesionado); }
@@ -148,26 +183,55 @@ export class Match {
 
   // ---------- Simulación por tick ----------
 
-  /** Avanza ~5 min de juego. Devuelve false (seguir) | true (decisión) | "halftime" | "pens" | "end". */
+  /**
+   * Tira una moneda calibrada POR CADA 5 MINUTOS de juego (la unidad en la que están
+   * expresados todos los diales del partido desde el Sprint A1) y la reescala al largo
+   * real del tick. Un solo lugar para el reloj continuo: los números de balance de arriba
+   * no cambian de significado, cambia cuántas veces se los pregunta.
+   */
+  _roll(p5) { return rnd() < (p5 * MIN_PER_TICK) / 5; }
+
+  /** Avanza 1 min de juego. Devuelve false (seguir) | true (decisión) | "halftime" | "pens" | "end". */
   tick() {
     if (this.finished || this.decision) return true;
-    const end = this.phase === "extra" ? 120 : 90;
-    if (this.min >= end) return this._finishRegular();
 
-    this.min += 5;
+    // MATCH MOMENTUM: se cierra la barra del minuto que TERMINA, antes de tocar nada más.
+    // Va acá arriba a propósito: los actos de una secuencia se resuelven con el reloj
+    // congelado (fuera de tick), así que sus empujones caen en el minuto en que arrancó
+    // la jugada — que es donde el jugador los vio pasar.
+    closeMinute(this);
+    const consejo = assistantLine(this);
+    if (consejo) this.log("plain", consejo);
+
+    // EL DESCUENTO: al pisar el minuto nominal el cuarto árbitro levanta el cartel y se
+    // sigue jugando hasta nominal+added. Se calcula UNA vez por tiempo (added === null =
+    // aún no se calculó) y ese tick no avanza el reloj: el cartel se lee antes de seguir.
+    if (this.added === null && this.min >= this.nominal) {
+      this.added = this._stoppage();
+      if (this.added > 0) {
+        this.log("info", `⏱️ ${this.nominal}' — El cuarto árbitro levanta el cartel: ${this.added} minuto${this.added > 1 ? "s" : ""} de descuento.`);
+        return false;
+      }
+    }
+    if (this.min >= this.nominal + (this.added ?? 0)) return this._endOfHalf();
+
+    this.min += MIN_PER_TICK;
     // La ráfaga de presión vence por minutos de partido (no por reloj de pared: una
     // secuencia congela el relato mientras el DT lee). Se resuelve ANTES de calcular
     // poderes para que el tick que la apaga ya no la cobre.
-    // Primero se COBRAN los 5 minutos recién jugados (si la ráfaga venía encendida) y
-    // recién después se la vence: al revés, el último tramo de cada ráfaga salía gratis.
-    if (pressOn(this)) for (const p of this.activeMine()) this._pressMin.set(p, (this._pressMin.get(p) || 0) + 5);
+    // Primero se COBRA el minuto recién jugado (si la ráfaga venía encendida) y recién
+    // después se la vence: al revés, el último tramo de cada ráfaga salía gratis.
+    if (pressOn(this)) for (const p of this.activeMine()) this._pressMin.set(p, (this._pressMin.get(p) || 0) + MIN_PER_TICK);
     tickPress(this);
+    // El rival se cansa mientras juega (medical.drainOppEnergy): llega al 90' cerca de
+    // 58 de energía. El Rondo (Posesión) acelera el drenaje — el rondo son ELLOS
+    // corriendo. Va ANTES de powers() para que el tick ya lo cobre en sus duelos.
+    drainOppEnergy(this.oppLineup, MIN_PER_TICK, hookOf(this, "oppStamina")?.factor || 1);
 
     const { mine, opp } = this.powers();
-
-    // Entretiempo
-    if (this.min === 45) { this.log("info", "⏸️ Entretiempo. Ajusta tu equipo si quieres."); return "halftime"; }
-    if (this.phase === "extra" && this.min === 105) { this.log("info", "⏸️ Fin del primer tiempo extra."); return "halftime"; }
+    // Estadísticas de transmisión (pases y córners ambiente). Va ANTES de las jugadas:
+    // el minuto ya jugado cuenta aunque el tick corte con una decisión.
+    tickStats(this, mine, opp);
 
     // Key Sequences (Bible §7): la columna interactiva del partido. Reemplazan a las
     // ocasiones sueltas de myChance/oppChance; 2-6 por partido moduladas por la preparación.
@@ -175,8 +239,8 @@ export class Match {
 
     // Eventos interactivos INDEPENDIENTES de las secuencias (penal y último hombre, intactos
     // del calibrado previo; A1 no toca su matemática, solo cada cuánto asoman como evento suelto).
-    if (rnd() < PEN_MINE_TICK) { this._flow.push({ min: this.min, side: "mine", w: 2 }); return Chances.myPenaltyChance(this); }
-    if (rnd() < BREAKAWAY_TICK) {
+    if (this._roll(PEN_MINE_TICK)) { this._flow.push({ min: this.min, side: "mine", w: 2 }); return Chances.myPenaltyChance(this); }
+    if (this._roll(BREAKAWAY_TICK)) {
       // T2 — Anticipar la Espalda: el central que LEYÓ el pelotazo lo corta antes del
       // mano a mano (el canal ambiente del breakaway — exactamente el fútbol que este
       // rasgo compra: la vacuna contra el balón largo que salta la presión). La
@@ -185,21 +249,65 @@ export class Match {
       if (g && rnd() < g.p) { traitMoment(this, g.traitId, [g.texto]); }
       else if (Chances.lastManChance(this)) { this._flow.push({ min: this.min, side: "opp", w: 2 }); return true; }
     }
-    if (rnd() < PEN_OPP_TICK) { this._flow.push({ min: this.min, side: "opp", w: 2 }); return Chances.oppPenaltyChance(this); }
+    if (this._roll(PEN_OPP_TICK)) { this._flow.push({ min: this.min, side: "opp", w: 2 }); return Chances.oppPenaltyChance(this); }
 
     // Ocasiones SIMULADAS (no interactivas): la parte "el resto se simula" del Bible §7.
     const ratioMy = mine.atk / (mine.atk + opp.def);
-    if (rnd() < (0.12 + 0.22 * ratioMy) * AMBIENT_MINE) { this._flow.push({ min: this.min, side: "mine", w: 1 }); Chances.ambientShotMine(this); }
+    if (this._roll((0.12 + 0.22 * ratioMy) * AMBIENT_MINE)) { this._flow.push({ min: this.min, side: "mine", w: 1 }); Chances.ambientShotMine(this); }
     const ratioOpp = opp.atk / (opp.atk + mine.def);
-    if (rnd() < (0.09 + 0.24 * ratioOpp) * AMBIENT_OPP) { this._flow.push({ min: this.min, side: "opp", w: 1 }); Chances.ambientShotOpp(this, mine); }
+    if (this._roll((0.09 + 0.24 * ratioOpp) * AMBIENT_OPP)) { this._flow.push({ min: this.min, side: "opp", w: 1 }); Chances.ambientShotOpp(this, mine); }
 
     // Faltas / tarjetas / lesiones
-    if (rnd() < 0.10) return this._foulEvent();
-    if (rnd() < 0.028) return this._injuryEvent();
+    if (this._roll(0.10)) return this._foulEvent();
+    if (this._roll(0.028)) return this._injuryEvent();
 
     // Relato ambiente contextual (A3): el pool vive en content/ambient.js y LEE el partido.
-    if (rnd() < 0.35) this.log("plain", this._ambientLine());
+    if (this._roll(AMBIENT_LINE)) this.log("plain", this._ambientLine());
     return false;
+  }
+
+  /**
+   * EL DESCUENTO del tiempo que termina, en minutos (tope duro ADDED_MAX = 6).
+   * Mientras MÁS MOMENTOS tuvo el tramo, más tiempo: pesa todo lo GENERADO (el mismo
+   * `_flow` del que salen posesión y momentum — secuencia 3 · penal 2 · ambiente 1) y
+   * aparte las paradas largas (goles y tarjetas, que frenan el reloj de verdad).
+   * Y el tiempo que CIERRA cada fase (90' / 120') se estira si el partido está empatado
+   * o a un gol: el descuento largo es dramaturgia, y ahí es donde vale.
+   * Los tiempos de 15' (prórroga) escalan por su largo — nunca cobran un descuento de 45'.
+   */
+  _stoppage() {
+    const cierre = this.nominal === 90 || this.nominal === 120;
+    const momentos = this._flow.reduce((s, f) => s + (f.min > this.halfStart ? f.w : 0), 0);
+    const paradas = this.feed.filter(f => f.min > this.halfStart
+      && (f.kind === "goal" || f.kind === "goal_opp" || f.kind === "card")).length;
+    const apretado = cierre && Math.abs(this.gMy - this.gOpp) <= 1 ? 1.2 : 0;
+    const largo = (this.nominal - this.halfStart) / 45;  // 1 en los tiempos de 45', ⅓ en los de 15'
+    const crudo = ((cierre ? 2.0 : 0.6) + momentos * 0.05 + paradas * 0.7 + apretado) * largo;
+    return Math.max(cierre ? 1 : 0, Math.min(ADDED_MAX, Math.round(crudo)));
+  }
+
+  /** Se acabó el tiempo en curso (nominal + descuento ya jugados). */
+  _endOfHalf() {
+    if (this.nominal === 45 || this.nominal === 105) {
+      this.log("info", this.nominal === 45 ? "⏸️ Entretiempo. Ajusta tu equipo si quieres." : "⏸️ Fin del primer tiempo extra.");
+      this._startHalf(this.nominal, this.nominal === 45 ? 90 : 120);
+      return "halftime";
+    }
+    return this._finishRegular();
+  }
+
+  /**
+   * Arranca un tiempo nuevo. El reloj VUELVE al minuto nominal: el descuento no se
+   * acumula (el segundo tiempo empieza 45', como en la vida real), así los minutos
+   * jugados, la energía y las ventanas de contexto (min >= 75) siguen valiendo lo mismo.
+   */
+  _startHalf(desde, nominal) {
+    this.min = desde;
+    this.halfStart = desde;
+    this.nominal = nominal;
+    this.added = null;
+    // El que entró DURANTE el descuento entró, para los minutos jugados, en `desde`.
+    for (const [p, enter] of this._enteredAt) if (enter > desde) this._enteredAt.set(p, desde);
   }
 
   /**
@@ -283,7 +391,8 @@ export class Match {
     if (!outPlayer.lesionado) this.my.bench.push(outPlayer); // queda visible en banca, en gris
     outPlayer.enCancha = false;
     this.subsLeft--;
-    this.log("info", `min ${this.min}' — 🔄 Cambio: entra #${inP.num || "?"} ${inP.name} por #${outPlayer.num || "?"} ${outPlayer.name}.`);
+    markMomentum(this, "🔄");
+    this.log("info", `min ${this.clock()}' — 🔄 Cambio: entra #${inP.num || "?"} ${inP.name} por #${outPlayer.num || "?"} ${outPlayer.name}.`);
     return true;
   }
 
@@ -294,6 +403,7 @@ export class Match {
     if (this.phase === "regular" && this.knockout && this.gMy === this.gOpp) {
       this.phase = "extra";
       this.log("info", "🕐 Empate. ¡Vamos a la PRÓRROGA! 30 minutos más.");
+      this._startHalf(90, 105);
       return "halftime";
     }
     if (this.phase === "extra" && this.gMy === this.gOpp) {
