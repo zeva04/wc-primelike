@@ -73,6 +73,7 @@ export function newRun(myTeamId) {
     dayOpp: null,              // Oportunidad viva HOY: {id} o null (escribe calendar; day-action la consume)
     diasSinEntrenar: 0,        // racha de días de prep sin Entrenar/Táctica → oxidación R1 (escribe game/oxidation; flow resetea al jugar)
     moral: 50,                 // Moral del equipo 1..100 (escribe game/morale; content/ la muta con clamp)
+    altura: 3,                 // Altura del bloque 1..5 que el DT deja puesta (escribe ui/hub; viaja a matchCtx)
     filoId: null,              // filosofía que se JUEGA hoy (escribe game/philosophy)
     filoInicial: null,         // la escuela del DT: fija toda la run, decide la afinidad de XP (escribe game/philosophy)
     filoXp: { press: 0, posesion: 0, contra: 0, bloque: 0 }, // las 4 progresiones INDEPENDIENTES (escriben game/philosophy y content/ vía addFiloProgress)

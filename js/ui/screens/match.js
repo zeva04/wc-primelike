@@ -13,12 +13,13 @@ import { Match } from "../../game/match/Match.js";
 import { startPress, pressState } from "../../game/match/press.js";
 import { matchStats } from "../../game/match/stats.js";
 import { momentumBars, markMomentum } from "../../game/match/match-momentum.js";
+import { heatCells, fieldState, setHeight, HEIGHT_DEFAULT } from "../../game/match/field.js";
 import { teamPowers } from "../../game/match/powers.js";
 import { filoCtx } from "../../game/philosophy.js";
 import { PHILOSOPHIES, FILO_LEVELS, xpLevelOf } from "../../content/philosophies.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, modal, closeModal, toast, energyBar, momentoChip } from "../components.js";
+import { screenShell, $, flagImg, modal, closeModal, toast, energyBar, momentoChip, heatPitch } from "../components.js";
 import { mountPitch, POS_NAME } from "../pitch.js";
 
 /** Crea la instancia Match con el once elegido y arranca el reloj del relato. */
@@ -28,10 +29,14 @@ function startMatch(oppId) {
   const bench = S.run.squad.filter(p => !S.selectedLineup.includes(p) && !p.suspendido && p.lesionadoPartidos === 0);
   // La filosofía cruza la frontera run→Match como la moral: {id, nivel}, nada más (F1).
   // koRound (R2): la profundidad KO enciende la escalada del rival (forma de torneo).
-  S.matchCtx = { team: me, lineup: S.selectedLineup.slice(), bench, mentalidad: "normal", buffs: { ...S.run.buffs }, moral: S.run.moral, filo: filoCtx(S.run), koRound: koRoundOf(S.run.stage) };
+  // La ALTURA DEL BLOQUE viaja como la mentalidad: es una orden del DT, no estado del
+  // simulador. Entra con la que el DT dejó puesta en la Concentración (run.altura) y
+  // los cambios en vivo valen solo para este partido.
+  S.matchCtx = { team: me, lineup: S.selectedLineup.slice(), bench, mentalidad: "normal", altura: S.run.altura ?? HEIGHT_DEFAULT, buffs: { ...S.run.buffs }, moral: S.run.moral, filo: filoCtx(S.run), koRound: koRoundOf(S.run.stage) };
   S.match = new Match(S.matchCtx, opp, S.run.stage !== "groups", S.run.rivalBans[oppId] || []);
   S.feedRendered = 0;
   S.paused = false;
+  slide = 0; heatSide = "mine";   // el carrusel arranca siempre en el momentum
   renderMatchScreen();
   S.match.log("info", `🏟️ ¡Comienza el partido! ${me.name} vs ${opp.name} — ${S.run.stage === "groups" ? "Grupo " + S.run.groups[S.run.myGroupIdx].name : STAGE_LABEL[S.run.stage]}`);
   updateMatchUI();
@@ -55,6 +60,11 @@ function renderMatchScreen() {
         <div class="flex rounded-lg overflow-hidden border border-slate-600 text-xs">
           ${["defensiva", "normal", "ofensiva"].map(mm => `<button data-ment="${mm}" class="ment-btn px-3 py-1.5 font-semibold cursor-pointer transition-colors ${mm === "normal" ? "bg-amber-500 text-slate-900" : "bg-slate-700 hover:bg-slate-600"}">${mm === "defensiva" ? "🛡️" : mm === "ofensiva" ? "⚔️" : "⚖️"} ${mm[0].toUpperCase() + mm.slice(1)}</button>`).join("")}
         </div>
+        <!-- LA ALTURA DEL BLOQUE (sprint del Territorio): la otra orden estructural del
+             DT, al lado de la mentalidad. Gratis antes del partido y en el entretiempo;
+             con el partido en juego consume una VENTANA TÁCTICA (las reglas viven en
+             game/match/field, el botón solo abre la pizarra). -->
+        <button id="btn-height" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold cursor-pointer whitespace-nowrap">🧱 Bloque</button>
         <!-- EL BOTÓN DE PRESIÓN: la barra ES el fondo del botón (un span absoluto que crece
              o se vacía), así el estado se lee sin mirar ningún número. Vacía mientras la
              ráfaga corre, se llena mientras recarga, y el color vuelve al encenderse. -->
@@ -100,20 +110,34 @@ function renderMatchScreen() {
                la subida; esto la deja ver venir. -->
           <div id="filo-xp" class="mt-3 pt-3 border-t border-slate-700/70 space-y-1.5"></div>
         </div>
-        <!-- MATCH MOMENTUM: el gráfico de la transmisión. Barras sólidas, nunca líneas.
-             Ocupa TODO el alto que sobre en la columna (flex-1): así no queda hueco muerto
-             debajo y el gráfico gana altura, que es lo que lo hace legible. Las barras se
-             posicionan en %, así que escalan solas con el contenedor. -->
+        <!-- EL CARRUSEL DE LECTURA (sprint del Territorio): dos formas de leer el mismo
+             partido en el mismo sitio — el Match Momentum (quién genera AHORA) y el mapa
+             de calor (dónde se está jugando). Las flechas alternan; ambos se actualizan
+             en vivo aunque no se estén viendo, porque los dos los sirve el motor.
+             El gráfico ocupa TODO el alto que sobre en la columna (flex-1) y se posiciona
+             en %, así que escala solo con el contenedor. -->
         <div class="bg-slate-900/80 border border-slate-700 rounded-2xl px-3 pt-3 pb-2 flex flex-col md:flex-1 md:min-h-0">
-          <div class="flex items-center justify-between mb-1.5 shrink-0">
-            <h3 class="text-[10px] uppercase tracking-[0.2em] font-black text-slate-400">Match Momentum</h3>
-            <div class="flex items-center gap-2 text-[9px] font-bold">
-              <span class="flex items-center gap-1 text-emerald-400"><i class="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></i>${me.name}</span>
-              <span class="flex items-center gap-1 text-red-400"><i class="w-2 h-2 rounded-sm bg-red-400 inline-block"></i>${opp.name}</span>
+          <div class="flex items-center justify-between gap-1 mb-1.5 shrink-0">
+            <button id="car-prev" class="w-5 h-5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 text-xs leading-none cursor-pointer shrink-0" title="Anterior">‹</button>
+            <h3 id="car-title" class="text-[10px] uppercase tracking-[0.2em] font-black text-slate-400 truncate">Match Momentum</h3>
+            <button id="car-next" class="w-5 h-5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 text-xs leading-none cursor-pointer shrink-0" title="Siguiente">›</button>
+          </div>
+          <div id="car-legend" class="flex items-center justify-center gap-2 text-[9px] font-bold mb-1 shrink-0"></div>
+          <div id="slide-mm" class="flex flex-col md:flex-1 md:min-h-0">
+            <div id="mm-chart" class="relative w-full h-24 md:h-auto md:flex-1 md:min-h-[4.5rem]"></div>
+            <div id="mm-axis" class="relative h-3 w-full text-[8.5px] text-slate-500 font-bold shrink-0"></div>
+          </div>
+          <!-- EL MAPA DE CALOR: la cancha ocupa el alto disponible manteniendo su
+               proporción (aspect-ratio), con mi arco abajo. Debajo, a quién se mira. -->
+          <div id="slide-heat" class="hidden flex-col md:flex-1 md:min-h-0">
+            <div class="h-52 md:h-auto md:flex-1 md:min-h-0 flex items-center justify-center">
+              <div id="heat-pitch" class="h-full max-w-full" style="aspect-ratio:3/4"></div>
+            </div>
+            <div class="flex items-center justify-center gap-1 mt-1.5 shrink-0">
+              <button data-heat="mine" class="heat-side px-2 py-0.5 rounded-md text-[9px] font-black border cursor-pointer transition-colors">${me.name}</button>
+              <button data-heat="opp" class="heat-side px-2 py-0.5 rounded-md text-[9px] font-black border cursor-pointer transition-colors">${opp.name}</button>
             </div>
           </div>
-          <div id="mm-chart" class="relative w-full h-24 md:h-auto md:flex-1 md:min-h-[4.5rem]"></div>
-          <div id="mm-axis" class="relative h-3 w-full text-[8.5px] text-slate-500 font-bold shrink-0"></div>
         </div>
       </div>
     </div>
@@ -126,10 +150,15 @@ function renderMatchScreen() {
     S.match.log("info", `📢 Mentalidad: ${b.dataset.ment.toUpperCase()}.`);
     updateMatchUI();
   });
+  $("#btn-height").onclick = openHeightModal;
   $("#btn-press").onclick = () => {
     if (!startPress(S.match)) return;   // la regla vive en game/match/press, no en el botón
     updateMatchUI();
   };
+  $("#car-prev").onclick = () => moveCarousel(-1);
+  $("#car-next").onclick = () => moveCarousel(1);
+  document.querySelectorAll(".heat-side").forEach(b => b.onclick = () => { heatSide = b.dataset.heat; paintCarousel(); });
+  paintCarousel();
   $("#btn-pause").onclick = togglePause;
   $("#btn-subs").onclick = () => openSquadModal(); // sin args: el onclick pasaría el MouseEvent como "caído"
   $("#btn-speed").onclick = () => {
@@ -355,6 +384,103 @@ function paintMomentum(match) {
   }).join("");
 }
 
+/**
+ * LA PIZARRA DE LA ALTURA: las 5 alturas de bloque con su explicación en fútbol y el
+ * costo a la vista. El motor manda (`fieldState` dice qué se puede elegir y si es
+ * gratis); acá solo se pinta y se rutea. Se muestra también cómo está parado el RIVAL
+ * —con palabras, jamás con un número: la capa numérica es invisible al jugador—.
+ */
+function openHeightModal() {
+  const match = S.match;
+  if (match.finished) return;
+  const wasPaused = S.paused;
+  S.paused = true;
+  const st = fieldState(match);
+  const w = modal(`
+    <h2 class="text-lg font-black mb-1">🧱 Altura del bloque</h2>
+    <p class="text-slate-400 text-xs mb-1">Dónde vive el equipo cuando tiene y cuando no tiene la pelota.</p>
+    <p class="text-[11px] mb-3 ${st.gratis ? "text-emerald-400" : "text-amber-300"}">${st.gratis
+      ? "El equipo está parado: moverlo ahora no cuesta nada."
+      : `Con el partido en juego, reorganizar las líneas consume una <b>ventana táctica</b>. Te quedan <b>${st.ventanas}</b>.`}</p>
+    <div class="space-y-2">
+      ${st.opciones.map(o => `<button data-h="${o.n}" ${o.actual || !o.puede ? "disabled" : ""}
+        class="h-opt w-full text-left px-4 py-2.5 rounded-xl border transition-all ${o.actual
+          ? "border-amber-400 bg-amber-400/15"
+          : o.puede ? "border-slate-600 bg-slate-700/60 hover:border-amber-400 hover:bg-slate-700 cursor-pointer" : "border-slate-700 bg-slate-800/40 opacity-40"}">
+        <div class="font-semibold text-sm">${o.icon} ${o.label}${o.actual ? ` <span class="text-[10px] text-amber-300 font-black uppercase tracking-wider">· actual</span>` : ""}</div>
+        <div class="text-xs text-slate-400">${o.desc}</div>
+      </button>`).join("")}
+    </div>
+    <p class="text-[11px] text-slate-500 mt-3">🔎 ${match.oppTeam.name} está jugando con <b class="text-slate-300">línea ${st.rival}</b>.</p>
+    <button id="h-close" class="w-full mt-3 text-sm font-bold py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 cursor-pointer">Volver al partido</button>
+  `);
+  const cerrar = () => {
+    closeModal();
+    S.paused = wasPaused;
+    updateMatchUI();
+    if (!match.finished && !match.decision && !S.timer) startTimer();
+  };
+  w.querySelectorAll(".h-opt").forEach(b => b.onclick = () => {
+    if (!setHeight(match, +b.dataset.h)) return;
+    markMomentum(match, "⚙️");   // decisión táctica: marca en el gráfico, nunca puntos
+    cerrar();
+  });
+  w.querySelector("#h-close").onclick = cerrar;
+}
+
+/* ── EL CARRUSEL: Match Momentum ↔ Mapa de calor ────────────────────────────
+   Estado de VISTA, no de partido: cuál diapositiva se mira y de quién es el mapa.
+   Vive en el módulo (no en `S`) porque muere con la pantalla, como `slide`. */
+const SLIDES = ["Match Momentum", "Mapa de calor"];
+let slide = 0, heatSide = "mine";
+
+/** Alterna de diapositiva (delta ±1, circular). */
+function moveCarousel(d) {
+  slide = (slide + d + SLIDES.length) % SLIDES.length;
+  paintCarousel();
+}
+
+/** Pinta la diapositiva activa: título, leyenda y qué panel se ve. */
+function paintCarousel() {
+  const t = $("#car-title"); if (!t) return;
+  t.textContent = SLIDES[slide];
+  const mm = $("#slide-mm"), heat = $("#slide-heat");
+  mm.classList.toggle("hidden", slide !== 0);
+  mm.classList.toggle("flex", slide === 0);
+  heat.classList.toggle("hidden", slide !== 1);
+  heat.classList.toggle("flex", slide === 1);
+  const me = S.matchCtx.team.name, opp = S.match.oppTeam.name;
+  $("#car-legend").innerHTML = slide === 0
+    ? `<span class="flex items-center gap-1 text-emerald-400"><i class="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></i>${me}</span>
+       <span class="flex items-center gap-1 text-red-400"><i class="w-2 h-2 rounded-sm bg-red-400 inline-block"></i>${opp}</span>`
+    // La escala del mapa se explica sola: de "sin uso" a rojo, como en la tele.
+    : `<span class="text-slate-500">Sin uso</span>
+       <i class="inline-block h-1.5 w-16 rounded-full" style="background:linear-gradient(90deg,rgba(250,204,21,.25),rgb(250,204,21),rgb(249,115,22),rgb(239,68,68))"></i>
+       <span class="text-red-400">Intenso</span>`;
+  // Los botones de a quién se mira (solo tienen sentido en el mapa).
+  document.querySelectorAll(".heat-side").forEach(b => {
+    const on = b.dataset.heat === heatSide;
+    b.className = `heat-side px-2 py-0.5 rounded-md text-[9px] font-black border cursor-pointer transition-colors ${
+      on ? "border-amber-400 bg-amber-400/20 text-amber-200" : "border-slate-700 bg-slate-800 text-slate-500 hover:text-slate-300"}`;
+  });
+  paintHeat(S.match, true);
+}
+
+/**
+ * EL MAPA DE CALOR del tiempo EN CURSO (cada tiempo tiene el suyo: el motor lo reinicia
+ * al empezar el segundo). Se repinta una vez por minuto —cuando hay calor nuevo—, no en
+ * cada refresco: son 15 nodos con desenfoque. El motor sirve las celdas ya normalizadas;
+ * acá no se decide nada del partido.
+ */
+function paintHeat(match, force = false) {
+  const box = $("#heat-pitch");
+  if (!box || (slide !== 1 && !force)) return;
+  const marca = `${match.min}-${heatSide}-${match.field?.maps.length}`;
+  if (!force && box.dataset.k === marca) return;
+  box.dataset.k = marca;
+  box.innerHTML = heatPitch(heatCells(match, heatSide));
+}
+
 /** Refresca marcador, minuto, relato (solo líneas nuevas) y las estadísticas. */
 export function updateMatchUI() {
   if (!$("#score")) return;
@@ -379,7 +505,17 @@ export function updateMatchUI() {
   paintStats(match);
   paintFiloXp(match);
   paintMomentum(match);
+  paintHeat(match);
   paintPressButton(match);
+  // El botón del bloque canta la altura vigente (y lo que costaría moverla ahora).
+  const bh = $("#btn-height");
+  if (bh) {
+    const st = fieldState(match);
+    bh.textContent = `${st.icon} ${st.label}`;
+    bh.title = st.gratis
+      ? `Bloque ${st.label.toLowerCase()}. Ahora moverlo es gratis.`
+      : `Bloque ${st.label.toLowerCase()}. Moverlo en juego consume una ventana táctica (quedan ${st.ventanas}).`;
+  }
   const feed = $("#feed");
   while (S.feedRendered < match.feed.length) {
     const f = match.feed[S.feedRendered++];

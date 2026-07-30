@@ -85,6 +85,43 @@ export function momentoChip(p) {
   }
 }
 
+/* ── EL MAPA DE CALOR (sprint del Territorio) ─────────────────────────────────
+   La cancha vertical con sus zonas pintadas por intensidad, como los mapas de
+   calor de las transmisiones. Recibe las celdas YA normalizadas por el motor
+   (match/field.heatCells): la vista no conoce zonas, alturas ni reglas — solo
+   dibuja. MI arco abajo y el rival arriba, siempre: es lo que hace que el mapa
+   se lea sin explicación (y lo que permite mostrar el mapa rival en la MISMA
+   cancha, sin espejar: su calor pegado a mi área significa "me atacan por acá").
+
+   El degradado es el del fútbol profesional: sin uso → amarillo → naranjo →
+   rojo. El desenfoque del contenedor convierte 15 rectángulos en manchas. */
+const HEAT_STOPS = [[250, 204, 21], [249, 115, 22], [239, 68, 68]];
+function heatColor(i) {
+  if (i <= 0.02) return "transparent";
+  const t = Math.min(1, i);
+  const [a, b] = t < 0.5 ? [HEAT_STOPS[0], HEAT_STOPS[1]] : [HEAT_STOPS[1], HEAT_STOPS[2]];
+  const k = t < 0.5 ? t / 0.5 : (t - 0.5) / 0.5;
+  const mix = a.map((c, j) => Math.round(c + (b[j] - c) * k));
+  return `rgba(${mix.join(",")},${(0.16 + 0.74 * t).toFixed(2)})`;
+}
+
+/**
+ * La cancha pintada. `cells` = [{h, v, i}] del motor; `lanes`/`rows` la grilla.
+ * Devuelve HTML (no toca el DOM): quien lo llama decide dónde vive.
+ */
+export function heatPitch(cells, { lanes = 3, rows = 5, blur = 9 } = {}) {
+  const w = 100 / lanes, hgt = 100 / rows;
+  const manchas = cells.map(c => `<span class="absolute" style="left:${(c.h - 1) * w}%;width:${w}%;top:${(rows - c.v) * hgt}%;height:${hgt}%;background:${heatColor(c.i)}"></span>`).join("");
+  return `<div class="relative w-full h-full overflow-hidden rounded-lg" style="background:#0b2016">
+    <div class="absolute inset-0" style="filter:blur(${blur}px)">${manchas}</div>
+    <div class="absolute inset-0 border border-white/15 rounded-lg"></div>
+    <div class="absolute left-0 right-0 top-1/2 h-px bg-white/15"></div>
+    <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15" style="width:26%;aspect-ratio:1"></div>
+    <div class="absolute left-1/4 w-1/2 border border-white/15 border-t-0" style="top:0;height:16%"></div>
+    <div class="absolute left-1/4 w-1/2 border border-white/15 border-b-0" style="bottom:0;height:16%"></div>
+  </div>`;
+}
+
 /** Notificación flotante que desaparece sola (~4s). */
 export function toast(msg) {
   const t = document.createElement("div");

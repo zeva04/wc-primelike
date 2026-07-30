@@ -26,6 +26,7 @@ import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, starsHtml, modal, closeModal, modalOpen, toast, momentoChip, energyCls, oxidCls } from "../components.js";
 import { oxidState } from "../../game/oxidation.js";
+import { HEIGHTS, HEIGHT_DEFAULT, heightOf } from "../../game/match/field.js";
 import { spriteSvg } from "../sprites.js";
 import { mountPitch } from "../pitch.js";
 import { renderGroupTableCard, renderKoInfoCard } from "./worldcup.js";
@@ -643,6 +644,17 @@ function renderHub(opts = {}) {
               <div class="text-4xl mb-2">⚽</div>
               <h3 class="text-xl font-black">¡Hoy se juega!</h3>
               <p class="text-sm text-slate-400 mt-1">${me.name} enfrenta a ${opp.name}. Revisa tu plantilla y cuando estés listo, salta a la cancha.</p>
+              <!-- LA ALTURA DEL BLOQUE (sprint del Territorio): la decisión táctica que se
+                   toma ANTES de saltar a la cancha. Acá es gratis; en el partido, moverla
+                   consume una ventana. Queda puesta para los partidos siguientes. -->
+              <div class="mt-4 pt-4 border-t border-slate-700/70">
+                <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">🧱 Altura del bloque</div>
+                <div class="flex items-center justify-center gap-1 flex-wrap">
+                  ${HEIGHTS.map(h => `<button data-alt="${h.n}" title="${h.desc}"
+                    class="alt-btn px-2 py-1 rounded-lg text-[11px] font-black border cursor-pointer transition-colors">${h.icon} ${h.label}</button>`).join("")}
+                </div>
+                <p id="alt-desc" class="text-[11px] text-slate-400 mt-2"></p>
+              </div>
             </div>`
           : actionCard()}
       </div>
@@ -699,6 +711,19 @@ function renderHub(opts = {}) {
   // partido: renunciar al boost de hoy por crecimiento permanente es una decisión válida).
   document.querySelectorAll(".canje-opt").forEach(b => b.onclick = () => showCanje(b.dataset.key));
   if (isMatchDay) {
+    // Los 5 botones de la altura: escriben la orden permanente del DT (`run.altura`) y
+    // repintan en el sitio — la regla de qué significa cada altura vive en el motor.
+    const paintAlt = () => {
+      const n = S.run.altura ?? HEIGHT_DEFAULT;
+      document.querySelectorAll(".alt-btn").forEach(b => {
+        const on = +b.dataset.alt === n;
+        b.className = `alt-btn px-2 py-1 rounded-lg text-[11px] font-black border cursor-pointer transition-colors ${
+          on ? "border-amber-400 bg-amber-400/20 text-amber-200" : "border-slate-600 bg-slate-800 text-slate-400 hover:border-amber-400/60 hover:text-slate-200"}`;
+      });
+      $("#alt-desc").textContent = heightOf(n).desc;
+    };
+    document.querySelectorAll(".alt-btn").forEach(b => b.onclick = () => { S.run.altura = +b.dataset.alt; paintAlt(); });
+    paintAlt();
     const play = $("#btn-play");
     // validateLineup no mira disponibilidad (eso lo hacía el auto-reemplazo retirado):
     // con una baja en el once no se juega — el DT la resuelve en Gestión de Plantilla.

@@ -34,6 +34,12 @@ const ACTION = args.action || null;
 // fotografiar cada identidad por separado (F2): separa el costo de una identidad del
 // ruido del azar. Sin el flag, se elige al azar (el PISO de siempre).
 const FILO = args.filo || null;
+// --altura=<1..5>: fija la ALTURA DEL BLOQUE de todas las runs (sprint del Territorio).
+// Es el gate propio de esa palanca: NINGUNA altura puede dominar a las otras (mismo
+// criterio que --action con las acciones del día). Sin el flag se juega en MEDIO, que
+// es donde todos los multiplicadores territoriales valen ×1 — o sea, la línea base
+// histórica del juego no se mueve por el hecho de que la palanca exista.
+const ALTURA = +args.altura || 3;
 // --smart: el DT GREEDY del arco del Meta (M1) — el smoke al azar mide el PISO de la
 // mecánica; este flag mide el TECHO de una estrategia óptima simple. El arco cambia la
 // estrategia dominante y el azar no la ve. Compone con --filo/--team; excluye --action
@@ -98,7 +104,7 @@ function playMatch(run, oppId) {
   const bench = available.filter(p => !lineup.includes(p));
   // matchCtx homólogo al de screens/match.js (la moral entra al generador por acá — A3;
   // la filosofía viaja igual desde F1: {id, nivel}, el Match no conoce la run)
-  const ctx = { team: me, lineup, bench, mentalidad: "normal", buffs: { ...run.buffs }, moral: run.moral, filo: E.filoCtx(run), koRound: E.koRoundOf(run.stage) };
+  const ctx = { team: me, lineup, bench, mentalidad: "normal", altura: ALTURA, buffs: { ...run.buffs }, moral: run.moral, filo: E.filoCtx(run), koRound: E.koRoundOf(run.stage) };
   const banned = run.rivalBans[oppId] || [];
   const match = new E.Match(ctx, opp, run.stage !== "groups", banned);
   // Escalada R2 + identidad (R3 + el dial del techo): el once rival lleva forma de torneo

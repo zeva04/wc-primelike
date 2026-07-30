@@ -45,6 +45,7 @@ import * as Shootout from "./shootout.js";
 import { hookOf, traitMoment } from "./trait-hooks.js";
 import { newPressState, pressOn, tickPress, PRESS_MOD } from "./press.js";
 import { newTally, tickStats } from "./stats.js";
+import { newField, tickField, startHalfField, backlineRisk } from "./field.js";
 import { newMomentum, closeMinute, assistantLine, noteMomentum, markMomentum } from "./match-momentum.js";
 import { drainOppEnergy } from "../medical.js";
 
@@ -122,6 +123,11 @@ export class Match {
     // MATCH MOMENTUM (match/match-momentum.js): el gráfico de barras de la transmisión.
     // Es una SALIDA del simulador — nada de lo que hay acá abajo lo lee.
     this.mm = newMomentum();
+    // EL TERRITORIO (match/field.js): dónde está la pelota, las dos alturas de bloque y
+    // el mapa de calor de cada tiempo. A diferencia del momentum, esto SÍ es una entrada
+    // del simulador: las jugadas que pueden aparecer dependen de él. El desfase de
+    // carriles sale del dorsal del primer rival (dato ya sorteado: no gasta azar nuevo).
+    this.field = newField(oppTeam, this.koRound, this.oppLineup[0]?.num || 0);
     this.scorers = [];
     this.assists = [];         // asistencias de MIS goles [{name, min}] (chances.goalMine)
     // Señales por protagonista para el cierre post-partido (momentum/morale):
@@ -140,6 +146,8 @@ export class Match {
     // presionados se acumulan aparte de los jugados porque cuestan el DOBLE de energía.
     this.press = newPressState();
     this._pressMin = new Map();                             // jugador → minutos presionados
+    this._highMin = new Map();                              // jugador → sobrecosto del bloque adelantado
+    this.enHalftime = false;                                // el equipo está parado: mover el bloque es gratis
   }
 
   // ---------- Estado y consultas ----------
@@ -194,6 +202,8 @@ export class Match {
   /** Avanza 1 min de juego. Devuelve false (seguir) | true (decisión) | "halftime" | "pens" | "end". */
   tick() {
     if (this.finished || this.decision) return true;
+    // El partido volvió a rodar: se acabó la ventana gratis para mover el bloque.
+    this.enHalftime = false;
 
     // MATCH MOMENTUM: se cierra la barra del minuto que TERMINA, antes de tocar nada más.
     // Va acá arriba a propósito: los actos de una secuencia se resuelven con el reloj
@@ -232,6 +242,9 @@ export class Match {
     // Estadísticas de transmisión (pases y córners ambiente). Va ANTES de las jugadas:
     // el minuto ya jugado cuenta aunque el tick corte con una decisión.
     tickStats(this, mine, opp);
+    // EL TERRITORIO: la deriva del minuto (dónde se está jugando) y su calor. Va acá
+    // arriba a propósito — las jugadas que nacen más abajo LEEN la zona resultante.
+    tickField(this, mine, opp);
 
     // Key Sequences (Bible §7): la columna interactiva del partido. Reemplazan a las
     // ocasiones sueltas de myChance/oppChance; 2-6 por partido moduladas por la preparación.
@@ -240,7 +253,10 @@ export class Match {
     // Eventos interactivos INDEPENDIENTES de las secuencias (penal y último hombre, intactos
     // del calibrado previo; A1 no toca su matemática, solo cada cuánto asoman como evento suelto).
     if (this._roll(PEN_MINE_TICK)) { this._flow.push({ min: this.min, side: "mine", w: 2 }); return Chances.myPenaltyChance(this); }
-    if (this._roll(BREAKAWAY_TICK)) {
+    // EL ESPACIO A LA ESPALDA (sprint del Territorio): el pelotazo que salta mi línea
+    // vale lo que mi bloque le regala. Neutro con el bloque medio; el que juega muy
+    // alto multiplica este riesgo — es el precio honesto de robar arriba.
+    if (this._roll(BREAKAWAY_TICK * backlineRisk(this))) {
       // T2 — Anticipar la Espalda: el central que LEYÓ el pelotazo lo corta antes del
       // mano a mano (el canal ambiente del breakaway — exactamente el fútbol que este
       // rasgo compra: la vacuna contra el balón largo que salta la presión). La
@@ -290,6 +306,7 @@ export class Match {
   _endOfHalf() {
     if (this.nominal === 45 || this.nominal === 105) {
       this.log("info", this.nominal === 45 ? "⏸️ Entretiempo. Ajusta tu equipo si quieres." : "⏸️ Fin del primer tiempo extra.");
+      this.enHalftime = true;   // con el equipo parado, mover el bloque no cuesta ventana
       this._startHalf(this.nominal, this.nominal === 45 ? 90 : 120);
       return "halftime";
     }
@@ -306,6 +323,9 @@ export class Match {
     this.halfStart = desde;
     this.nominal = nominal;
     this.added = null;
+    // Cada tiempo tiene su PROPIO mapa de calor (decisión de diseño del sprint del
+    // Territorio) y arranca con la pelota al medio, como el saque.
+    startHalfField(this, nominal);
     // El que entró DURANTE el descuento entró, para los minutos jugados, en `desde`.
     for (const [p, enter] of this._enteredAt) if (enter > desde) this._enteredAt.set(p, desde);
   }
@@ -453,6 +473,15 @@ export class Match {
   pressMinutesByName() {
     const out = {};
     for (const [p, m] of this._pressMin) out[p.name] = m;
+    return out;
+  }
+
+  /** Minutos de SOBRECOSTO por jugar con el bloque adelantado (field.HIGH_FATIGUE), por
+   *  NOMBRE. Espejo de los presionados y se cobran por el mismo caño en `flow`: el que
+   *  corre veinte metros más arriba llega más gastado al partido siguiente. */
+  heightMinutesByName() {
+    const out = {};
+    for (const [p, m] of this._highMin) out[p.name] = m;
     return out;
   }
 

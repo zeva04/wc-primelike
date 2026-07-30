@@ -9,7 +9,8 @@ import { closeMatch, advanceStage } from "../../game/flow.js";
 import { MOMENTO_LABELS } from "../../game/momentum.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, modal, closeModal } from "../components.js";
+import { screenShell, $, flagImg, modal, closeModal, heatPitch } from "../components.js";
+import { heatCells, heatHalves } from "../../game/match/field.js";
 import { renderGroupTableCard } from "./worldcup.js";
 import { stopTimer } from "./match.js";
 
@@ -144,6 +145,47 @@ function friosBlock(frios) {
 }
 
 /**
+ * DÓNDE SE JUGÓ EL PARTIDO (sprint del Territorio): los mapas de calor del encuentro,
+ * uno por tiempo — el motor los guarda separados porque cada tiempo tiene el suyo, y
+ * puestos lado a lado cuentan la historia táctica del partido (el equipo que empujó en
+ * el primero y se replegó en el segundo se VE, sin un solo número).
+ */
+function heatCard(match) {
+  const halves = heatHalves(match).filter(h => !h.vacio);
+  if (!halves.length) return "";
+  const me = getTeam(S.run.teamId).name;
+  return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+    <div class="flex items-center justify-between gap-2 flex-wrap mb-1">
+      <h3 class="font-bold flex items-center gap-2">🔥 Dónde se jugó</h3>
+      <div class="flex items-center gap-1">
+        <button data-pmheat="mine" class="pm-heat px-2 py-0.5 rounded-md text-[10px] font-black border cursor-pointer">${me}</button>
+        <button data-pmheat="opp" class="pm-heat px-2 py-0.5 rounded-md text-[10px] font-black border cursor-pointer">${match.oppTeam.name}</button>
+      </div>
+    </div>
+    <p class="text-[11px] text-slate-500 mb-3">Las zonas donde el equipo tuvo la pelota. Tu arco, abajo.</p>
+    <div class="flex gap-3 justify-center">
+      ${halves.map(h => `<div class="flex-1 max-w-[9rem]">
+        <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold text-center mb-1">${h.label}</div>
+        <div class="w-full" data-pmpitch="${h.idx}" style="aspect-ratio:3/4"></div>
+      </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+/** Pinta (o repinta) los mapas del post-partido para el lado elegido. */
+function paintHeatCard(match, side) {
+  document.querySelectorAll("[data-pmpitch]").forEach(el => {
+    el.innerHTML = heatPitch(heatCells(match, side, +el.dataset.pmpitch), { blur: 7 });
+  });
+  document.querySelectorAll(".pm-heat").forEach(b => {
+    const on = b.dataset.pmheat === side;
+    b.className = `pm-heat px-2 py-0.5 rounded-md text-[10px] font-black border cursor-pointer transition-colors ${
+      on ? "border-amber-400 bg-amber-400/20 text-amber-200" : "border-slate-700 bg-slate-800 text-slate-500 hover:text-slate-300"}`;
+    b.onclick = () => paintHeatCard(match, b.dataset.pmheat);
+  });
+}
+
+/**
  * Pantalla post-partido: resultado, goleadores y el análisis del cuerpo técnico (Moral +
  * Momento). En fase de grupos va a 2 columnas (tabla del grupo + análisis); en
  * eliminatorias, a UNA columna centrada — sin celdas vacías ocupando espacio.
@@ -156,6 +198,7 @@ function renderPostMatch(res, advanced, momentum, morale, filo) {
   const headline = won ? "🎉 ¡VICTORIA!" : res.winner === "opp" ? "😞 Derrota" : "🤝 Empate";
   const myScorers = match.scorers.map(s => `⚽ ${s.name} ${s.clock ?? s.min}'`).join(" · ") || "Sin goles propios";
   const analysis = analisisCard(momentum, morale, filo);
+  const heat = heatCard(match);
 
   screenShell(`
     <div class="text-center mb-6 mt-4">
@@ -166,12 +209,13 @@ function renderPostMatch(res, advanced, momentum, morale, filo) {
       <div class="text-slate-500 text-xs mt-1">Tiros: ${match.stats.misTiros} vs ${match.stats.oppTiros} · Decisiones tomadas: ${match.stats.decisiones}</div>
     </div>
     ${run.stage === "groups"
-      ? `<div class="grid md:grid-cols-2 gap-4 mb-6 md:items-start"><div>${renderGroupTableCard()}</div><div>${analysis}</div></div>`
-      : `<div class="max-w-lg mx-auto mb-6">${analysis}</div>`}
+      ? `<div class="grid md:grid-cols-2 gap-4 mb-6 md:items-start"><div class="space-y-4">${renderGroupTableCard()}${heat}</div><div>${analysis}</div></div>`
+      : `<div class="max-w-lg mx-auto mb-6 space-y-4">${analysis}${heat}</div>`}
     <div class="text-center">
       <button id="btn-next" class="btn-primary text-lg">Continuar →</button>
     </div>
   `);
+  paintHeatCard(match, "mine");
   $("#btn-next").onclick = () => routeAdvance(advanced);
 }
 

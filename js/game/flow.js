@@ -91,6 +91,11 @@ export function postMatchUpdate(run, match) {
   const presRaw = match.pressMinutesByName ? match.pressMinutesByName() : {};
   const presionados = {};
   for (const [name, min] of Object.entries(presRaw)) presionados[name] = pressExtraMinutes(match, min);
+  // Y el sobrecosto del BLOQUE ADELANTADO (sprint del Territorio) se cobra por el mismo
+  // caño, pero SIN el descuento de los rasgos de fuelle: esos abaratan el acto de
+  // presionar, no la decisión estructural de vivir veinte metros más arriba.
+  const altoRaw = match.heightMinutesByName ? match.heightMinutesByName() : {};
+  for (const [name, min] of Object.entries(altoRaw)) presionados[name] = (presionados[name] || 0) + min;
   // El costo físico de la identidad (F2: el Press corre y lo paga) se cobra ANTES
   // del loop por jugador: usa los flags usado/sustituido que ese loop resetea.
   const filoCost = applyFiloCosts(run, match);

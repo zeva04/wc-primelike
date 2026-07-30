@@ -40,6 +40,7 @@ import { buildActDecision } from "./sequence-acts.js";
 import { hookOf, hasTrait, traitHooks, traitMoment } from "./trait-hooks.js";
 import { pressOn, PRESS_POOL } from "./press.js";
 import { noteCorner as noteCornerStat } from "./stats.js";
+import { noteZone, myHeight, oppHeight, HEIGHT_DEFAULT } from "./field.js";
 import { noteMomentum } from "./match-momentum.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
@@ -171,6 +172,7 @@ function typeWeights(m, side, plan) {
     balon_parado_def: 0.8 + 1 * prof.cab,
     fortaleza: 0,
   };
+  heightWeights(m, side, w);
   applyFiloWeights(m, side, w, plan.oppFilo);
   // EL BOTÓN DE PRESIÓN: mientras corre la ráfaga el partido GENERA otro fútbol —
   // se roba arriba mucho más y no se revienta la pelota. Va DESPUÉS de la filosofía
@@ -180,6 +182,56 @@ function typeWeights(m, side, plan) {
   if (m._lastSeqType && w[m._lastSeqType] !== undefined) w[m._lastSeqType] = 0;
   return w;
 }
+
+/* ── [LA ALTURA DEL BLOQUE → EL POOL] (sprint del Territorio, T3) ──────────────
+   El DT decide DÓNDE se juega y eso decide QUÉ jugadas existen. Nunca CUÁNTAS (la
+   densidad no se toca en este sprint) ni con qué probabilidad de gol: el territorio
+   no puede ser un modificador de poder escondido — misma ley que la Filosofía.
+
+   Todo vale ×1 con el bloque MEDIO. Es deliberado: la línea base medida del juego
+   se juega en medio, así que el balance calibrado NO se mueve por el solo hecho de
+   que esta palanca exista; lo que se mide aparte es que ninguna altura domine.
+
+   El fútbol que codifica: arriba se roba arriba y no se revienta la pelota; abajo
+   se revienta y se sale de contra. Y la ESPALDA es simétrica — mi contra vive del
+   bloque rival adelantado, y mi bloque adelantado le regala el mismo fútbol a él
+   (eso lo cobra `field.backlineRisk` en el canal del pelotazo a la espalda). */
+const famOf = id => ADV_SOURCE[id] || id;
+const mulFam = (w, fam, f) => { for (const k of Object.keys(w)) if (famOf(k) === fam && w[k] > 0) w[k] *= f; };
+
+function heightWeights(m, side, w) {
+  const a = myHeight(m) - HEIGHT_DEFAULT;    // −2..+2 — mi bloque
+  const o = oppHeight(m) - HEIGHT_DEFAULT;   // −2..+2 — el suyo (la IA juega su idea)
+  if (side === "mine") {
+    mulFam(w, "recuperacion", 1 + 0.28 * a);
+    mulFam(w, "pelotazo", 1 - 0.20 * a);
+    mulFam(w, "transicion", (1 - 0.10 * a) * (1 + 0.18 * o));
+    // El bloque rival ROTA el pool, no lo encoge: lo que la contra pierde contra un
+    // equipo que espera, lo ganan las dos respuestas clásicas al bloque bajo —
+    // circular con paciencia e ir por afuera. (Medido: sin esta rotación, la altura
+    // rival le comía −2.8pp al favorito con MI bloque en medio, o sea que la palanca
+    // movía la línea base sin que el DT tocara nada.)
+    mulFam(w, "circulacion", (1 + 0.06 * a) * (1 - 0.10 * o));
+    if (w.banda) w.banda *= 1 - 0.10 * o;
+  } else {
+    mulFam(w, "salida_fondo", 1 + 0.25 * o); // su bloque alto me asfixia la salida
+    mulFam(w, "repliegue", 1 + 0.10 * a);    // yo muy alto: cuando llegan, llegan de verdad
+  }
+}
+
+/**
+ * Los pesos del pool tal como los ve el generador AHORA, sin sortear nada: el mismo
+ * cálculo que usa `maybeStartSequence`. Existe para poder LEER el sesgo (tests del
+ * territorio) sin tener que muestrear diez mil partidos para inferirlo.
+ */
+export const typeWeightsFor = (m, side) => typeWeights(m, side, seqPlan(m));
+
+/**
+ * Cuánto inclina la ALTURA el reparto de iniciativa: el que vive arriba tiene la
+ * pelota más cerca del arco rival y más seguido; el que se mete atrás se la cede.
+ * Mismo canal (y mismo orden de magnitud) que la mentalidad y la filosofía.
+ */
+export const heightShareShift = m => 0.045 * (myHeight(m) - HEIGHT_DEFAULT) - 0.02 * (oppHeight(m) - HEIGHT_DEFAULT);
 
 /* [MATRIZ DE COUNTERS] (F2, decisión PO #7 — celdas aprobadas 22-jul): "mi filo|su filo"
    → multiplicadores sobre el pool del lado indicado. Direccionales del roadmap: mi Press
@@ -399,7 +451,7 @@ export function maybeStartSequence(m) {
   // rival por posesión (+0.06) y Contragolpe Total por MIEDO (+0.04: atacar contra
   // esa contra es regalarse — el rival se cuida). Suma de todos los shareShift.
   const traitShift = Object.values(traitHooks(m)).flat().reduce((s, h) => s + (h.shareShift || 0), 0);
-  const mineShare = clamp(0.5 + plan.edge * 0.045 + mentShift + late + reds + filoShareShift(m.my.filo, plan.oppFilo) + traitShift, 0.3, 0.72);
+  const mineShare = clamp(0.5 + plan.edge * 0.045 + mentShift + late + reds + filoShareShift(m.my.filo, plan.oppFilo) + traitShift + heightShareShift(m), 0.3, 0.72);
   const side = rnd() < mineShare ? "mine" : "opp";
   // FRÍOS (Press, Master): el DT congeló el partido renunciando a un remate, y lo que
   // compró fue esto — la próxima llegada rival NO ocurre. Se descuenta del objetivo del
@@ -425,6 +477,10 @@ export function startSequence(m, type) {
   noteFiloIntent(m, type);   // la INTENCIÓN: proponer ese fútbol ya enseña (70% de la XP)
   m._lastSeqType = type.id; // memoria del contexto dinámico: no repetir tipo dos veces seguidas
   m._flow.push({ min: m.min, side: type.side, w: 3 }); // posesión/momentum derivados (A3, #11)
+  // EL TERRITORIO: una jugada REAL deja mucho más calor que un minuto de relleno, y del
+  // lado de quien la propone (una defensiva es SU posesión). Dónde nace cada tipo lo
+  // decide el catálogo (T4); acá solo se marca el mapa.
+  noteZone(m, type.side);
   m.stats.decisiones++;
   if (type.side === "mine") {
     const cands = m.activeMine().filter(p => p.pos !== "POR");
