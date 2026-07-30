@@ -19,7 +19,7 @@
    {id, nivel} (se arma en screens/match.js Y tests/smoke.js);
    el Match no conoce la run (ARQUITECTURA §3.2).
    ============================================================ */
-import { getPhilosophy, PHILOSOPHIES, aristaById, filoPointsOf, filoLevelOf, filoEtapaOf, afinidadMult } from "../content/philosophies.js";
+import { getPhilosophy, PHILOSOPHIES, aristaById, filoPointsOf, filoLevelOf, filoEtapaOf, afinidadMult, FILO_LEVELS } from "../content/philosophies.js";
 import { ADVANCED_BY_FILO } from "../content/sequences.js";
 import { TEAM_PHILOSOPHIES } from "../content/team-philosophies.js";
 import { teamRating } from "./ratings.js";
@@ -101,11 +101,13 @@ export function choosePhilosophy(run, filoId) {
 }
 
 /**
- * Cambio de filosofía a mitad de run: CUESTA la Acción del Día (decisión PO #1)
- * y la demolición es orgánica — `run.aristas` no se toca: lo entrenado persiste,
- * pero la nueva identidad combina otras aristas (costo hundido real, sin castigo
- * arbitrario). Devuelve la filosofía nueva, o null si no hay acción pendiente,
- * el id no existe o es la actual (la UI no debería permitirlo).
+ * Cambio de filosofía a mitad de run: CUESTA la Acción del Día (decisión PO #1).
+ * Desde el arco de la Progresión no hay nada que demoler — cada filosofía lleva su
+ * propio nivel de XP y sus rasgos comprados siguen activos (build híbrida), así que
+ * cambiar no hereda ni pierde: solo declara qué fútbol se va a jugar, y ese día
+ * invertido vale como Plan de Partido (×1.5 de XP en el próximo partido).
+ * Devuelve la filosofía nueva, o null si no hay acción pendiente, el id no existe
+ * o es la actual (la UI no debería permitirlo).
  */
 export function changePhilosophy(run, filoId) {
   const f = getPhilosophy(filoId);
@@ -218,14 +220,42 @@ export function rivalFilo(team, koRound = 0) {
 // el que dispersó su Sesión Táctica entre 5 aristas paga la brecha. En grupos no
 // existe (koRound 0). El dial declarado del sprint es ESTA constante.
 export const IDENTITY_GAP_PCT = 0.04; // nació 0.02; el dial declarado de R3 (medido: 2% movía −1.8pp)
-/** Multiplicador del castigo por brecha de identidad: ×1 en grupos o sin brecha;
- *  ×(1 + 0.04·brecha) con brecha = etapa rival (madurada por la ronda) − MI etapa.
- *  ETAPA vs etapa (T1): la escalera de 10 niveles no toca la brecha — cero
- *  recalibración del Rebalance. */
-export function identityGapMult(oppTeam, myEtapa, koRound = 0) {
+
+// AL FAVORITO LE JUEGAN LA FINAL (29-jul-2026, el dial del techo): el espejo del de
+// arriba. En KO, el rival al que le llevo VENTAJA de identidad también se agranda:
+// nadie le juega igual al que llega con todo resuelto — te esperan diez atrás, te
+// estudian, y sale el mejor partido de su torneo.
+//
+// Por qué hizo falta ESTE lever y no un dial global. Medido a n=4000 sobre BRA
+// (techo `--smart` 48.5% · piso mixto azar 28.9%):
+//   · afeitar los hooks del árbol un 30% → techo −1.9pp pero piso −2.1pp
+//   · forma de torneo +3%→+4% por ronda  → techo −3.3pp pero piso −3.7pp
+// Los dos hunden MÁS el piso que el techo, porque el mismo % de poder rival le cuesta
+// más win-rate al que ya venía peor. Un dial global no puede bajar el techo: la única
+// palanca que discrimina es la que se enciende PORQUE estoy fuerte.
+// El castigo se mide en ETAPAS (0-2, escala del rival) y la ventaja en NIVELES (1-10,
+// la escala fina de la Progresión). No es una inconsistencia: es lo único que funciona.
+// La etapa no puede ver la ventaja — Consolidada exige nivel 10 y el DT óptimo promedia
+// 7.9, así que en etapas está EMPATADO con medio mundo y `lead` no se enciende nunca
+// (medido: +10%/etapa movió el techo −0.4pp). En niveles, 7.9 contra 5.7 sí se distingue.
+export const IDENTITY_LEAD_PCT = 0.16;
+/** El nivel equivalente de una etapa rival: el PRIMER nivel de esa etapa. Traduce la
+ *  escala gruesa del rival a la fina del jugador para poder comparar ventaja.
+ *  DERIVADO de FILO_LEVELS, no escrito a mano: si la escalera se recalibra, esto
+ *  la sigue sola (misma indexación 0-9 que `filoLevel`). */
+const NIVEL_DE_ETAPA = [0, 1, 2].map(e => FILO_LEVELS.findIndex(l => l.etapa === e));
+
+/** Multiplicador de identidad del rival en KO. ×1 en grupos. Es SIMÉTRICO:
+ *  - le llevo MENOS idea (`gap`, en etapas) → me pasa por encima (R3, "el Mundial
+ *    castiga al sin idea")
+ *  - le llevo MÁS idea (`lead`, en niveles) → le juegan la final de su vida
+ *  Parejos, ×1: el partido de igual a igual es el único sin condimento. */
+export function identityGapMult(oppTeam, myEtapa, koRound = 0, myNivel = null) {
   if (!koRound) return 1;
-  const gap = Math.max(0, rivalFiloLevel(oppTeam, koRound) - (myEtapa ?? 0));
-  return 1 + IDENTITY_GAP_PCT * gap;
+  const rivalEtapa = rivalFiloLevel(oppTeam, koRound);
+  const gap = Math.max(0, rivalEtapa - (myEtapa ?? 0));
+  const lead = myNivel == null ? 0 : Math.max(0, myNivel - NIVEL_DE_ETAPA[rivalEtapa]);
+  return 1 + IDENTITY_GAP_PCT * gap + IDENTITY_LEAD_PCT * lead;
 }
 
 /**

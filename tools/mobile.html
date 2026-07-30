@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WC26 — Banco de pruebas móvil</title>
+<!--
+  ============================================================
+  tools/mobile — EL BANCO DE PRUEBAS MÓVIL (deuda C1, 29-jul-2026)
+
+  El problema que resuelve: achicar la ventana de Chrome (o el panel
+  Browser interno) NO reproduce un teléfono. La ventana tiene barras,
+  scrollbars y un zoom propio, así que el ancho de CSS que ve el juego
+  no es el que uno cree — y da falsos positivos y falsos negativos.
+
+  Un IFRAME sí: el ancho del iframe ES el viewport CSS del documento
+  embebido, exacto al píxel. Flex-wrap, overflow y la única media query
+  del proyecto (max-width: 700px) se comportan igual que en el teléfono,
+  con la ventana del navegador del tamaño que sea.
+
+  Encima audita: recorre el DOM del juego y lista los elementos que se
+  SALEN del ancho, que es la familia de bug real (la cabecera de Squad
+  que apilaba 398px de contenido en 375). El SPA no recarga, así que el
+  audit se vuelve a correr solo cada vez que el DOM cambia.
+
+  Uso: servir el proyecto y abrir /tools/mobile.html
+       (el juego debe cargarse por http, no por file://, para que el
+        banco pueda leer el DOM del iframe — mismo origen).
+  ============================================================
+-->
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #10131a; color: #e8ecf4; min-height: 100vh;
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    padding: 10px 16px; background: #171b25; border-bottom: 1px solid #2a3040;
+  }
+  h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 700; letter-spacing: .2px; }
+  .grp { display: flex; gap: 6px; align-items: center; }
+  .grp > span { opacity: .55; font-size: 12px; }
+  button {
+    background: #222836; color: #dfe6f2; border: 1px solid #333c50; border-radius: 8px;
+    padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  button:hover { background: #2b3345; }
+  button[aria-pressed="true"] { background: #3a5bd9; border-color: #4d6ce8; color: #fff; }
+  .stage { flex: 1; display: flex; gap: 18px; padding: 18px; align-items: flex-start; overflow: auto; }
+  .device {
+    background: #000; border: 10px solid #262c3a; border-radius: 26px; flex: none;
+    box-shadow: 0 14px 40px rgba(0,0,0,.55);
+  }
+  iframe { display: block; border: 0; background: #fff; border-radius: 16px; }
+  .panel {
+    flex: 1; min-width: 300px; background: #161a23; border: 1px solid #2a3040;
+    border-radius: 12px; padding: 14px 16px; position: sticky; top: 0;
+  }
+  .verdict { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+  .ok { color: #56d98a; }
+  .bad { color: #ff6b6b; }
+  .meta { opacity: .55; font-size: 12px; margin: 0 0 12px; }
+  ul { list-style: none; margin: 0; padding: 0; max-height: 62vh; overflow: auto; }
+  li { padding: 7px 9px; border-radius: 7px; background: #1d2230; margin-bottom: 6px; cursor: pointer; }
+  li:hover { background: #262d3e; }
+  .sel { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #9ec1ff; }
+  .over { float: right; color: #ff8f6b; font-weight: 700; font-size: 12px; }
+  .txt { display: block; opacity: .6; font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📱 Banco de pruebas móvil</h1>
+  <div class="grp" id="anchos"><span>ancho</span></div>
+  <div class="grp">
+    <button id="reload">↻ Recargar juego</button>
+    <button id="audit">🔍 Auditar ahora</button>
+  </div>
+  <div class="grp"><span id="ruta"></span></div>
+</header>
+
+<div class="stage">
+  <div class="device" id="device">
+    <iframe id="frame" src="../index.html" title="El juego a ancho de teléfono"></iframe>
+  </div>
+  <div class="panel">
+    <p class="verdict" id="verdict">Cargando…</p>
+    <p class="meta" id="meta"></p>
+    <ul id="lista"></ul>
+  </div>
+</div>
+
+<script>
+/* Los anchos que importan: el iPhone SE/mini es el peor caso real (375) y 700 es la
+   ÚNICA media query del proyecto — se prueba a los dos lados de su borde. */
+const ANCHOS = [
+  { w: 375, h: 812, label: "375 · SE/mini" },
+  { w: 390, h: 844, label: "390 · iPhone 14" },
+  { w: 430, h: 932, label: "430 · Pro Max" },
+  { w: 699, h: 900, label: "699 · bajo el corte" },
+  { w: 701, h: 900, label: "701 · sobre el corte" },
+  { w: 1280, h: 860, label: "1280 · escritorio" },
+];
+
+const frame = document.getElementById("frame");
+const grupo = document.getElementById("anchos");
+let actual = ANCHOS[0];
+
+for (const a of ANCHOS) {
+  const b = document.createElement("button");
+  b.textContent = a.label;
+  b.onclick = () => setAncho(a);
+  b.dataset.w = a.w;
+  grupo.appendChild(b);
+}
+
+function setAncho(a) {
+  actual = a;
+  frame.style.width = a.w + "px";
+  frame.style.height = a.h + "px";
+  for (const b of grupo.querySelectorAll("button")) b.setAttribute("aria-pressed", String(+b.dataset.w === a.w));
+  calibrar();
+  auditar();
+}
+
+/* CALIBRACIÓN (y el motivo por el que esto no se puede hacer a ojo): el iframe se lleva
+   ~8-17px de barra de scroll, así que pedir 375 le deja al juego un viewport de 367 y la
+   herramienta pasa a mentir — más estricta que un teléfono real, donde la barra es un
+   overlay y no ocupa ancho. Se mide la diferencia real y se ensancha el marco hasta que
+   el viewport de ADENTRO da exactamente el número pedido. */
+function calibrar() {
+  const doc = frame.contentDocument;
+  if (!doc || !doc.documentElement) return;
+  for (let i = 0; i < 3; i++) {
+    const delta = actual.w - doc.documentElement.clientWidth;
+    if (Math.abs(delta) < 1) break;
+    frame.style.width = (parseFloat(frame.style.width) + delta) + "px";
+  }
+}
+
+/* ---------- La auditoría ----------
+   El síntoma que se busca es UNO: que algo se salga del ancho del viewport. Se reporta
+   el desborde de la página (scroll horizontal, el bug visible) y quiénes lo causan.
+   Solo se listan los culpables MÁS EXTERNOS: si un contenedor se sale, sus 40 hijos
+   también, y listarlos a todos esconde el que hay que arreglar. */
+function auditar() {
+  const doc = frame.contentDocument;
+  const verdict = document.getElementById("verdict");
+  const meta = document.getElementById("meta");
+  const lista = document.getElementById("lista");
+  lista.innerHTML = "";
+  if (!doc || !doc.body) { verdict.textContent = "Sin acceso al juego (¿se abrió por file://?)"; return; }
+
+  const W = doc.documentElement.clientWidth;
+  const paginaDesborda = doc.documentElement.scrollWidth > W + 1;
+  const culpables = [];
+  for (const el of doc.body.querySelectorAll("*")) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) continue;                 // invisible: no molesta a nadie
+    if (getComputedStyle(el).position === "fixed") continue;       // los overlay se anclan aparte
+    const exceso = Math.max(r.right - W, -r.left);
+    if (exceso <= 1) continue;
+    if (recortado(el, r)) continue;                                // lo tapa un ancestro: no se ve
+    if (culpables.some(c => c.el.contains(el))) continue;          // ya está reportado su padre
+    culpables.push({ el, exceso: Math.round(exceso) });
+  }
+
+  const limpio = !paginaDesborda && culpables.length === 0;
+  verdict.textContent = limpio ? "✅ Sin desbordes" : `❌ ${culpables.length} elemento(s) se salen`;
+  verdict.className = "verdict " + (limpio ? "ok" : "bad");
+  meta.textContent = `viewport ${W}px · la página mide ${doc.documentElement.scrollWidth}px`
+    + (paginaDesborda ? " · HAY SCROLL HORIZONTAL" : "");
+  document.getElementById("ruta").textContent = "pantalla: " + (doc.querySelector("[data-screen]")?.dataset.screen || doc.body.className || "—");
+
+  for (const c of culpables) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="over">+${c.exceso}px</span><span class="sel">${selectorDe(c.el)}</span>`
+      + `<span class="txt">${(c.el.textContent || "").trim().slice(0, 90)}</span>`;
+    li.onclick = () => { c.el.scrollIntoView({ block: "center" }); c.el.style.outline = "3px solid #ff4d4d"; };
+    lista.appendChild(li);
+  }
+}
+
+/* EL FALSO POSITIVO que hay que matar (y el que hacía inservible mirar a ojo): un panel
+   que se sale del ancho pero al que un ancestro RECORTA no es un bug — no se ve y no
+   empuja la página. El riel de la pizarra vive así: cerrado se estaciona a la derecha con
+   translateX(101%) y .board-frame lo tapa con overflow:hidden. Si esto no se filtra, el
+   banco reporta un bug en cada pantalla con un panel deslizante y deja de servir. */
+function recortado(el, r) {
+  for (let p = el.parentElement; p && p !== el.ownerDocument.body; p = p.parentElement) {
+    const cs = getComputedStyle(p);
+    if (!/hidden|clip|auto|scroll/.test(cs.overflowX)) continue;
+    const pr = p.getBoundingClientRect();
+    if (r.right > pr.right + 1 || r.left < pr.left - 1) return true;
+  }
+  return false;
+}
+
+const selectorDe = el => el.tagName.toLowerCase()
+  + (el.id ? "#" + el.id : "")
+  + (el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/).slice(0, 3).join(".") : "");
+
+/* El juego es un SPA: no recarga al cambiar de pantalla. Se re-audita solo cuando el DOM
+   cambia (con un respiro para no correr 200 veces durante un render). */
+let pendiente = null;
+frame.addEventListener("load", () => {
+  calibrar();
+  auditar();
+  const doc = frame.contentDocument;
+  new MutationObserver(() => { clearTimeout(pendiente); pendiente = setTimeout(() => { calibrar(); auditar(); }, 350); })
+    .observe(doc.body, { childList: true, subtree: true, attributes: true });
+});
+
+document.getElementById("reload").onclick = () => frame.contentWindow.location.reload();
+document.getElementById("audit").onclick = auditar;
+setAncho(ANCHOS[0]);
+</script>
+</body>
+</html>

@@ -26,7 +26,6 @@
    ============================================================ */
 import { clamp } from "../../core/math.js";
 import { effStat } from "./powers.js";
-import { PASE_MIX } from "../ratings.js";
 
 /** Pases que se juegan por minuto entre los dos equipos (6v6: ~800 en 90'). */
 const PASSES_PER_MIN = 9;
@@ -40,17 +39,17 @@ export const newTally = () => ({
 });
 
 /**
- * Precisión de pase de un once, 0..1. Sale del `pase` promedio de sus jugadores de campo
+ * Precisión de pase de un once, 0..1. Sale del `pase_corto` promedio de sus jugadores de campo
  * por el MISMO caño que todo lo demás (`effStat`: energía, forma, oxidación incluidas),
  * así un equipo fundido al 80' también pierde la pelota más seguido.
  */
 function passRate(players, buffs) {
   const field = players.filter(p => p.pos !== "POR" && !p.expulsado && !p.lesionado);
   if (!field.length) return 0.6;
-  // ODISEA: la precisión del panel mezcla los dos pases (ratings.PASE_MIX) hasta que la
-  // segunda mitad del sprint la calcule por tipo de jugada.
-  const q = field.reduce((s, p) => s + (effStat(p, "pase_corto", buffs) * PASE_MIX.pase_corto
-    + effStat(p, "pase_largo", buffs) * PASE_MIX.pase_largo), 0) / field.length;
+  // ODISEA (costura cerrada): la precisión del panel mide `pase_corto`. La inmensa mayoría
+  // de los ~500 pases de un partido son de circulación; la estadística de "% de pases
+  // completados" que muestra una transmisión está dominada por ellos, no por el pelotazo.
+  const q = field.reduce((s, p) => s + effStat(p, "pase_corto", buffs), 0) / field.length;
   return clamp(0.58 + q * 0.06, 0.5, 0.93);
 }
 

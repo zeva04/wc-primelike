@@ -8,13 +8,10 @@ import { momentoMult } from "./momentum.js";
 export const STAT_KEYS = ["tiro", "defensa", "cabezazo", "pase_corto", "pase_largo", "velocidad", "aura"];        // jugadores de campo
 export const GK_STAT_KEYS = ["atajadas", "reflejos", "salidas", "pase_corto", "pase_largo", "velocidad", "aura"]; // arqueros
 
-/* LA MEZCLA DE PASE (arco de la Odisea, sprint 1): mientras el partido no distinga los dos
-   pases acto por acto, todo lo que necesita UN número de pase usa esta mezcla — 60% corto,
-   40% largo, el reparto con el que se dividió el `pase` original. Es la COSTURA declarada
-   del sprint: la segunda mitad reemplaza cada llamada por el pase que corresponda a esa
-   jugada (el filtrado es largo, la circulación es corta) y esta constante desaparece. */
-export const PASE_MIX = { pase_corto: 0.6, pase_largo: 0.4 };
-export const paseMix = (p) => Math.round(p.stats.pase_corto * PASE_MIX.pase_corto + p.stats.pase_largo * PASE_MIX.pase_largo);
+/* NO HAY "un número de pase". La costura de la Odisea (`PASE_MIX`, 60/40) murió el
+   29-jul-2026: cada sitio del motor declara CUÁL de los dos pases mide y por qué —
+   circulación y precisión del panel son `pase_corto`; el filtrado, el centro alto y el
+   pelotazo son `pase_largo`. Si aparece un caso nuevo, elige uno; no vuelvas a mezclar. */
 
 // ---------- Jugar fuera de puesto (docs/CORE.md §2b) ----------
 // La línea del fútbol: de atrás hacia adelante. La distancia entre dos posiciones

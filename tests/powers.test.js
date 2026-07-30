@@ -82,7 +82,11 @@ assert(E.ENERGY_OK > E.FATIGUE_INJURY_FROM, "la banda avisa ANTES que el riesgo 
   }
   const n = equipos.length;
   // Decisión PO 28-jul: "delanteros mandan" — amontonar delanteros ES el dibujo más ofensivo.
-  assert(atkTop === n, "el 1-1-3 (Todo al ataque) es el de MÁS ataque en todos los planteles", `${atkTop}/${n}`);
+  // Espejo exacto de la tolerancia defensiva de abajo: NO se pueden amontonar delanteros que
+  // NO EXISTEN. NZL tiene un solo DEL de verdad (Chris Wood), así que su 1-1-3 llena el
+  // ataque con gente fuera de puesto y el 1-2-2 —con sus dos volantes reales— lo empata
+  // (medido al cerrar PASE_MIX: 3.4789 vs 3.4757, 0.09%). Con delanteros de verdad, manda.
+  assert(atkTop >= n - 1, "el 1-1-3 (Todo al ataque) es el de MÁS ataque en casi todos los planteles", `${atkTop}/${n}`);
   assert(menosDef === n, "y el de MENOS defensa en todos", `${menosDef}/${n}`);
   // El 3-1-1 no siempre gana la defensa a propósito: sin un tercer central de verdad, el
   // 2-2-1 puede defender mejor. Lo que NO puede pasar es que quede fuera del podio.
@@ -114,9 +118,8 @@ assert(E.ENERGY_OK > E.FATIGUE_INJURY_FROM, "la banda avisa ANTES que el riesgo 
   const por = act.find(p => pos(p) === "POR");
   const avg = (ps, k) => ps.length ? ps.reduce((s, p) => s + E.effStat(p, k, {}), 0) / ps.length : 1;
   const aura = avg(act, "aura");
-  // La fórmula VIEJA, sin ningún factor de bocas
-  const avgPase = ps => avg(ps, "pase_corto") * E.PASE_MIX.pase_corto + avg(ps, "pase_largo") * E.PASE_MIX.pase_largo;
-  const atkViejo = avg(atkP, "tiro") * 0.4 + avgPase(medP) * 0.3 + avg(atkP, "cabezazo") * 0.12 + aura * 0.18;
+  // La fórmula VIEJA, sin ningún factor de bocas (el atk del medio es circulación: pase_corto)
+  const atkViejo = avg(atkP, "tiro") * 0.4 + avg(medP, "pase_corto") * 0.3 + avg(atkP, "cabezazo") * 0.12 + aura * 0.18;
   const defViejo = avg(defP, "defensa") * 0.52 + E.gkQuality(por, {}) * 0.32 + aura * 0.16;
   const pw = E.teamPowers(lineup, "normal", {});
   assert(Math.abs(pw.atk - atkViejo) < 1e-9, "el 2-1-2 da el MISMO atk que la fórmula sin bocas", `${pw.atk} vs ${atkViejo}`);

@@ -176,7 +176,12 @@ function renderPhilosophy(opts = {}, selected = null) {
         </div>
       </div>
 
-      <div class="flex items-center gap-3 ml-auto">
+      <!-- El flex-wrap NO es decorativo: los cuatro bloques miden ~515px y a 375 de
+           pantalla el contenedor tiene 343. Sin envolver, la banda empujaba la página
+           a 567px de ancho y la pizarra se miraba con scroll horizontal (medido con
+           tools/mobile.html, 29-jul). Mismo bug —y mismo arreglo— que la cabecera de
+           Gestión de Plantilla: una fila de anchos fijos que no puede romper. -->
+      <div class="flex flex-wrap items-center justify-end gap-3 ml-auto">
         <!-- EL DIRECTOR TÉCNICO: la segunda capa. Los PI que gasta el árbol salen de acá. -->
         <div class="text-right leading-none">
           <div class="text-[9px] font-black uppercase tracking-[.2em] mb-1 text-sky-400/70">Director técnico</div>
@@ -190,7 +195,7 @@ function renderPhilosophy(opts = {}, selected = null) {
           <div class="text-[9px] font-black uppercase tracking-[.2em] mb-1" style="color:${oro}b3">${FILO_ETAPAS[etapa].label}</div>
           <div class="text-[15px] font-black">Nivel ${lvl + 1}<span class="text-slate-600 text-[12px] font-bold">/10</span></div>
         </div>
-        <div class="w-56">
+        <div class="w-56 max-w-full">
           <div class="h-[6px] rounded-full bg-black/60 overflow-hidden ring-1 ring-white/10">
             <div class="h-full rounded-full transition-all duration-500" style="width:${Math.min(100, nivelPct)}%;background:linear-gradient(90deg,${oro}88,${oro})"></div>
           </div>

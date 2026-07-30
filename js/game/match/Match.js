@@ -95,10 +95,10 @@ export class Match {
     // conoce la run) y enciende la forma de torneo del once rival (0 en grupos = ×1).
     this.koRound = my.koRound || 0;
     this.oppLineup = genOpponentLineup(oppTeam, oppBanned, this.koRound);
-    // LA BRECHA DE IDENTIDAD (R3): el rival con más idea que yo amplifica su modo
-    // Mundial — se apila sobre p.forma (mismo canal, un solo campo en los datos).
-    // ETAPA vs etapa (T1): la escalera fina de niveles no toca la brecha.
-    const gapMult = identityGapMult(oppTeam, my.filo?.etapa, this.koRound);
+    // LA BRECHA DE IDENTIDAD (R3 + el dial del techo): el rival con más idea que yo
+    // amplifica su modo Mundial, y al que le llevo ventaja le juegan la final de su
+    // vida — las dos se apilan sobre p.forma (mismo canal, un solo campo en los datos).
+    const gapMult = identityGapMult(oppTeam, my.filo?.etapa, this.koRound, my.filo?.nivel);
     if (gapMult !== 1) for (const p of this.oppLineup) p.forma *= gapMult;
     this.knockout = knockout;
     this.min = 0;

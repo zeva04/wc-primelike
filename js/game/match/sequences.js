@@ -76,8 +76,11 @@ function rivalProfile(m) {
   const field = m.oppLineup.filter(p => p.pos !== "POR");
   const st = k => field.reduce((s, p) => s + (p.stats[k] || 50), 0) / Math.max(1, field.length);
   const N = x => clamp((x - 58) / 28, 0, 1); // ~58 (genéricos débiles) → 0 · ~86 (élite) → 1
-  const pase = st("pase_corto") * 0.6 + st("pase_largo") * 0.4;   // ODISEA: mezcla (ratings.PASE_MIX)
-  return { atk: N(st("tiro")), def: N(st("defensa")), pase: N(pase), cab: N(st("cabezazo")), vel: N(st("velocidad")) };
+  // ODISEA (costura cerrada): "vocación de tener la pelota" es `pase_corto`. Un equipo que
+  // quiere la pelota es el que sabe tocarla, no el que sabe lanzarla — de hecho el que
+  // vive del pase largo es justo el que NO la quiere. Su capacidad de envío largo no entra
+  // acá: sería otra dimensión, y no se agrega un dial que nadie lee (la lección de `vel`).
+  return { atk: N(st("tiro")), def: N(st("defensa")), pase: N(st("pase_corto")), cab: N(st("cabezazo")), vel: N(st("velocidad")) };
 }
 
 /**
@@ -155,7 +158,11 @@ function typeWeights(m, side, plan) {
     // El desborde (Odisea): la respuesta clásica al rival que se encierra — cuanto más
     // sólido y junto está el bloque rival, más sentido tiene ir por afuera. Cansado no
     // sale (el sprint es lo primero que se pierde) y perdiendo tarde se busca más.
-    banda: (1.5 + 1.5 * prof.def) * (losingLate ? 1.4 : 1) * (tired ? 0.7 : 1) * brave,
+    // Y se va a buscar la ESPALDA LENTA (`prof.vel`, el dial que se calculaba sin usar):
+    // contra una zaga que no corre, la banda es el camino; contra laterales rápidos, no.
+    // El término está CENTRADO —1.0 fijo + 1.0·(1−vel), que promedia los 1.5 de antes—
+    // así el desborde discrimina por el rival sin aparecer más seguido en promedio.
+    banda: (1.0 + 1.5 * prof.def + 1.0 * (1 - prof.vel)) * (losingLate ? 1.4 : 1) * (tired ? 0.7 : 1) * brave,
     balon_parado: 1.5,
     caceria: 0, sinfonia: 0, contra_letal: 0,
   } : {

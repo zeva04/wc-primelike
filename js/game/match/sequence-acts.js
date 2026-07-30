@@ -26,6 +26,10 @@ import { noteMomentum } from "./match-momentum.js";
 // un acto más de circulación, lo arma startSequence) o el del catálogo.
 const planOf = s => s.plan || s.type.plan;
 
+/** Peso del DESMARQUE (Odisea): el que se suelta para recibir es el que arranca. Mismo
+ *  cuadrático sobre 70 que `protStatW` — inclina fuerte sin ser determinista. */
+const desmarqueW = p => ((p.stats.velocidad ?? 70) / 70) ** 2;
+
 /** Crea la decisión del acto actual según su `kind`. Las opciones son reglas (mapean a
  *  Football Actions); el flavor viene del tipo. */
 export function buildActDecision(m) {
@@ -515,9 +519,13 @@ export function resolveSequenceAct(m, key) {
       // ubicado DE VERDAD (el de mejor Tiro), no a un corredor cualquiera.
       const supUp = hookOf(m, "supportUpgrade");
       const numeric = supUp && familyOf(s.type) === "transicion" && mates.length > 0;
+      // ODISEA (costura cerrada): EL DESMARQUE. Sin Superioridad Numérica, el que recibe
+      // el pase de gol no es el mejor ubicado: es el que ARRANCÓ. La velocidad pondera el
+      // sorteo (mismo cuadrático sobre 70 que protStatW: vel 95 ×1.8, vel 55 ×0.6) sin
+      // volverlo determinista — el 9 lento sigue recibiendo, solo deja de recibir igual.
       const mate = !mates.length ? s.prot
         : numeric ? [...mates].sort((a, b) => (b.stats.tiro || 0) - (a.stats.tiro || 0))[0]
-        : m._weightedPick(mates, mates.map(p => playedPos(p) === "DEL" ? 3 : 1));
+        : m._weightedPick(mates, mates.map(p => (playedPos(p) === "DEL" ? 3 : 1) * desmarqueW(p)));
       const pass = A.actPass(m, s.prot);
       if (!pass.ok) return maybeCounter(m, `min ${m.clock()}' — el pase de ${s.prot.name} no encuentra a nadie.`, true);
       // T1 — Correr en Manada: en la contra, el "buscar al mejor ubicado" encuentra
@@ -819,6 +827,9 @@ function maybeCounter(m, failText, risky = false) {
   const alive = m.oppLineup.filter(p => !p.expulsado);
   const fast = alive.filter(p => p.pos === "DEL" || p.pos === "MED");
   const sh = fast.length ? pick(fast) : pick(alive);
+  // Rama de EMERGENCIA: con LASTMAN_FROM_COUNTER = 1.0 acá solo se llega sin un defensor
+  // en pie (todos expulsados o lesionados). La persecución con velocidad vive donde la
+  // contra realmente se juega — `chances.resolveLastMan`, opción "esperar".
   const shot = A.actOppShot(m, sh, mine, { bonus: 0.10 });
   if (shot.ok) { goalOpp(m, sh); return closeSilent(m); }
   return closeSeq(m, "chance", `min ${m.clock()}' — ${sh.name} remata la contra pero ${mine.por ? mine.por.name : "el arquero"} responde enorme.`);

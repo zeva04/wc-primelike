@@ -244,12 +244,32 @@ assert(E.filoLevel(run) === 9, "la escalera tiene techo: XP de sobra no desborda
   assert(Math.abs(E.identityGapMult(fra, 1, 1) - (1 + E.IDENTITY_GAP_PCT)) < 1e-9, "brecha 1 → +2%", E.identityGapMult(fra, 1, 1));
   assert(Math.abs(E.identityGapMult(fra, 0, 1) - (1 + 2 * E.IDENTITY_GAP_PCT)) < 1e-9, "brecha 2 → +4% (el sin idea ante un grande)");
   assert(E.identityGapMult(fra, undefined, 1) === E.identityGapMult(fra, 0, 1), "sin filosofía = nivel 0 (duck-typed)");
-  assert(E.identityGapMult(cpv, 2, 1) === 1, "mi nivel sobre el suyo NUNCA me premia: la brecha solo castiga");
+  assert(E.identityGapMult(cpv, 2, 1) === 1, "sin pasar mi nivel fino, llevar ventaja de ETAPA no cambia nada");
   // La brecha COMPONE con la madurez (R3: desde 16avos): hasta el rival chico llega
   // a KO con idea (nivel 1 madurado) y castiga al improvisador — nunca en grupos.
   assert(Math.abs(E.identityGapMult(cpv, 0, 1) - (1 + E.IDENTITY_GAP_PCT)) < 1e-9,
     "el chico madurado ya genera brecha 1 contra el sin idea desde 16avos", E.identityGapMult(cpv, 0, 1));
   assert(E.identityGapMult(cpv, 1, 1) === 1, "…y con nivel propio 1 esa brecha desaparece");
+
+  // AL FAVORITO LE JUEGAN LA FINAL (el dial del techo, 29-jul-2026): el espejo. El
+  // castigo se mide en ETAPAS y la ventaja en NIVELES (0-9) — es lo único que separa
+  // al DT óptimo (~7) del que improvisa (~5), porque en etapas los dos están en 1.
+  {
+    const cpvKO = E.rivalFiloLevel(cpv, 1); // el chico madurado en 16avos = etapa 1 → ancla nivel 4
+    assert(cpvKO === 1, "el rival del ejemplo llega a 16avos En desarrollo", cpvKO);
+    assert(E.identityGapMult(cpv, 1, 0, 9) === 1, "en grupos no hay vara alta: la ventaja tampoco existe (koRound 0)");
+    assert(E.identityGapMult(cpv, 1, 1, 4) === 1, "empatado con su etapa (nivel 4 = el ancla) el partido es parejo: ×1");
+    assert(Math.abs(E.identityGapMult(cpv, 1, 1, 7) - (1 + 3 * E.IDENTITY_LEAD_PCT)) < 1e-9,
+      "3 niveles por encima de su etapa → le juegan la final de su vida", E.identityGapMult(cpv, 1, 1, 7));
+    assert(E.identityGapMult(cpv, 1, 1, 4) <= E.identityGapMult(cpv, 1, 1, 7), "más ventaja = más vara alta (monótono)");
+    // Las dos mitades NUNCA se pisan: o llego corto de idea, o llego sobrado.
+    assert(E.identityGapMult(fra, 0, 1, 2) === E.identityGapMult(fra, 0, 1),
+      "contra un grande voy por detrás: paga la brecha y la vara alta no suma nada");
+    assert(E.identityGapMult(cpv, 1, 1, 0) === 1, "y por debajo del ancla no hay ventaja que cobrar (nunca es negativa)");
+    // El ancla sale de FILO_LEVELS, no de un número a mano: Consolidada arranca en el
+    // último nivel, así que ni el nivel 9 lleva ventaja contra un rival Consolidado.
+    assert(E.identityGapMult(fra, 2, 5, 9) === 1, "contra el Consolidado, ni con la filosofía al tope hay ventaja");
+  }
 
   // El canal completo: forma × brecha llegan multiplicadas al once del Match.
   // (T1: el Match lee filo.etapa para la brecha — matchCtx viaja {id, nivel, etapa})

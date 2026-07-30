@@ -582,6 +582,74 @@ function genSample(oppId, mut, n = 4000) {
   assert(contRapida > contLenta, "una zaga veloz corta más que una lenta", `${contLenta.toFixed(2)} → ${contRapida.toFixed(2)}`);
 }
 
+// ══════════ LA COSTURA CERRADA: muere PASE_MIX, despierta prof.vel (Odisea, cierre) ══════════
+
+// El perfil del rival mide pase CORTO: "querer la pelota" es saber tocarla, no saber lanzarla.
+{
+  assert(E.PASE_MIX === undefined && E.paseMix === undefined, "PASE_MIX/paseMix ya no existen: ningún sitio mezcla los dos pases");
+  const perfil = mut => { const m = makeMatch(); mut(m.oppLineup.filter(p => p.pos !== "POR")); m.min = 50; E.maybeStartSequence(m); return m._seqPlan.prof; };
+  const base = perfil(() => {});
+  const conLargo = perfil(fs => fs.forEach(p => p.stats.pase_largo = 99));
+  const conCorto = perfil(fs => fs.forEach(p => p.stats.pase_corto = 99));
+  assert(Math.abs(conLargo.pase - base.pase) < 1e-9, "un rival que sabe LANZAR no quiere más la pelota (el largo no entra al perfil)", `${base.pase.toFixed(3)} vs ${conLargo.pase.toFixed(3)}`);
+  assert(conCorto.pase > base.pase + 0.05, "un rival que sabe TOCAR sí quiere la pelota", `${base.pase.toFixed(3)} → ${conCorto.pase.toFixed(3)}`);
+}
+
+// El desborde va a buscar la espalda LENTA: prof.vel dejó de ser un dial dormido.
+{
+  const lenta = genSample("ARG", m => { m._seqPlan.prof.vel = 0; });
+  const rapida = genSample("ARG", m => { m._seqPlan.prof.vel = 1; });
+  assert(lenta.share("banda") > rapida.share("banda") * 1.25,
+    "contra una zaga rival LENTA sale más el desborde por la banda", `${rapida.share("banda").toFixed(3)} → ${lenta.share("banda").toFixed(3)}`);
+  // Y el término está CENTRADO: con una zaga del montón el desborde aparece como siempre.
+  const media = genSample("ARG", m => { m._seqPlan.prof.vel = 0.5; });
+  assert(Math.abs(media.share("banda") - (lenta.share("banda") + rapida.share("banda")) / 2) < 0.02,
+    "el dial reparte alrededor del peso viejo, no lo sube", media.share("banda").toFixed(3));
+}
+
+// EL DESMARQUE: el que recibe el pase de gol es el que arrancó.
+{
+  // Once clonado: todos idénticos salvo la velocidad de dos de ellos, así lo único que
+  // puede explicar la diferencia de goles es quién se soltó (el tiro es el mismo para todos).
+  const m = makeMatch();
+  const campo = m.my.lineup.filter(p => p.pos !== "POR");
+  for (const p of campo) p.stats = { ...p.stats, tiro: 75, cabezazo: 70, defensa: 70, pase_corto: 80, pase_largo: 70, velocidad: 70, aura: 70 };
+  const rapido = campo[1], lento = campo[2];
+  rapido.stats = { ...rapido.stats, velocidad: 97 };
+  lento.stats = { ...lento.stats, velocidad: 30 };
+  const goles = {};
+  for (let i = 0; i < 1500; i++) {
+    m.seq = null; m.decision = null; m.scorers = [];
+    E.startSequence(m, E.sequenceType("transicion"));
+    while (m.seq && (m.seq.plan || m.seq.type.plan)[m.seq.actIdx] !== "finish") m.resolveSequenceAct("pase");
+    if (!m.seq) continue;
+    m.resolveSequenceAct("asistir");
+    for (const g of m.scorers) goles[g.name] = (goles[g.name] || 0) + 1;
+  }
+  assert((goles[rapido.name] || 0) > (goles[lento.name] || 0),
+    "a igual tiro, el rápido recibe el pase de gol más que el lento", `${goles[rapido.name] || 0} vs ${goles[lento.name] || 0}`);
+  assert(Object.keys(goles).length >= 3, "pero no es determinista: el lento también aparece", Object.keys(goles).join(","));
+}
+
+// LA PERSECUCIÓN TRAS ROBO: contener es aguantar hasta que los demás vuelven corriendo.
+// (Toda contra con un defensor en pie va al mano a mano: LASTMAN_FROM_COUNTER = 1.0.)
+{
+  const contener = vel => {
+    const m = makeMatch();
+    m.my.lineup.filter(p => p.pos !== "POR").forEach(p => { p.stats = { ...p.stats, velocidad: vel }; });
+    let gol = 0;
+    for (let i = 0; i < 1500; i++) {
+      m.decision = null; m.gOpp = 0; m.min = 50;
+      if (!E.lastManChance(m)) continue;
+      m.resolveLastMan("esperar");
+      gol += m.gOpp;
+    }
+    return gol;
+  };
+  const lenta = contener(20), rapida = contener(95);
+  assert(lenta > rapida, "si nadie vuelve corriendo, el que se escapó define mejor", `zaga rápida ${rapida} → zaga lenta ${lenta} goles`);
+}
+
 console.log(`sequences.test: ${checks} checks · fallos: ${fails}`);
 console.log(fails ? "❌ sequences con fallos" : "✅ sequences OK");
 process.exit(fails ? 1 : 0);

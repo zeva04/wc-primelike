@@ -79,12 +79,22 @@ seguir valiendo lo mismo, y un extremo veloz de aura baja ya no la necesita.
 > 82→81, Dailon Livramento 64→65. Diales si el PO los quiere intactos: subirles la velocidad
 > o bajar su peso en `OVR_WEIGHTS` (y recalcular los 230).
 
-**La costura del sprint.** El partido todavía mide UN pase en varios sitios (poder del
-medio, precisión del panel, perfil del rival): usan `ratings.PASE_MIX` (60% corto / 40%
-largo, el reparto con el que se dividió el original). La **segunda mitad del sprint**
-reemplaza cada uno por el pase que corresponda a esa jugada. Lo único que ya distingue de
-verdad es `actions.actPass`: el pase **filtrado** mide `pase_largo` y el de circulación
-`pase_corto`.
+**La costura, CERRADA (29-jul-2026).** Ya no existe "un número de pase": `PASE_MIX` murió y
+cada sitio del motor declara cuál de los dos mide y por qué.
+
+| Mide `pase_corto` | Mide `pase_largo` |
+|---|---|
+| circulación (`actPass` simple) | pase **filtrado**, el que rompe líneas (`actPass hard`) |
+| **atk del MEDIO** (`teamPowers`): atacar desde el medio es sostener y hacer circular | centro **alto** al área (`actCross`) |
+| **precisión del panel** (`stats.passRate`): la inmensa mayoría de los ~500 pases de un partido son cortos | el pelotazo |
+| **perfil del rival** (`sequences.rivalProfile`): "querer la pelota" es saber tocarla — el que vive del pase largo es justo el que NO la quiere | pase atrás rasante → NO (ese es corto: es un toque) |
+
+La capacidad de **lanzar en largo** del rival deliberadamente NO entra al perfil: sería una
+dimensión nueva, y la lección de `prof.vel` —un dial calculado que nadie leía durante todo
+un sprint— es que no se agrega un número sin un consumidor.
+
+Medido al cerrar: BRA `--smart --focus` **47.9%** (n=2000) contra 47.3% de baseline, MAR
+**44.1%** (n=1500) contra 41.8%. El cambio no movió el balance.
 
 > **Por qué ponderar.** Con un promedio plano, Haaland (defensa 40) daría una nota
 > mediocre pese a tener tiro 97. La ponderación hace que cada jugador se mida por lo que
@@ -301,9 +311,22 @@ forma      = 1 + 0.03 × ronda_KO                SOLO el once rival (modo Mundia
   16avos, tope Consolidada — `philosophy.FILO_MADURA_DESDE`; nació "desde cuartos" y R3 la
   adelantó) y la **BRECHA DE IDENTIDAD** (`philosophy.identityGapMult`): si mi nivel de
   identidad < el del rival madurado, su modo Mundial suma **+4% por nivel de brecha**
-  (`IDENTITY_GAP_PCT`; brecha 2 → +8%). El DT Consolidado es INMUNE por construcción —
-  improvisar se paga; consolidar la identidad antes de KO es la vacuna. La brecha solo
-  castiga (mi nivel sobre el suyo no me premia) y no existe en grupos.
+  (`IDENTITY_GAP_PCT`; brecha 2 → +8%) — improvisar se paga; consolidar la identidad antes
+  de KO es la vacuna. Y desde el **29-jul-2026** la moneda tiene su otra cara: **AL FAVORITO
+  LE JUEGAN LA FINAL** (`IDENTITY_LEAD_PCT` = **+16% por nivel de ventaja**) — al que llega
+  con la idea armada le sale enfrente el mejor partido del torneo rival. Nadie le juega de
+  igual a igual al que ya tiene todo resuelto. Ninguna existe en grupos, y el partido parejo
+  es el único sin condimento (×1).
+
+  **Las dos mitades usan escalas distintas, a propósito.** El castigo se mide en ETAPAS
+  (0-2, la escala del rival); la ventaja, en NIVELES (0-9, la escala fina de la Progresión),
+  contra el primer nivel de la etapa rival (`NIVEL_DE_ETAPA`, derivado de `FILO_LEVELS`).
+  Por qué: Consolidada exige nivel 10 y el DT óptimo promedia ~7.9, así que **en etapas está
+  empatado con medio mundo** y la ventaja no se encendería nunca (medido: +10%/etapa movió
+  el techo −0.4pp). En niveles, 7.9 contra 5.7 sí se distingue — y es justo lo que separa al
+  que invierte del que improvisa. De paso: la "inmunidad por construcción" del DT Consolidado
+  que R3 daba por sentada **ya no existe** desde el arco de Progresión, porque llegar a
+  Consolidada dejó de ser rutinario.
 
 > **Rebalance del 20-jul-2026 (decisión PO).** El factor de energía pesaba **35%**
 > (`0.65 + 0.35`) y bajó a **20%**, acoplado a subir el cansancio del partido de −10 a
@@ -386,6 +409,37 @@ forma      = 1 + 0.03 × ronda_KO                SOLO el once rival (modo Mundia
 > que no hace nada — coherente con la tesis) · CPV 5.7 ≥3 ✓ · filos 27-34 (posesión
 > premium, contra sano). La escalera final del arco COMPLETO: **11.3 · 15.0 · 29.7 ·
 > 41.9** — del 46% pre-arco a un tercio, con el techo intacto.
+
+> **AL FAVORITO LE JUEGAN LA FINAL (29-jul-2026, decisión PO "ataca los 6pp").** Los arcos
+> de Rasgos, Progresión y la Odisea derivaron el TECHO: BRA `--smart` **48.5%** (n=4000)
+> contra los 41.9 con que cerró R3, con el piso mixto **28.9** clavado en su 29.7. O sea:
+> derivó el premio al que invierte, no la dificultad general.
+>
+> **Tres diales medidos, dos descartados** (todo BRA, n=4000, techo `--smart` / piso mixto):
+>
+> | Dial | Techo | Piso | Ratio |
+> |---|---|---|---|
+> | Afeitar los hooks del árbol −30% (el dial que dejó escrito el arco de Rasgos) | 46.6 (−1.9) | 26.8 (−2.1) | 0.9:1 ❌ |
+> | Forma de torneo +3% → +4%/ronda (el dial que R3 midió en 40.6-41.0) | 45.2 (−3.3) | 25.2 (−3.7) | 0.9:1 ❌ |
+> | Vara alta por ETAPA, +10% | 48.1 (−0.4) | 27.6 (−1.3) | 0.3:1 ❌ |
+> | **Vara alta por NIVEL, +16%** | **42.05** (−6.5) | **27.55** (−1.4) | **4.6:1 ✓** |
+>
+> **LA LEY QUE SALIÓ DE ACÁ: ningún dial GLOBAL puede bajar el techo.** Los dos primeros
+> hunden más el piso que el techo, y no por casualidad — el mismo % de poder rival le
+> cuesta más win-rate al que ya venía peor, porque está en la parte empinada de su curva.
+> Para mover el techo solo, la palanca tiene que **encenderse porque estoy fuerte**. Es la
+> misma lección del "techo estructural del dial" de R3, vista desde el otro lado.
+>
+> **Escalera al 29-jul-2026** (n=4000, 2 corridas en los dos peldaños de arriba):
+> recuperar **16.0** · entrenar **18.1** · mixto **27.8/27.3** · smart **42.2/41.9** ·
+> CPV 4.1 ≥3 ✓ · KOR 19.9. Con `--focus`: BRA 47.9 → **41.4**, MAR 44.1 → **35.5**.
+> El mixto en ~27.5 **paga la deuda declarada de R3**, cuyo gate original era ~25 y se
+> re-pactó a 29-31 solo porque el dial de entonces no llegaba.
+>
+> ⚠️ **Deuda abierta, NO causada por este dial**: el recuperador está en **16.0** contra la
+> tesis del Rebalance (10-15). Medido con la palanca apagada da **17.0** — o sea que la
+> derivaron los arcos de Rasgos/Progresión y esta recalibración lo empuja *hacia* la banda,
+> no fuera. Cerrarlo es su propio sprint.
 
 > Este es el único punto donde se mezcla "escala 1–99" (datos) con "escala 0–5" (fórmulas).
 > Todo lo demás del partido razona en 0–5.

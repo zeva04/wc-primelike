@@ -155,6 +155,54 @@ sano). **Escalera final del ARCO COMPLETO: 11.3 · 15.0 · 29.7 · 41.9** (pre-a
 46.4 · 27.2 · 41.8 · 50.5). La narración quedó: chip rojo del informe suma forma+brecha
 ("+17% encendido — llega con más idea"), previa del Daily la nombra.
 
+### R4 — "Al favorito le juegan la final" — ✅ CERRADO (29-jul-2026)
+
+No estaba planificado: lo abrió el PO al cerrar la Odisea, con una orden de una línea
+("ataca los 6 pp"). **El techo había derivado 6.6pp** — BRA `--smart` 48.5% (n=4000)
+contra los 41.9 con que cerró R3 — mientras el piso mixto seguía clavado en 28.9. Los
+arcos de Rasgos, Progresión y la Odisea premiaron al DT que invierte, no subieron la
+dificultad general.
+
+**La ley que salió del sprint: NINGÚN DIAL GLOBAL PUEDE BAJAR EL TECHO.** Tres candidatos
+medidos a n=4000 antes de encontrar el que sirve:
+
+| Dial | Techo `--smart` | Piso mixto | Ratio |
+|---|---|---|---|
+| Afeitar los hooks del árbol −30% — *el dial que el arco de Rasgos dejó escrito* | 46.6 (−1.9) | 26.8 (−2.1) | 0.9:1 ❌ |
+| Forma de torneo +3%→+4%/ronda — *el que R3 midió en 40.6-41.0* | 45.2 (−3.3) | 25.2 (−3.7) | 0.9:1 ❌ |
+| Vara alta por ETAPA, +10% | 48.1 (−0.4) | 27.6 (−1.3) | 0.3:1 ❌ |
+| **Vara alta por NIVEL, +16%** | **42.05** (−6.5) | **27.55** (−1.4) | **4.6:1 ✓** |
+
+Los dos primeros hunden MÁS el piso que el techo, y no por mala suerte: el mismo % de
+poder rival le cuesta más win-rate al que ya venía peor, porque está en la parte empinada
+de su curva. Para mover el techo solo, la palanca tiene que **encenderse porque estoy
+fuerte** — es el "techo estructural del dial" de R3 visto desde el otro lado.
+
+**La palanca: el espejo de R3.** `identityGapMult` pasa a ser simétrica — al que llega con
+MENOS idea le pasan por encima (R3, intacto) y al que llega con MÁS le sale enfrente el
+mejor partido del torneo rival (`IDENTITY_LEAD_PCT` = +16%/nivel de ventaja).
+
+**Dos hallazgos que invalidaban supuestos de R3:**
+1. **La inmunidad del Consolidado YA NO EXISTÍA.** R3 la daba por construcción, pero desde
+   la Progresión llegar a Consolidada exige nivel 10 y el DT óptimo promedia **7.9** — o
+   sea que hoy el smart está en etapa 1 y *paga* la brecha como cualquiera.
+2. **Por eso la ventaja se mide en NIVELES y el castigo en ETAPAS.** En etapas el óptimo
+   (7.9) y el improvisador (5.7) están los dos en 1: empatados, la vara alta no se
+   encendería nunca (medido: −0.4pp). El ancla sale derivada de `FILO_LEVELS`.
+
+**Escalera de cierre** (n=4000, 2 corridas en los dos peldaños de arriba): recuperar
+**16.0** · entrenar **18.1** · mixto **27.8/27.3** · smart **42.2/41.9** · CPV 4.1 ≥3 ✓ ·
+KOR 19.9. Con `--focus`: BRA 47.9 → **41.4**, MAR 44.1 → **35.5**.
+
+**El mixto en ~27.5 no es daño colateral: PAGA LA DEUDA DE R3**, cuyo gate original era
+~25 y se re-pactó a 29-31 solo porque el dial de entonces no llegaba.
+
+**⚠️ Deuda abierta (NO causada por este sprint): el recuperador está en 16.0 contra la
+tesis del arco (10-15).** Medido con la palanca apagada da **17.0**, así que lo derivaron
+los arcos posteriores y esta recalibración lo empuja *hacia* la banda. Cerrarlo es su
+propio sprint — y ojo, la tesis "ganar sin jugar no tiene sentido" es la ley de este
+documento, así que la deuda es real.
+
 ## Riesgos declarados
 
 | Riesgo | Contención |
@@ -185,6 +233,12 @@ sano). **Escalera final del ARCO COMPLETO: 11.3 · 15.0 · 29.7 · 41.9** (pre-a
   solo KO, canal de poder); B descartada; el dial es la brecha misma (smart inmune a
   cualquier dosis); tolerancia del recuperador hasta ~9 sin re-diales. Gate: mixto 23-27
   con la escalera intacta. Sin implementar.
+- **29-jul-2026** — **R4 CERRADO** (sprint no planificado, orden del PO "ataca los 6 pp"):
+  el techo había derivado a 48.5 y volvió a **41.9-42.2** con la vara alta por nivel
+  (`IDENTITY_LEAD_PCT` +16%). Tres diales globales medidos y descartados: **ninguno puede
+  bajar el techo sin hundir más el piso**. El mixto quedó en ~27.5, pagando la deuda del
+  gate original de R3 (~25). Deuda nueva heredada, no causada: el recuperador en 16.0
+  contra la tesis 10-15.
 - **22-jul-2026 (quinquies)** — **R3 CERRADO y ARCO DEL REBALANCE COMPLETO**: brecha
   +4% con madurez desde 16avos; el dial topó su techo estructural (recuperador nivel 0
   paga siempre la brecha completa) y el gate del mixto se re-pactó a 29-31 con ok del

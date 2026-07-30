@@ -30,7 +30,6 @@ import { spriteSvg } from "../sprites.js";
 import { mountPitch } from "../pitch.js";
 import { renderGroupTableCard, renderKoInfoCard } from "./worldcup.js";
 import { renderScorersCard, wireScorersCard } from "./scorers.js";
-import { showFiloChange } from "../filo-change.js";
 
 /**
  * Figuras a mostrar del rival: las de mayor nota, sin duplicados y con un solo arquero.
@@ -167,10 +166,17 @@ function showScoutReport(oppId) {
         </div>
       </div>
       <div class="space-y-2 mt-4">
-        ${rep.modoMundial ? `<div class="rounded-xl border ${rep.modoMundial.brechaPct ? "border-red-500/60 bg-red-500/10" : "border-amber-500/60 bg-amber-500/10"} p-3">
-          <span class="font-semibold text-sm ${rep.modoMundial.brechaPct ? "text-red-300" : "text-amber-300"}">🔥 Modo Mundial: llega un +${rep.modoMundial.pct + rep.modoMundial.brechaPct}% encendido</span>
-          <p class="text-[11px] ${rep.modoMundial.brechaPct ? "text-red-200/70" : "text-amber-200/70"} mt-1">En eliminatorias los rivales suben con cada ronda — el Mundial de verdad se juega en finales.${rep.modoMundial.madura ? " Y a esta altura del torneo, su idea llega madurada: juega su fútbol en serio." : ""}${rep.modoMundial.brechaPct ? ` <b>Llega con más idea que nosotros (+${rep.modoMundial.brechaPct}% extra): a la final no se llega improvisando — consolidar nuestra identidad es la vacuna.</b>` : ""}</p>
-        </div>` : ""}
+        ${(mm => mm ? `<div class="rounded-xl border ${mm.brechaPct ? "border-red-500/60 bg-red-500/10" : "border-amber-500/60 bg-amber-500/10"} p-3">
+          <span class="font-semibold text-sm ${mm.brechaPct ? "text-red-300" : "text-amber-300"}">🔥 Modo Mundial: llega un +${mm.pct + mm.brechaPct}% encendido</span>
+          <p class="text-[11px] ${mm.brechaPct ? "text-red-200/70" : "text-amber-200/70"} mt-1">En eliminatorias los rivales suben con cada ronda — el Mundial de verdad se juega en finales.${mm.madura ? " Y a esta altura del torneo, su idea llega madurada: juega su fútbol en serio." : ""}${
+            // Las dos caras del mismo número. Antes el texto SIEMPRE decía "llega con más
+            // idea que nosotros", pero desde que existe la vara alta el extra también
+            // aparece cuando somos NOSOTROS los que llegamos con la idea armada — y ahí
+            // ese texto decía exactamente lo contrario de lo que pasa en la cancha.
+            !mm.brechaPct ? ""
+              : mm.lead ? ` <b>Nos tienen miedo (+${mm.brechaPct}% extra): saben a qué jugamos y van a dar el partido de su torneo. Al favorito nadie le juega de igual a igual.</b>`
+              : ` <b>Llega con más idea que nosotros (+${mm.brechaPct}% extra): a la final no se llega improvisando — consolidar nuestra identidad es la vacuna.</b>`}</p>
+        </div>` : "")(rep.modoMundial)}
         <div class="rounded-xl border tp-border tp-bg-soft p-3">
           <div class="flex items-center justify-between">
             <span class="font-semibold text-sm">${rep.filosofia.icon} Su idea: ${rep.filosofia.name}</span>
@@ -494,7 +500,12 @@ function teamStateCard(v, discipline, fueraDePuesto, forma) {
   // Clima de vestuario: la Moral modula la frecuencia de conflictos de la ventana (Sprint 2).
   if (mb.id === "suelo" || mb.id === "baja") avisos.push(`<div class="text-orange-400" title="La moral baja convulsiona el vestuario: más conflictos entre partidos">🎭 Vestuario caldeado: se vienen más conflictos</div>`);
   else if (mb.id === "nubes") avisos.push(`<div class="text-emerald-400" title="La moral alta serena el vestuario: menos conflictos entre partidos">🎭 Vestuario en paz: semana tranquila por delante</div>`);
-  return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 h-full flex flex-col">
+  // min-w-0: sin él la card hereda el piso `min-width:auto` de item de grilla y NO puede
+  // achicarse por debajo de su contenido mínimo. En escritorio no se nota (la columna mide
+  // 20rem), pero en una sola columna a 375px la card se plantaba en 379 y empujaba la
+  // página a 394 con scroll horizontal (medido con tools/mobile.html, 29-jul). Sus
+  // hermanas de la grilla ya lo llevan; a esta se le había escapado.
+  return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 h-full flex flex-col min-w-0">
     <div class="flex items-center justify-between mb-2.5 shrink-0">
       <h3 class="font-bold text-sm">👕 Estado del equipo</h3>
       <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Formación <b class="tp-text">${formationLabel}</b></span>
@@ -637,7 +648,7 @@ function renderHub(opts = {}) {
       </div>
 
       <!-- DERECHA: grupo (fijo) + goleadores (llena el resto) -->
-      <div class="flex flex-col gap-5">
+      <div class="flex flex-col gap-5 min-w-0">
         <div id="btn-standings2" class="cursor-pointer transition-transform hover:scale-[1.01] shrink-0" title="Ver el estado de todos los grupos">
           ${run.stage === "groups" ? renderGroupTableCard() : renderKoInfoCard()}
         </div>
@@ -713,8 +724,6 @@ function renderHub(opts = {}) {
       b.addEventListener("focus", () => { payoutEl.innerHTML = decodeURIComponent(b.dataset.payoff); });
       b.addEventListener("mouseleave", () => { payoutEl.innerHTML = payoutEl.dataset.default; });
     });
-    const filoBtn = $("#btn-filo-change");
-    if (filoBtn) filoBtn.onclick = () => showFiloChange(renderHub);
     const oppBtn = $("#da-opp");
     if (oppBtn) oppBtn.onclick = () => {
       const o = dayOpportunity(S.run);

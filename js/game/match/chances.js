@@ -241,7 +241,15 @@ export function resolveLastMan(m, key) {
   m.stats.oppTiros++; // remate rival contenido pero remate al fin (bug T3: no se contaba)
   const q = effStat(shooter, "tiro");
   const porQ = mine.por ? (effStat(mine.por, "atajadas", m.my.buffs) * 0.65 + effStat(mine.por, "reflejos", m.my.buffs) * 0.35) : 1;
-  const pGoal = clamp(0.18 + q * 0.06 - porQ * 0.05 - (dPow - 2.5) * 0.04, 0.05, 0.42);
+  // ODISEA (costura cerrada): LA PERSECUCIÓN TRAS ROBO. Contener es exactamente eso —
+  // "le da tiempo a la zaga", dice el relato: el último hombre aguanta mientras los demás
+  // vuelven corriendo. Si vuelven rápido, el remate llega achicado; si no llegan, el que
+  // se escapó define cómodo. El término está CENTRADO contra la velocidad del que corre,
+  // así el ritmo de gol no se mueve: lo que se mueve es QUIÉN paga las contras.
+  const pack = m.activeMine().filter(p => p !== def && p.pos !== "POR");
+  const chase = pack.length ? pack.reduce((s, p) => s + effStat(p, "velocidad", m.my.buffs), 0) / pack.length : effStat(def, "velocidad", m.my.buffs);
+  const piernas = (chase - effStat(shooter, "velocidad")) * 0.03;
+  const pGoal = clamp(0.18 + q * 0.06 - porQ * 0.05 - (dPow - 2.5) * 0.04 - piernas, 0.05, 0.42);
   if (rnd() < pGoal) return goalOpp(m, shooter);
   m.log("chance", `min ${m.clock()}' — ${def.name} CONTIENE y le da tiempo a la zaga; ${shooter.name} termina rematando sin ángulo y ${pick(["ataja el arquero", "la manda afuera", "pega en la defensa"])}.`);
   return false;

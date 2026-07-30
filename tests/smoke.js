@@ -101,11 +101,12 @@ function playMatch(run, oppId) {
   const ctx = { team: me, lineup, bench, mentalidad: "normal", buffs: { ...run.buffs }, moral: run.moral, filo: E.filoCtx(run), koRound: E.koRoundOf(run.stage) };
   const banned = run.rivalBans[oppId] || [];
   const match = new E.Match(ctx, opp, run.stage !== "groups", banned);
-  // Escalada R2 + brecha R3: el once rival lleva forma de torneo × castigo por brecha
-  // de identidad exactos para la ronda y MI nivel (×1 en grupos; smart llega Consolidado
-  // a KO y es inmune a la brecha por construcción — la tesis de R3 en un invariante).
+  // Escalada R2 + identidad (R3 + el dial del techo): el once rival lleva forma de torneo
+  // × el multiplicador de identidad exacto para la ronda y MI nivel — el castigo si llego
+  // con menos idea y la vara alta si llego con más (×1 en grupos, y ×1 en el partido parejo).
   const koR = E.koRoundOf(run.stage);
-  const formaEsperada = E.tourneyFormaMult(koR) * E.identityGapMult(opp, E.filoCtx(run)?.etapa, koR);
+  const fc = E.filoCtx(run);
+  const formaEsperada = E.tourneyFormaMult(koR) * E.identityGapMult(opp, fc?.etapa, koR, fc?.nivel);
   assert(match.oppLineup.every(p => Math.abs(p.forma - formaEsperada) < 1e-9), "la forma del rival cuadra con ronda y brecha", `${run.stage} → ${formaEsperada}`);
   // La suspensión por roja ajena es real: el suspendido no puede estar en el once rival
   for (const name of banned) assert(!match.oppLineup.some(p => p.name === name), "suspendido fuera del once rival", name);

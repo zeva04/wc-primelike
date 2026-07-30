@@ -3,7 +3,7 @@
    (docs/CORE.md §4-5). Sin estado, sin azar.
    ============================================================ */
 import { clamp } from "../../core/math.js";
-import { effectiveStat, playedPos, PASE_MIX } from "../ratings.js";
+import { effectiveStat, playedPos } from "../ratings.js";
 
 // Modificadores de la mentalidad táctica (en escala normalizada ~0-5)
 export const MENT_MOD = { defensiva: { atk: -0.5, def: +0.6 }, normal: { atk: 0, def: 0 }, ofensiva: { atk: +0.6, def: -0.5 } };
@@ -179,10 +179,11 @@ export function teamPowers(lineup, mentalidad, buffs) {
   const delP = act.filter(p => playedPos(p) === "DEL");
   const defP = act.filter(p => playedPos(p) === "DEF");
   const avg = (ps, k) => ps.length ? ps.reduce((s, p) => s + effStat(p, k, buffs), 0) / ps.length : 1;
-  // ODISEA (sprint 1): el poder del MEDIO sigue midiendo UN pase — la mezcla corto/largo de
-  // ratings.PASE_MIX. La segunda mitad del sprint decidirá si el atk del medio se calcula
-  // por tipo de circulación; cambiar esto AHORA movería el balance sin haberlo medido.
-  const avgPase = (ps) => avg(ps, "pase_corto") * PASE_MIX.pase_corto + avg(ps, "pase_largo") * PASE_MIX.pase_largo;
+  // ODISEA (costura cerrada): el atk del MEDIO es CIRCULACIÓN — lo mide `pase_corto` y
+  // nada más. Un mediocampo que ataca es el que sostiene la pelota y la hace circular
+  // cerca del área; el envío largo que rompe líneas ya tiene su sitio propio en el
+  // partido (actPass filtrado, actCross alto), no es lo que hace peligroso a un medio.
+  const avgPase = (ps) => avg(ps, "pase_corto");
   const auraAll = avg(act, "aura");
   // Calidad × bocas, línea por línea. El aura y el arquero NO llevan factor: no son
   // una línea (el aura es del equipo entero y el arquero es siempre uno).
