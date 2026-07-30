@@ -166,7 +166,10 @@ function playRun(teamId) {
   assert(run.identityPoints === 1, "elegir filosofía acredita el PI inicial", run.identityPoints);
   {
     const opciones = E.traitTree(run).filter(t => t.buyable);
-    assert(opciones.length === 3, "los 3 básicos de la filosofía están comprables al inicio", opciones.length);
+    // 3 en casi todas; 4 en el Bloque bajo, cuya Firma abre con dos básicos que
+    // convergen (rediseño del 30-jul-2026).
+    const basicos = E.traitsOf(run.filoId, "basic").length;
+    assert(opciones.length === basicos, "los básicos de la filosofía están comprables al inicio", `${opciones.length}/${basicos}`);
     const elegido = opciones[Math.floor(Math.random() * opciones.length)];
     assert(E.buyTrait(run, elegido.id), "el 1-de-3 del inicio se compra", elegido.id);
     assert(run.identityPoints === 0 && E.activeTraitIds(run).length === 1, "la compra cobra el PI");

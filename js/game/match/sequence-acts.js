@@ -15,7 +15,7 @@ import { rnd, pick } from "../../core/rng.js";
 import { playedPos } from "../ratings.js";
 import { sequenceType } from "../../content/sequences.js";
 import { protMomentum, noteFiloHit, familyOf } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
-import { hookOf, rollChain, chainMine, traitMoment, hasTrait } from "./trait-hooks.js"; // el árbol de rasgos (T1/T2)
+import { hookOf, hooksOf, rollChain, chainMine, traitMoment, hasTrait } from "./trait-hooks.js"; // el árbol de rasgos (T1/T2)
 import { effStat } from "./powers.js";
 import * as A from "./actions.js";
 import { goalMine, goalOpp, myPenalty, lastManChance } from "./chances.js";
@@ -67,6 +67,11 @@ export function buildActDecision(m) {
         // final y sin ir perdiendo — congelar ganando o empatando es fútbol; hacerlo
         // en el minuto 20 sería renunciar al partido.
         ...(canFreeze(m) ? [{ label: "🧊 Congelar el partido", hint: "Renuncias al remate: a cambio, el rival pierde su próxima llegada", key: "congelar" }] : []),
+        // PASE ATRÁS (Contra, avanzada): la jugada de finalización de la contra. Solo en
+        // SU familia — es el que llegó al fondo pisándola para el que entra de frente.
+        ...(hookOf(m, "squarePass") && familyOf(s.type) === "transicion"
+          ? [{ label: "🎯 Pase atrás", hint: `La pisa y la devuelve al que entra de frente (Pase corto ${s.prot.stats.pase_corto})`, key: "pase_atras" }]
+          : []),
       ],
     }),
     contain: () => ({
@@ -75,6 +80,13 @@ export function buildActDecision(m) {
       options: [
         { label: "🧍 Contener y esperar", hint: "Seguro: baja la peligrosidad", key: "contener" },
         { label: "🏃 Salir a presionar", hint: "Corta más, pero si falla queda mejor perfilado", key: "presionar" },
+        // PELOTAZO (Bloque, avanzada): "Reventar el Balón" — la tercera jugada NUEVA del
+        // catálogo, junto al Retroceso de La Trampa y el Congelar de Fríos. No se sortea:
+        // la elige el DT. Mata el ataque rival sin remate… y renuncia a todo lo que la
+        // contención podía darte (convertir, encadenar contra) — y a veces sale al córner.
+        ...(hookOf(m, "clearBall")
+          ? [{ label: "🚀 Reventar el balón", hint: "Mata la jugada sin remate: el rival empieza de nuevo desde atrás… o se lleva un córner", key: "reventar" }]
+          : []),
       ],
     }),
     press: () => ({
@@ -95,6 +107,12 @@ export function buildActDecision(m) {
       options: [
         { label: "🤜 Ir al choque", hint: `Cabezazo ${s.prot.stats.cabezazo} — ganarla es rematar de cabeza`, key: "choque" },
         { label: "🪶 Peinarla al espacio", hint: "Prolonga para un compañero lanzado: más letal, más difícil", key: "peinar" },
+        // HOMBRE OBJETIVO (Bloque, Master): "Pivoteo al Área". El que gana por arriba no
+        // remata: la aguanta de espaldas y la BAJA para el mejor rematador, que llega de
+        // frente al arco. Tampoco se sortea — es una decisión del DT.
+        ...(hookOf(m, "pivot")
+          ? [{ label: "🎯 Pivotear al área", hint: "La aguanta de espaldas y la baja al mejor rematador, de frente al arco", key: "pivotear" }]
+          : []),
       ],
     }),
     setpiece: () => {
@@ -268,8 +286,18 @@ export function resolveSequenceAct(m, key) {
   }
 
   if (kind === "carry") {
+    // SEGUNDO AIRE (Contra, avanzada): conducir la contra con el tanque vacío deja de
+    // ser una condena — el que corre fundido llega igual. SKILLER (Master): al que
+    // conduce la contra no lo frenan limpio, así que la falta rival es más probable.
+    const legs = hookOf(m, "tiredLegs");
+    const tiredBonus = legs && familyOf(s.type) === "transicion" && (s.prot.energia ?? 100) < legs.under ? legs.bonus : 0;
+    const sk = hookOf(m, "counterFouls");
+    const foulPlus = sk && familyOf(s.type) === "transicion" ? sk.plus : 0;
     if (key === "conducir") {
-      const r = A.actDribble(m, s.prot, { bonus: s.type.advFor === "contra" && s.actIdx === 1 ? s.type.adv.carryEase : 0 });
+      const r = A.actDribble(m, s.prot, { foulPlus,
+        bonus: tiredBonus + (s.type.advFor === "contra" && s.actIdx === 1 ? s.type.adv.carryEase : 0) });
+      if (tiredBonus && rnd() < 0.3) traitMoment(m, legs.traitId, [legs.texto]);
+      if (r.foul && sk && foulPlus && rnd() < 0.4) traitMoment(m, sk.traitId, [sk.texto]);
       if (r.foul) {
         // GEOGRAFÍA de la falta en el Contragolpe letal (M2): en el primer tramo (lejos
         // del área) es la falta desesperada — amarilla + tiro libre encadenado; en el
@@ -308,17 +336,33 @@ export function resolveSequenceAct(m, key) {
       // que la transición simple); el 1er tramo profundo era el rasgo F2 de Consolidada —
       // desde T2 lo compra La Trampa Cerrada (migración al árbol).
       s.bonus += (s.type.advFor === "contra" ? s.type.adv.carryBonus[Math.min(s.actIdx, 1)] : 0.05)
-        + (s.type.advFor === "contra" && s.actIdx === 0 && hasTrait(m, "trampa_cerrada") ? s.type.adv.deepBonus : 0);
+        + (s.type.advFor === "contra" && s.actIdx === 0 && hasTrait(m, "ataque_relampago") ? s.type.adv.deepBonus : 0);
       m.log("plain", `min ${m.clock()}' — ${f.carryOk(s.prot)}`);
       dtOk(m);
     } else {
       // Pase al pie: seguro, siempre progresa. En el Contragolpe letal (M2) TAMBIÉN gana
       // metros de verdad (adv.passBonus): con el rival partido, el pase al pie es progreso.
-      s.bonus += s.type.advFor === "contra" ? s.type.adv.passBonus[Math.min(s.actIdx, 1)] : 0.02;
+      s.bonus += (s.type.advFor === "contra" ? s.type.adv.passBonus[Math.min(s.actIdx, 1)] : 0.02) + tiredBonus;
+      if (tiredBonus && rnd() < 0.3) traitMoment(m, legs.traitId, [legs.texto]);
       const pasador = s.prot;
       m.log("plain", passTo(m, s) // el pase al pie también se desprende de la pelota
         ? `min ${m.clock()}' — ${pasador.name} la juega al pie y ${s.prot.name} toma la posta.`
         : `min ${m.clock()}' — ${f.carryOk(s.prot)}`);
+    }
+    // EL PASE DE LA CONTRA. Tres rasgos de dos filosofías lo trabajan y se APILAN:
+    // Primer Pase (Contra, solo el acto que la lanza — `act: "first"`), Primera Marcha
+    // (Contra, cualquier acto) y Salida Vertical (Bloque, cualquier acto). El momento
+    // se narra una sola vez por acto aunque sumen varios.
+    let tpBonus = 0, tpVoz = null;
+    for (const tp of hooksOf(m, "transitionPass")) {
+      if (familyOf(s.type) !== "transicion") break;
+      if (tp.act === "first" && s.actIdx !== 0) continue;
+      tpBonus += tp.bonus;
+      tpVoz = tpVoz || tp;
+    }
+    if (tpBonus) {
+      s.bonus += tpBonus;
+      if (rnd() < 0.3) traitMoment(m, tpVoz.traitId, [tpVoz.texto]);
     }
     return escalate(m);
   }
@@ -363,13 +407,17 @@ export function resolveSequenceAct(m, key) {
     // Pelotazo: choque = gana y remata ÉL de cabeza; peinar = prolonga a un lanzado (más
     // letal, más difícil de ganar). El Cabezazo por fin decide jugadas.
     const winner = s.prot;
-    const r = A.actAerial(m, s.prot, { handicap: key === "peinar" ? 0.08 : 0 });
+    // El pivoteo es más difícil que el choque frontal (hay que aguantar de espaldas)
+    // pero menos que la peinada al espacio: la pelota se baja, no se prolonga.
+    const pv = key === "pivotear" ? hookOf(m, "pivot") : null;
+    const risky = key === "peinar" || !!pv;   // las dos opciones de riesgo cobran el fallo
+    const r = A.actAerial(m, s.prot, { handicap: key === "peinar" ? 0.08 : pv ? 0.05 : 0 });
     if (!r.ok) {
       // La fortaleza castiga (M2): el pelotazo del castigo que la zaga rival despeja
       // apurada, de espaldas a su arco, un % de las veces muere en CÓRNER ganado —
       // balón parado encadenado. La fortaleza casi siempre saca algo.
       if (s.cornerOnDuelFail && rnd() < s.cornerOnDuelFail) {
-        if (key === "peinar") dtFail(m);
+        if (risky) dtFail(m);
         noteCorner(m, "mine"); noteMomentum(m, "corner");   // córner ganado de verdad
         m.log("chance", `min ${m.clock()}' — ${sequenceType("fortaleza").flavor.cornerText}`);
         return chainSetPiece(m, 0.02);
@@ -379,17 +427,29 @@ export function resolveSequenceAct(m, key) {
       // T2 — Plataforma la sube de calidad: posición establecida, con su propia voz.
       const sj = rollChain(m, "chainOnDuelFail");
       if (sj) {
-        if (key === "peinar") dtFail(m);
+        if (risky) dtFail(m);
         m.log("chance", `min ${m.clock()}' — ${f.duelFail}`);
         const up = hookOf(m, "secondBallUpgrade");
         return chainMine(m, sj.to, { bonus: sj.bonus + (up?.bonus || 0), intro: up?.intro || sj.intro, buildDecision: buildActDecision }) ? false : closeSilent(m);
       }
       const out = closeSeq(m, "chance", `min ${m.clock()}' — ${f.duelFail}`);
-      if (key === "peinar") dtFail(m);
+      if (risky) dtFail(m);
       return out;
     }
     m.log("event", `min ${m.clock()}' — ${f.duelOk(winner)}`);
-    if (key === "peinar") {
+    if (pv) {
+      // La bajada: la pelota cambia de pies hacia el MEJOR rematador de los que llegan
+      // (mismo criterio que Superioridad Numérica) y el remate es de frente, no de cabeza.
+      const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
+      if (mates.length) {
+        s.assistFrom = winner;
+        s.prot = [...mates].sort((a, b) => (b.stats.tiro || 0) - (a.stats.tiro || 0))[0];
+      }
+      s.finishStat = "tiro";
+      s.bonus += pv.bonus;
+      traitMoment(m, pv.traitId, [pv.texto]);
+      dtOk(m);
+    } else if (key === "peinar") {
       const runners = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
       if (runners.length) s.prot = m._weightedPick(runners, runners.map(p => playedPos(p) === "DEL" ? 3 : 1));
       s.assistFrom = winner; // la peinada es la asistencia si el lanzado convierte
@@ -494,12 +554,12 @@ export function resolveSequenceAct(m, key) {
     // T1 — Pausa: en el desenlace de la circulación, la aceleración súbita — el
     // rival dormido por el tempo no llega al cierre (mejor perfil, relato propio).
     // Por FAMILIA: la sinfonía también acelera (hallazgo del gate T1).
-    const acc = hookOf(m, "accelFinish");
-    if (acc && familyOf(s.type) === acc.of && rnd() < acc.p) { s.bonus += acc.bonus; m.log("event", `min ${m.clock()}' — ${acc.intro(s.prot)}`); }
+    const acc = hookOf(m, "accelFinish", familyOf(s.type));
+    if (acc && !s.oneOnOne && rnd() < acc.p) { s.bonus += acc.bonus; s.oneOnOne = true; m.log("event", `min ${m.clock()}' — ${acc.intro(s.prot)}`); }
     // T2 — Arco a la Vista: si la jugada nació en su variante profunda (la asfixia
     // sobre el saque de meta), el desenlace llega a quemarropa.
-    const df = hookOf(m, "deepFinish");
-    if (df && s.deepVariant && familyOf(s.type) === df.of) { s.bonus += df.bonus; traitMoment(m, df.traitId, [df.texto]); }
+    const df = hookOf(m, "deepFinish", familyOf(s.type));
+    if (df && s.deepVariant) { s.bonus += df.bonus; traitMoment(m, df.traitId, [df.texto]); }
     // T3 — A Campo Abierto: la avalancha llega al desenlace de toda la familia de la
     // contra — la defensa no sabe a quién marcar.
     const av = hookOf(m, "avalancha");
@@ -508,11 +568,21 @@ export function resolveSequenceAct(m, key) {
     // define mejor — el robo YA es creación.
     const mp = hookOf(m, "masterPress");
     if (mp && familyOf(s.type) === "recuperacion") { s.bonus += mp.bonus; if (rnd() < 0.4) traitMoment(m, mp.traitId, [mp.texto]); }
-    // T3 — Uno a Cero (Master, rasgo de ESTADO): con VENTAJA, el castigo directo gana
-    // letalidad — perdiendo no aporta nada (pura identidad).
-    const mb = hookOf(m, "masterBloque");
-    if (mb && m.gMy > m.gOpp && familyOf(s.type) === "pelotazo") { s.bonus += mb.myBonus; if (rnd() < 0.3) traitMoment(m, mb.traitId, [mb.texto]); }
     const stat = s.finishStat || f.finishStat;
+    // PASE ATRÁS (Contra): el que llegó no remata — la pisa y la devuelve al que entra
+    // de frente al arco. Es un pase de VERDAD (se puede perder, y perderla ahí abre
+    // contra); a cambio, el remate que sigue llega servido y de frente.
+    if (key === "pase_atras") {
+      const sq = hookOf(m, "squarePass");
+      const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
+      const mate = mates.length ? [...mates].sort((a, b) => (b.stats.tiro || 0) - (a.stats.tiro || 0))[0] : s.prot;
+      const pass = A.actPass(m, s.prot);
+      if (!pass.ok) return maybeCounter(m, `min ${m.clock()}' — ${s.prot.name} la pisa y la devuelve atrás, pero la corta un rival que volvió.`, true);
+      traitMoment(m, sq.traitId, [sq.texto]);
+      const shot = A.actShot(m, mate, { stat: "tiro", bonus: s.bonus + f.finishBonus + sq.bonus });
+      if (shot.ok) { goalMine(m, mate, "¡La empujó de frente tras el pase atrás!", s.prot); return closeSilent(m); }
+      return maybeRebound(m, `min ${m.clock()}' — ${mate.name} entra de frente pero su remate se va.`);
+    }
     if (key === "asistir") {
       const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
       // T2 — Superioridad Numérica: en la familia de la contra, el pase elige al MEJOR
@@ -531,11 +601,11 @@ export function resolveSequenceAct(m, key) {
       // T1 — Correr en Manada: en la contra, el "buscar al mejor ubicado" encuentra
       // superioridad de verdad — la definición llega con dos camisetas libres.
       // Por FAMILIA: el contragolpe letal también corre en manada (gate T1).
-      const sup = hookOf(m, "finishSupport");
-      const supBonus = (sup && familyOf(s.type) === sup.of ? sup.bonus : 0) + (numeric ? supUp.bonus : 0);
+      const sup = hookOf(m, "finishSupport", familyOf(s.type));
+      const supBonus = (sup ? sup.bonus : 0) + (numeric ? supUp.bonus : 0);
       // La voz: Superioridad (si la hay) pisa a la de la Manada — un momento, no dos.
       if (numeric) traitMoment(m, supUp.traitId, [supUp.texto]);
-      else if (sup && familyOf(s.type) === sup.of) traitMoment(m, sup.traitId, [sup.texto]);
+      else if (sup) traitMoment(m, sup.traitId, [sup.texto]);
       const shot = A.actShot(m, mate, { stat: "tiro", bonus: s.bonus + f.finishBonus + 0.04 + supBonus });
       if (shot.ok) { goalMine(m, mate, "¡Definición tras la asistencia!", s.prot); return closeSilent(m); }
       return maybeRebound(m, `min ${m.clock()}' — ${mate.name} no logra conectar el remate.`);
@@ -559,9 +629,7 @@ export function resolveSequenceAct(m, key) {
     // T2 — Pelota Parada Ensayada: la pizarra entra en acción — ambas opciones llegan
     // mejor ensayadas (bonus de situación) y el momento se narra una vez por jugada.
     const sr = hookOf(m, "setpieceRehearsed");
-    // T3 — Uno a Cero (Master): con ventaja, también el balón parado castiga más.
-    const mbSp = hookOf(m, "masterBloque");
-    const srB = (sr ? sr.bonus : 0) + (mbSp && m.gMy > m.gOpp ? mbSp.myBonus : 0);
+    const srB = sr ? sr.bonus : 0;
     if (sr && !s.rehearsedTold) { s.rehearsedTold = true; traitMoment(m, sr.traitId, [sr.texto]); }
     if (key === "centro") {
       const t = s.target || s.prot;
@@ -581,11 +649,12 @@ export function resolveSequenceAct(m, key) {
     // T3 — Contragolpe Total (Master): la contra también nace del córner rival —
     // el momento más improbable del catálogo, comprado con toda la doctrina.
     const { mine } = m.powers();
+    // Dos filosofías encadenan desde acá hacia jugadas distintas (Atentos lanza el
+    // pelotazo del Bloque · Defensa Intencionada lanza la contra): rollChain las tira
+    // a las dos, así tener las dos da las dos chances.
     const chainDS = () => {
       const ds = rollChain(m, "chainOnDefendSp");
-      if (ds) return chainMine(m, ds.to, { bonus: ds.bonus, intro: ds.intro, buildDecision: buildActDecision });
-      const mc = rollChain(m, "masterContra");
-      return mc ? chainMine(m, "transicion", { bonus: mc.bonus, intro: mc.intro, buildDecision: buildActDecision }) : false;
+      return ds ? chainMine(m, ds.to, { bonus: ds.bonus, intro: ds.intro, buildDecision: buildActDecision }) : false;
     };
     if (key === "salir") {
       const r = A.actContain(m, mine, { press: true, bonus: 0.06 });
@@ -596,11 +665,11 @@ export function resolveSequenceAct(m, key) {
         return closeSilent(m);
       }
       dtFail(m);
-      const shot = A.actOppShot(m, s.shooter, mine, { stat: "cabezazo", bonus: 0.08 + frustMalus(m) + leadMalus(m) });
+      const shot = A.actOppShot(m, s.shooter, mine, { stat: "cabezazo", bonus: 0.08 + oppShotBlockMalus(m, { aerial: true }) });
       if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
       return closeSeq(m, "chance", `min ${m.clock()}' — ¡${s.shooter.name} cabecea SOLO pero ${mine.por ? mine.por.name : "el arquero"} la saca de milagro!`);
     }
-    const shot = A.actOppShot(m, s.shooter, mine, { stat: "cabezazo", bonus: -0.05 + frustMalus(m) + leadMalus(m) }); // área poblada
+    const shot = A.actOppShot(m, s.shooter, mine, { stat: "cabezazo", bonus: -0.05 + oppShotBlockMalus(m, { aerial: true }) }); // área poblada
     if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
     m.log("chance", `min ${m.clock()}' — la zona aguanta: el cabezazo de ${s.shooter.name} ${pick(["se va desviado", "muere en las manos del arquero", "lo saca la defensa"])}.`);
     noteOppDead(m);
@@ -613,10 +682,10 @@ export function resolveSequenceAct(m, key) {
     // letal… o CONVIERTE la secuencia en una transición mía (la misma jugada sigue).
     if (key === "despeje") {
       const out = closeSeq(m, "plain", `min ${m.clock()}' — ${f.playoutSafe}`);
-      // T3 — Contragolpe Total (Master): hasta el despeje de la salida asfixiada
-      // puede ser el inicio de una contra (cualquier balón, cualquier zona).
-      const mc = rollChain(m, "masterContra");
-      if (mc && chainMine(m, "transicion", { bonus: mc.bonus, intro: mc.intro, buildDecision: buildActDecision })) return false;
+      // SAQUE RÁPIDO (Contra): reventarla ya no es rendirse — el equipo reinicia antes
+      // de que el rival se acomode y la jugada muerta sale corriendo para el otro lado.
+      const qr = rollChain(m, "quickRestart");
+      if (qr && chainMine(m, "transicion", { bonus: qr.bonus, intro: qr.intro, buildDecision: buildActDecision })) return false;
       return out;
     }
     const r = A.actPass(m, s.prot, { hard: true });
@@ -629,7 +698,7 @@ export function resolveSequenceAct(m, key) {
       m.log("chance", `min ${m.clock()}' — ${f.playoutFail(s.prot)}`);
       dtFail(m);
       const { mine } = m.powers();
-      const shot = A.actOppShot(m, s.shooter, mine, { bonus: 0.12 });
+      const shot = A.actOppShot(m, s.shooter, mine, { bonus: 0.12 + oppShotBlockMalus(m) });
       if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
       return closeSeq(m, "chance", `min ${m.clock()}' — ${s.shooter.name} remata el regalo pero ${mine.por ? mine.por.name : "el arquero"} responde. Se salvaron.`);
     }
@@ -646,6 +715,19 @@ export function resolveSequenceAct(m, key) {
   }
 
   if (kind === "contain") {
+    // PELOTAZO (Bloque): REVENTAR EL BALÓN. La jugada rival muere sin remate — el precio
+    // es doble: se resigna todo lo que la contención podía dar (la fortaleza que convierte,
+    // la contra que encadena) y `p` de las veces el despeje apurado sale al córner.
+    if (key === "reventar") {
+      const cb = hookOf(m, "clearBall");
+      traitMoment(m, cb.traitId, [cb.texto]);
+      if (rnd() < cb.p) {
+        m.log("chance", `min ${m.clock()}' — el despeje sale apurado y se va al CÓRNER de ${m.oppTeam.name}.`);
+        return chainOppCorner(m);
+      }
+      noteOppDead(m);   // el ataque rival murió: alimenta la frustración como cualquier otro
+      return closeSeq(m, "event", `min ${m.clock()}' — 🚀 La revientan lejos del área: ${m.oppTeam.name} tiene que armar todo otra vez desde atrás.`);
+    }
     const { mine } = m.powers();
     const fortaleza = s.type.advFor === "bloque"; // la avanzada del Bloque (M2)
     // La contención profunda de la fortaleza era el rasgo F2 de Consolidada — desde T2
@@ -653,12 +735,18 @@ export function resolveSequenceAct(m, key) {
     // ODISEA: replegar es LLEGAR — la velocidad media de mi línea de fondo entra al corte.
     const zaga = m.activeMine().filter(p => playedPos(p) === "DEF");
     const chase = zaga.length ? zaga.reduce((a, p) => a + effStat(p, "velocidad", m.my.buffs), 0) / zaga.length : null;
-    const r = A.actContain(m, mine, { press: key === "presionar", chase, bonus: fortaleza && hasTrait(m, "duenos_area") ? s.type.adv.deepContain : 0 });
+    // ESTÓICOS (Contra, básica): replegado, el equipo aguanta lo que le tiren — la
+    // contención del bloque corta más ("en Bloque Bajo" = cuando el equipo se repliega,
+    // decisión PO 30-jul: no la filosofía homónima ni la mentalidad).
+    const est = hookOf(m, "containBonus");
+    const r = A.actContain(m, mine, { press: key === "presionar", chase,
+      bonus: (est ? est.bonus : 0) + (fortaleza && hasTrait(m, "area_blindada") ? s.type.adv.deepContain : 0) });
+    if (est && r.ok && rnd() < 0.2) traitMoment(m, est.traitId, [est.texto]);
     if (r.ok) {
       // La fortaleza CASTIGA (M2): la contención exitosa convierte — pelotazo inmediato
       // con el rival desarmado (def→of, el patrón de la salida bajo presión). El convert
       // profundo era el rasgo F2 de Consolidada — desde T2 lo compra Dueños del Área.
-      if (fortaleza && rnd() < (hasTrait(m, "duenos_area") ? s.type.adv.convertDeep : s.type.adv.convert)) {
+      if (fortaleza && rnd() < (hasTrait(m, "area_blindada") ? s.type.adv.convertDeep : s.type.adv.convert)) {
         if (r.press) dtOk(m);
         m.log("event", `min ${m.clock()}' — ${f.convertText(m.oppTeam)}`);
         const t = sequenceType("pelotazo");
@@ -688,6 +776,9 @@ export function resolveSequenceAct(m, key) {
       traitMoment(m, of.traitId, [of.texto]);
       return closeSilent(m);
     }
+    // FORTALEZA INEXPUGNABLE (Bloque, Master): la OCASIÓN CLARA que no ocurre. Antes de
+    // que la contención rota se vuelva mano a mano, apareció el que tenía que aparecer.
+    if (clearChanceGuarded(m)) return closeSilent(m);
     // ABSORCIÓN DEL ÚLTIMO HOMBRE (Sprint A2, decisión PO #7): buena parte de las
     // contenciones rotas terminan en el mano a mano con MI central — la decisión
     // `last_man` del Sprint 1, con su calibración INTACTA (lastManChance/resolveLastMan
@@ -701,14 +792,12 @@ export function resolveSequenceAct(m, key) {
   // T1 — Jaula Central: el remate del repliegue llega INCÓMODO (la jaula lo empujó
   // a la banda: la situación es peor, no mi arquero mejor — el canal finishBonus).
   // Por FAMILIA: la fortaleza también encierra (gate T1).
-  const jl = hookOf(m, "oppShotMalus");
-  const malus = jl && familyOf(s.type) === jl.seq ? jl.bonus : 0;
-  // T3 — La Fortaleza: la FRUSTRACIÓN acumulada degrada el remate rival (por tiro
-  // errado hasta hoy, con tope) — cuanto más ataca sin premio, peor define.
-  // T3 — Uno a Cero (Master): con ventaja, la muralla se amplifica.
-  const frust = frustMalus(m);
-  const lead = leadMalus(m);
-  const r = A.actOppShot(m, s.shooter, mine, { bonus: s.bonus + malus + frust + lead });
+  const jl = hookOf(m, "oppShotMalus", familyOf(s.type));
+  const malus = jl ? jl.bonus : 0;
+  // BLOQUE BAJO: todo lo que el árbol le hace a este remate — la frustración acumulada,
+  // la muralla mientras el marcador aguanta, el área blindada y la primera ocasión del
+  // partido contra la defensa escalonada (ver oppShotBlockMalus).
+  const r = A.actOppShot(m, s.shooter, mine, { bonus: s.bonus + malus + oppShotBlockMalus(m) });
   if (r.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
   const out = closeSeq(m, "chance", `min ${m.clock()}' — ${s.shooter.name} remata pero ${pick([`ataja ${mine.por ? mine.por.name : "el arquero"}`, "se va afuera", "la bloquea la zaga"])}.`);
   if (malus && rnd() < 0.4) traitMoment(m, jl.traitId, [jl.texto]); // el momento se narra a veces (sin spamear)
@@ -738,10 +827,69 @@ function noteOppDead(m) {
   if (fr && frustMalus(m) <= -0.05 && rnd() < 0.25) traitMoment(m, fr.traitId, [fr.texto]);
 }
 
-/** T3 — Uno a Cero (Master, ESTADO): con ventaja en el marcador, la muralla se amplifica. */
-function leadMalus(m) {
-  const mb = hookOf(m, "masterBloque");
-  return mb && m.gMy > m.gOpp ? mb.oppMalus : 0;
+/* ---------- LO QUE EL BLOQUE LE HACE AL REMATE RIVAL (rediseño 30-jul-2026) ----------
+   Cuatro nodos del árbol nuevo empeoran la SITUACIÓN del remate rival (jamás mejoran a
+   mis jugadores: la ley del arco). Se suman por el mismo canal —el bonus de actOppShot—
+   y se piden juntos en los tres sitios donde el rival remata contra mi bloque: el
+   desenlace del repliegue (clear), el córner en contra (defend_sp) y el regalo de la
+   salida asfixiada. `aerial` suma el dominio aéreo solo donde se cabecea. */
+function oppShotBlockMalus(m, { aerial = false } = {}) {
+  return frustMalus(m) + wallMalus(m) + boxMalus(m) + firstChanceMalus(m) + (aerial ? aerialMalus(m) : 0);
+}
+
+/** MURALLA (avanzada, ESTADO): mientras el marcador no vaya en contra —empatado O
+ *  ganando, decisión PO— la zaga no se mueve. Perdiendo no aporta nada: pura identidad. */
+function wallMalus(m) {
+  const w = hookOf(m, "wall");
+  return w && m.gMy >= m.gOpp ? w.bonus : 0;
+}
+
+/** ÁREA BLINDADA (intermedia): el remate rival DENTRO del área sale a destiempo. */
+const boxMalus = m => hookOf(m, "boxShield")?.bonus || 0;
+
+/** DOMINIO AÉREO (básica): por arriba no se les gana — el cabezazo rival llega forzado. */
+const aerialMalus = m => hookOf(m, "aerialDef")?.bonus || 0;
+
+/**
+ * DEFENSA ESCALONADA (avanzada): la PRIMERA ocasión rival del partido —la que llega con
+ * el equipo todavía leyendo al rival— se encuentra con la segunda línea ya puesta. Se
+ * consume una sola vez por partido: la función es IMPURA a propósito (marca y narra el
+ * momento al gastarlo), como el contador de frustración que vive al lado.
+ */
+function firstChanceMalus(m) {
+  const h = hookOf(m, "firstChanceGuard");
+  if (!h || m._escalonadaUsada) return 0;
+  m._escalonadaUsada = true;
+  traitMoment(m, h.traitId, [h.texto]);
+  return h.bonus;
+}
+
+/**
+ * FORTALEZA INEXPUGNABLE (Master): ¿esta OCASIÓN CLARA rival directamente no ocurre? Los
+ * dos canales por los que el rival llega solo frente al arco —el mano a mano tras la
+ * contención rota y la contra tras mi pérdida— pueden morir contra el que llegó a cubrir.
+ */
+function clearChanceGuarded(m) {
+  const cg = hookOf(m, "clearChanceGuard");
+  if (!cg || rnd() >= cg.p) return false;
+  traitMoment(m, cg.traitId, [cg.texto]);
+  return true;
+}
+
+/**
+ * El CÓRNER que se regala al reventar el balón: la misma jugada sigue como balón parado
+ * EN CONTRA (espejo de chainSetPiece, del otro lado). El cabeceador rival es su mejor
+ * cabezazo en cancha, igual que cuando el córner nace del generador.
+ */
+function chainOppCorner(m) {
+  const t = sequenceType("balon_parado_def");
+  const alive = m.oppLineup.filter(p => !p.expulsado && p.pos !== "POR");
+  const shooter = alive.sort((a, b) => (b.stats.cabezazo || 0) - (a.stats.cabezazo || 0))[0] || pick(m.oppLineup);
+  noteCorner(m, "opp"); noteMomentum(m, "corner", "opp");
+  m.seq = { type: t, shooter, actIdx: 0, bonus: 0 };
+  m.log("event", `${t.icon} min ${m.clock()}' — ${t.flavor.intro(m.oppTeam)}`);
+  buildActDecision(m);
+  return false;
 }
 
 /**
@@ -820,6 +968,10 @@ function maybeCounter(m, failText, risky = false) {
   // significa sostener una línea adelantada.
   const ot = hookOf(m, "offsideTrap");
   if (ot && rnd() < ot.p) { traitMoment(m, ot.traitId, [ot.texto]); return closeSilent(m); }
+  // FORTALEZA INEXPUGNABLE (Bloque): el otro canal de la ocasión clara — la contra que
+  // nace de mi pérdida. El espejo defensivo de lo que la trampa del offside hace en
+  // Posesión: la jugada más peligrosa del rival muere antes de existir.
+  if (clearChanceGuarded(m)) return closeSilent(m);
   // La mitad de las contras terminan en el mano a mano del último hombre (absorción A2,
   // calibración del Sprint 1 intacta); la otra mitad, en remate directo del que se escapó.
   if (rnd() < LASTMAN_FROM_COUNTER && lastManChance(m)) { closeSilent(m); return true; }

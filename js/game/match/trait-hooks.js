@@ -52,9 +52,27 @@ export function traitHooks(m) {
   return (m._traitHooks = out);
 }
 
-/** El primer hook `name` (T1: no hay apilados) o null. */
-export function hookOf(m, name) {
-  return traitHooks(m)[name]?.[0] || null;
+/**
+ * El hook `name` activo, o null.
+ *
+ * `family` (rediseño del Contra, 30-jul-2026) DESAMBIGUA las builds híbridas: varios
+ * hooks son "de una jugada" (`of`/`seq`: skipToFinish de la transición, variantDeep de
+ * la recuperación, oppShotMalus del repliegue…) y con las 4 filosofías rediseñadas un
+ * DT puede tener dos rasgos que declaran el mismo hook para jugadas DISTINTAS. Sin
+ * este filtro ganaba siempre el primero comprado y el otro rasgo quedaba mudo.
+ * Pasando la familia se devuelve EL de esa jugada; sin ella, el primero (los hooks
+ * que no son de jugada — backPass, iceGame, wall… — siguen igual).
+ */
+export function hookOf(m, name, family) {
+  const list = traitHooks(m)[name];
+  if (!list?.length) return null;
+  if (family === undefined) return list[0];
+  return list.find(h => (h.of ?? h.seq) === family) || null;
+}
+
+/** Todos los hooks `name` activos (los que se APILAN: transitionPass, pressStamina). */
+export function hooksOf(m, name) {
+  return traitHooks(m)[name] || [];
 }
 
 /** ¿El DT compró este rasgo? — EL GATE DE LA MIGRACIÓN F2 (T2): donde antes
@@ -72,12 +90,19 @@ export function hasTrait(m, traitId) {
  * El Robo es el Pase suma chainPlus a la p de Morder).
  */
 export function rollChain(m, name, pPlus = 0) {
-  const h = hookOf(m, name);
-  if (!h) return null;
+  const list = hooksOf(m, name);
+  if (!list.length) return null;
   if ((m._chainCount || 0) >= MAX_CHAINS) return null;
-  if (rnd() >= h.p + pPlus) return null;
-  m._chainCount = (m._chainCount || 0) + 1;
-  return h;
+  // Se tiran TODOS los rasgos que declaren esta cadena, en orden de compra, hasta que
+  // uno enganche (rediseño del Contra): dos filosofías pueden encadenar desde el mismo
+  // sitio hacia jugadas distintas —el córner defendido lanza pelotazo en el Bloque y
+  // contra en el Contragolpe— y tenerlas las dos debe dar las dos chances, no una.
+  for (const h of list) {
+    if (rnd() >= h.p + pPlus) continue;
+    m._chainCount = (m._chainCount || 0) + 1;
+    return h;
+  }
+  return null;
 }
 
 /**

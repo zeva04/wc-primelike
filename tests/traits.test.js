@@ -14,20 +14,23 @@ const { Engine: E } = await loadEngine();
 let fails = 0, checks = 0;
 const assert = (cond, msg, ctx) => { checks++; if (!cond) { fails++; console.error("FAIL:", msg, ctx ?? ""); } };
 
-// Las filosofías cuyo árbol YA se rediseñó (grafo con `pos` y bifurcaciones).
-// Las demás siguen con la grilla 3×3 del arco T1-T3 y sus reglas de forma.
-const REDISENADAS = ["press", "posesion"];
+// LAS CUATRO filosofías están rediseñadas (Press 25-jul · Posesión 26-jul · Bloque y
+// Contra 30-jul): todos los árboles son GRAFOS con `pos` y bifurcaciones. La grilla
+// 3×3 del arco T1-T3 quedó sin usuarios — sus reglas de forma murieron con ella.
+const REDISENADAS = ["press", "posesion", "bloque", "contra"];
 
 // ---------- catálogo ----------
 {
   const basics = E.TRAITS.filter(t => t.tier === "basic");
-  assert(basics.length === 12, "12 rasgos Basic (3 por filosofía)", basics.length);
+  // 13 y no 12: el rediseño del Bloque (30-jul-2026) abre su Firma con DOS básicos
+  // —compactar por dentro y poblar la zona— que convergen en el Área Blindada.
+  assert(basics.length === 13, "13 rasgos Basic (3 por filosofía; 4 en el Bloque)", basics.length);
   assert(new Set(E.TRAITS.map(t => t.id)).size === E.TRAITS.length, "ids únicos en el catálogo");
   for (const filo of ["press", "posesion", "contra", "bloque"]) {
     const own = E.traitsOf(filo, "basic");
-    assert(own.length === 3, `${filo} tiene 3 básicos`, own.length);
-    // Regla Firma · Respuesta · Expansión: cada básico abre una rama distinta
-    assert(new Set(own.map(t => t.rama)).size === 3, `${filo}: un básico por rama`, own.map(t => t.rama).join(","));
+    assert(own.length === (filo === "bloque" ? 4 : 3), `${filo} tiene sus básicos`, own.length);
+    // Regla Firma · Respuesta · Expansión: SIEMPRE hay un básico que abre cada rama
+    assert(new Set(own.map(t => t.rama)).size === 3, `${filo}: las tres ramas nacen de un básico`, own.map(t => t.rama).join(","));
     for (const t of own) assert(E.RAMA_LABELS[t.rama], "rama válida", `${t.id}: ${t.rama}`);
   }
   for (const t of E.TRAITS) {
@@ -120,13 +123,13 @@ const REDISENADAS = ["press", "posesion"];
   const r = E.newRun("BRA");
   E.choosePhilosophy(r, "contra");
   const tree = E.traitTree(r);
-  assert(tree.length === 9, "el árbol del contra trae el arco completo: 3+3+2+1 (T3)", tree.length);
+  assert(tree.length === 16, "el árbol del contra trae su rediseño completo: 6+5+5", tree.length);
   const buyables = tree.filter(t => t.buyable);
   assert(buyables.length === 3 && buyables.every(t => t.tier === "basic"), "con 1 PI solo los 3 básicos son comprables (el 1-de-3 del inicio)");
   assert(tree.filter(t => t.tier === "intermediate").every(t => !t.buyable && t.faltas.length >= 2), "los intermediate nacen con candado múltiple (previo + nivel)");
-  E.buyTrait(r, "tres_pases");
+  E.buyTrait(r, "primer_pase");
   const tree2 = E.traitTree(r);
-  assert(tree2.find(t => t.id === "tres_pases").owned, "el comprado figura owned");
+  assert(tree2.find(t => t.id === "primer_pase").owned, "el comprado figura owned");
   assert(tree2.filter(t => !t.owned).every(t => !t.buyable && t.faltas.length), "sin PI el resto queda con candado y faltas legibles");
   // El árbol de CUALQUIER filosofía se puede consultar (la pizarra las navega)
   const ajeno = E.traitTree(r, "bloque");
@@ -178,28 +181,30 @@ function forcePlay(m, typeId, optIdx = 0) {
   }
   assert(!sinRasgo, "sin comprar el rasgo no hay mordida (los hooks nacen del árbol)");
 
-  // Tender la Trampa: el repliegue contenido convierte en transición mía
+  // Contragolpe Letal (Bloque, Master): el repliegue contenido convierte en transición
+  // mía — es el chainOnContain que antes traía Tender la Trampa.
   let trampa = false;
   for (let i = 0; i < 300 && !trampa; i++) {
-    const m = makeMatch("MAR", "contra", ["tender_trampa"]);
+    const m = makeMatch("MAR", "bloque", ["contragolpe_letal"]);
     m.min = 30;
-    if (forcePlay(m, "repliegue", 0).includes("¡La trampa se cierra!")) trampa = true;
+    if (forcePlay(m, "repliegue", 0).includes("¡CONTRAATAQUE!")) trampa = true;
   }
-  assert(trampa, "Tender la Trampa convierte el repliegue en contra (def→of comprable)");
+  assert(trampa, "el repliegue contenido convierte en contra (def→of comprable)");
 
-  // Segunda Jugada: el duelo perdido del pelotazo recupera la segunda pelota
+  // Atentos: el duelo perdido del pelotazo recupera la segunda pelota (heredó el hook
+  // de Segunda Jugada en el rediseño del Bloque: no conceder el rebote es quedárselo)
   let segunda = false;
   for (let i = 0; i < 300 && !segunda; i++) {
-    const m = makeMatch("ARG", "bloque", ["segunda_jugada"]);
+    const m = makeMatch("ARG", "bloque", ["atentos"]);
     m.min = 30;
-    if (forcePlay(m, "pelotazo", 0).includes("La segunda pelota es nuestra")) segunda = true;
+    if (forcePlay(m, "pelotazo", 0).includes("El rechace del duelo cae al pie")) segunda = true;
   }
-  assert(segunda, "Segunda Jugada caza el rechace y vuelve a lanzar");
+  assert(segunda, "Atentos caza el rechace y vuelve a lanzar");
 
-  // Tres Pases o Nada: la transición puede NACER en el desenlace (actIdx saltado)
+  // Ataque Relámpago: la transición puede NACER en el desenlace (actIdx saltado)
   let salto = false;
   for (let i = 0; i < 200 && !salto; i++) {
-    const m = makeMatch("MAR", "contra", ["tres_pases"]);
+    const m = makeMatch("MAR", "contra", ["ataque_relampago"]);
     m.min = 30;
     E.startSequence(m, E.sequenceType("transicion"));
     if (m.seq && m.seq.actIdx === 1) salto = true;
@@ -254,28 +259,20 @@ function forcePlay(m, typeId, optIdx = 0) {
   }
 }
 
-// ---------- T2: los 12 Intermediate — catálogo, gating y la regla del ajeno ----------
+// ---------- El catálogo entero, ya con las 4 filosofías rediseñadas ----------
 {
-  assert(E.TRAITS.length === 51, "51 rasgos: 18 del Press + 15 de Posesión (rediseñados) + 9 × 2 por rediseñar", E.TRAITS.length);
-  // Las reglas de forma de T2 valen para las filosofías que todavía NO se
-  // rediseñaron. Las rediseñadas (Press, Posesión) tienen su propia sección más
-  // abajo: son grafos con ramas que se bifurcan, y por lo tanto pueden tener más
-  // de un intermediate por rama y convergencias por `alguno`.
-  const inters = E.TRAITS.filter(t => t.tier === "intermediate" && !REDISENADAS.includes(t.filo));
-  assert(inters.length === 6, "6 Intermediate (3 por filosofía sin rediseñar)", inters.length);
-  for (const filo of ["contra", "bloque"]) {
-    const own = E.traitsOf(filo, "intermediate");
-    assert(own.length === 3 && new Set(own.map(t => t.rama)).size === 3, `${filo}: un intermediate por rama`);
-  }
-  for (const t of inters) {
-    // Los requisitos vivos (arco de Progresión): previo en SU rama + nivel 3 de su
-    // filosofía. Los "Principios mínimos" murieron con las aristas: el GDD deja dos.
-    const prev = E.traitById(t.req.previo);
-    assert(prev && prev.filo === t.filo && prev.rama === t.rama && prev.tier === "basic",
-      "el previo es el básico de SU rama", `${t.id} ← ${t.req.previo}`);
-    assert(t.req.nivel === 3, "gating uniforme: nivel 3", t.id);
-    assert(t.req.principio === undefined && t.req.principios === undefined, "ningún rasgo pide ya Principios", t.id);
-  }
+  assert(E.TRAITS.length === 64, "64 rasgos: 18 Press + 15 Posesión + 15 Bloque + 16 Contra", E.TRAITS.length);
+  assert(E.TRAITS.every(t => REDISENADAS.includes(t.filo)),
+    "no quedan filosofías con el árbol viejo: las cuatro son grafos");
+  assert(E.TRAITS.every(t => t.pos), "y por lo tanto TODO rasgo del juego declara su posición en la cancha");
+  assert(E.TRAITS.every(t => t.req.principio === undefined && t.req.principios === undefined),
+    "ningún rasgo pide ya Principios (murieron con las aristas)");
+  // Un nombre no se repite JAMÁS entre filosofías: la pizarra y el diario no pueden
+  // mostrar dos rasgos distintos con el mismo nombre (rediseño del Contra: por esto
+  // "Salida Vertical" pasó a Primera Marcha y "Pulmones de Acero" a Segundo Aire).
+  const nombres = E.TRAITS.map(t => t.nombre);
+  const repes = [...new Set(nombres.filter((n, i) => nombres.indexOf(n) !== i))];
+  assert(!repes.length, "ningún nombre de rasgo se repite en el catálogo", repes.join(" · "));
 }
 
 // ---------- T2: la cadena de compra básico → intermediate ----------
@@ -295,27 +292,9 @@ function forcePlay(m, typeId, optIdx = 0) {
   assert(E.traitReqs(r, E.traitById("angriffpressing")).ok, "en nivel 6 el candado se abre");
 }
 
-// ---------- T3: Advanced y Master — catálogo, convergencias y la doctrina completa ----------
+// ---------- La doctrina completa: la cadena de compra hasta el Master ----------
 {
-  const advs = E.TRAITS.filter(t => t.tier === "advanced" && !REDISENADAS.includes(t.filo));
-  const masters = E.TRAITS.filter(t => t.tier === "master" && !REDISENADAS.includes(t.filo));
-  assert(advs.length === 4 && masters.length === 2, "4 Advanced (2×filo) + 2 Master (1×filo) en las filosofías sin rediseñar");
-  for (const t of advs) {
-    // Convergencia asimétrica: Int de rama líder + Básico de rama de apoyo, de ramas DISTINTAS
-    const [a, b] = t.req.todos.map(id => E.traitById(id));
-    assert(a && b && a.filo === t.filo && b.filo === t.filo, "convergencia dentro de la filosofía", t.id);
-    assert(a.tier === "intermediate" && b.tier === "basic" && a.rama !== b.rama, "Int líder + Básico apoyo de ramas distintas", t.id);
-    assert(t.req.nivel === 6, "Advanced pide nivel 6", t.id);
-  }
-  for (const t of masters) {
-    assert(t.req.nivel === 10, "Master pide Consolidada (nivel 10)", t.id);
-    const basicos = t.req.todos.map(id => E.traitById(id));
-    assert(basicos.length === 3 && new Set(basicos.map(x => x.rama)).size === 3 && basicos.every(x => x.tier === "basic" && x.filo === t.filo),
-      "Master exige los 3 básicos: presencia en las TRES ramas", t.id);
-    assert(t.req.alguno.length === 2 && t.req.alguno.every(id => E.traitById(id)?.tier === "advanced"), "Master exige un Advanced cualquiera", t.id);
-
-  }
-  // La cadena completa hasta el Master (camino mínimo: 6 PI + Consolidada)
+  // La cadena completa hasta el Master (camino mínimo: 4 PI + Consolidada)
   const r = E.newRun("BRA");
   E.choosePhilosophy(r, "press");
   E.applyFiloXp(r, { filoXp: { press: E.FILO_LEVELS[9].min } }); // Consolidada: nivel 10
@@ -381,6 +360,8 @@ function forcePlay(m, typeId, optIdx = 0) {
   const FORMA = {
     press:    { total: 18, firma: 5, respuesta: 4, expansion: 9, deep: "gegenpressing" },
     posesion: { total: 15, firma: 6, respuesta: 4, expansion: 5, deep: "desesperantes" },
+    bloque:   { total: 15, firma: 6, respuesta: 5, expansion: 4, deep: "area_blindada" },
+    contra:   { total: 16, firma: 6, respuesta: 5, expansion: 5, deep: "ataque_relampago" },
   };
   const NIVEL = { basic: 1, intermediate: 3, advanced: 6, master: 10 };
   const ORDEN = ["basic", "intermediate", "advanced", "master"];
@@ -403,12 +384,15 @@ function forcePlay(m, typeId, optIdx = 0) {
       assert(!vistos.has(clave), "dos rasgos nunca comparten posición", t.id);
       vistos.add(clave);
       assert(t.req.nivel === NIVEL[t.tier], `nivel ${NIVEL[t.tier]} para un ${t.tier}`, t.id);
-      assert(!t.req.todos, "los árboles rediseñados no usan `todos` (se encadenan, no convergen por AND)", t.id);
+      // `todos` (convergencia Y) es de los dos árboles del 30-jul: el Bloque abre su
+      // Firma con dos básicos que se compran juntos, y el Contra pide DOS padres en
+      // las tres avanzadas. Press y Posesión se encadenan y convergen solo por `alguno`.
+      assert(!t.req.todos || filo === "bloque" || filo === "contra", "solo Bloque y Contra convergen por AND", t.id);
 
       // Padres: de SU misma rama y del tier inmediatamente anterior. El árbol se
       // bifurca hacia adelante y a veces vuelve a juntarse, pero jamás cruza de rama
       // ni saltea escalones.
-      const padres = [...(t.req.previo ? [t.req.previo] : []), ...(t.req.alguno || [])];
+      const padres = [...(t.req.previo ? [t.req.previo] : []), ...(t.req.todos || []), ...(t.req.alguno || [])];
       if (t.tier === "basic") {
         assert(!padres.length, "los básicos no tienen previo: abren su rama", t.id);
       } else {
@@ -558,6 +542,335 @@ function forcePlay(m, typeId, optIdx = 0) {
   // --- Ninguna de las tres sigue siendo deuda ---
   for (const [id, hook] of [["maquina_colectiva", "tapIn"], ["la_trampa", "backPass"], ["la_frontera", "offsideTrap"]]) {
     assert(E.traitById(id).hooks[hook], `${id} declara ${hook}`);
+  }
+}
+
+// ---------- Las mecánicas del árbol del BLOQUE BAJO (30-jul-2026) ----------
+// Mismo criterio que la sección de Posesión: no basta con que el hook exista — cada
+// jugada nueva tiene que OCURRIR en un partido de verdad.
+{
+  // --- REVENTAR EL BALÓN: opción nueva del acto de contención ---
+  {
+    const sin = makeMatch("ARG", "bloque", []);
+    E.startSequence(sin, E.sequenceType("repliegue"));
+    assert(sin.decision.options.length === 2, "sin el rasgo, contener ofrece 2 opciones", sin.decision.options.length);
+    assert(!sin.decision.options.some(o => o.key === "reventar"), "sin Pelotazo no existe el reventarla");
+
+    const con = makeMatch("ARG", "bloque", ["pelotazo_fuera"]);
+    E.startSequence(con, E.sequenceType("repliegue"));
+    const rev = con.decision.options.find(o => o.key === "reventar");
+    assert(rev && /Reventar el bal/.test(rev.label), "la jugada nueva se ofrece por su nombre", rev?.label);
+
+    // Mata la jugada rival sin remate… y a veces la manda al córner (su precio).
+    let muerta = false, corner = false;
+    for (let i = 0; i < 200 && !(muerta && corner); i++) {
+      const m = makeMatch("ARG", "bloque", ["pelotazo_fuera"]);
+      m.min = 30;
+      const tiros = m.stats.oppTiros;
+      E.startSequence(m, E.sequenceType("repliegue"));
+      m.resolveSequenceAct("reventar");
+      if (!m.seq && m.stats.oppTiros === tiros) muerta = true;
+      if (m.seq && m.seq.type.id === "balon_parado_def") corner = true;
+    }
+    assert(muerta, "reventarla mata el ataque rival sin remate");
+    assert(corner, "y a veces el despeje apurado regala el córner (el precio de la jugada)");
+  }
+
+  // --- PIVOTEO AL ÁREA: opción nueva del duelo aéreo ---
+  {
+    const sin = makeMatch("ARG", "bloque", []);
+    E.startSequence(sin, E.sequenceType("pelotazo"));
+    assert(!sin.decision.options.some(o => o.key === "pivotear"), "sin Hombre Objetivo no hay pivoteo");
+
+    let bajada = false;
+    for (let i = 0; i < 300 && !bajada; i++) {
+      const m = makeMatch("ARG", "bloque", ["hombre_objetivo"]);
+      m.min = 30;
+      E.startSequence(m, E.sequenceType("pelotazo"));
+      assert(m.decision.options.some(o => o.key === "pivotear"), "con Hombre Objetivo el duelo ofrece pivotear");
+      m.resolveSequenceAct("pivotear");
+      // Ganado el duelo, la pelota cambia de pies y el remate pasa a ser de frente
+      if (m.seq && m.seq.finishStat === "tiro" && m.seq.assistFrom) bajada = true;
+    }
+    assert(bajada, "el pivoteo baja la pelota al mejor rematador, que define de frente");
+  }
+
+  // --- LA MURALLA es de ESTADO: solo mientras el marcador no vaya en contra ---
+  {
+    // Se juegan N repliegues sosteniendo el marcador (el estado es lo único que cambia)
+    // y se cuentan los goles rivales.
+    const concede = (gMy, gOpp, rasgos) => {
+      const m = makeMatch("ARG", "bloque", rasgos);
+      m.min = 30;
+      let goles = 0;
+      for (let i = 0; i < 6000; i++) {   // muestra grande: los goles concedidos son ~1 de cada 100 repliegues
+        m.gMy = gMy; m.gOpp = gOpp;
+        E.startSequence(m, E.sequenceType("repliegue"));
+        let g = 0;
+        while (m.seq && g++ < 10) m.resolveSequenceAct(m.decision?.id === "sequence" ? m.decision.options[0].key : null);
+        if (m.gOpp > gOpp) goles++;
+        m.seq = null; m.decision = null;
+      }
+      return goles;
+    };
+    const enPie = concede(0, 0, ["muralla"]), abajo = concede(0, 1, ["muralla"]), pelado = concede(0, 0, []);
+    assert(enPie < abajo, "empatado la muralla aguanta; yendo abajo en el marcador no aporta nada", `${enPie} vs ${abajo}`);
+    assert(enPie < pelado, "y con el marcador a salvo concede menos que sin el rasgo", `${enPie} vs ${pelado}`);
+  }
+
+  // --- DEFENSA ESCALONADA: la primera ocasión rival, una sola vez por partido ---
+  {
+    let visto = false;
+    for (let i = 0; i < 60 && !visto; i++) {
+      const m = makeMatch("ARG", "bloque", ["defensa_escalonada"]);
+      m.min = 30;
+      for (let k = 0; k < 4; k++) {
+        E.startSequence(m, E.sequenceType("repliegue"));
+        while (m.seq) m.resolveSequenceAct(m.decision?.id === "sequence" ? "contener" : null);
+        m.decision = null;
+      }
+      const veces = m.feed.filter(l => /escalonados/.test(l.text)).length;
+      assert(veces <= 1, "el escalonamiento se cobra UNA sola vez por partido", veces);
+      if (veces === 1) visto = true;
+    }
+    assert(visto, "la primera ocasión rival del partido se encuentra con la segunda línea");
+  }
+
+  // --- FORTALEZA INEXPUGNABLE: la ocasión clara que no ocurre ---
+  {
+    let anulada = false;
+    for (let i = 0; i < 600 && !anulada; i++) {
+      const m = makeMatch("ARG", "bloque", ["fortaleza_inexpugnable"]);
+      m.min = 30;
+      if (/No hay ocasión clara/.test(forcePlay(m, "circulacion", 1))) anulada = true;   // filtrado: abre contra
+    }
+    assert(anulada, "la Fortaleza mata la contra rival antes de que sea ocasión clara");
+    // y conserva la NEUTRALIZACIÓN del sitio que traía La Fortaleza vieja
+    const h = E.traitById("fortaleza_inexpugnable").hooks;
+    assert(h.oppPoolMod?.vsFilo === "posesion" && Math.abs(1.35 * h.oppPoolMod.weights.repliegue - 1) < 0.03,
+      "el sitio de Posesión vuelve a tablas (1.35 × 0.74 ≈ 1.00), sin invertirse");
+    assert(h.frustration, "y la frustración acumulada sigue teniendo dueño");
+  }
+
+  // --- La migración F2 del Bloque cambió de dueño: la fortaleza profunda es del Área Blindada ---
+  {
+    const m = makeMatch("MAR", "bloque", ["area_blindada"], 2);
+    assert(E.hasTrait(m, "area_blindada"), "hasTrait lee el nodo nuevo");
+    assert(E.DEEP_TRAIT.bloque.id === "area_blindada", "deepBloque vive en Área Blindada", E.DEEP_TRAIT.bloque.id);
+  }
+
+  // --- El camino mínimo a una Maestría del Bloque cuesta 5 PI (los dos básicos de Firma) ---
+  {
+    const r = E.newRun("BRA");
+    E.choosePhilosophy(r, "bloque");
+    E.applyFiloXp(r, { filoXp: { bloque: E.FILO_LEVELS[9].min } });
+    r.identityPoints = 10;
+    for (const id of ["compactacion", "sobrepoblado", "area_blindada", "muralla"]) assert(E.buyTrait(r, id), `la escalera compra ${id}`);
+    assert(E.traitReqs(r, E.traitById("fortaleza_inexpugnable")).ok, "con Muralla sola el Master converge (O, no Y)");
+    assert(E.buyTrait(r, "fortaleza_inexpugnable"), "el Master del Bloque se compra");
+    assert(r.identityPoints === 5, "el camino mínimo cuesta 5 PI", r.identityPoints);
+    assert(r.journal.some(j => j.title.includes("PRENSA CONSAGRA")), "y consagra");
+  }
+}
+
+// ---------- Las mecánicas del árbol del CONTRAGOLPE (30-jul-2026) ----------
+{
+  // --- PASE ATRÁS: opción nueva del desenlace, SOLO en la familia de la contra ---
+  {
+    const sin = makeMatch("ARG", "contra", []);
+    E.startSequence(sin, E.sequenceType("transicion"));
+    while (sin.seq && sin.decision?.options && !sin.decision.options.some(o => o.key === "rematar")) sin.resolveSequenceAct("pase");
+    assert(sin.decision.options.length === 2, "sin el rasgo, el desenlace ofrece 2 opciones", sin.decision.options.length);
+
+    let ofrecido = false, gol = false, perdida = false;
+    for (let i = 0; i < 400 && !(ofrecido && gol && perdida); i++) {
+      const m = makeMatch("ARG", "contra", ["pase_atras"]);
+      m.min = 30;
+      E.startSequence(m, E.sequenceType("transicion"));
+      let g = 0;
+      while (m.seq && g++ < 10) {
+        if (!m.decision) { m.resolveSequenceAct(null); continue; }
+        const hay = m.decision.options.find(o => o.key === "pase_atras");
+        if (hay) { ofrecido = true; m.resolveSequenceAct("pase_atras"); break; }
+        m.resolveSequenceAct("pase");
+      }
+      const feed = m.feed.map(l => l.text).join(" | ");
+      if (/pase atr[áa]s/i.test(feed) && /GOOOOL|GOL CONFIRMADO/.test(feed)) gol = true;
+      if (/la corta un rival que volvió/.test(feed)) perdida = true;
+    }
+    assert(ofrecido, "con Pase Atrás el desenlace de la contra ofrece la jugada nueva");
+    assert(gol, "y cuando entra, el gol lo reconoce el relato");
+    assert(perdida, "el pase se juega de verdad: se puede perder (y perderla ahí abre contra)");
+
+    // En una jugada que NO es contra, la opción no existe (es de la familia de la transición)
+    const otra = makeMatch("ARG", "contra", ["pase_atras"]);
+    E.startSequence(otra, E.sequenceType("circulacion"));
+    let g2 = 0;
+    while (otra.seq && g2++ < 10 && !otra.decision?.options?.some(o => o.key === "rematar")) otra.resolveSequenceAct("seguro");
+    assert(!otra.decision.options.some(o => o.key === "pase_atras"), "en la circulación no se ofrece: es una jugada de la contra");
+  }
+
+  // --- SIN ESCALAS: la contra nace YA resuelta, en mano a mano ---
+  {
+    let directo = false;
+    for (let i = 0; i < 300 && !directo; i++) {
+      const m = makeMatch("MAR", "contra", ["sin_escalas"]);
+      m.min = 30;
+      E.startSequence(m, E.sequenceType("transicion"));
+      if (m.seq && m.seq.oneOnOne && m.seq.actIdx === m.seq.type.plan.length - 1) directo = true;
+      m.seq = null; m.decision = null;
+    }
+    assert(directo, "Sin Escalas saltea los actos intermedios y arranca en el mano a mano");
+    // Sin el rasgo jamás ocurre
+    let nunca = true;
+    for (let i = 0; i < 200 && nunca; i++) {
+      const m = makeMatch("MAR", "contra", []);
+      E.startSequence(m, E.sequenceType("transicion"));
+      if (m.seq?.oneOnOne) nunca = false;
+      m.seq = null; m.decision = null;
+    }
+    assert(nunca, "sin el Master la contra nunca nace resuelta");
+  }
+
+  // --- SAQUE RÁPIDO: el despeje de la salida asfixiada se vuelve contra mía ---
+  {
+    let reinicio = false;
+    for (let i = 0; i < 400 && !reinicio; i++) {
+      const m = makeMatch("ESP", "contra", ["saque_rapido"]);
+      m.min = 30;
+      E.startSequence(m, E.sequenceType("salida_fondo"));
+      m.resolveSequenceAct("despeje");
+      if (m.feed.some(l => /SAQUE RÁPIDO/.test(l.text))) reinicio = true;
+    }
+    assert(reinicio, "Saque Rápido convierte el despeje en contraataque");
+  }
+
+  // --- DEFENSA INTENCIONADA: el córner defendido lanza la contra ---
+  {
+    let contra = false;
+    for (let i = 0; i < 400 && !contra; i++) {
+      const m = makeMatch("ARG", "contra", ["defensa_intencionada"]);
+      m.min = 30;
+      if (forcePlay(m, "balon_parado_def", 0).includes("El despeje fue un PASE")) contra = true;
+    }
+    assert(contra, "Defensa Intencionada convierte el cabezazo de despeje en contra");
+  }
+
+  // --- SKILLER: al que conduce la contra le hacen más faltas ---
+  {
+    const penales = rasgos => {
+      const m = makeMatch("ARG", "contra", rasgos);
+      m.min = 30;
+      let faltas = 0;
+      for (let i = 0; i < 2500; i++) {
+        E.startSequence(m, E.sequenceType("transicion"));
+        const antes = m.feed.length;
+        if (m.decision?.options?.some(o => o.key === "conducir")) m.resolveSequenceAct("conducir");
+        if (m.feed.slice(antes).some(l => /PENAL/.test(l.text))) faltas++;
+        m.seq = null; m.decision = null;
+      }
+      return faltas;
+    };
+    const con = penales(["skiller"]), sin = penales([]);
+    assert(con > sin, "con Skiller, conducir la contra termina en falta más seguido", `${con} vs ${sin}`);
+  }
+
+  // --- EL PASE DE LA CONTRA SE APILA (Primer Pase + Primera Marcha + Salida Vertical) ---
+  {
+    const bonus = rasgos => {
+      const m = makeMatch("ARG", "contra", rasgos);
+      m.min = 30;
+      E.startSequence(m, E.sequenceType("transicion"));
+      if (m.seq.actIdx !== 0) return null;          // saltó al desenlace: no sirve de muestra
+      const antes = m.seq.bonus;
+      m.resolveSequenceAct("pase");
+      return m.seq ? m.seq.bonus - antes : null;
+    };
+    const medir = rasgos => { for (let i = 0; i < 50; i++) { const b = bonus(rasgos); if (b !== null) return b; } return null; };
+    const uno = medir(["primer_pase"]), dos = medir(["primer_pase", "primera_marcha"]);
+    assert(uno > 0 && dos > uno, "dos rasgos del pase de la contra SUMAN (no gana el primero comprado)", `${uno} vs ${dos}`);
+  }
+
+  // --- SEGUNDO AIRE: solo con el tanque vacío ---
+  // OJO (hallazgo del gate): MI energía no baja DENTRO del partido — solo el rival se
+  // cansa en cancha (drainOppEnergy). Al rasgo se llega fundido desde el día anterior,
+  // que es exactamente la situación que el diseño quiere premiar.
+  {
+    const medir = energia => {
+      let n = 0, suma = 0, visto = 0;
+      for (let i = 0; i < 200; i++) {
+        const run = E.newRun("BRA");
+        const { lineup } = E.currentLineup(run.squad, null, null);
+        for (const p of run.squad) p.energia = energia;
+        const bench = run.squad.filter(p => !lineup.includes(p));
+        const m = new E.Match({ team: E.getTeam("BRA"), lineup, bench, mentalidad: "normal", buffs: {},
+          filo: { id: "contra", nivel: 0, etapa: 0, rasgos: ["segundo_aire"] } }, E.getTeam("ARG"), false, []);
+        m.min = 30;
+        E.startSequence(m, E.sequenceType("transicion"));
+        if (m.seq?.actIdx !== 0) continue;
+        n++;
+        const antes = m.seq.bonus;
+        m.resolveSequenceAct("pase");
+        if (m.seq) suma += m.seq.bonus - antes;
+        if (m.feed.some(l => /segundo aire/i.test(l.text))) visto++;
+      }
+      return { medio: suma / n, visto };
+    };
+    const fresco = medir(100), fundido = medir(45);
+    assert(fundido.medio > fresco.medio, "con el tanque vacío la contra sigue llegando; fresco no aporta nada",
+      `${fresco.medio.toFixed(3)} vs ${fundido.medio.toFixed(3)}`);
+    assert(!fresco.visto && fundido.visto, "y el momento SE VE solo cuando hay piernas fundidas", `${fresco.visto}/${fundido.visto}`);
+  }
+
+  // --- EL ANZUELO: la neutralización del partido muerto (heredada de La Invitación) ---
+  {
+    const h = E.traitById("el_anzuelo").hooks;
+    assert(h.poolMod.vsFilo.includes("contra") && h.poolMod.vsFilo.includes("bloque"),
+      "el anzuelo neutraliza SOLO contra los que esperan");
+    assert(Math.abs(0.6 * h.poolMod.weights.transicion - 1) < 0.05,
+      "la transición vuelve a ~1.00 contra el que espera (a tablas, no invertida)", (0.6 * h.poolMod.weights.transicion).toFixed(3));
+    let picaron = false, esperador = false;
+    for (let i = 0; i < 400 && !picaron; i++) {
+      const m = makeMatch("SWE", "contra", ["el_anzuelo"]);   // SWE = bloque curado
+      m.min = 30;
+      // El hook lee la filosofía rival del PLAN del partido: hay que despertarlo antes
+      // de forzar la jugada (el plan nace en maybeStartSequence, no en startSequence).
+      E.maybeStartSequence(m); m.seq = null; m.decision = null;
+      if (["contra", "bloque"].includes(m._seqPlan?.oppFilo?.id)) esperador = true;
+      if (/Picaron el ANZUELO/.test(forcePlay(m, "circulacion", 0))) picaron = true;
+    }
+    assert(esperador, "el rival de prueba es de los que esperan");
+    assert(picaron, "el rival que espera pica el anzuelo y la circulación-cebo se vuelve contra");
+  }
+
+  // --- EL FILTRO POR FAMILIA: dos filosofías con el mismo hook para jugadas distintas ---
+  {
+    // Directo (Press) salta la recuperación · Ataque Relámpago (Contra) salta la contra.
+    const m = makeMatch("ARG", "press", ["directo", "ataque_relampago"]);
+    assert(E.hookOf(m, "skipToFinish", "recuperacion")?.traitId === "directo", "el hook de la recuperación es el del Press");
+    assert(E.hookOf(m, "skipToFinish", "transicion")?.traitId === "ataque_relampago", "y el de la contra es el del Contragolpe");
+    assert(E.hookOf(m, "skipToFinish", "circulacion") === null, "y para una jugada que ninguno cubre, ninguno");
+  }
+
+  // --- El camino mínimo a una Maestría del Contra cuesta 5 PI (las tres avanzadas piden DOS padres) ---
+  {
+    const r = E.newRun("BRA");
+    E.choosePhilosophy(r, "contra");
+    E.applyFiloXp(r, { filoXp: { contra: E.FILO_LEVELS[9].min } });
+    r.identityPoints = 10;
+    for (const id of ["primer_pase", "primera_marcha", "ataque_espacio", "ataque_relampago", "duelista"]) {
+      assert(E.buyTrait(r, id), `la escalera del Contra compra ${id}`);
+    }
+    assert(r.identityPoints === 5, "el camino mínimo al Master del Contra cuesta 5 PI", r.identityPoints);
+    assert(r.journal.some(j => j.title.includes("PRENSA CONSAGRA")), "y consagra");
+    // La convergencia Y muerde: sin los DOS padres, la avanzada no se abre
+    const r2 = E.newRun("BRA");
+    E.choosePhilosophy(r2, "contra");
+    E.applyFiloXp(r2, { filoXp: { contra: E.FILO_LEVELS[9].min } });
+    r2.identityPoints = 10;
+    E.buyTrait(r2, "primer_pase"); E.buyTrait(r2, "primera_marcha");
+    const faltas = E.traitReqs(r2, E.traitById("ataque_relampago")).faltas;
+    assert(faltas.some(x => x.includes("Ataque al Espacio")), "el candado nombra el padre que falta", faltas.join(" · "));
   }
 }
 

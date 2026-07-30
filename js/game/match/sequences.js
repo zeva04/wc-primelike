@@ -215,6 +215,10 @@ const RIVAL_FIRMA_OPP = { press: "salida_fondo", posesion: "repliegue" };
 const ADV_SOURCE = { caceria: "recuperacion", sinfonia: "circulacion", contra_letal: "transicion", fortaleza: "repliegue" };
 const ADV_SHARE = [0.6, 0.9]; // [nivel 1, nivel 2]
 
+/** El plan de actos de un TIPO (sin instancia de secuencia): lo necesita el arranque
+ *  para saltar al último acto (Sin Escalas) antes de que exista `m.seq.plan`. */
+const planOfType = type => type.plan;
+
 /** La FAMILIA de un tipo: la avanzada pertenece a su tipo base (cacería ES
  *  recuperación profunda). Los hooks de rasgos que no canibalizan la jugada
  *  avanzada matchean por familia (T1, hallazgo del gate: sin esto, el rasgo
@@ -310,7 +314,7 @@ export function filoShareShift(myFilo, oppFilo) {
 
 /* filoRasgo() MURIÓ en T2 (migración F2, decisión PO #2): el efecto profundo que
    Consolidada regalaba automático ahora se COMPRA en el árbol — el gate es
-   trait-hooks.hasTrait (gegenpressing · desesperantes · trampa_cerrada · duenos_area).
+   trait-hooks.hasTrait (gegenpressing · desesperantes · trampa_cerrada · area_blindada).
    Consolidada da su PI, el mult 2.1 y el share 0.9 de la avanzada — nada más. */
 
 /* ============================================================
@@ -437,27 +441,39 @@ export function startSequence(m, type) {
     // (la contra a una), en el contragolpe letal conserva un tramo + definición —
     // acelera la avanzada sin canibalizar sus bonus de escalada.
     let traitIntro = null;
-    const vd = hookOf(m, "variantDeep"); // Asfixia en Salida: el robo nace sobre el saque de meta
-    if (vd && vd.of === familyOf(type) && rnd() < vd.p) {
+    const fam = familyOf(type);
+    const vd = hookOf(m, "variantDeep", fam); // Angriffpressing: el robo nace sobre el saque de meta
+    if (vd && rnd() < vd.p) {
       m.seq.bonus += vd.bonus;
       m.seq.deepVariant = true; // Arco a la Vista (T2) profundiza ESTE desenlace
       traitIntro = vd.intro;
     }
     // Variante condicional al RIVAL: la Salida Lavolpiana de Posesión la usa contra
     // el Press (el mediocampista que baja deja sobrando a la primera línea).
-    const vs = hookOf(m, "variantSwitch");
-    if (vs && vs.of === familyOf(type) && vs.vsFilo === seqPlan(m).oppFilo?.id && rnd() < vs.p) {
+    const vs = hookOf(m, "variantSwitch", fam);
+    if (vs && vs.vsFilo === seqPlan(m).oppFilo?.id && rnd() < vs.p) {
       m.seq.bonus += vs.bonus;
       traitIntro = vs.intro;
     }
-    const sk = hookOf(m, "skipToFinish"); // Tres Pases o Nada: la contra se juega a una
-    if (sk && sk.of === familyOf(type) && rnd() < sk.p) {
-      m.seq.actIdx = 1;
-      m.seq.bonus += sk.bonus;
-      traitIntro = sk.intro;
-      // El Primer Pase (T2): el salto gana calidad y SU voz (el pase que rompe la línea)
-      const up = hookOf(m, "skipUpgrade");
-      if (up) { m.seq.bonus += up.bonus; traitIntro = up.intro; }
+    // SIN ESCALAS (Contra, Master): la contra puede nacer YA RESUELTA — se saltean los
+    // actos intermedios y el desenlace es el mano a mano. Va antes del salto normal
+    // porque es su versión superlativa: si sale esta, la otra no se tira.
+    const oo = fam === "transicion" ? hookOf(m, "oneOnOne") : null;
+    if (oo && rnd() < oo.p) {
+      m.seq.actIdx = planOfType(type).length - 1;
+      m.seq.bonus += oo.bonus;
+      m.seq.oneOnOne = true;
+      traitIntro = oo.intro;
+    } else {
+      const sk = hookOf(m, "skipToFinish", fam); // Ataque Relámpago: la contra se juega a una
+      if (sk && rnd() < sk.p) {
+        m.seq.actIdx = 1;
+        m.seq.bonus += sk.bonus;
+        traitIntro = sk.intro;
+        // Tres Toques (Press, T2): el salto gana calidad y SU voz.
+        const up = hookOf(m, "skipUpgrade");
+        if (up) { m.seq.bonus += up.bonus; traitIntro = up.intro; }
+      }
     }
     // [RELATO CON IDENTIDAD] (F3): cuando la secuencia es MI tipo firma, la narra la
     // filosofía ("el pressing que entrenamos toda la semana") en vez del intro genérico.

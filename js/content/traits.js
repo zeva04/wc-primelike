@@ -100,6 +100,41 @@
                        perdiendo. Cambia MI ocasión por la del rival: se resigna
                        el remate y la próxima llegada rival no ocurre. Tampoco se
                        sortea — la elige el DT (match/sequence-acts.canFreeze).
+   Vocabulario del rediseño del Contragolpe (30-jul-2026):
+   - transitionPass:   {bonus, act?, texto} el pase de la contra sale limpio. `act:"first"`
+                       lo limita al acto que la LANZA. SE APILAN (los suma el motor).
+   - tiredLegs:        {under, bonus, texto} conducir la contra con la energía por debajo
+                       de `under` deja de ser una condena (⚠️ adyacente: ver Segundo Aire).
+   - counterFouls:     {plus, texto}   al que conduce la contra no lo frenan limpio: la
+                       ventana de FALTA a favor se ensancha.
+   - containBonus:     {bonus, texto}  replegado, el equipo corta más (el acto de contener).
+   - quickRestart:     {p, bonus, intro} el despeje de la salida asfixiada reinicia rápido
+                       y se vuelve contra mía (secuencia reactiva).
+   - squarePass:       {bonus, texto}  LA JUGADA NUEVA "Pase Atrás": opción del desenlace,
+                       solo en la familia de la contra. Es un pase de verdad (se pierde y
+                       abre contra); si llega, el remate es de frente y servido.
+   - oneOnOne:         {p, bonus, intro} la contra NACE resuelta: se saltean los actos
+                       intermedios y el desenlace es el mano a mano.
+
+   Vocabulario del rediseño del Bloque bajo (30-jul-2026):
+   - boxShield:        {bonus, texto}  el remate rival DENTRO del área sale a destiempo.
+   - aerialDef:        {bonus, texto}  el cabezazo rival (córner en contra) llega forzado.
+   - wall:             {bonus, texto}  rasgo de ESTADO: mientras el marcador esté empatado
+                       o a favor, la situación del remate rival empeora. Es el "+2 Defensa"
+                       del diseño expresado por el canal legal (la ley del arco prohíbe
+                       el buff plano de stats).
+   - firstChanceGuard: {bonus, texto}  la PRIMERA ocasión rival del partido se encuentra
+                       con la segunda línea ya puesta. Se consume una vez por partido.
+   - clearChanceGuard: {p, texto}      la OCASIÓN CLARA rival (mano a mano tras contención
+                       rota · contra tras mi pérdida) directamente no ocurre.
+   - clearBall:        {p, texto}      LA JUGADA NUEVA "Reventar el Balón": tercera opción
+                       del acto de contención. No se sortea: la elige el DT. Mata el ataque
+                       rival sin remate, resignando lo que la contención podía dar — y `p`
+                       de las veces el despeje sale al córner.
+   - pivot:            {bonus, texto}  LA OTRA JUGADA NUEVA "Pivoteo al Área": tercera
+                       opción del duelo aéreo. El que gana por arriba la BAJA al mejor
+                       rematador, que define de frente en vez de cabecear.
+   - transitionPass:   {bonus, texto}  tras recuperar, el pase de la transición sale limpio.
    - oppStamina:       {factor}        el rival se cansa MÁS RÁPIDO dentro del
                        partido (El Rondo: el rondo son ELLOS corriendo). Escala
                        medical.drainOppEnergy — ver docs/CORE.md §Fatiga del rival.
@@ -556,62 +591,494 @@ export const TRAITS = [
       texto: "Todos juegan de todo: aparece un pasillo donde no habia nadie y la posesion no muere." } },
   },
 
-  /* ---------------- ⚡ Contragolpe ---------------- */
+  /* ================= 🧱 BLOQUE BAJO — el árbol REDISEÑADO =================
+     15 rasgos (rediseño del PO, 30-jul-2026). Sustituye al árbol de 9 del arco
+     T1-T3, con el mismo criterio que Press y Posesión: donde el concepto
+     coincidía se RECICLARON los hooks ya construidos (la jaula que empuja el
+     remate afuera, el oficio que corta el partido, la fortaleza profunda, el
+     córner defendido que lanza, la cabeza de playa, el balón parado ensayado,
+     la trampa que convierte el repliegue) y el resto son nodos nuevos.
+
+     La forma en la cancha es la de un BLOQUE BAJO de verdad: todo nace pegado
+     al área propia y solo la Expansión cruza hacia el campo rival.
+       Firma      (arriba)  el área como fortaleza: dos básicos que se cierran
+                            juntos (compactar por dentro y poblar la zona)
+                            convergen en el Área Blindada, que se abre en las
+                            dos maneras de sostenerla —escalonarse o amurallarse—
+                            y las dos vuelven a juntarse en la Maestría.
+       Respuesta  (centro)  sobrevivir al asedio: ganar por arriba, quedarse con
+                            el rechace, y las dos maneras de sacar la pelota de
+                            ahí (reventarla o mandarla al área rival).
+       Expansión  (abajo)   las armas del que defiende: el balón parado y la
+                            salida rápida, en línea recta hasta el contraataque.
+
+     LAS DECISIONES DE DISEÑO (PO, 30-jul-2026):
+     1. MURALLA no da "+2 Defensa": la ley del arco prohíbe la mejora estadística
+        plana. Se expresa por el canal de siempre (la SITUACIÓN del remate rival),
+        como el viejo Uno a Cero — pero con su condición propia: empatado O
+        ganando, no solo ganando.
+     2. La NEUTRALIZACIÓN del sitio de Posesión (era La Fortaleza, avanzada) se
+        mudó a Fortaleza Inexpugnable: "el rival no genera ocasión clara" ES el
+        asedio neutralizado. Sube de precio (nivel 6 → 10) a cambio de que la
+        Maestría de la Firma signifique algo contra su peor cruce.
+     3. Las convergencias: Y en Área Blindada (los dos básicos son baratos y la
+        rama se abre con los dos puestos), O en las dos Maestrías (como en Press:
+        cualquiera de los dos caminos llega). Camino mínimo al primer Master: 5 PI. */
+
+  /* ---- Firma · el área como fortaleza (círculo, campo propio) ---- */
   {
-    id: "tres_pases", filo: "contra", rama: "firma", tier: "basic", icon: "🗡️",
-    nombre: "Tres Pases o Nada",
-    desc: "Las contras se resuelven con el mínimo de pases posible, priorizando velocidad sobre control.",
-    momento: "Robo, pase, gol: ocho segundos.",
-    req: { nivel: 1 },
-    hooks: { skipToFinish: { of: "transicion", p: 0.30, bonus: 0.05,
-      intro: p => `¡Sin escalas! ${p.name} sale disparado: la contra se juega a UNA.` } },
+    id: "compactacion", filo: "bloque", rama: "firma", tier: "basic", icon: "🏰",
+    nombre: "Compactación",
+    desc: "El bloque se cierra y le tapa el carril del medio: por el centro no se pasa, y al rival solo le queda dar la vuelta por afuera.",
+    momento: "El rival dando vueltas por afuera sin encontrar la puerta.",
+    req: { nivel: 1 }, pos: { x: 190, y: 140 },
+    // RECICLADO de Jaula Central: mismo hook, mismo concepto (la jaula que invita
+    // a la banda — el remate llega incómodo, forzado desde afuera).
+    hooks: { oppShotMalus: { seq: "repliegue", bonus: -0.05,
+      texto: "El centro está clausurado: el remate llegó incómodo, forzado desde afuera." } },
   },
   {
-    id: "tender_trampa", filo: "contra", rama: "respuesta", tier: "basic", icon: "🪤",
-    nombre: "Tender la Trampa",
-    desc: "El equipo cede terreno deliberadamente para atacar el espacio que el rival deja a su espalda.",
-    momento: "El rival estrellado y la cancha entera para correr.",
-    req: { nivel: 1 },
-    hooks: { chainOnContain: { to: "transicion", p: 0.30, bonus: 0.04,
-      intro: p => `¡La trampa se cierra! El rival quedó estirado y ${p.name} arranca con la cancha entera por delante.` } },
+    id: "sobrepoblado", filo: "bloque", rama: "firma", tier: "basic", icon: "🕸️",
+    nombre: "Sobrepoblado",
+    desc: "Hay siempre una pierna más de la que el rival contaba: los pases entre líneas se topan con alguien y el ataque muere antes de nacer.",
+    momento: "El pase rival que no llega a destino tres veces seguidas.",
+    req: { nivel: 1 }, pos: { x: 190, y: 250 },
+    // RECICLADO de Oficio de Trinchera: la secuencia rival pierde continuidad —
+    // acá el motivo es la intercepción, no la falta táctica (el texto lo dice).
+    hooks: { oppLoseActs: { p: 0.25,
+      texto: "Zona sobrepoblada: el pase entre líneas se topa con una pierna y el ataque muere en la nada." } },
   },
   {
-    id: "manada", filo: "contra", rama: "expansion", tier: "basic", icon: "🐆",
-    nombre: "Correr en Manada",
-    desc: "Cada contraataque incorpora varios jugadores en carrera para generar superioridad.",
-    momento: "Tres contra dos y definición cruzada.",
-    req: { nivel: 1 },
-    hooks: { finishSupport: { of: "transicion", bonus: 0.06,
-      texto: "La manada llega en números: dos camisetas libres esperan el pase." } },
+    id: "area_blindada", filo: "bloque", rama: "firma", tier: "intermediate", icon: "🗿",
+    nombre: "Área Blindada",
+    desc: "Dentro del área manda el equipo: cada centro se come, cada remate sale a destiempo y el rival termina buscando desde afuera.",
+    momento: "El despeje número diez del central y la contra que nace de ahí.",
+    // LA CONVERGENCIA Y (decisión PO): cerrar el centro y poblar la zona son las
+    // dos mitades de la misma idea — el área se blinda con las dos, no con una.
+    req: { nivel: 3, todos: ["compactacion", "sobrepoblado"] },
+    pos: { x: 450, y: 195 },
+    // Hereda deepBloque de Dueños del Área: LA MIGRACIÓN F2 del Bloque (la fortaleza
+    // PROFUNDA — deepContain + convertDeep, lo que Consolidada regalaba). Y `boxShield`
+    // es el nodo propiamente dicho: el remate rival DENTRO del área llega peor.
+    hooks: {
+      deepBloque: {},
+      boxShield: { bonus: -0.05,
+        texto: "El área blindada: le achicaron el ángulo y el remate salió sin destino." },
+    },
+  },
+  {
+    id: "defensa_escalonada", filo: "bloque", rama: "firma", tier: "advanced", icon: "🪜",
+    nombre: "Defensa Escalonada",
+    desc: "Las líneas se escalonan: al que rompe la primera lo espera la segunda. El rival tarda medio partido en entender por dónde entrar.",
+    momento: "La primera llegada rival muriendo contra una línea que ya estaba ahí.",
+    req: { nivel: 6, previo: "area_blindada" },
+    pos: { x: 710, y: 125 },
+    // Rasgo de MOMENTO del partido: la PRIMERA ocasión rival del partido, la que
+    // llega con el equipo todavía sin leer al rival, es la que el escalonamiento
+    // paga. Se consume una vez por partido (trait-hooks lo marca).
+    hooks: { firstChanceGuard: { bonus: -0.06,
+      texto: "Primera llegada del partido y ya estaban escalonados: el que rompió la primera línea se encontró con la segunda." } },
+  },
+  {
+    id: "muralla", filo: "bloque", rama: "firma", tier: "advanced", icon: "🧱",
+    nombre: "Muralla",
+    desc: "Mientras el marcador no vaya en contra, la zaga juega con una convicción distinta: nadie se saca la camiseta de encima y no pasa nadie.",
+    momento: "Los últimos veinte minutos defendiendo el resultado sin conceder una sola llegada limpia.",
+    req: { nivel: 6, previo: "area_blindada" },
+    pos: { x: 710, y: 245 },
+    // Rasgo de ESTADO (decisión PO 30-jul): NO es "+2 Defensa" —la ley del arco
+    // prohíbe el buff plano— sino el canal de siempre: con el marcador a favor o
+    // empatado, la situación del remate rival empeora. Perdiendo no aporta nada.
+    hooks: { wall: { bonus: -0.05,
+      texto: "La muralla no se mueve: mientras el resultado aguante, por acá no pasa nadie." } },
+  },
+  {
+    id: "fortaleza_inexpugnable", filo: "bloque", rama: "firma", tier: "master", icon: "👑",
+    nombre: "Fortaleza Inexpugnable",
+    desc: "El rival puede tener la pelota todo el partido: no va a tener una sola ocasión clara. Ataca, ataca, y termina discutiendo entre ellos.",
+    momento: "El delantero rival discutiendo con sus compañeros tras la enésima llegada muerta.",
+    // LA CONVERGENCIA O (decisión PO): se llega desde cualquiera de las dos maneras
+    // de sostener el área — escalonarse o amurallarse.
+    req: { nivel: 10, alguno: ["defensa_escalonada", "muralla"] },
+    pos: { x: 960, y: 185 },
+    hooks: {
+      // LA OCASIÓN CLARA que no ocurre: el mano a mano y la contra tras mi pérdida
+      // mueren contra el que llegó a cubrir. Es el hook propio del Master.
+      clearChanceGuard: { p: 0.25,
+        texto: "¡No hay ocasión clara contra esta fortaleza! Apareció el que tenía que aparecer y la jugada murió sin remate." },
+      // RECICLADO de La Fortaleza (avanzada del árbol viejo): la NEUTRALIZACIÓN del
+      // sitio —la celda opp bloque|posesion vuelve a tablas (1.35 × 0.74 ≈ 1.0)— y la
+      // FRUSTRACIÓN acumulada, que degrada el remate rival por cada ataque muerto.
+      oppPoolMod: { vsFilo: "posesion", weights: { repliegue: 0.74 } },
+      frustration: { perShot: 0.02, cap: 0.08,
+        texto: "La frustración rival se palpa: cuanto más ataca sin premio, peor remata — la muralla come moral." },
+    },
   },
 
-  /* ---------------- 🧱 Bloque bajo ---------------- */
+  /* ---- Respuesta · sobrevivir al asedio (cuadrado, eje del área propia) ---- */
   {
-    id: "jaula", filo: "bloque", rama: "firma", tier: "basic", icon: "🏰",
-    nombre: "Jaula Central",
-    desc: "El bloque cierra el carril central y dirige el ataque rival hacia las bandas.",
-    momento: "El rival dando vueltas por afuera sin encontrar la puerta.",
-    req: { nivel: 1 },
-    hooks: { oppShotMalus: { seq: "repliegue", bonus: -0.05,
-      texto: "La jaula hizo su trabajo: el remate llegó incómodo, forzado desde afuera." } },
+    id: "dominio_aereo", filo: "bloque", rama: "respuesta", tier: "basic", icon: "🦅",
+    nombre: "Dominio Aéreo",
+    desc: "Todo lo que entra por el aire lo gana el equipo: centros, córners y pelotas divididas terminan siempre en una cabeza propia.",
+    momento: "El central ganando el décimo cabezazo del partido.",
+    req: { nivel: 1 }, pos: { x: 190, y: 395 },
+    hooks: { aerialDef: { bonus: -0.05,
+      texto: "Por arriba no se les gana: el cabezazo rival salió forzado, con la zaga encima." } },
   },
   {
-    id: "oficio", filo: "bloque", rama: "respuesta", tier: "basic", icon: "⏳",
-    nombre: "Oficio de Trinchera",
-    desc: "El equipo corta el ritmo del partido para desgastar y frustrar al rival.",
-    momento: "El rival frustrado pateando desde afuera.",
-    req: { nivel: 1 },
-    hooks: { oppLoseActs: { p: 0.25,
-      texto: "El oficio corta el partido: falta táctica, protesta rival y el ataque muere en la nada." } },
+    id: "atentos", filo: "bloque", rama: "respuesta", tier: "intermediate", icon: "👀",
+    nombre: "Atentos",
+    desc: "Tras cada atajada y cada bloqueo, la segunda pelota es del equipo: nadie mira la jugada, todos van al rechace.",
+    momento: "El rechace del córner que ya es un pelotazo nuestro.",
+    req: { nivel: 3, previo: "dominio_aereo" },
+    pos: { x: 450, y: 380 },
+    // RECICLADO doble — los DOS canales por los que se concede un rebote, que acá
+    // dejan de concederse: el córner rival defendido (Dueños del Área) y el duelo
+    // aéreo perdido (Segunda Jugada). En los dos casos la segunda pelota es MÍA.
+    hooks: {
+      chainOnDefendSp: { to: "pelotazo", p: 0.30, bonus: 0.03,
+        intro: p => `¡Atentos al rechace! La segunda pelota es nuestra y ${p.name} ya tiene el pelotazo armado.` },
+      chainOnDuelFail: { to: "pelotazo", p: 0.30, bonus: 0.02,
+        intro: p => `¡Atentos! El rechace del duelo cae al pie y ${p.name} vuelve a la carga.` },
+    },
   },
   {
-    id: "segunda_jugada", filo: "bloque", rama: "expansion", tier: "basic", icon: "🪂",
-    nombre: "Segunda Jugada",
-    desc: "El equipo se organiza para disputar y ganar la segunda pelota tras cada balón largo.",
-    momento: "La peinada que cae al diez y llegada.",
-    req: { nivel: 1 },
-    hooks: { chainOnDuelFail: { to: "pelotazo", p: 0.30, bonus: 0.02,
-      intro: p => `¡La segunda pelota es nuestra! El rechace cae al pie y ${p.name} vuelve a la carga.` } },
+    id: "pelotazo_fuera", filo: "bloque", rama: "respuesta", tier: "advanced", icon: "🚀",
+    nombre: "Pelotazo",
+    desc: "Desbloquea la jugada Reventar el Balón: cuando el peligro aprieta, la zaga la manda lejos y obliga al rival a empezar todo de nuevo desde atrás.",
+    momento: "El pelotazo a la tribuna que apaga el incendio y hace bramar al estadio.",
+    req: { nivel: 6, previo: "atentos" },
+    pos: { x: 710, y: 360 },
+    // LA JUGADA NUEVA (como el Retroceso de La Trampa o el Congelar de Fríos): una
+    // tercera opción del acto de contención, que NO se sortea — la elige el DT. Mata
+    // la jugada rival sin remate, y `p` es su precio: a veces el despeje sale al córner.
+    hooks: { clearBall: { p: 0.30,
+      texto: "¡A REVENTARLA! La zaga la manda lejos del área y el rival tiene que armar todo otra vez desde atrás." } },
+  },
+  {
+    id: "al_area", filo: "bloque", rama: "respuesta", tier: "advanced", icon: "🎪",
+    nombre: "Al Área",
+    desc: "Desbloquea la jugada Saque Largo al Área: los saques de banda en campo rival dejan de ser un trámite y se convierten en un envío al área.",
+    momento: "El saque de banda que termina en un córner a favor.",
+    req: { nivel: 6, previo: "atentos" },
+    pos: { x: 710, y: 480 },
+    // RECICLADO de Cabeza de Playa: el pelotazo que muere sin gol no se pierde — la
+    // pelota sale por el lateral y el saque largo vuelve a poblar el área (balón
+    // parado encadenado). El ciclo del Bloque: despeje → pelotazo → área → parado.
+    hooks: { beachhead: { p: 0.35,
+      texto: "¡Saque largo AL ÁREA! La pelota salió por el lateral y el envío vuelve a llenar el área rival." } },
+  },
+  {
+    id: "hombre_objetivo", filo: "bloque", rama: "respuesta", tier: "master", icon: "👑",
+    nombre: "Hombre Objetivo",
+    desc: "Desbloquea la jugada Pivoteo al Área: el nueve ya no solo cabecea, también la baja para el que llega de frente al arco.",
+    momento: "El nueve aguantando de espaldas y la descarga que termina en gol.",
+    // LA CONVERGENCIA O: cualquiera de las dos maneras de sacar la pelota del área
+    // propia habilita al hombre objetivo del otro lado de la cancha.
+    req: { nivel: 10, alguno: ["pelotazo_fuera", "al_area"] },
+    pos: { x: 960, y: 420 },
+    // La otra JUGADA NUEVA: tercera opción del duelo aéreo (tampoco se sortea). El
+    // que gana por arriba no remata: descarga al mejor rematador, que llega de frente.
+    hooks: { pivot: { bonus: 0.07,
+      texto: "El hombre objetivo la aguanta de espaldas y la BAJA: llega uno de frente al arco." } },
+  },
+
+  /* ---- Expansión · las armas del que defiende (triángulo, campo rival) ---- */
+  {
+    id: "especialistas", filo: "bloque", rama: "expansion", tier: "basic", icon: "📐",
+    nombre: "Especialistas",
+    desc: "El equipo tiene pateadores de verdad: cada centro de pelota quieta cae donde tiene que caer.",
+    momento: "El córner que cae clavado en la cabeza del nueve.",
+    req: { nivel: 1 }, pos: { x: 280, y: 600 },
+    // RECICLADO de Pelota Parada Ensayada, partido en dos: acá vive la EJECUCIÓN
+    // (poolMult 1 = no toca el pool), y el pool lo mueve Estrategia Ensayada.
+    hooks: { setpieceRehearsed: { bonus: 0.06, poolMult: 1,
+      texto: "Esto lo patea un especialista: la pelota quieta cae exactamente donde se ensayó." } },
+  },
+  {
+    id: "estrategia_ensayada", filo: "bloque", rama: "expansion", tier: "intermediate", icon: "📋",
+    nombre: "Estrategia Ensayada",
+    desc: "La pizarra del balón parado se ensaya toda la semana: córners y tiros libres laterales terminan en remate mucho más seguido.",
+    momento: "Tres córners seguidos que terminan los tres en remate.",
+    req: { nivel: 3, previo: "especialistas" },
+    pos: { x: 490, y: 600 },
+    // El balón parado propio SALE más seguido: se apila sobre el ×1.3 incondicional
+    // del Bloque (su arma declarada), no lo reemplaza.
+    hooks: { poolMod: { weights: { balon_parado: 1.15 } } },
+  },
+  {
+    id: "salida_vertical", filo: "bloque", rama: "expansion", tier: "advanced", icon: "📈",
+    nombre: "Salida Vertical",
+    desc: "Recuperada la pelota, el equipo no la esconde: la primera intención es siempre hacia adelante, y esos pases salen.",
+    momento: "El pase vertical inmediato tras el robo, con el rival todavía volviendo.",
+    req: { nivel: 6, previo: "estrategia_ensayada" },
+    pos: { x: 720, y: 600 },
+    hooks: { transitionPass: { bonus: 0.05,
+      texto: "Salida vertical: la pelota sale limpia hacia adelante antes de que el rival vuelva a su sitio." } },
+  },
+  {
+    id: "contragolpe_letal", filo: "bloque", rama: "expansion", tier: "master", icon: "👑",
+    nombre: "Contragolpe Letal",
+    desc: "Desbloquea la jugada Contraataque: cada pelota recuperada en campo propio puede lanzarse de inmediato, sin pasar por armar el ataque.",
+    momento: "El robo en la puerta del área propia que termina en gol en la de enfrente.",
+    req: { nivel: 10, previo: "salida_vertical" },
+    pos: { x: 960, y: 600 },
+    // RECICLADO de Tender la Trampa (Contragolpe): el repliegue contenido CONVIERTE
+    // en transición mía — el patrón def→of, acá como premio de la Maestría.
+    hooks: { chainOnContain: { to: "transicion", p: 0.30, bonus: 0.04,
+      intro: p => `¡CONTRAATAQUE! Recuperaron en campo propio y ${p.name} sale disparado sin pedirle permiso a nadie.` } },
+  },
+
+  /* ================= ⚡ CONTRAGOLPE — el árbol REDISEÑADO =================
+     16 rasgos (rediseño del PO, 30-jul-2026). El ÚLTIMO de los cuatro: con este,
+     las 4 filosofías son grafos y la grilla histórica de 3×3 queda sin usuarios.
+     Mismo criterio que los otros tres: los 9 viejos se retiran y sus hooks se
+     mudan al nodo nuevo donde el concepto coincide (Tres Pases→Ataque Relámpago,
+     Correr en Manada→Ataque al Espacio, Superioridad + A Campo Abierto→El
+     Enjambre, La Trampa Cerrada→Ataque Relámpago (deepContra), La Invitación→El
+     Anzuelo, Contragolpe Total→repartido entre Defensa Intencionada y Saque
+     Rápido, Tender la Trampa→ya se había mudado al Bloque como su Maestría).
+
+     La forma en la cancha: LAS TRES RAMAS SE BIFURCAN Y VUELVEN A JUNTARSE —
+     es el único árbol donde las tres avanzadas piden DOS padres (convergencia Y).
+       Firma      (arriba)  la contra misma: el primer pase abre en las dos maneras
+                            de correrla (con el pase o con el desmarque), que se
+                            juntan en el Ataque Relámpago y se bifurcan otra vez en
+                            los dos desenlaces (el duelo o la avalancha).
+       Respuesta  (centro)  el precio de correr: pulmón, y las dos maneras de
+                            fabricarse la contra (despejar de cabeza o tender el
+                            anzuelo con la pelota).
+       Expansión  (abajo)   de dónde NACE la contra: aguantar, el balón aéreo y el
+                            reinicio rápido, hasta la jugada de finalización.
+
+     DECISIONES DE DISEÑO (PO, 30-jul-2026):
+     1. DOS RENOMBRES para no duplicar nombres del juego: "Salida Vertical" (que ya
+        es la avanzada de Expansión del Bloque) pasó a PRIMERA MARCHA, y "Pulmones
+        de Acero" (que ya es la básica de Respuesta del Press) pasó a SEGUNDO AIRE.
+     2. LOS DOS FÍSICOS SON ADYACENTES, Y ES DEUDA DECLARADA: correr una contra hoy
+        no cuesta energía (el único gasto que el DT controla es el botón de presión),
+        así que Anaeróbicos abarata ESE gasto y Segundo Aire sostiene al que corre
+        fundido. ⚠️ El sprint de SITUACIONES DE JUEGO construye el costo físico de
+        la contra: cuando exista, los dos rasgos se reescriben contra él.
+     3. El nodo [Intermedia] que faltaba en la Expansión es SAQUE RÁPIDO (el tercer
+        origen: aéreo · reinicio · aguante).
+     4. "En Bloque Bajo" (Estóicos) = cuando el equipo se REPLIEGA, no la filosofía
+        homónima ni la mentalidad: se expresa en el acto de contención. */
+
+  /* ---- Firma · la contra misma (círculo, del robo al arco) ---- */
+  {
+    id: "primer_pase", filo: "contra", rama: "firma", tier: "basic", icon: "📡",
+    nombre: "Primer Pase",
+    desc: "El primer pase tras recuperar la pelota no se piensa: sale hacia adelante y sale bien. La contra nace ya lanzada.",
+    momento: "El pase que sale en el mismo movimiento del robo.",
+    req: { nivel: 1 }, pos: { x: 190, y: 150 },
+    // `act: "first"` — solo el primer acto de la contra (el pase que la lanza). Los
+    // transitionPass se APILAN: el motor suma los de todos los rasgos que los traigan.
+    hooks: { transitionPass: { act: "first", bonus: 0.05,
+      texto: "El primer pase salió al toque: la contra nace lanzada, sin escala de seguridad." } },
+  },
+  {
+    id: "primera_marcha", filo: "contra", rama: "firma", tier: "intermediate", icon: "📈",
+    nombre: "Primera Marcha",
+    desc: "Ya en carrera, el equipo se entiende: los pases de la contra encuentran siempre al que va lanzado.",
+    momento: "Tres pases a toda velocidad sin que la pelota toque el piso dos veces.",
+    // RENOMBRADO (era "Salida Vertical" en el diseño): ese nombre ya es de la avanzada
+    // de Expansión del Bloque bajo, y encima con este mismo hook.
+    req: { nivel: 3, previo: "primer_pase" },
+    pos: { x: 450, y: 125 },
+    hooks: { transitionPass: { bonus: 0.05,
+      texto: "Primera marcha metida: la contra circula a toda velocidad y ningún pase se cae." } },
+  },
+  {
+    id: "ataque_espacio", filo: "contra", rama: "firma", tier: "intermediate", icon: "🏃",
+    nombre: "Ataque al Espacio",
+    desc: "Cuando uno arranca, arrancan tres: el que conduce siempre tiene a quién buscar en carrera.",
+    momento: "Tres contra dos y definición cruzada.",
+    req: { nivel: 3, previo: "primer_pase" },
+    pos: { x: 450, y: 250 },
+    // RECICLADO de Correr en Manada: el "buscar al mejor ubicado" de la contra encuentra
+    // superioridad de verdad — acá el relato es el DESMARQUE, que es lo que lo produce.
+    hooks: { finishSupport: { of: "transicion", bonus: 0.06,
+      texto: "Los desmarques al espacio parten a la defensa: hay dos camisetas libres esperando el pase." } },
+  },
+  {
+    id: "ataque_relampago", filo: "contra", rama: "firma", tier: "advanced", icon: "⚡",
+    nombre: "Ataque Relámpago",
+    desc: "Del robo al remate en el menor número de pases posible: la jugada se resuelve antes de que el rival vuelva a estar en su sitio.",
+    momento: "Robo, pase, gol: ocho segundos.",
+    // LA CONVERGENCIA Y: correr la contra bien es pase Y desmarque, las dos cosas.
+    req: { nivel: 6, todos: ["primera_marcha", "ataque_espacio"] },
+    pos: { x: 700, y: 190 },
+    hooks: {
+      // RECICLADO de Tres Pases o Nada: la contra puede nacer directamente en su desenlace.
+      skipToFinish: { of: "transicion", p: 0.30, bonus: 0.05,
+        intro: p => `¡Sin escalas! ${p.name} sale disparado: la contra se juega a UNA.` },
+      // Y hereda deepContra de La Trampa Cerrada: LA MIGRACIÓN F2 del Contragolpe (el
+      // primer tramo del contragolpe letal deja al rival AÚN más partido).
+      deepContra: {},
+    },
+  },
+  {
+    id: "duelista", filo: "contra", rama: "firma", tier: "master", icon: "👑",
+    nombre: "Duelista",
+    desc: "En cada contra hay un jugador que se suelta solo: el equipo lo busca siempre, y el mano a mano es el desenlace natural.",
+    momento: "El delantero solo contra el arquero, otra vez.",
+    req: { nivel: 10, previo: "ataque_relampago" },
+    pos: { x: 940, y: 130 },
+    // RECICLADO de El Jaguar (Press): el desenlace de la contra se acelera y termina en
+    // mano a mano. OJO en builds híbridas: es el mismo hook que El Jaguar y solo aplica
+    // el de una filosofía (hookOf resuelve por familia y las dos son "transicion").
+    hooks: { accelFinish: { of: "transicion", p: 0.30, bonus: 0.07,
+      intro: p => `¡${p.name} se suelta de la marca y ya no lo agarra nadie: MANO A MANO con el arquero!` } },
+  },
+  {
+    id: "el_enjambre", filo: "contra", rama: "firma", tier: "master", icon: "👑",
+    nombre: "El Enjambre",
+    desc: "La contra ya no la corren dos: la corren cinco. Cuando la pelota llega al área, la defensa rival no sabe a quién marcar.",
+    momento: "Cuatro camisetas cruzando mediocampo a la vez.",
+    req: { nivel: 10, previo: "ataque_relampago" },
+    pos: { x: 940, y: 265 },
+    hooks: {
+      // RECICLADO de Superioridad Numérica: el pase elige al MEJOR ubicado de verdad…
+      supportUpgrade: { bonus: 0.05,
+        texto: "El enjambre llegó entero: el pase encuentra al mejor rematador completamente libre." },
+      // …y de A Campo Abierto: toda la contra llega en oleada.
+      avalancha: { bonus: 0.06,
+        texto: "AVALANCHA a campo abierto: la contra llega en oleada y la defensa no sabe a quién marcar." },
+    },
+  },
+
+  /* ---- Respuesta · el precio de correr, y cómo fabricarse la contra (cuadrado) ---- */
+  {
+    id: "anaerobicos", filo: "contra", rama: "respuesta", tier: "basic", icon: "🫁",
+    nombre: "Anaeróbicos",
+    desc: "El equipo está hecho para el esfuerzo explosivo: salir a apretar y volver a correr le cuesta menos que a cualquiera.",
+    momento: "La cuarta ráfaga de presión del partido, corrida igual que la primera.",
+    req: { nivel: 1 }, pos: { x: 190, y: 395 },
+    // ⚠️ ADYACENTE POR AHORA (decisión PO): el diseño pide abaratar el desgaste de
+    // CORRER LA CONTRA, y eso hoy no cuesta energía. Se abarata el único gasto que el
+    // DT controla —el botón de presión— hasta que el sprint de situaciones construya
+    // el costo físico del contraataque. Los pressStamina se apilan (multiplicativos).
+    hooks: { pressStamina: { factor: 0.85 } },
+  },
+  {
+    id: "defensa_intencionada", filo: "contra", rama: "respuesta", tier: "intermediate", icon: "🪖",
+    nombre: "Defensa Intencionada",
+    desc: "El despeje de cabeza deja de ser un manotazo de ahogado: el central cabecea buscando a un compañero, y ahí ya empezó la contra.",
+    momento: "El cabezazo del central que termina en gol treinta metros más allá.",
+    req: { nivel: 3, previo: "anaerobicos" },
+    pos: { x: 430, y: 350 },
+    // RECICLADO de Contragolpe Total (mitad): el córner rival defendido encadena contra.
+    hooks: { chainOnDefendSp: { to: "transicion", p: 0.30, bonus: 0.04,
+      intro: p => `¡El despeje fue un PASE! ${p.name} la baja de cabeza y el equipo sale de contra con el rival entero arriba.` } },
+  },
+  {
+    id: "el_anzuelo", filo: "contra", rama: "respuesta", tier: "intermediate", icon: "🎣",
+    nombre: "El Anzuelo",
+    desc: "El equipo tiene la pelota en su propio campo y espera: el rival, aburrido de mirar, termina saliendo a buscarla — y eso es exactamente lo que se quería.",
+    momento: "El rival dando dos pasos afuera de su bloque y el espacio a su espalda abierto de par en par.",
+    req: { nivel: 3, previo: "anaerobicos" },
+    pos: { x: 430, y: 455 },
+    hooks: {
+      // El cebo: el rival sale a presionar mi salida MÁS seguido — y sobrevivir esa
+      // presión CONVIERTE la jugada en contra mía (el motor ya lo hace).
+      oppPoolMod: { weights: { salida_fondo: 1.20 } },
+      // RECICLADO de La Invitación: LA NEUTRALIZACIÓN del partido muerto — las celdas
+      // contra|contra y contra|bloque vuelven a tablas (0.6 × 1.67 ≈ 1.0) y la
+      // circulación-cebo puede CONVERTIR cuando el que esperaba da un paso al frente.
+      // Baja de avanzada (4 PI) a intermedia (3 PI): acá es donde el concepto vive.
+      poolMod: { vsFilo: ["contra", "bloque"], weights: { transicion: 1.67 } },
+      baitConvert: { vsFilo: ["contra", "bloque"], p: 0.30, bonus: 0.05,
+        texto: "¡Picaron el ANZUELO! El rival dio dos pasos afuera y el espacio a su espalda es una autopista." },
+    },
+  },
+  {
+    id: "segundo_aire", filo: "contra", rama: "respuesta", tier: "advanced", icon: "💨",
+    nombre: "Segundo Aire",
+    desc: "En el tramo final del partido, cuando todos arrastran las piernas, los que corren la contra encuentran un aire que el rival ya no tiene.",
+    momento: "El minuto ochenta y cinco, y el que arranca la contra es el que más corrió.",
+    // RENOMBRADO (era "Pulmones de Acero"): ese nombre ya es la básica de Respuesta
+    // del High Press. LA CONVERGENCIA Y de la rama.
+    req: { nivel: 6, todos: ["defensa_intencionada", "el_anzuelo"] },
+    pos: { x: 680, y: 405 },
+    // ⚠️ ADYACENTE POR AHORA (decisión PO): el diseño pide anular parte de la
+    // penalización de VELOCIDAD por energía baja, que hoy es una curva global sin
+    // excepciones por jugada. Se expresa donde SÍ se ve: conducir la contra con el
+    // tanque vacío deja de ser una condena. Se reescribe en el sprint de situaciones.
+    hooks: { tiredLegs: { under: 50, bonus: 0.08,
+      texto: "Piernas fundidas y ahí va igual: el segundo aire aparece justo cuando el rival ya no tiene ninguno." } },
+  },
+  {
+    id: "skiller", filo: "contra", rama: "respuesta", tier: "master", icon: "👑",
+    nombre: "Skiller",
+    desc: "Al que conduce la contra no lo frena nadie de pie: el rival tiene que elegir entre dejarlo pasar o cometerle la falta.",
+    momento: "La falta desesperada al borde del área, y el tiro libre es nuestro.",
+    req: { nivel: 10, previo: "segundo_aire" },
+    pos: { x: 930, y: 405 },
+    hooks: { counterFouls: { plus: 0.06,
+      texto: "No lo pueden frenar limpio: al que corre la contra hay que hacerle falta." } },
+  },
+
+  /* ---- Expansión · de dónde NACE la contra (triángulo, campo propio) ---- */
+  {
+    id: "estoicos", filo: "contra", rama: "expansion", tier: "basic", icon: "🗿",
+    nombre: "Estóicos",
+    desc: "Replegado, el equipo aguanta lo que le tiren: cede terreno sin ceder el área, y espera su momento.",
+    momento: "El rival estrellándose contra el bloque una y otra vez.",
+    req: { nivel: 1 }, pos: { x: 280, y: 600 },
+    hooks: { containBonus: { bonus: 0.05,
+      texto: "El bloque aguanta estoico: cortan la jugada sin despeinarse." } },
+  },
+  {
+    id: "balonazo", filo: "contra", rama: "expansion", tier: "intermediate", icon: "🌩️",
+    nombre: "Balonazo",
+    desc: "Una pelota que cruza el cielo del área propia es una contra en potencia: el equipo la disputa pensando ya en el arco de enfrente.",
+    momento: "El rechace del duelo aéreo que cae al pie y ya son cuatro corriendo.",
+    req: { nivel: 3, previo: "estoicos" },
+    pos: { x: 500, y: 545 },
+    // RECICLADO de Contragolpistas (Press): la segunda pelota de un duelo aéreo lanza contra.
+    hooks: { chainOnDuelFail: { to: "transicion", p: 0.28, bonus: 0.04,
+      intro: p => `¡La segunda pelota fue nuestra! ${p.name} la engancha y sale disparado con el rival mal parado.` } },
+  },
+  {
+    id: "saque_rapido", filo: "contra", rama: "expansion", tier: "intermediate", icon: "⏱️",
+    nombre: "Saque Rápido",
+    desc: "Reventarla ya no es rendirse: el equipo reinicia antes de que el rival se acomode, y la jugada que parecía muerta sale corriendo para el otro lado.",
+    momento: "El despeje que el rival mira caer mientras dos ya salieron corriendo.",
+    // EL NODO QUE FALTABA en el diseño (decisión PO 30-jul): el tercer origen de la
+    // contra — aéreo (Balonazo) · reinicio (este) · aguante (Estóicos).
+    req: { nivel: 3, previo: "estoicos" },
+    pos: { x: 500, y: 648 },
+    // RECICLADO de Contragolpe Total (la otra mitad): hasta el despeje de la salida
+    // asfixiada puede ser el inicio de una contra.
+    hooks: { quickRestart: { p: 0.30, bonus: 0.04,
+      intro: p => `¡SAQUE RÁPIDO! La reiniciaron antes de que el rival volviera: ${p.name} ya está corriendo.` } },
+  },
+  {
+    id: "pase_atras", filo: "contra", rama: "expansion", tier: "advanced", icon: "🎯",
+    nombre: "Pase Atrás",
+    desc: "Desbloquea la jugada Pase Atrás: llegado al área, el que conduce no remata — la pisa y la devuelve para el que entra de frente al arco.",
+    momento: "La pisada en el área chica y el compañero entrando solo a empujarla.",
+    // LA CONVERGENCIA Y: la jugada de finalización pide las dos maneras de nacer.
+    req: { nivel: 6, todos: ["balonazo", "saque_rapido"] },
+    pos: { x: 720, y: 600 },
+    // LA JUGADA NUEVA: tercera opción del desenlace, SOLO en la familia de la contra.
+    // No se sortea: la elige el DT. Es un pase de verdad (se puede perder) a cambio de
+    // que el remate llegue de frente y regalado.
+    hooks: { squarePass: { bonus: 0.14,
+      texto: "La pisa y la devuelve atrás: el que llega la empuja de frente al arco." } },
+  },
+  {
+    id: "sin_escalas", filo: "contra", rama: "expansion", tier: "master", icon: "👑",
+    nombre: "Sin Escalas",
+    desc: "A veces no hay jugada: hay un pase y un jugador solo contra el arquero. El equipo entero juega esperando ese momento.",
+    momento: "Un pase, cincuenta metros, y el nueve de cara al arquero.",
+    req: { nivel: 10, previo: "pase_atras" },
+    pos: { x: 940, y: 600 },
+    // La contra puede NACER ya resuelta: se saltean los actos intermedios y el desenlace
+    // es directamente el mano a mano. Poco probable a propósito (es el ideal platónico).
+    hooks: { oneOnOne: { p: 0.14, bonus: 0.12,
+      intro: p => `¡SIN ESCALAS! Un solo pase y ${p.name} quedó MANO A MANO con el arquero: no hubo jugada, hubo puñalada.` } },
   },
 
   /* ================= INTERMEDIATE (T2 "Las ramas") =================
@@ -620,130 +1087,11 @@ export const TRAITS = [
      Los marcados (migrado F2) absorben el efecto que Consolidada
      regalaba automático — ahora se compra. */
 
-  /* ---------------- ⚡ Contragolpe ---------------- */
-  {
-    id: "primer_pase", filo: "contra", rama: "firma", tier: "intermediate", icon: "📡",
-    nombre: "El Primer Pase",
-    desc: "El primer pase tras el robo busca directamente romper la última línea.",
-    momento: "El pase de cincuenta metros que deja el mano a mano.",
-    req: { nivel: 3, previo: "tres_pases" },
-    hooks: { skipUpgrade: { bonus: 0.06,
-      intro: p => `¡El PRIMER PASE rompe la última línea! ${p.name} queda lanzado con cincuenta metros por delante.` } },
-  },
-  {
-    id: "trampa_cerrada", filo: "contra", rama: "respuesta", tier: "intermediate", icon: "⛓️",
-    nombre: "La Trampa Cerrada",
-    desc: "Cuando el rival se vuelca al ataque, el equipo multiplica las contras a campo abierto.",
-    momento: "La segunda contra consecutiva con el rival regalado.",
-    req: { nivel: 3, previo: "tender_trampa" }, // AJENO: aguantar para cazar
-    // Migración F2: el 1er tramo del Contragolpe letal deja al rival AÚN más partido
-    // (deepBonus que antes regalaba Consolidada — filoRasgo contra).
-    hooks: { deepContra: {} },
-  },
-  {
-    id: "superioridad", filo: "contra", rama: "expansion", tier: "intermediate", icon: "🎯",
-    nombre: "Superioridad Numérica",
-    desc: "Los contraataques buscan sistemáticamente el dos contra uno en el último tercio.",
-    momento: "El dos contra uno resuelto con pase al del área chica.",
-    req: { nivel: 3, previo: "manada" },
-    hooks: { supportUpgrade: { bonus: 0.05, // el pase busca al MEJOR ubicado de verdad (max Tiro)
-      texto: "SUPERIORIDAD numérica: el pase encuentra al mejor rematador completamente libre." } },
-  },
-
-  /* ---------------- 🧱 Bloque bajo ---------------- */
-  {
-    id: "duenos_area", filo: "bloque", rama: "firma", tier: "intermediate", icon: "🗿",
-    nombre: "Dueños del Área",
-    desc: "El equipo domina el juego aéreo defensivo dentro de su propia área.",
-    momento: "El despeje número diez del central y la contra que nace de ahí.",
-    req: { nivel: 3, previo: "jaula" },
-    // Migración F2: la fortaleza PROFUNDA (deepContain + convertDeep — filoRasgo bloque:
-    // "la muralla contiene mejor y castiga casi siempre") + el córner rival defendido
-    // puede encadenar pelotazo propio (comer centros → lanzar).
-    hooks: { deepBloque: {}, chainOnDefendSp: { to: "pelotazo", p: 0.30, bonus: 0.03,
-      intro: p => `¡El área es NUESTRA! Despeje limpio, y ${p.name} ya tiene el pelotazo armado.` } },
-  },
-  {
-    id: "pelota_ensayada", filo: "bloque", rama: "respuesta", tier: "intermediate", icon: "📐",
-    nombre: "Pelota Parada Ensayada",
-    desc: "Cada tiro libre y córner ejecuta una jugada ensayada en el entrenamiento.",
-    momento: "El córner ensayado que termina en gol del dos.",
-    req: { nivel: 3, previo: "oficio" }, // AJENO: ensayar es elaborar
-    hooks: { setpieceRehearsed: { bonus: 0.06, poolMult: 1.25,
-      texto: "Esto se ensayó mil veces: la pizarra del balón parado entra en acción." } },
-  },
-  {
-    id: "plataforma", filo: "bloque", rama: "expansion", tier: "intermediate", icon: "🏗️",
-    nombre: "Plataforma",
-    desc: "Ganada la segunda pelota, el equipo la convierte en ataque organizado en campo rival.",
-    momento: "Peinada, control del diez, llegada limpia.",
-    req: { nivel: 3, previo: "segunda_jugada" },
-    hooks: { secondBallUpgrade: { bonus: 0.06,
-      intro: p => `¡Segunda pelota y POSICIÓN establecida! ${p.name} organiza el ataque en campo rival.` } },
-  },
-
   /* ================= ADVANCED (T3 "La doctrina") =================
      Convergencia ASIMÉTRICA: Intermediate de la rama líder + Básico de la
      rama de apoyo + Nivel 6 + Principio a 4 (propio) o 3 (ajeno) + 1 PI.
      Los anti-matchup NEUTRALIZAN la matriz F2 — la llevan a tablas, JAMÁS
      la invierten (regla del arco). */
-
-  /* ---------------- ⚡ Contragolpe ---------------- */
-  {
-    id: "invitacion", filo: "contra", rama: "respuesta", tier: "advanced", icon: "🎩",
-    nombre: "La Invitación",
-    desc: "Cuando el rival espera, el equipo mantiene el balón con paciencia para obligarlo a salir — y entonces ataca el espacio.",
-    momento: "Diez minutos de toque paciente y la puñalada cuando el bloque dio dos pasos afuera.",
-    req: { nivel: 6, todos: ["trampa_cerrada", "tres_pases"] }, // el MÁS ajeno del pool
-    // LA RESPUESTA AL PARTIDO MUERTO: neutraliza las celdas contra|contra y
-    // contra|bloque (0.6×1.67 ≈ 1.0) y la circulación-cebo puede CONVERTIR en
-    // transición cuando el rival que esperaba da un paso al frente.
-    hooks: {
-      poolMod: { vsFilo: ["contra", "bloque"], weights: { transicion: 1.67 } },
-      baitConvert: { vsFilo: ["contra", "bloque"], p: 0.30, bonus: 0.05,
-        texto: "¡LA INVITACIÓN funcionó! El rival dio dos pasos afuera y el espacio a su espalda es una autopista." },
-    },
-  },
-  {
-    id: "campo_abierto", filo: "contra", rama: "firma", tier: "advanced", icon: "🏇",
-    nombre: "A Campo Abierto",
-    desc: "Las contras combinan velocidad máxima y varios corredores: el robo se convierte en avalancha.",
-    momento: "Cuatro camisetas cruzando mediocampo a la vez.",
-    req: { nivel: 6, todos: ["primer_pase", "manada"] },
-    hooks: { avalancha: { bonus: 0.06,
-      texto: "AVALANCHA a campo abierto: la contra llega en oleada y la defensa no sabe a quién marcar." } },
-  },
-
-  /* ---------------- 🧱 Bloque bajo ---------------- */
-  {
-    id: "la_fortaleza", filo: "bloque", rama: "firma", tier: "advanced", icon: "🏯",
-    nombre: "La Fortaleza",
-    desc: "El área propia se vuelve territorio prohibido: cada centro, cada córner, cada embestida muere en el muro.",
-    momento: "El delantero rival discutiendo con sus compañeros tras la enésima llegada muerta.",
-    req: { nivel: 6, todos: ["duenos_area", "oficio"] },
-    // LA NEUTRALIZACIÓN del sitio: la celda opp bloque|posesion vuelve a tablas
-    // (1.35×0.74 ≈ 1.0) y la FRUSTRACIÓN acumulada degrada los remates rivales a
-    // medida que fallan (por remate errado, con tope).
-    hooks: {
-      oppPoolMod: { vsFilo: "posesion", weights: { repliegue: 0.74 } },
-      // perShot = por ataque rival MUERTO en la muralla (contador propio del Match:
-      // el diseño pide ataques frustrados, no tiros — el corte sin remate también suma).
-      frustration: { perShot: 0.02, cap: 0.08,
-        texto: "La frustración rival se palpa: cuanto más ataca sin premio, peor remata — la muralla come moral." },
-    },
-  },
-  {
-    id: "cabeza_playa", filo: "bloque", rama: "expansion", tier: "advanced", icon: "⚓",
-    nombre: "Cabeza de Playa",
-    desc: "El equipo ya no despeja: cada balón largo establece posición en campo rival.",
-    momento: "Tres córners seguidos fabricados desde pelotazos.",
-    req: { nivel: 6, todos: ["plataforma", "jaula"] },
-    // El pelotazo REACTIVO que muere sin gol puede fabricar córner (balón parado
-    // encadenado): la escasez ofensiva del Bloque compensada por CALIDAD del ciclo
-    // despeje → pelotazo → segunda → córner — cada llegada vale más.
-    hooks: { beachhead: { p: 0.35,
-      texto: "¡Cabeza de playa! El pelotazo no muere: la zaga rival, incómoda, la manda al córner." } },
-  },
 
   /* ================= MASTER (T3 — el ideal platónico) =================
      Un Advanced cualquiera + los TRES básicos (presencia en las tres ramas)
@@ -755,28 +1103,6 @@ export const TRAITS = [
      en vez de converger las tres, y viven arriba en el bloque de Press. La
      consagración solo dispara con el PRIMERO de la filosofía. Las tres
      filosofías todavía sin rediseñar conservan la regla original de abajo. */
-  {
-    id: "contragolpe_total", filo: "contra", rama: "master", tier: "master", icon: "👑",
-    nombre: "Contragolpe Total",
-    desc: "Cualquier balón recuperado, en cualquier zona, en cualquier momento, es el inicio de una contra. El rival ataca con miedo.",
-    momento: "La contra que nace de un córner rival.",
-    req: { nivel: 10, alguno: ["invitacion", "campo_abierto"], todos: ["tres_pases", "tender_trampa", "manada"] },
-    // El córner rival defendido y la salida sobrevivida también encadenan contra;
-    // y el MIEDO: el rival ataca con menos volumen (shareShift a mi favor).
-    hooks: { masterContra: { p: 0.30, shareShift: 0.04, bonus: 0.04,
-      intro: p => `¡CONTRAGOLPE TOTAL! Nadie en el estadio lo esperaba — ${p.name} ya está corriendo y el rival entero quedó a sus espaldas.` } },
-  },
-  {
-    id: "uno_a_cero", filo: "bloque", rama: "master", tier: "master", icon: "👑",
-    nombre: "Uno a Cero",
-    desc: "Con ventaja en el marcador, el equipo convierte el partido en territorio propio: el uno a cero se defiende con oficio, muro y castigo hasta el final.",
-    momento: "Los últimos veinte minutos defendiendo la ventaja sin conceder una sola llegada limpia.",
-    req: { nivel: 10, alguno: ["la_fortaleza", "cabeza_playa"], todos: ["jaula", "segunda_jugada", "oficio"] },
-    // Rasgo de ESTADO (el único del pool): SOLO con ventaja — la muralla se amplifica
-    // y el castigo directo gana letalidad. Perdiendo no aporta NADA: pura identidad.
-    hooks: { masterBloque: { oppMalus: -0.05, myBonus: 0.05,
-      texto: "El uno a cero es un arte y este equipo lo pinta: muralla atrás, cuchillo adelante, reloj corriendo." } },
-  },
 ];
 
 /** Un rasgo por id (o undefined). */

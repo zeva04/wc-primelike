@@ -25,7 +25,7 @@
    tiempo real: la sensación es la que pidió el PO, sin que el
    estado del juego dependa de cuánto tarda el jugador en leer.
    ============================================================ */
-import { hookOf } from "./trait-hooks.js";
+import { hooksOf } from "./trait-hooks.js";
 import { markMomentum } from "./match-momentum.js";
 
 /** Cuánto dura una ráfaga, en minutos de partido (2 ticks de simulación). */
@@ -111,10 +111,10 @@ export function pressState(m) {
  * minutos, no energía — la conversión sigue siendo de medical.matchFatigue, que
  * es la única que sabe cuánto cuesta un minuto (un solo dueño del dial).
  *
- * Pulmones de Acero (rediseño de Press) entra JUSTO acá: el rasgo abarata el
- * acto de presionar y NADA más — nunca la fatiga general del partido.
+ * Pulmones de Acero (Press) y Anaeróbicos (Contra) entran JUSTO acá: abaratan el
+ * acto de presionar y NADA más — nunca la fatiga general del partido. Se APILAN
+ * multiplicativos: tener los dos rinde ×0.85 × ×0.85, no el mejor de los dos.
  */
 export function pressExtraMinutes(m, minutosPresionados) {
-  const h = hookOf(m, "pressStamina");
-  return minutosPresionados * (h ? h.factor : 1);
+  return hooksOf(m, "pressStamina").reduce((min, h) => min * h.factor, minutosPresionados);
 }

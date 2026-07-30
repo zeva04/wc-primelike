@@ -1,10 +1,18 @@
 # Catálogo de Rasgos — el árbol de identidad completo
 
-Documento de referencia del arco de Rasgos (T1–T3, cerrado 23-jul-2026). Lista los 36
+Documento de referencia del arco de Rasgos (T1–T3, cerrado 23-jul-2026). Lista los
 rasgos vivos con su efecto mecánico ("buff"), su costo/tradeoff real, y el árbol de
 dependencias para desbloquear cada uno. Diseño narrativo completo en
 [ROADMAP-rasgos.md](ROADMAP-rasgos.md); datos fuente en
 [content/traits.js](../js/content/traits.js).
+
+> ⚠️ **Deuda de documentación.** Las cuatro filosofías se REDISEÑARON después de cerrar
+> el arco y este documento está al día en dos: **Bloque bajo** y **Contragolpe**
+> (30-jul-2026). **High Press** (18 rasgos, 25-jul) y **Posesión** (15 rasgos, 26-jul)
+> siguen listados con su árbol viejo de 9, y todo lo que este documento dice sobre
+> **"Principios mínimos"** murió con las aristas en el arco de Progresión: los requisitos
+> vivos son **nivel de la filosofía del rasgo + 1 PI**. La fuente de verdad es siempre
+> [content/traits.js](../js/content/traits.js).
 
 ## Cómo leer esto
 
@@ -77,41 +85,68 @@ estrella contra un bloque bajo bien plantado.
 
 ---
 
-## ⚡ Contragolpe — *"Orden atrás, y a la que pierden la pelota: puñalada al espacio."*
+## ⚡ Contragolpe — *"Orden atrás, y a la que pierden la pelota: puñalada al espacio."* — **REDISEÑADO 30-jul-2026**
 
 **Fuerte:** vive del rival que ataca (cada avance suyo es una contra en potencia) ·
 **Advertencia:** cede la iniciativa — contra otro que también espera, el partido se muere.
 
-| Rama | Tier | Rasgo | Buff (qué cambia en el partido) | Tradeoff / costo real |
+Árbol de **16 rasgos** en grafo. Es el más caro del juego: **las tres avanzadas piden
+DOS padres** (convergencia Y), así que cada rama cuesta 5 PI hasta su Maestría.
+
+| Rama | Tier | Rasgo | Buff (qué cambia en el partido) | Requisitos |
 |---|---|---|---|---|
-| Firma | Basic | 🗡️ Tres Pases o Nada | 30% de saltar directo al desenlace de la transición (fútbol sin escalas, más riesgo/premio). | Ninguno. |
-| Respuesta | Basic | 🪤 Tender la Trampa | 30% de convertir un repliegue contenido en transición mía (el rival quedó estirado). | Ninguno. |
-| Expansión | Basic | 🐆 Correr en Manada | El "buscar al mejor ubicado" del desenlace de la transición gana +0.06 de bonus (superioridad real). | Ninguno. |
-| Firma | Intermediate | 📡 El Primer Pase | Sube la calidad y la voz propia del salto de Tres Pases (+0.06 extra). | Exige Verticalidad ⚡ 2 — **propia**. |
-| Respuesta | Intermediate | ⛓️ La Trampa Cerrada | Migración F2: profundiza el 1er tramo del Contragolpe letal (rival aún más partido). | Exige Solidez 🧱 2 — **propia del Contra** (excepción del arco: es SU arista de aguantar). |
-| Expansión | Intermediate | 🎯 Superioridad Numérica | El pase busca al MEJOR rematador real (máximo Tiro), no a un corredor cualquiera (+0.05). | Exige Elaboración 🎼 2 — **AJENA** (la única ajena real del Contra). |
-| Respuesta | Advanced | 🎩 La Invitación | **La respuesta al partido muerto**: neutraliza Contra\|Contra y Contra\|Bloque (transición ×1.67 ≈ tablas) + 30% de convertir la circulación-cebo en transición cuando el rival da un paso al frente. | Exige Elaboración 🎼 3 — el principio MÁS ajeno del pool. |
-| Firma | Advanced | 🏇 A Campo Abierto | Avalancha: +0.06 de bonus a toda la familia de la transición — la contra llega en oleada. | Exige Verticalidad 4, Primer Pase + Manada, nivel 6. |
-| Master | Master | 👑 Contragolpe Total | Cualquier balón recuperado (hasta un córner defendido) puede encadenar contra + el rival ataca con MIEDO (shareShift +0.04 a mi favor: menos volumen ofensivo rival). | Exige un Advanced (La Invitación o A Campo Abierto) + los 3 básicos + nivel 10 + Solidez 4 **y** Verticalidad 4. |
+| Firma | Basic | 📡 Primer Pase | El acto que LANZA la contra sale +0.05. Los tres rasgos del pase de la contra se apilan. | Nivel 1. |
+| Firma | Intermediate | 📈 Primera Marcha | Todos los actos de la contra salen +0.05 (ya en carrera, el equipo se entiende). | Nivel 3 + Primer Pase. |
+| Firma | Intermediate | 🏃 Ataque al Espacio | El "buscar al mejor ubicado" del desenlace de la contra gana +0.06: los desmarques parten a la defensa. | Nivel 3 + Primer Pase. |
+| Firma | Advanced | ⚡ Ataque Relámpago | 30% de saltar directo al desenlace (la contra a una) + **migración F2**: profundiza el 1er tramo del Contragolpe letal. | Nivel 6 + Primera Marcha **y** Ataque al Espacio. |
+| Firma | Master | 👑 Duelista | 30% de que el desenlace de la contra se acelere hasta el mano a mano con el arquero (+0.07). | Nivel 10 + Ataque Relámpago. |
+| Firma | Master | 👑 El Enjambre | El pase encuentra al MEJOR rematador real (+0.05) **y** toda la contra llega en oleada (+0.06). | Nivel 10 + Ataque Relámpago. |
+| Respuesta | Basic | 🫁 Anaeróbicos | El botón de presión cuesta 15% menos energía (se apila con Pulmones de Acero del Press). ⚠️ *Adyacente: ver deuda abajo.* | Nivel 1. |
+| Respuesta | Intermediate | 🪖 Defensa Intencionada | 30% de que el córner rival defendido de cabeza encadene contra mía. | Nivel 3 + Anaeróbicos. |
+| Respuesta | Intermediate | 🎣 El Anzuelo | El rival sale a presionar mi salida más seguido (×1.20) — y sobrevivirla ES una contra + **neutralización** del partido muerto (transición ×1.67 vs Contra y Bloque ≈ tablas) + 30% de convertir la circulación-cebo. | Nivel 3 + Anaeróbicos. |
+| Respuesta | Advanced | 💨 Segundo Aire | Conducir la contra con menos de 50 de energía gana +0.08. ⚠️ *Adyacente: ver deuda abajo.* | Nivel 6 + Defensa Intencionada **y** El Anzuelo. |
+| Respuesta | Master | 👑 Skiller | Al que conduce la contra le hacen falta más seguido (+0.06 de ventana): más penales y tiros libres. | Nivel 10 + Segundo Aire. |
+| Expansión | Basic | 🗿 Estóicos | Replegado, el equipo corta más: +0.05 al acto de contención. | Nivel 1. |
+| Expansión | Intermediate | 🌩️ Balonazo | 28% de que la segunda pelota de un duelo aéreo perdido lance la contra. | Nivel 3 + Estóicos. |
+| Expansión | Intermediate | ⏱️ Saque Rápido | 30% de que el despeje de la salida asfixiada reinicie rápido y se vuelva contra mía. | Nivel 3 + Estóicos. |
+| Expansión | Advanced | 🎯 Pase Atrás | **Jugada nueva**: opción del desenlace de la contra. La pisa y la devuelve al que entra de frente (+0.14). Es un pase de verdad: perderlo abre contra rival. | Nivel 6 + Balonazo **y** Saque Rápido. |
+| Expansión | Master | 👑 Sin Escalas | 14% de que la contra NAZCA resuelta: se saltean los actos intermedios y el desenlace es el mano a mano (+0.12). | Nivel 10 + Pase Atrás. |
+
+> ⚠️ **Deuda declarada (sprint de SITUACIONES DE JUEGO).** Anaeróbicos y Segundo Aire
+> apuntan a un sustrato que todavía no existe: **correr una contra no cuesta energía**
+> (el único gasto que el DT controla es el botón de presión) y la penalización por
+> energía es una curva global sin excepciones por jugada. Los dos están implementados
+> con el efecto adyacente más cercano y **se reescriben cuando ese sprint construya el
+> costo físico del contraataque**.
 
 ---
 
-## 🧱 Bloque bajo — *"Muralla atrás y pelotazo al duelo: fútbol de trinchera."*
+## 🧱 Bloque bajo — *"Muralla atrás y pelotazo al duelo: fútbol de trinchera."* — **REDISEÑADO 30-jul-2026**
 
 **Fuerte:** dificilísimo de romper (invita al rival y lo seca) · **Advertencia:** sufre al
 que elabora con paciencia y renuncia a generar volumen ofensivo.
 
-| Rama | Tier | Rasgo | Buff (qué cambia en el partido) | Tradeoff / costo real |
+Árbol de **15 rasgos** en grafo (como Press y Posesión). Único del juego con una
+convergencia **Y**: la Firma abre con DOS básicos que se compran juntos. Los requisitos
+son solo **nivel de la filosofía + 1 PI** (los Principios murieron con las aristas).
+
+| Rama | Tier | Rasgo | Buff (qué cambia en el partido) | Requisitos |
 |---|---|---|---|---|
-| Firma | Basic | 🏰 Jaula Central | El remate rival del repliegue llega incómodo (bonus −0.05: la jaula lo empujó a la banda). | Ninguno. |
-| Respuesta | Basic | ⏳ Oficio de Trinchera | 25% de que el avance rival multi-acto pierda continuidad (el partido se corta). | Ninguno. |
-| Expansión | Basic | 🪂 Segunda Jugada | 30% de ganar la segunda pelota tras un duelo aéreo perdido y relanzar el pelotazo. | Ninguno. |
-| Firma | Intermediate | 🗿 Dueños del Área | Migración F2: la fortaleza contiene mejor y castiga más + el córner defendido puede encadenar pelotazo propio. | Exige Solidez 🧱 2 — **propia**. |
-| Respuesta | Intermediate | 📐 Pelota Parada Ensayada | El balón parado propio sale más seguido (×1.25 en el pool) y con mejor bonus (+0.06). | Exige Elaboración 🎼 2 — **AJENA**. |
-| Expansión | Intermediate | 🏗️ Plataforma | La cadena de Segunda Jugada sube de calidad (+0.06) y gana su propia voz (posición establecida). | Exige Juego directo 🌩️ 2 — **propia**. |
-| Firma | Advanced | 🏯 La Fortaleza | **Neutralización real**: repliegue ×0.74 vs Posesión (el sitio vuelve a tablas) + frustración acumulada degrada el remate rival hasta −0.08 con cada ataque muerto en la muralla. | Exige Solidez 4, Dueños del Área + Oficio, nivel 6. |
-| Expansión | Advanced | ⚓ Cabeza de Playa | 35% de que el pelotazo sin gol fabrique un córner en vez de morir — el ciclo despeje→pelotazo→segunda→córner cierra completo. | Exige Juego directo 🌩️ 4 — **propia**. |
-| Master | Master | 👑 Uno a Cero | **Rasgo de ESTADO — el único del pool**: SOLO con ventaja en el marcador, la muralla se amplifica (−0.05 al rival) y el castigo directo gana letalidad (+0.05). Perdiendo o empatando no aporta NADA. | Exige un Advanced (La Fortaleza o Cabeza de Playa) + los 3 básicos + nivel 10 + Solidez 4 **y** Juego directo 4. |
+| Firma | Basic | 🏰 Compactación | El remate rival del repliegue llega incómodo (−0.05): cerrado el centro, se remata desde afuera. | Nivel 1. |
+| Firma | Basic | 🕸️ Sobrepoblado | 25% de que el avance rival multi-acto muera interceptado antes del remate. | Nivel 1. |
+| Firma | Intermediate | 🗿 Área Blindada | **Migración F2 del Bloque**: la fortaleza contiene mejor y castiga más (convert 0.55→0.75) + el remate rival dentro del área sale a destiempo (−0.05). | Nivel 3 + Compactación **y** Sobrepoblado. |
+| Firma | Advanced | 🪜 Defensa Escalonada | La PRIMERA ocasión rival del partido llega −0.06. Se consume una vez por partido. | Nivel 6 + Área Blindada. |
+| Firma | Advanced | 🧱 Muralla | **Rasgo de ESTADO**: mientras el marcador esté empatado o a favor, el remate rival llega −0.05. Perdiendo no aporta nada. | Nivel 6 + Área Blindada. |
+| Firma | Master | 👑 Fortaleza Inexpugnable | 25% de que la **ocasión clara** rival (mano a mano · contra tras mi pérdida) directamente no ocurra + **neutralización** del sitio (repliegue ×0.74 vs Posesión: la celda vuelve a tablas) + frustración acumulada hasta −0.08. | Nivel 10 + Defensa Escalonada **o** Muralla. |
+| Respuesta | Basic | 🦅 Dominio Aéreo | El cabezazo rival del córner en contra llega forzado (−0.05). | Nivel 1. |
+| Respuesta | Intermediate | 👀 Atentos | La segunda pelota es mía por los dos canales: 30% tras córner defendido y 30% tras duelo aéreo perdido — las dos encadenan pelotazo propio. | Nivel 3 + Dominio Aéreo. |
+| Respuesta | Advanced | 🚀 Pelotazo | **Jugada nueva "Reventar el Balón"**: tercera opción del acto de contención. Mata el ataque rival sin remate; el precio es resignar la conversión de la fortaleza y 30% de córner concedido. | Nivel 6 + Atentos. |
+| Respuesta | Advanced | 🎪 Al Área | 35% de que el pelotazo sin gol termine en saque largo al área (balón parado encadenado) en vez de morir. | Nivel 6 + Atentos. |
+| Respuesta | Master | 👑 Hombre Objetivo | **Jugada nueva "Pivoteo al Área"**: tercera opción del duelo aéreo. El que gana por arriba la baja al mejor rematador, que define de frente (+0.07). | Nivel 10 + Pelotazo **o** Al Área. |
+| Expansión | Basic | 📐 Especialistas | El balón parado propio se ejecuta mejor (+0.06). | Nivel 1. |
+| Expansión | Intermediate | 📋 Estrategia Ensayada | El balón parado propio SALE más seguido (×1.15 en el pool, apilado sobre el ×1.3 incondicional del Bloque). | Nivel 3 + Especialistas. |
+| Expansión | Advanced | 📈 Salida Vertical | Los actos de la familia de la transición salen +0.05: recuperada la pelota, el pase hacia adelante llega. | Nivel 6 + Estrategia Ensayada. |
+| Expansión | Master | 👑 Contragolpe Letal | **Jugada nueva "Contraataque"**: 30% de que el repliegue contenido convierta en transición mía. | Nivel 10 + Salida Vertical. |
 
 ---
 
@@ -176,25 +211,38 @@ flowchart TD
 flowchart TD
   subgraph CON["⚡ Contragolpe"]
     direction TB
-    C1["🗡️ Tres Pases o Nada\nBasic · Nv1"]
-    C2["🪤 Tender la Trampa\nBasic · Nv1"]
-    C3["🐆 Correr en Manada\nBasic · Nv1"]
-    C4["📡 El Primer Pase\nInt · Nv3 · Vertical2"]
-    C5["⛓️ La Trampa Cerrada\nInt · Nv3 · Solidez2 (propia)"]
-    C6["🎯 Superioridad Numérica\nInt · Nv3 · Elab2 (ajena)"]
-    C7["🏇 A Campo Abierto\nAdv · Nv6 · Vertical4"]
-    C8["🎩 La Invitación\nAdv · Nv6 · Elab3 (ajena)"]
-    C9["👑 Contragolpe Total\nMaster · Nv10 · Solidez4+Vert4"]
-    C1 --> C4 --> C7
-    C3 --> C7
-    C2 --> C5 --> C8
-    C1 --> C8
-    C3 --> C6
+    C1["📡 Primer Pase\nBasic · Nv1"]
+    C2["📈 Primera Marcha\nInt · Nv3"]
+    C3["🏃 Ataque al Espacio\nInt · Nv3"]
+    C4["⚡ Ataque Relámpago\nAdv · Nv6 · deepContra"]
+    C5["👑 Duelista\nMaster · Nv10"]
+    C6["👑 El Enjambre\nMaster · Nv10"]
+    C7["🫁 Anaeróbicos\nBasic · Nv1"]
+    C8["🪖 Defensa Intencionada\nInt · Nv3"]
+    C9["🎣 El Anzuelo\nInt · Nv3 · neutraliza"]
+    C10["💨 Segundo Aire\nAdv · Nv6"]
+    C11["👑 Skiller\nMaster · Nv10"]
+    C12["🗿 Estóicos\nBasic · Nv1"]
+    C13["🌩️ Balonazo\nInt · Nv3"]
+    C14["⏱️ Saque Rápido\nInt · Nv3"]
+    C15["🎯 Pase Atrás — jugada nueva\nAdv · Nv6"]
+    C16["👑 Sin Escalas\nMaster · Nv10"]
+    C1 --> C2
+    C1 --> C3
+    C2 ==>|"todos (Y)"| C4
+    C3 ==>|"todos (Y)"| C4
+    C4 --> C5
+    C4 --> C6
+    C7 --> C8
     C7 --> C9
-    C8 -.->|"alguno"| C9
-    C1 --> C9
-    C2 --> C9
-    C3 --> C9
+    C8 ==>|"todos (Y)"| C10
+    C9 ==>|"todos (Y)"| C10
+    C10 --> C11
+    C12 --> C13
+    C12 --> C14
+    C13 ==>|"todos (Y)"| C15
+    C14 ==>|"todos (Y)"| C15
+    C15 --> C16
   end
 ```
 
@@ -202,25 +250,32 @@ flowchart TD
 flowchart TD
   subgraph BLQ["🧱 Bloque bajo"]
     direction TB
-    B1["🏰 Jaula Central\nBasic · Nv1"]
-    B2["⏳ Oficio de Trinchera\nBasic · Nv1"]
-    B3["🪂 Segunda Jugada\nBasic · Nv1"]
-    B4["🗿 Dueños del Área\nInt · Nv3 · Solidez2"]
-    B5["📐 Pelota Ensayada\nInt · Nv3 · Elab2 (ajena)"]
-    B6["🏗️ Plataforma\nInt · Nv3 · Directo2"]
-    B7["🏯 La Fortaleza\nAdv · Nv6 · Solidez4"]
-    B8["⚓ Cabeza de Playa\nAdv · Nv6 · Directo4"]
-    B9["👑 Uno a Cero (ESTADO)\nMaster · Nv10 · Solidez4+Directo4"]
-    B1 --> B4 --> B7
-    B2 --> B7
-    B2 --> B5
-    B3 --> B6 --> B8
-    B1 --> B8
-    B7 -.->|"alguno"| B9
-    B8 -.->|"alguno"| B9
-    B1 --> B9
-    B2 --> B9
-    B3 --> B9
+    B1["🏰 Compactación\nBasic · Nv1"]
+    B2["🕸️ Sobrepoblado\nBasic · Nv1"]
+    B3["🗿 Área Blindada\nInt · Nv3 · deepBloque"]
+    B4["🪜 Defensa Escalonada\nAdv · Nv6"]
+    B5["🧱 Muralla (ESTADO)\nAdv · Nv6"]
+    B6["👑 Fortaleza Inexpugnable\nMaster · Nv10"]
+    B7["🦅 Dominio Aéreo\nBasic · Nv1"]
+    B8["👀 Atentos\nInt · Nv3"]
+    B9["🚀 Pelotazo — Reventar el Balón\nAdv · Nv6"]
+    B10["🎪 Al Área — Saque Largo\nAdv · Nv6"]
+    B11["👑 Hombre Objetivo — Pivoteo\nMaster · Nv10"]
+    B12["📐 Especialistas\nBasic · Nv1"]
+    B13["📋 Estrategia Ensayada\nInt · Nv3"]
+    B14["📈 Salida Vertical\nAdv · Nv6"]
+    B15["👑 Contragolpe Letal — Contraataque\nMaster · Nv10"]
+    B1 ==>|"todos (Y)"| B3
+    B2 ==>|"todos (Y)"| B3
+    B3 --> B4
+    B3 --> B5
+    B4 -.->|"alguno"| B6
+    B5 -.->|"alguno"| B6
+    B7 --> B8 --> B9
+    B8 --> B10
+    B9 -.->|"alguno"| B11
+    B10 -.->|"alguno"| B11
+    B12 --> B13 --> B14 --> B15
   end
 ```
 

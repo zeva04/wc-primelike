@@ -52,7 +52,9 @@ export function actPass(m, from, { hard = false } = {}) {
  * `bonus` (M2): conducir con la cancha ROTA es más fácil — el 2º tramo del Contragolpe
  * letal lo usa (adv.carryEase): el rival partido y de espaldas no es una defensa plantada.
  */
-export function actDribble(m, p, { bonus = 0 } = {}) {
+/** `foulPlus` (Skiller, Contra): a ese no lo frenan limpio — la ventana de FALTA a favor
+ *  se ensancha (el 12% de siempre más lo que traiga el rasgo). */
+export function actDribble(m, p, { bonus = 0, foulPlus = 0 } = {}) {
   // ODISEA (2ª mitad): conducir al espacio es carisma Y PIERNAS. El aura cedió parte de
   // su peso a la velocidad manteniendo el mismo valor esperado en un jugador promedio
   // (aura 70 / vel 70 daba 0.313; ahora 0.323): el que cambia es el perfil, no el ritmo
@@ -60,7 +62,7 @@ export function actDribble(m, p, { bonus = 0 } = {}) {
   const pr = clamp(0.05 + effStat(p, "aura", m.my.buffs) * 0.048
     + effStat(p, "velocidad", m.my.buffs) * 0.028 + bonus, 0.05, 0.65);
   const roll = rnd();
-  const out = { ok: roll < pr, foul: roll >= pr && roll < pr + 0.12 };
+  const out = { ok: roll < pr, foul: roll >= pr && roll < pr + 0.12 + foulPlus };
   noteMomentum(m, out.ok ? "conduccion" : out.foul ? "paseProgresivo" : "conduccionFallada");
   return out;
 }
