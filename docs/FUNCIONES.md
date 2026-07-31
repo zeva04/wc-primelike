@@ -509,7 +509,20 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 - Las filas salen de **`playedPos(p)`, no del índice del slot**: así cae bien el arquero que entra por una roja, que ocupa el índice del jugador de campo que salió pero juega en el arco.
 - El resalte de destinos válidos va **por clases, sin repintar**: repintar en `dragstart` destruye el nodo que el mouse arrastra y cancela el drag.
 
-### 7. Hub y sus pantallas satélite — `ui/screens/hub.js` · `squad.js` · `worldcup.js` · `scorers.js` · `journal.js`
+### 7. Hub y sus pantallas satélite — `ui/screens/hub/` · `squad.js` · `worldcup.js` · `scorers.js` · `journal.js`
+
+La Concentración es una **carpeta** desde el 30-jul-2026 (889 líneas contra un presupuesto de
+500; mudanza pura). Quién hace qué:
+
+| Módulo | Responsabilidad |
+|---|---|
+| `hub/index.js` | La **composición** de la pantalla (las 3 columnas, la banda VS, el calendario y el botón del día) y `pasarDia`. Registra `hub`. |
+| `hub/rival.js` | Todo lo del **rival**: su card, el Informe (Bible §4.6) con su bloque y su altura, y el selector de Oportunidad. |
+| `hub/team.js` | **Mi equipo**: la card de estado (moral, energía, ritmo, cancha, avisos), la identidad, los efectos con su canje y la **altura del bloque** (el picker que comparten esta card y el Informe). |
+| `hub/day.js` | **El día**: calendario, Acción del Día con sus multiplicadores, y los modales que abre pasar de día (portada del Daily, evento inevitable, conflicto con decisión). |
+
+Las tres hojas importan `renderHub` de `index` para repintar tras aplicar algo: ciclo benigno de
+runtime, el mismo patrón que `sequences` ↔ `sequence-acts`.
 | Función | Qué hace |
 |---|---|
 | `nextOpponentId()` | Id del próximo rival (grupo o cruce). |

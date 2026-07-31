@@ -125,7 +125,11 @@ js/
       menu.js                  ← carrusel + dificultad (~120)
       history.js               ← historial de runs (~45)
       draw.js                  ← sorteo de grupos (~50)
-      hub.js                   ← Concentración: calendario, buffs, eventos/conflictos del día (~230)
+      hub/                     ── la Concentración, partida por responsabilidad ──
+        index.js               ← la composición de la pantalla y el paso del día (~255)
+        rival.js               ← el rival: su card, el Informe (Bible §4.6) y la Oportunidad (~210)
+        team.js                ← mi equipo: estado, identidad, efectos y la altura del bloque (~235)
+        day.js                 ← el día: calendario, Acción del Día y sus modales (~325)
       squad.js                 ← Gestión de Plantilla (~120)
       worldcup.js              ← Estado del Mundial (~60)
       journal.js               ← Diario de Campaña (~60)
@@ -467,3 +471,25 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
     (`buildActDecision` para reconstruir la decisión, `resolveSequenceAct` para las opciones que
     caen a la básica) y las familias ↔ `chains` (escalar y cerrar). Nada se usa en la evaluación
     del módulo, solo dentro de las funciones.
+- **30-jul-2026 — `hub.js` PARTIDO** (última deuda de tamaño del proyecto): 889 líneas → la
+  carpeta `ui/screens/hub/` con cuatro módulos — `index` (la composición de la pantalla y el
+  paso del día), `rival` (su card, el Informe y la Oportunidad), `team` (estado, identidad,
+  efectos y la altura del bloque) y `day` (calendario, Acción del Día y sus modales).
+  - **Mudanza pura, demostrada igual que la de `acts/`**: 684 líneas de código antes y 684
+    después, y las ÚNICAS diferencias son los 20 `export` que ganaron las funciones al cruzar
+    una frontera de módulo. Ni una línea más.
+  - Ciclo benigno de runtime: las tres hojas importan `renderHub` de `index` para repintar tras
+    aplicar algo (canjear un buff, elegir una Oportunidad, cerrar un evento del día).
+  - **Trampa de la mudanza, anotada para la próxima**: al bajar los archivos un nivel, TODAS las
+    rutas relativas necesitan un `../` más — y `ui.validate` no lo detecta (solo parsea). Los
+    404 aparecen recién al cargar la pantalla en el navegador; el paso de verificación real de
+    una mudanza de UI es abrirla, no que la batería esté verde.
+
+  Con esto **ninguna PANTALLA pasa el presupuesto de §6** (la mayor es `screens/squad.js`, 463).
+  Quedan dos archivos sobre 500, los dos con su motivo:
+  - `content/traits.js` (1.127) es una **tabla de contenido**, no lógica: §6 solo le pide vivir
+    en `content/`, que es donde está. Si algún día molesta, el corte natural es por árbol
+    (un archivo por filosofía).
+  - `game/match/sequences.js` (606) es el GENERADOR: pesos del pool, filosofía, altura,
+    amplitud y XP de identidad. Su corte natural sería separar el sesgo del pool
+    (`typeWeights` + las matrices) del arranque de secuencia (`startSequence`). No urge.

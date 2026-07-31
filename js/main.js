@@ -13,7 +13,7 @@ import "./ui/screens/menu.js";
 import "./ui/screens/history.js";
 import "./ui/screens/identity.js";
 import "./ui/screens/draw.js";
-import "./ui/screens/hub.js";
+import "./ui/screens/hub/index.js";
 import "./ui/screens/philosophy.js";
 import "./ui/screens/squad.js";
 import "./ui/screens/worldcup.js";
