@@ -212,7 +212,9 @@ derecha) y **cero `rnd()`**: la deriva ambiente es determinista a propósito (mi
 | `myHeight(m)` / `oppHeight(m)` | La altura de bloque 1..5. La mía es una orden del DT y vive en `matchCtx.altura` (se lee en vivo); la del rival sale de su identidad, se radicaliza si está consolidada y la mueve el marcador. |
 | `setHeight(m,n)` / `canChangeHeight(m,n)` / `heightFree(m)` | Mover el bloque. Gratis antes del partido y en el entretiempo; en juego consume una de las `TACTIC_WINDOWS` (3). Narra la orden — el jugador se entera por el relato, nunca por un número. |
 | `backlineRisk(m)` | Cuánto multiplica MI altura el pelotazo a la espalda (`Match.BREAKAWAY_TICK`). ×1 con bloque medio; **asimétrico** hacia abajo (ver CORE §Territorio). |
-| `zoneWeight(type,v)` / `originOf(m,type)` | La geografía de las jugadas: cuánto pesa un tipo desde donde está la pelota (×0.55 por altura de lejanía) y dónde la planta al arrancar. |
+| `lineCover(n)` / `attackWidth(m)` / `defenseWidth(m)` / `widthHint(def,med,del)` | **La amplitud** (Eje Horizontal): una línea de tres ocupa los tres carriles, una de uno solo el centro. Escala −1..+1 centrada en la línea de DOS (punto neutro exacto). `widthHint` es la lectura para la UI, en palabras y sin números — la usan el selector de dibujo y la pizarra del partido. |
+| `otherLane(m)` / `wingLane(m)` / `inWing(m)` | El carril opuesto (el cambio de frente), un carril de banda alternando sin gastar azar, y si la pelota está por afuera. |
+| `zoneWeight(type,v,h)` / `originOf(m,type)` | La geografía de las jugadas: cuánto pesa un tipo desde donde está la pelota (×0.55 por altura de lejanía) y dónde la planta al arrancar. |
 | `ADVANCE` / `inOppBox(m)` | Cuánto avanza la pelota cada gesto, y si estamos dentro del área (lo pregunta la falta: solo ahí hay penal). |
 | `startHalfField(m,nominal)` | Mapa de calor limpio y pelota al medio: cada tiempo tiene el suyo. |
 | `heatCells(m,side,mapIdx)` / `heatHalves(m)` / `fieldState(m)` | Salidas para la UI, ya masticadas: celdas normalizadas 0..1, los tiempos etiquetados y la altura con nombre, icono, explicación, ventanas y **la lectura del rival en palabras**. |

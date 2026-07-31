@@ -385,6 +385,141 @@ function centroV(map) {
   assert(conAltura(5) && !conAltura(2), "la trampa del offside existe con línea alta y no con el bloque metido atrás");
 }
 
+// ---------- EL EJE HORIZONTAL: la amplitud del dibujo ----------
+{
+  // Una línea de 3 ocupa los tres carriles; una de 1, solo el centro; la de 2 es el
+  // punto NEUTRO del dial (y por eso el 2-2-1 no puede moverse ni un pelo).
+  assert(E.lineCover(3) === 1 && E.lineCover(1) === 0 && E.lineCover(2) === 0.5,
+    "una línea de tres cubre los carriles; una de uno, ninguno; la de dos es el medio");
+  const conDibujo = (def, med, del) => {
+    const m = nuevo();
+    const puestos = ["POR", ...Array(def).fill("DEF"), ...Array(med).fill("MED"), ...Array(del).fill("DEL")];
+    m.my.lineup.forEach((p, i) => { p.posJugada = puestos[i]; p.expulsado = false; p.lesionado = false; });
+    return m;
+  };
+  const a131 = E.attackWidth(conDibujo(1, 3, 1)), a311 = E.attackWidth(conDibujo(3, 1, 1)), a221 = E.attackWidth(conDibujo(2, 2, 1));
+  assert(a131 === 1 && a311 === -1, "el 1-3-1 llega a las dos bandas; el 3-1-1 ataca solo por el medio", `${a131} / ${a311}`);
+  assert(a221 === 0, "y el 2-2-1 es EXACTAMENTE el punto neutro (la línea base no se mueve)", a221);
+  const d311 = E.defenseWidth(conDibujo(3, 1, 1)), d131 = E.defenseWidth(conDibujo(1, 3, 1));
+  assert(d311 === 1, "una zaga de tres cubre las bandas atrás", d311);
+  assert(d311 > d131 && E.defenseWidth(conDibujo(2, 2, 1)) === 0, "más que un mediocampo de tres, y el 2-2-1 sigue neutro");
+  // La UI recibe PALABRAS, nunca números (objetivo de diseño del territorio)
+  const h131 = E.widthHint(1, 3, 1), h221 = E.widthHint(2, 2, 1), h311 = E.widthHint(3, 1, 1);
+  assert(/bandas/.test(h131.txt) && !/\d/.test(h131.txt), "el dibujo ancho se explica con palabras", h131.txt);
+  assert(h221.txt === "", "el dibujo neutro no dice nada (no hay nada que contar)");
+  assert(/cubre las bandas/.test(h311.txt) && /solo por el medio/.test(h311.txt),
+    "el 3-1-1 cuenta sus dos caras: cubre atrás y no ataca por afuera", h311.txt);
+}
+
+// ---------- EL EJE HORIZONTAL: la amplitud ROTA el pool (no lo infla) ----------
+{
+  const pesos = (def, med, del) => {
+    const m = nuevo();
+    const puestos = ["POR", ...Array(def).fill("DEF"), ...Array(med).fill("MED"), ...Array(del).fill("DEL")];
+    m.my.lineup.forEach((p, i) => { p.posJugada = puestos[i]; });
+    m.min = 20;
+    return E.typeWeightsFor(m, "mine");
+  };
+  const ancho = pesos(1, 3, 1), angosto = pesos(3, 1, 1);
+  assert(ancho.banda > angosto.banda, "con amplitud sale más fútbol por afuera",
+    `${ancho.banda.toFixed(2)} vs ${angosto.banda.toFixed(2)}`);
+  assert(ancho.cambio_frente > angosto.cambio_frente * 2,
+    "y el cambio de frente ES la jugada del ancho: sin nadie del otro lado casi no existe",
+    `${ancho.cambio_frente.toFixed(2)} vs ${angosto.cambio_frente.toFixed(2)}`);
+  assert(angosto.circulacion > ancho.circulacion,
+    "el que no tiene banda ataca POR DENTRO: la mezcla rota, no se encoge",
+    `${angosto.circulacion.toFixed(2)} vs ${ancho.circulacion.toFixed(2)}`);
+}
+
+// ---------- EL EJE HORIZONTAL: el carril pesa en el sorteo ----------
+{
+  const banda = E.sequenceType("banda");
+  assert(E.zoneWeight(banda, 4, 1) > E.zoneWeight(banda, 4, 2),
+    "con la pelota ya abierta, el fútbol por afuera se propone solo",
+    `${E.zoneWeight(banda, 4, 1).toFixed(2)} vs ${E.zoneWeight(banda, 4, 2).toFixed(2)}`);
+  const m = nuevo();
+  m.field.h = 1;
+  assert(E.otherLane(m) === E.LANES, "el cambio de frente va al carril OPUESTO");
+  m.field.h = 3;
+  assert(E.otherLane(m) === 1, "y al revés");
+}
+
+// ---------- EL EJE HORIZONTAL: el cambio de frente ----------
+{
+  const jugar = key => {
+    const m = nuevo();
+    m.min = 20;
+    E.startSequence(m, E.sequenceType("cambio_frente"));
+    const antes = m.field.h;
+    const opciones = m.decision.options.map(o => o.key);
+    m.resolveSequenceAct(key);
+    return { m, antes, opciones };
+  };
+  const dentro = jugar("dentro");
+  assert(dentro.opciones.join(",") === "largo,dentro", "el cambio de frente ofrece la diagonal y la circulación");
+  assert(dentro.m.seq && dentro.m.field.h !== dentro.antes,
+    "circular por dentro SIEMPRE llega al otro carril", `${dentro.antes} → ${dentro.m.field.h}`);
+  let salio = false, perdida = false;
+  for (let i = 0; i < 150 && !(salio && perdida); i++) {
+    const { m, antes } = jugar("largo");
+    if (m.seq && m.field.h !== antes) salio = true; else if (!m.seq) perdida = true;
+  }
+  assert(salio && perdida, "la diagonal larga a veces cruza la cancha y a veces se va al lateral");
+  // Y deja la jugada mejor perfilada que la circulación lenta: ese es el trato.
+  const largoOk = (() => { for (let i = 0; i < 200; i++) { const { m } = jugar("largo"); if (m.seq?.crossBonus > 0.05) return m.seq.crossBonus; } return 0; })();
+  assert(largoOk > (dentro.m.seq?.crossBonus || 0), "y el centro que sigue sale con la defensa desarmada", largoOk);
+}
+
+// ---------- EL EJE HORIZONTAL: los centros dependen de DÓNDE se centra ----------
+{
+  const menu = v => {
+    const m = nuevo();
+    m.min = 20;
+    E.startSequence(m, E.sequenceType("banda"));
+    m.seq.actIdx = 1;              // el acto del centro
+    m.field.v = v;
+    m.decision = null;
+    E.buildActDecision(m);
+    return m.decision.options.map(o => o.key);
+  };
+  assert(menu(5).includes("atras") && !menu(5).includes("segundo"),
+    "desde la LÍNEA DE FONDO existe el pase atrás (hay que haber llegado para pisarla)", menu(5).join(","));
+  assert(menu(4).includes("segundo") && !menu(4).includes("atras"),
+    "sin desbordar, la alternativa es el envío al segundo palo", menu(4).join(","));
+  assert(menu(4).includes("centro") && menu(5).includes("centro"), "el centro al área siempre está");
+}
+
+// ---------- EL EJE HORIZONTAL: córner vs tiro libre frontal ----------
+{
+  const menu = h => {
+    const m = nuevo();
+    m.min = 20;
+    E.startSequence(m, E.sequenceType("balon_parado"));
+    m.field.h = h;
+    m.decision = null;
+    E.buildActDecision(m);
+    return { keys: m.decision.options.map(o => o.key), title: m.decision.title };
+  };
+  const corner = menu(1), frontal = menu(2);
+  assert(!corner.keys.includes("directo"), "desde el córner no hay tiro directo: no hay ángulo", corner.keys.join(","));
+  assert(frontal.keys.includes("directo"), "de frente al arco SÍ aparece el tiro libre directo", frontal.keys.join(","));
+  assert(/Córner/.test(corner.title) && /Tiro libre/.test(frontal.title),
+    "y la jugada se NOMBRA distinto según de dónde salga", `${corner.title} | ${frontal.title}`);
+  // El tiro libre directo puede terminar en gol (existe de verdad, no es un adorno).
+  let gol = false;
+  for (let i = 0; i < 300 && !gol; i++) {
+    const m = nuevo();
+    m.min = 20;
+    E.startSequence(m, E.sequenceType("balon_parado"));
+    m.field.h = 2; m.field.v = E.ROWS;
+    m.decision = null;
+    E.buildActDecision(m);
+    m.resolveSequenceAct("directo");
+    if (m.gMy > 0) gol = true;
+  }
+  assert(gol, "y el tiro libre directo se convierte de vez en cuando");
+}
+
 // ---------- lo que se le sirve a la UI ----------
 {
   const m = jugar();

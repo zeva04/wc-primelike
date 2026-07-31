@@ -1771,3 +1771,84 @@ balón (1-3) · Angriffpressing (bloque alto) · La Frontera (bloque alto) · Pi
 
 Barrido de alturas (n=1500, BRA): 26.3 · 25.9 · 27.2 · 28.1 · 27.7 — **ninguna altura domina**
 (el criterio de "ningún dibujo dominado" aplicado a esta palanca).
+
+
+## El Eje Horizontal (30-jul-2026)
+
+El Territorio dejó los carriles alimentando el mapa de calor y poco más. Este arco los
+convierte en una dimensión táctica: **el ancho de la cancha se ocupa o no se ocupa**, y eso
+depende del dibujo.
+
+### La amplitud (una línea de tres ocupa los tres carriles)
+
+`field.lineCover(n)` = 0 con una línea de 1 · 0.5 con 2 · 1 con 3. De ahí salen dos lecturas
+en escala **−1..+1 centrada en la línea de DOS** (el punto neutro exacto: con un 2-2-1 todo
+vale ×1 y la línea base medida no se mueve):
+
+- `attackWidth` = la línea más ancha de MED/DEL — para atacar la banda alcanza con que
+  alguien la ocupe.
+- `defenseWidth` = la zaga manda y el mediocampo ayuda (×0.7: bajar a tapar no es lo mismo
+  que estar parado ahí).
+
+Con cinco jugadores de campo **nunca puede haber dos líneas de tres**: cada dibujo tiene ancho
+arriba, ancho atrás, o ninguno.
+
+| Canal | Efecto |
+|---|---|
+| Pool propio | desborde ×(1+0.35·a) · cambio de frente ×(1+0.60·a) · y **rota**: circulación ×(1−0.12·a), pelotazo ×(1−0.10·a), espalda ×(1−0.10·a) |
+| Centro al área | +0.04·a (con tres arriba el área se llena de verdad) |
+| Sprint por afuera | +0.03·a |
+| Contención POR AFUERA | +0.10·d (solo con la pelota en una banda) |
+| Remate rival desde una banda | −0.09·d en el desenlace del repliegue · −0.06·d en el remate ambiente |
+
+**Por qué el pool ROTA y no solo sube** (medido): subir una familia sin bajar otra diluye a
+todas las demás y termina castigando al dibujo que se quería premiar — el 1-3-1 perdía −2.6pp
+por "premiarlo". El que no tiene a nadie por afuera **ataca por dentro**.
+
+**Y la amplitud defensiva no toca el pool rival**: bajarle peso al repliegue le subía la cuota
+a la salida asfixiada y al córner en contra, que son peores para mí (−3.6pp al 3-1-1, el
+dibujo al que venía a premiar). Se expresa solo donde está el fútbol: cortando por afuera y en
+el remate que nace de una banda cubierta.
+
+### El cambio de frente
+
+Jugada nueva de 3 actos (`cambio_frente`), nace con la pelota atascada en una banda y contra
+un bloque junto. Su acto propio ofrece **diagonal larga** (pase largo de riesgo: si llega, el
+que recibe centra con la defensa desarmada — `crossBonus` +0.10) o **circular por dentro**
+(siempre llega, sin ventaja). Solo la juega de verdad un equipo con amplitud.
+
+### Los centros dependen de DÓNDE se centra
+
+- Desde la **línea de fondo** (v5): centro al área **o pase atrás rasante** — para pisarla y
+  devolverla hay que haber llegado hasta el fondo.
+- Sin desbordar (v4): centro al área con la zaga ya parada, **o envío al segundo palo** — más
+  difícil (−0.06) pero lo ataca **el que llega lanzado** (lo elige la velocidad, no el mejor
+  cabeceador parado), y por eso remata mejor (+0.07 contra el +0.02 del centro normal).
+
+### El balón parado tiene carril
+
+El tipo `balon_parado` ya no nace forzado al centro: nace **donde quedó la pelota**, y eso
+decide qué jugada es.
+
+| Desde | Es | Opciones |
+|---|---|---|
+| Banda (h1/h3) | **Córner** | Centro al área (**+0.03**: es su sitio natural) · Jugada preparada |
+| Centro (h2) | **Tiro libre frontal** | **Tiro libre directo** (+0.13 desde el borde del área, +0.07 más lejos) · Centro al área (**−0.05**: de frente sale peor) · Jugada preparada |
+
+El córner encadenado (Cabeza de Playa, el que gana la Fortaleza) nace en una banda; el que
+nace de una falta se cobra donde se cometió.
+
+### Balance medido
+
+Banco de PARTIDOS con plantel fijo (3.000 partidos ARG vs KOR por celda: el % de campeón tiene
+±1.3pp de ruido a n=2500 y no sirve para calibrar un efecto táctico):
+
+| Dibujo | Goles a favor | En contra | Antes (en contra) |
+|---|---|---|---|
+| 1-3-1 (ancho arriba) | 1.948 | 0.276 | 0.290 |
+| 2-2-1 (neutro) | 1.929 | 0.277 | 0.285 |
+| 3-1-1 (ancho atrás) | 1.798 | **0.209** | 0.251 |
+
+El 3-1-1 concede **17% menos** y ataca menos por afuera (desborde 2.3% de las jugadas contra
+3.9% del 1-3-1; cambio de frente 1.1% contra 3.5%). Gate de campaña: BRA **26.1% vs 27.2%**
+(n=4000, dentro de ±2pp).

@@ -35,7 +35,7 @@ Los actos marcados con 🔓 solo existen si el DT compró el rasgo que los desbl
 
 # 1. Las secuencias
 
-Quince tipos. `mine` = yo ataco · `opp` = yo defiendo. Las cuatro **avanzadas** son
+Dieciséis tipos. `mine` = yo ataco · `opp` = yo defiendo. Las cuatro **avanzadas** son
 el fútbol superior de cada filosofía y solo salen cuando esa identidad está
 desarrollada.
 
@@ -56,6 +56,7 @@ desarrollada.
 | 🗼 Salida bajo presión | opp | **mi área / mi salida** | Salida (acto único) |
 | 🧤 **Salida desde el área** *(Territorio)* | mine | **mi área / mi salida** | Salida propia → Construcción → Definición |
 | 🏹 **Pelota a la espalda** *(Territorio)* | mine | mediocampo → tres cuartos | Pase a la espalda → Definición |
+| 🔀 **Cambio de frente** *(Eje Horizontal)* | mine | tres cuartos, **por afuera** | Cambio de frente → Centro → Definición |
 
 ---
 
@@ -128,13 +129,25 @@ y el equipo vuelva a lanzar 🔓, o que la zaga rival, incómoda, la mande al **
 | 📡 **Centrar de primera** | No arriesga el desborde, pero la defensa llega acomodada y el centro sale peor. |
 | ✂️ **Cortar hacia adentro** | Se perfila y **se saltea el centro**: va directo a rematar él. Si lo cruzan entrando al área: **penal**. Si la pierde: contragolpe rival. |
 
-## 📡 Centro — *"El área está poblada, ¿qué manda?"*
-*(Desborde por la banda)*
+## 🔀 Cambio de frente — *"El otro carril está vacío"*
+*(Cambio de frente — jugada del Eje Horizontal: solo la propone de verdad un equipo con
+amplitud, y casi siempre contra un rival amontonado de un lado)*
 
 | Opción | Resolución |
 |---|---|
-| 📡 **Centro al área** | Busca la cabeza del mejor cabeceador del equipo, que pasa a ser el rematador. |
-| 🎯 **Pase atrás rasante** | Busca al mejor rematador, que entra **de frente al arco**. |
+| 🔀 **Diagonal larga al otro carril** | Pase de riesgo. Si cruza: el que recibe queda solo y **el centro que sigue sale con la defensa desarmada**. Si se va al lateral: contragolpe rival. |
+| 🎯 **Circular por dentro** | Llega siempre al otro carril, pero el bloque rival se corre a tiempo: el centro sale contra la defensa acomodada. |
+
+## 📡 Centro — *"¿Qué manda desde el costado?"*
+*(Desborde por la banda · Cambio de frente)*
+
+**El menú depende de DÓNDE se centra** (Eje Horizontal):
+
+| Opción | Desde | Resolución |
+|---|---|---|
+| 📡 **Centro al área** | siempre | Busca la cabeza del mejor cabeceador del equipo, que pasa a ser el rematador. Con una línea de tres arriba, el área se llena y el envío encuentra a alguien. |
+| 🎯 **Pase atrás rasante** | solo desde la **línea de fondo** | Busca al mejor rematador, que entra **de frente al arco**. Para pisarla y devolverla hay que haber llegado hasta el fondo. |
+| 🌙 **Al espacio, segundo palo** | solo **sin haber desbordado** | Más difícil (hay que pasar a toda la zaga), pero lo ataca **el que llega lanzado** — lo elige la velocidad, no el mejor cabeceador parado — y remata mejor que un centro normal. |
 
 Si el envío no llega, la jugada muere ahí.
 
@@ -174,10 +187,14 @@ aparece, porque no hay espalda que atacar)*
 
 ## 🎯 Balón parado a favor — *"¿Qué ensayaron en la semana?"*
 
-| Opción | Resolución |
-|---|---|
-| 📡 **Centro al área** | Cabezazo del mejor cabeceador. Gol, o rebote/atajada. |
-| 🎭 **Jugada preparada** | Descarga corta y remate del lanzador. Gol, o rebote/atajada. |
+**El carril decide qué balón parado es** (Eje Horizontal): desde la banda es un **córner** y
+desde el centro, un **tiro libre frontal**. La jugada se nombra distinto y las opciones cambian.
+
+| Opción | Dónde | Resolución |
+|---|---|---|
+| 🎯 **Tiro libre directo al arco** | solo **de frente** | La opción más peligrosa del sitio, y más aún cuanto más cerca se cobra. Gol, o rebote/atajada. Desde el córner no existe: no hay ángulo. |
+| 📡 **Centro al área** | siempre | Cabezazo del mejor cabeceador. **Más peligroso desde el costado** (el córner es su sitio natural) y peor de frente, con la barrera y la zaga mirando la pelota. |
+| 🎭 **Jugada preparada** | siempre | Descarga corta y remate del lanzador. Gol, o rebote/atajada. |
 
 ## 🧱 Contención — *"¡Encara! ¿Cómo lo frena la zaga?"*
 *(Repliegue · La fortaleza castiga)*
@@ -326,6 +343,11 @@ No son jugadas, pero cambian lo que ocurre en ellas:
 - 🔁 **Gestión de plantilla en vivo** — cambios, incluidos los forzados por lesión.
 - 🎚️ **Mentalidad** — ofensiva / normal / defensiva: inclina cuántas jugadas propone
   el equipo y cuántas sufre.
+- 📐 **El dibujo** (Eje Horizontal) — una línea de **tres** ocupa los tres carriles: arriba
+  significa llegar a las dos bandas (más desborde, más cambio de frente, centros que
+  encuentran gente); atrás significa cubrirlas (el ataque rival por afuera duele mucho menos).
+  Un dibujo sin líneas de tres ataca y defiende por el medio. Con cinco de campo nunca se
+  pueden tener las dos cosas.
 - 🧱 **Altura del bloque** (Territorio) — muy bajo · bajo · medio · alto · muy alto. Decide
   **dónde vive el equipo**, y con eso qué jugadas aparecen: arriba se roba arriba y no se
   revienta la pelota; abajo se revienta, se sale de contra y aparece la salida desde el área.

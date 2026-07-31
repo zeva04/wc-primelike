@@ -27,6 +27,7 @@ import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, starsHtml, posBadge, numTag, energyBar, energyCls, momentoChip, toast, modal, closeModal } from "../components.js";
 import { mountPitch, POS_NAME, jerseyNum } from "../pitch.js";
 import { spriteSvg } from "../sprites.js";
+import { widthHint } from "../../game/match/field.js";
 
 const STAT_NAME = {
   tiro: "Tiro", defensa: "Defensa", cabezazo: "Cabezazo", aura: "Aura",
@@ -189,13 +190,21 @@ function renderFormationPicker(available) {
       ${FORMATIONS.map(f => {
         const usable = canUseFormation(available, f.id);
         const isCur = f.id === S.formation;
-        return `<button data-formation="${f.id}" ${usable ? "" : "disabled"}
+        // LA AMPLITUD (sprint del Eje Horizontal): una línea de TRES ocupa los tres
+        // carriles y una de UNO solo el centro. El chip lo dice sin números — ámbar si
+        // el ancho está arriba (llega a las bandas), celeste si está atrás (las cubre).
+        // Nunca los dos: con cinco de campo no entran dos líneas de tres.
+        const wh = widthHint(f.def, f.med, f.del);
+        const chip = wh.txt
+          ? `<span class="${wh.atk >= 0.9 ? "text-amber-400" : "text-sky-400"} text-[11px] font-black">↔</span>`
+          : "";
+        return `<button data-formation="${f.id}" ${usable ? "" : "disabled"} title="${wh.txt}"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-left border-b border-slate-800 last:border-0 ${
             !usable ? "opacity-35 cursor-not-allowed"
             : isCur ? "tp-bg-soft tp-text cursor-pointer"
             : "text-slate-200 hover:bg-slate-800 cursor-pointer"}">
           <span class="font-black text-sm w-11 shrink-0">${f.id}</span>
-          <span class="${isCur ? "" : "text-slate-500"}">${formationDots(f)}</span>
+          <span class="${isCur ? "" : "text-slate-500"}">${formationDots(f)}</span>${chip}
           <span class="text-[10px] flex-1 text-right ${usable ? "text-slate-500" : "text-red-400/80"}">${usable ? f.hint : `Faltan ${missingLines(available, f)}`}</span>
         </button>`;
       }).join("")}

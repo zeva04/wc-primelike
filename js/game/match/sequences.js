@@ -40,7 +40,7 @@ import { buildActDecision } from "./sequence-acts.js";
 import { hookOf, hasTrait, traitHooks, traitMoment } from "./trait-hooks.js";
 import { pressOn, PRESS_POOL } from "./press.js";
 import { noteCorner as noteCornerStat } from "./stats.js";
-import { setBall, myHeight, oppHeight, HEIGHT_DEFAULT, zoneWeight, originOf } from "./field.js";
+import { setBall, myHeight, oppHeight, HEIGHT_DEFAULT, zoneWeight, originOf, attackWidth, defenseWidth } from "./field.js";
 import { noteMomentum } from "./match-momentum.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
@@ -172,6 +172,10 @@ function typeWeights(m, side, plan) {
     // La espalda, en cambio, sí lee al rival: es la respuesta al bloque adelantado y
     // contra un equipo metido atrás prácticamente no existe (no hay espalda que atacar).
     espalda: Math.max(0.3, 1 + 0.55 * (oppHeight(m) - HEIGHT_DEFAULT)) * 1.4 * (losingLate ? 1.3 : 1),
+    // EL CAMBIO DE FRENTE (Eje Horizontal): la respuesta al bloque JUNTO — cuanto más
+    // sólido y amontonado está el rival, más sentido tiene mandarla al otro carril. La
+    // amplitud lo gatea abajo (widthWeights): sin nadie del otro lado, no hay a quién.
+    cambio_frente: (0.9 + 1.1 * prof.def) * (tired ? 0.8 : 1),
     caceria: 0, sinfonia: 0, contra_letal: 0,
   } : {
     repliegue: (2 + 3 * prof.atk) * (winningLate ? 1.4 : 1),
@@ -180,6 +184,7 @@ function typeWeights(m, side, plan) {
     fortaleza: 0,
   };
   heightWeights(m, side, w);
+  widthWeights(m, side, w);
   applyFiloWeights(m, side, w, plan.oppFilo);
   // EL BOTÓN DE PRESIÓN: mientras corre la ráfaga el partido GENERA otro fútbol —
   // se roba arriba mucho más y no se revienta la pelota. Va DESPUÉS de la filosofía
@@ -232,6 +237,35 @@ function heightWeights(m, side, w) {
  * territorio) sin tener que muestrear diez mil partidos para inferirlo.
  */
 export const typeWeightsFor = (m, side) => typeWeights(m, side, seqPlan(m));
+
+/**
+ * [LA AMPLITUD → EL POOL] (sprint del Eje Horizontal): una línea de TRES ocupa los tres
+ * carriles y una de UNO solo el centro, así que el dibujo decide cuánto fútbol por afuera
+ * existe. Neutro (×1) en las líneas de DOS — el punto medio del dial, igual que el bloque
+ * medio en la altura: la línea base medida no se mueve porque la lectura exista.
+ *
+ * Del lado rival es el espejo: una zaga que cubre las bandas recibe menos ataques por
+ * afuera, y una que no las cubre los invita.
+ */
+function widthWeights(m, side, w) {
+  if (side !== "mine") return;
+  const a = attackWidth(m);            // −1 (todo por el medio) … +1 (los tres carriles)
+  mulFam(w, "banda", 1 + 0.35 * a);
+  mulFam(w, "cambio_frente", 1 + 0.60 * a);   // ES la jugada del ancho
+  // Y ROTA la mezcla en vez de inflarla (la lección medida del arco del Territorio: un
+  // dial de contexto que solo SUBE una familia diluye a todas las demás y termina
+  // castigando al dibujo que quería premiar). El que no tiene a nadie por afuera ataca
+  // por dentro: más circulación, más pelotazo, más pelota a la espalda.
+  mulFam(w, "circulacion", 1 - 0.12 * a);
+  mulFam(w, "pelotazo", 1 - 0.10 * a);
+  mulFam(w, "espalda", 1 - 0.10 * a);
+}
+
+/* La amplitud DEFENSIVA no toca el pool: se expresa donde está el fútbol —cortar por
+   afuera y el remate que nace de una banda cubierta (sequence-acts)—. Tocar el pool
+   rival resultó un canal escondido: bajarle peso al repliegue le subía la cuota a la
+   salida asfixiada y al córner en contra, que son PEORES para mí. Medido: −3.6pp al
+   3-1-1, el dibujo al que la amplitud defensiva venía a premiar. */
 
 /**
  * Cuánto inclina la ALTURA el reparto de iniciativa: el que vive arriba tiene la
@@ -477,7 +511,7 @@ export function maybeStartSequence(m) {
   // [EL TERRITORIO DECIDE QUÉ JUGADA SALE] (T4): además de todo lo anterior, cada tipo
   // pesa según cuán lejos está la pelota de la altura donde ese fútbol NACE. Como el
   // sorteo normaliza dentro del lado, esto cambia la MEZCLA y nunca el número de jugadas.
-  startSequence(m, m._weightedPick(pool, pool.map(t => (w[t.id] ?? 1) * zoneWeight(t, m.field?.v ?? 3))));
+  startSequence(m, m._weightedPick(pool, pool.map(t => (w[t.id] ?? 1) * zoneWeight(t, m.field?.v ?? 3, m.field?.h ?? 2))));
   return true;
 }
 

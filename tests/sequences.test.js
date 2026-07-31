@@ -26,9 +26,9 @@ function makeMatch(oppId = "MAR") {
 }
 
 // ---------- catálogo (A2: los 6 del roadmap + repliegue + la cara defensiva del córner) ----------
-assert(E.SEQUENCE_TYPES.length === 15, "catálogo: 11 base (desborde de la Odisea + las 2 del Territorio) + 4 avanzadas", E.SEQUENCE_TYPES.length);
+assert(E.SEQUENCE_TYPES.length === 16, "catálogo: 12 base (Odisea + las 2 del Territorio + el cambio de frente) + 4 avanzadas", E.SEQUENCE_TYPES.length);
 const sides = E.SEQUENCE_TYPES.map(t => t.side);
-assert(sides.filter(s => s === "mine").length === 11, "11 tipos ofensivos (mine)", sides.join(","));
+assert(sides.filter(s => s === "mine").length === 12, "12 tipos ofensivos (mine)", sides.join(","));
 assert(sides.filter(s => s === "opp").length === 4, "4 tipos con iniciativa rival (opp)", sides.join(","));
 // Las 4 AVANZADAS (M2): una por filosofía, con sus datos de desenlace
 {

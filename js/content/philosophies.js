@@ -89,6 +89,7 @@ export const FILO_BY_TIPO = {
   repliegue: "bloque",        // defender organizado y neutralizar
   salida_corta: "posesion",   // sacarla jugada desde el área propia (Territorio, T4)
   espalda: "contra",          // atacar el espacio detrás del bloque alto (Territorio, T4)
+  cambio_frente: "posesion", // mover al rival de lado a lado ES tener la pelota (Eje Horizontal)
 };
 export const filoOfType = (type) => type?.advFor || FILO_BY_TIPO[type?.id] || null;
 

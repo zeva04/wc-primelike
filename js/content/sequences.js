@@ -131,7 +131,10 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "balon_parado", side: "mine", icon: "🎯", name: "Balón parado a favor",
-    zone: { from: [4, 5], lane: "center" }, // córner o tiro libre cerca del área rival
+    // SIN carril forzado (sprint del Eje Horizontal): el balón parado nace DONDE quedó la
+    // pelota, y eso decide qué jugada es — desde la banda es un CÓRNER (centro o corto);
+    // por el centro es un TIRO LIBRE FRONTAL, y ahí aparece el disparo directo al arco.
+    zone: { from: [4, 5] },
     // Córner/tiro libre: UNA decisión y desenlace (Bible: algunas secuencias son un solo
     // duelo decisivo). El centro busca al mejor cabeceador; la jugada preparada, un remate limpio.
     protWeight: { MED: 3, DEL: 2, DEF: 1 }, // el lanzador
@@ -142,7 +145,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "balon_parado_def", side: "opp", icon: "🚨", name: "Balón parado en contra",
-    zone: { from: [1, 1], lane: "center" }, // el córner en contra se defiende DENTRO de mi área
+    zone: { from: [1, 1], lane: "wide" },   // el córner en contra nace del costado, dentro de mi área
     // El espejo defensivo: córner rival. Zona = seguro; salir a despejar corta más, pero si
     // se falla el cabeceador remata solo.
     protWeight: { DEF: 3, MED: 1, DEL: 0 },
@@ -203,6 +206,29 @@ export const SEQUENCE_TYPES = [
       outLong: "Pelotazo a buscar al punta: la salida se juega por arriba.",
       outSafe: "La sacan al lateral sin arriesgar: pelota afuera y a respirar.",
       finishStat: "tiro", finishBonus: 0.12,
+    },
+  },
+  {
+    // LA JUGADA DEL EJE HORIZONTAL (decisión PO 30-jul-2026): el ancho como arma. Nace con
+    // la pelota atascada en una banda y busca el otro carril, donde la defensa ya no está.
+    // Solo la juega de verdad un equipo con AMPLITUD (una línea de tres): sin alguien
+    // esperando del otro lado, cambiar de frente es regalar la pelota.
+    id: "cambio_frente", side: "mine", icon: "🔀", name: "Cambio de frente",
+    zone: { from: [3, 4], lane: "wide" },
+    protWeight: { MED: 3, DEF: 2, DEL: 1 }, protStat: "pase_largo",
+    plan: ["switch", "cross", "finish"],
+    flavor: {
+      intro: p => pick([
+        `Por esta banda no hay paso: ${p.name} levanta la cabeza y mira al otro costado.`,
+        `${p.name} para la pelota: el rival se amontonó de este lado y del otro hay pasto.`,
+        `Todo el bloque rival se corrió a un costado. ${p.name} tiene el cambio de frente servido.`,
+      ]),
+      switchOk: p => `¡Cambio de frente ENORME! La pelota cruza toda la cancha y ${p.name} la recibe solo del otro lado.`,
+      switchFail: "El cambio de frente sale largo y se va al lateral: la pelota cruza… y se pierde.",
+      switchSlow: "El equipo la circula por dentro hasta el otro carril: llega, pero el rival se corre a tiempo.",
+      crossOk: "El centro entra desde el costado abierto.",
+      crossFail: "El centro no encuentra a nadie y muere del otro lado.",
+      finishStat: "cabezazo", finishBonus: 0.13,
     },
   },
   {

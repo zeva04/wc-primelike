@@ -21,7 +21,7 @@ import * as A from "./actions.js";
 import { goalMine, goalOpp, myPenalty, lastManChance } from "./chances.js";
 import { noteCorner } from "./stats.js";
 import { noteMomentum } from "./match-momentum.js";
-import { moveBall, setBall, ADVANCE, inOppBox, BOX_OPP, BOX_MINE } from "./field.js";
+import { moveBall, setBall, ADVANCE, inOppBox, BOX_OPP, BOX_MINE, attackWidth, defenseWidth, inWing, otherLane, wingLane } from "./field.js";
 
 // El plan de actos de la secuencia: el propio si lo tiene (rasgo de Posesión:
 // un acto más de circulación, lo arma startSequence) o el del catálogo.
@@ -122,14 +122,24 @@ export function buildActDecision(m) {
       ],
       };
     },
+    // EL BALÓN PARADO TIENE CARRIL (Eje Horizontal): desde la banda ES un córner —el
+    // centro es su arma y no hay ángulo para patear al arco—; por el centro es un tiro
+    // libre FRONTAL, y ahí aparece la opción más peligrosa del sitio: el disparo directo.
+    // El mismo tipo, dos jugadas de fútbol distintas, decididas por dónde quedó la pelota.
     setpiece: () => {
       const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
       s.target = mates.sort((a, b) => (b.stats.cabezazo || 0) - (a.stats.cabezazo || 0))[0] || s.prot;
+      const corner = inWing(m);
       return {
-        title: `🎯 min ${m.clock()}' — Balón parado: lo para ${s.prot.name}`,
-        text: "¿Qué ensayaron en la semana?",
+        title: corner
+          ? `🎯 min ${m.clock()}' — Córner a favor: lo tira ${s.prot.name}`
+          : `🎯 min ${m.clock()}' — Tiro libre frontal: ${s.prot.name} se para detrás de la pelota`,
+        text: corner ? "El área se llena de camisetas. ¿Qué ensayaron en la semana?" : "Hay barrera, y el arco de frente. ¿Qué ensayaron en la semana?",
         options: [
-          { label: `📡 Centro al área para ${s.target.name}`, hint: `Cabezazo ${s.target.stats.cabezazo}`, key: "centro" },
+          ...(corner ? [] : [{ label: "🎯 Tiro libre directo al arco", hint: `Tiro ${s.prot.stats.tiro} — de frente hay ángulo: es la opción más peligrosa`, key: "directo" }]),
+          { label: `📡 Centro al área para ${s.target.name}`, hint: corner
+            ? `Cabezazo ${s.target.stats.cabezazo} — desde el costado el envío llega perfecto`
+            : `Cabezazo ${s.target.stats.cabezazo} — de frente, el centro sale peor`, key: "centro" },
           { label: "🎭 Jugada preparada", hint: `Descarga corta y remate (Tiro ${s.prot.stats.tiro})`, key: "jugada" },
         ],
       };
@@ -161,12 +171,35 @@ export function buildActDecision(m) {
     // El envío desde la banda: es EL sitio donde el split de pase decide qué jugada se
     // juega — el centro alto es pase largo y termina en cabezazo; el rasante es pase
     // corto y termina en remate de frente.
-    cross: () => ({
-      title: `📡 min ${m.clock()}' — ${s.prot.name} levanta la cabeza desde el costado`,
-      text: "El área está poblada. ¿Qué manda?",
+    // EL EJE HORIZONTAL: el menú depende de DESDE DÓNDE se centra. Solo desde la LÍNEA
+    // DE FONDO existe el pase atrás —para pisarla y devolverla hace falta haber llegado
+    // hasta el fondo—; sin desbordar, la alternativa es el envío largo al segundo palo,
+    // que ataca el espacio que la defensa acomodada deja a su espalda.
+    cross: () => {
+      const fondo = (m.field?.v ?? 4) >= BOX_OPP;
+      return {
+        title: fondo
+          ? `📡 min ${m.clock()}' — ${s.prot.name} llega al fondo y levanta la cabeza`
+          : `📡 min ${m.clock()}' — ${s.prot.name} arma el envío desde el costado`,
+        text: fondo ? "La zaga rival quedó de espaldas a su arco. ¿Qué manda?" : "La defensa está acomodada dentro del área. ¿Qué manda?",
+        options: [
+          { label: "📡 Centro al área", hint: `Pase largo ${s.prot.stats.pase_largo} — busca la cabeza del mejor rematador${fondo ? "" : ", con la zaga ya parada"}`, key: "centro" },
+          fondo
+            ? { label: "🎯 Pase atrás rasante", hint: `Pase corto ${s.prot.stats.pase_corto} — al que llega de frente al arco`, key: "atras" }
+            : { label: "🌙 Al espacio, segundo palo", hint: `Pase largo ${s.prot.stats.pase_largo} — más difícil, pero lo ataca el que llega LANZADO desde atrás`, key: "segundo" },
+        ],
+      };
+    },
+    // ═══ EL CAMBIO DE FRENTE (Eje Horizontal) ═══
+    // La primera decisión del motor cuyo eje es el ANCHO y no la profundidad: mandarla
+    // cruzada (rápido y letal, pero se puede ir al lateral) o llevarla por dentro (llega
+    // siempre, y el bloque rival llega también).
+    switch: () => ({
+      title: `🔀 min ${m.clock()}' — ${s.prot.name} levanta la cabeza: el otro carril está vacío`,
+      text: "Todo el bloque rival se corrió a este lado. ¿Cómo cambian el frente?",
       options: [
-        { label: "📡 Centro al área", hint: `Pase largo ${s.prot.stats.pase_largo} — busca la cabeza del mejor rematador`, key: "centro" },
-        { label: "🎯 Pase atrás rasante", hint: `Pase corto ${s.prot.stats.pase_corto} — al que llega de frente al arco`, key: "atras" },
+        { label: "🔀 Diagonal larga al otro carril", hint: `Pase largo ${s.prot.stats.pase_largo} — si llega, el que recibe queda SOLO para centrar`, key: "largo" },
+        { label: "🎯 Circular por dentro", hint: "Llega siempre… pero el rival se corre a tiempo y el centro sale contra la defensa acomodada", key: "dentro" },
       ],
     }),
     // ═══ LAS DOS JUGADAS DEL TERRITORIO (T4) ═══
@@ -320,6 +353,34 @@ export function resolveSequenceAct(m, key) {
     const recibe = passTo(m, s); // seguro o filtrado: el pase cambia la pelota de pies
     m.log("plain", `min ${m.clock()}' — ${f.buildOk}${recibe ? ` La recibe ${s.prot.name}.` : ""}`);
     if (key === "filtrado") dtOk(m);
+    return escalate(m);
+  }
+
+  // ═══ CAMBIO DE FRENTE (Eje Horizontal) ═══
+  if (kind === "switch") {
+    const destino = otherLane(m);
+    if (key === "dentro") {
+      // Circular por dentro SIEMPRE llega (misma convención que el pase seguro de la
+      // construcción: la opción segura no se sortea) — el precio es que el bloque rival
+      // se corre con la pelota y el centro sale contra la defensa ya acomodada.
+      setBall(m, { h: destino });
+      m.log("plain", `min ${m.clock()}' — ${f.switchSlow}`);
+      passTo(m, s);
+      return escalate(m);
+    }
+    const r = A.actPass(m, s.prot, { hard: true });   // la diagonal larga ES un pase de riesgo
+    if (!r.ok) return maybeCounter(m, `min ${m.clock()}' — ${f.switchFail}`, true);
+    setBall(m, { h: destino });
+    // La recibe el que ESPERABA abierto del otro lado: pesa el que llega lanzado.
+    const cands = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
+    if (cands.length) {
+      s.assistFrom = s.prot;
+      s.prot = m._weightedPick(cands, cands.map(p => (playedPos(p) === "DEF" ? 1 : 3) * desmarqueW(p)));
+    }
+    s.crossBonus = (s.crossBonus || 0) + 0.10;   // el centro sale con la defensa desarmada
+    s.bonus += 0.03;
+    m.log("event", `min ${m.clock()}' — ${f.switchOk(s.prot)}`);
+    dtOk(m);
     return escalate(m);
   }
 
@@ -536,7 +597,7 @@ export function resolveSequenceAct(m, key) {
         if (risky) dtFail(m);
         noteCorner(m, "mine"); noteMomentum(m, "corner");   // córner ganado de verdad
         m.log("chance", `min ${m.clock()}' — ${sequenceType("fortaleza").flavor.cornerText}`);
-        return chainSetPiece(m, 0.02);
+        return chainSetPiece(m, 0.02, true);
       }
       // T1 — Segunda Jugada: el duelo perdido no siempre es pérdida — la segunda
       // pelota puede caer nuestra y el bloque vuelve a lanzar (secuencia reactiva).
@@ -606,7 +667,7 @@ export function resolveSequenceAct(m, key) {
     }
     // LA LÍNEA DE FONDO: el sprint puro contra el lateral. Llegar al fondo deja a la zaga
     // rival de espaldas a su arco — el centro que sigue es el mejor del juego.
-    const r = A.actSprint(m, s.prot, { chaser: s.chaser, handicap: 0.10 });
+    const r = A.actSprint(m, s.prot, { chaser: s.chaser, handicap: 0.10, bonus: 0.03 * attackWidth(m) });
     if (!r.ok) return maybeCounter(m, `min ${m.clock()}' — ${f.wingFail}`, false);
     setBall(m, { v: BOX_OPP });        // la línea de fondo: la zaga rival queda de espaldas
     m.log("plain", `min ${m.clock()}' — ${f.wingOk(s.prot)}`);
@@ -618,7 +679,13 @@ export function resolveSequenceAct(m, key) {
 
   if (kind === "cross") {
     const rasante = key === "atras";
-    const r = A.actCross(m, s.prot, { rasante, bonus: s.crossBonus || 0 });
+    const segundo = key === "segundo";
+    // LA AMPLITUD (Eje Horizontal): con una línea de tres arriba el área se llena de
+    // verdad y el envío encuentra a alguien; atacando solo por el medio, el centro cae
+    // donde no hay nadie. Neutro con líneas de dos. El envío al segundo palo es MÁS
+    // difícil (hay que pasar a toda la zaga) pero lo ataca un jugador lanzado.
+    const ancho = 0.04 * attackWidth(m);
+    const r = A.actCross(m, s.prot, { rasante, bonus: (s.crossBonus || 0) + ancho - (segundo ? 0.06 : 0) });
     if (!r.ok) return closeSeq(m, "chance", `min ${m.clock()}' — ${f.crossFail}`);
     // El centro CAMBIA de protagonista: el que remata es el que atacó el área. El alto
     // busca al mejor cabezazo (y define de cabeza); el rasante, al mejor tiro de frente.
@@ -629,14 +696,22 @@ export function resolveSequenceAct(m, key) {
     const mates = all.filter(x => playedPos(x) !== "DEF").length ? all.filter(x => playedPos(x) !== "DEF") : all;
     if (mates.length) {
       s.assistFrom = s.prot;
-      s.prot = mates.sort((a, b) => (b.stats[rasante ? "tiro" : "cabezazo"] || 0) - (a.stats[rasante ? "tiro" : "cabezazo"] || 0))[0];
+      // Al segundo palo NO la ataca el mejor cabeceador parado en el área: la ataca EL QUE
+      // LLEGA — por eso lo elige la velocidad (el mismo desmarque de la Odisea).
+      s.prot = segundo
+        ? m._weightedPick(mates, mates.map(p => desmarqueW(p) * (playedPos(p) === "DEL" ? 2 : 3)))
+        : mates.sort((a, b) => (b.stats[rasante ? "tiro" : "cabezazo"] || 0) - (a.stats[rasante ? "tiro" : "cabezazo"] || 0))[0];
     }
     setBall(m, { v: BOX_OPP, h: 2 });   // el centro mete la pelota EN el área
     s.finishStat = rasante ? "tiro" : "cabezazo";
-    s.bonus += rasante ? 0.05 : 0.02;   // el rasante llega de frente al arco: mejor perfil
+    // El rasante llega de frente al arco; el del segundo palo llega LANZADO y sin marca
+    // (paga el riesgo extra del envío); el centro normal, con la zaga encima.
+    s.bonus += rasante ? 0.05 : segundo ? 0.07 : 0.02;
     m.log("event", `min ${m.clock()}' — ${rasante
       ? `${s.assistFrom.name} la pisa y la devuelve atrás: ${s.prot.name} entra de frente.`
-      : `${f.crossOk} La pelea ${s.prot.name}.`}`);
+      : segundo
+        ? `El envío cruza toda el área al segundo palo… ¡y ahí llega ${s.prot.name} lanzado!`
+        : `${f.crossOk} La pelea ${s.prot.name}.`}`);
     return escalate(m);
   }
 
@@ -742,7 +817,7 @@ export function resolveSequenceAct(m, key) {
     if (bh && s.type.id === "pelotazo" && rnd() < bh.p) {
       m.log("chance", `min ${m.clock()}' — ${s.prot.name} remata pero la defensa rechaza apurada...`);
       traitMoment(m, bh.traitId, [bh.texto]);
-      return chainSetPiece(m, 0.02);
+      return chainSetPiece(m, 0.02, true);
     }
     return maybeRebound(m, `min ${m.clock()}' — ${s.prot.name} remata pero ${pick(["ataja el arquero", "se va desviado", "la saca la defensa"])}.`);
   }
@@ -754,9 +829,20 @@ export function resolveSequenceAct(m, key) {
     const sr = hookOf(m, "setpieceRehearsed");
     const srB = sr ? sr.bonus : 0;
     if (sr && !s.rehearsedTold) { s.rehearsedTold = true; traitMoment(m, sr.traitId, [sr.texto]); }
+    // EL TIRO LIBRE DIRECTO (Eje Horizontal): solo existe de frente al arco, y vale más
+    // cuanto más cerca se cobra. Es la opción más peligrosa del balón parado frontal —
+    // y la que no existe desde el córner, donde no hay ángulo que valga.
+    if (key === "directo") {
+      const cerca = (m.field?.v ?? 4) >= BOX_OPP;
+      const shot = A.actShot(m, s.prot, { stat: "tiro", bonus: (cerca ? 0.13 : 0.07) + srB });
+      if (shot.ok) { goalMine(m, s.prot, "¡GOLAZO DE TIRO LIBRE! La colgó del ángulo.", "open"); return closeSilent(m); }
+      return maybeRebound(m, `min ${m.clock()}' — el tiro libre de ${s.prot.name} ${pick(["se estrella en la barrera", "pasa lamiendo el palo", "lo manda al córner el arquero volando"])}.`);
+    }
     if (key === "centro") {
       const t = s.target || s.prot;
-      const shot = A.actShot(m, t, { stat: "cabezazo", bonus: 0.10 + srB });
+      // El centro es MÁS peligroso desde el costado (el córner es su sitio natural) y peor
+      // de frente, donde la barrera y la zaga están mirando la pelota.
+      const shot = A.actShot(m, t, { stat: "cabezazo", bonus: 0.10 + (inWing(m) ? 0.03 : -0.05) + srB });
       if (shot.ok) { goalMine(m, t, "¡Cabezazo letal en el balón parado!", s.prot); return closeSilent(m); }
       return maybeRebound(m, `min ${m.clock()}' — el centro busca a ${t.name} pero ${pick(["gana el arquero en el aire", "la despeja la zaga", "el cabezazo se va por arriba"])}.`);
     }
@@ -867,8 +953,12 @@ export function resolveSequenceAct(m, key) {
     // contención del bloque corta más ("en Bloque Bajo" = cuando el equipo se repliega,
     // decisión PO 30-jul: no la filosofía homónima ni la mentalidad).
     const est = hookOf(m, "containBonus");
+    // LA AMPLITUD DEFENSIVA (Eje Horizontal): cortar un ataque POR AFUERA depende de que
+    // alguien esté parado ahí. Una zaga de tres cubre las dos bandas; una de uno vive de
+    // milagro cada vez que la jugada se abre. Por el centro no cambia nada.
     const r = A.actContain(m, mine, { press: key === "presionar", chase,
-      bonus: (est ? est.bonus : 0) + (fortaleza && hasTrait(m, "area_blindada") ? s.type.adv.deepContain : 0) });
+      bonus: (est ? est.bonus : 0) + (inWing(m) ? 0.10 * defenseWidth(m) : 0)
+        + (fortaleza && hasTrait(m, "area_blindada") ? s.type.adv.deepContain : 0) });
     if (est && r.ok && rnd() < 0.2) traitMoment(m, est.traitId, [est.texto]);
     if (r.ok) {
       setBall(m, { side: "mine" });   // cortar es recuperar: la pelota pasa a ser mía
@@ -927,7 +1017,8 @@ export function resolveSequenceAct(m, key) {
   // BLOQUE BAJO: todo lo que el árbol le hace a este remate — la frustración acumulada,
   // la muralla mientras el marcador aguanta, el área blindada y la primera ocasión del
   // partido contra la defensa escalonada (ver oppShotBlockMalus).
-  const r = A.actOppShot(m, s.shooter, mine, { bonus: s.bonus + malus + oppShotBlockMalus(m) });
+  const r = A.actOppShot(m, s.shooter, mine, { bonus: s.bonus + malus + oppShotBlockMalus(m)
+    - (inWing(m) ? 0.09 * defenseWidth(m) : 0) });   // el remate que nace de una banda cubierta llega peor
   if (r.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
   const out = closeSeq(m, "chance", `min ${m.clock()}' — ${s.shooter.name} remata pero ${pick([`ataja ${mine.por ? mine.por.name : "el arquero"}`, "se va afuera", "la bloquea la zaga"])}.`);
   if (malus && rnd() < 0.4) traitMoment(m, jl.traitId, [jl.texto]); // el momento se narra a veces (sin spamear)
@@ -1127,9 +1218,11 @@ function maybeCounter(m, failText, risky = false) {
  * conversión de la salida bajo presión). El lanzador sale por el protWeight del tipo,
  * como en un balón parado que nace solo.
  */
-function chainSetPiece(m, bonus = 0) {
+function chainSetPiece(m, bonus = 0, corner = false) {
   const t = sequenceType("balon_parado");
-  setBall(m, { v: BOX_OPP, h: 2, side: "mine" });
+  // El carril decide qué balón parado es: el que nace de un CÓRNER se cobra del costado;
+  // el que nace de una falta, donde se cometió (o sea, donde está la pelota).
+  setBall(m, { v: BOX_OPP, h: corner ? wingLane(m) : (m.field?.h ?? 2), side: "mine" });
   const cands = m.activeMine().filter(p => p.pos !== "POR");
   const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
   m.seq = { type: t, prot, actIdx: 0, bonus };

@@ -35,6 +35,7 @@
    ============================================================ */
 import { clamp } from "../../core/math.js";
 import { rivalFilo } from "../philosophy.js";
+import { playedPos } from "../ratings.js";
 
 /** Carriles (horizontal) y alturas (vertical) de la grilla. */
 export const LANES = 3, ROWS = 5;
@@ -228,6 +229,61 @@ export function startHalfField(m, nominal) {
   f._pos = 0.5;
 }
 
+/* ── LA AMPLITUD: quién ocupa los carriles (sprint del Eje Horizontal) ────────
+   Una línea de TRES ocupa los tres carriles. Una de UNO, solo el centro. Es la
+   lectura que le faltaba al dibujo: un 3-1-1 no es "defensivo" a secas — es un
+   equipo que cubre las dos bandas atrás y que arriba no tiene a NADIE por afuera;
+   un 1-3-1 es exactamente el espejo. El mismo número que ya se elegía cobra un
+   significado nuevo, sin agregar un dial más que mantener.
+
+   Escala −1..+1 CENTRADA EN LA LÍNEA DE DOS: ahí todo vale ×1, que es el punto
+   neutro del dial (misma técnica que el bloque medio en la altura — la línea base
+   medida no se mueve por el hecho de que la lectura exista).
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/** Cuánto cubre los CARRILES una línea de n jugadores: 0 (nadie por afuera) … 1 (los tres). */
+export const lineCover = n => clamp((n - 1) / 2, 0, 1);
+
+/** Cuántos hay en cada línea AHORA (por puesto jugado: una roja angosta al equipo). */
+function lineCounts(m) {
+  const c = { DEF: 0, MED: 0, DEL: 0 };
+  for (const p of m.activeMine()) if (c[playedPos(p)] !== undefined) c[playedPos(p)]++;
+  return c;
+}
+
+/** Amplitud OFENSIVA (−1..+1): manda la línea más ancha de las dos de arriba — para
+ *  atacar la banda alcanza con que ALGUIEN la ocupe (el extremo o el volante abierto). */
+export function attackWidth(m) {
+  const c = lineCounts(m);
+  return 2 * (Math.max(lineCover(c.MED), lineCover(c.DEL)) - 0.5);
+}
+
+/** Amplitud DEFENSIVA (−1..+1): la zaga manda y el mediocampo ayuda (×0.7 — bajar a
+ *  tapar la banda no es lo mismo que estar parado ahí). */
+export function defenseWidth(m) {
+  const c = lineCounts(m);
+  return 2 * (Math.max(lineCover(c.DEF), lineCover(c.MED) * 0.7) - 0.5);
+}
+
+/** ¿La pelota está en una banda? (el centro no premia ni castiga la amplitud) */
+export const inWing = m => (m.field?.h ?? 2) !== 2;
+
+/**
+ * La lectura de amplitud de un DIBUJO, para la UI: en palabras, nunca en números
+ * (objetivo de diseño del territorio). Recibe la cuenta por línea, no un Match, así
+ * la puede pedir el selector de formación antes de que exista el partido.
+ */
+export function widthHint(def, med, del) {
+  const a = 2 * (Math.max(lineCover(med), lineCover(del)) - 0.5);
+  const d = 2 * (Math.max(lineCover(def), lineCover(med) * 0.7) - 0.5);
+  const partes = [];
+  if (a >= 0.9) partes.push("llega a las dos bandas");
+  else if (a <= -0.9) partes.push("ataca solo por el medio");
+  if (d >= 0.9) partes.push("cubre las bandas atrás");
+  else if (d <= -0.9) partes.push("deja las bandas libres");
+  return { atk: a, def: d, txt: partes.join(" · ") };
+}
+
 /* ── LA GEOGRAFÍA DE LAS JUGADAS (T4) ─────────────────────────────────────────
    Cada tipo de Key Sequence declara DESDE QUÉ ALTURAS puede nacer (`zone.from` en
    content/sequences). Un penal casi solo puede originarse en el área rival; una
@@ -243,13 +299,25 @@ export function startHalfField(m, nominal) {
 /** Caída del peso por cada altura de distancia entre la pelota y la cuna del tipo. */
 const ZONE_FALLOFF = 0.55;
 
-/** Cuánto pesa un tipo desde donde está la pelota (1 = nace justo acá). */
-export function zoneWeight(type, v) {
+/**
+ * Cuánto pesa un tipo desde donde está la pelota (1 = nace justo acá). La ALTURA cae
+ * por distancia; el CARRIL es una preferencia más suave — con la pelota ya abierta, el
+ * fútbol por afuera se propone solo; con la pelota en el medio, cuesta más abrirla.
+ */
+export function zoneWeight(type, v, h = 2) {
   const z = type?.zone?.from;
   if (!z) return 1;
   const d = v < z[0] ? z[0] - v : v > z[1] ? v - z[1] : 0;
-  return ZONE_FALLOFF ** d;
+  const lane = type.zone.lane === "wide" ? (h === 2 ? 0.65 : 1.35)
+    : type.zone.lane === "center" ? (h === 2 ? 1.25 : 0.80) : 1;
+  return (ZONE_FALLOFF ** d) * lane;
 }
+
+/** Un carril de BANDA, alternando (sin gastar azar: la ley de la deriva). */
+export const wingLane = m => (m.field ? (m.field._lane++ % 2 ? 1 : LANES) : 1);
+
+/** El carril OPUESTO al actual (el cambio de frente). Desde el centro, abre a una banda. */
+export const otherLane = m => ((m.field?.h ?? 2) === 2 ? wingLane(m) : LANES + 1 - m.field.h);
 
 /**
  * Dónde PLANTA la pelota un tipo que arranca: la altura actual llevada al borde más
@@ -262,7 +330,7 @@ export function originOf(m, type) {
   const z = type?.zone?.from || [1, ROWS];
   const v = clamp(f?.v ?? 3, z[0], z[1]);
   const lane = type?.zone?.lane;
-  const h = lane === "wide" ? (f._lane % 2 ? 1 : LANES) : lane === "center" ? 2 : (f?.h ?? 2);
+  const h = lane === "wide" ? wingLane(m) : lane === "center" ? 2 : (f?.h ?? 2);
   return { h, v };
 }
 

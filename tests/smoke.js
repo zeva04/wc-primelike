@@ -40,6 +40,10 @@ const FILO = args.filo || null;
 // es donde todos los multiplicadores territoriales valen ×1 — o sea, la línea base
 // histórica del juego no se mueve por el hecho de que la palanca exista.
 const ALTURA = +args.altura || 3;
+// --formacion=<id>: fija el DIBUJO de todas las runs (1-1-3 … 3-1-1). Es el gate del
+// sprint del Eje Horizontal: una línea de TRES ocupa los tres carriles, así que el dibujo
+// pasa a decidir cuánto fútbol por afuera existe — y ningún dibujo puede quedar dominado.
+const FORMACION = args.formacion || null;
 // --smart: el DT GREEDY del arco del Meta (M1) — el smoke al azar mide el PISO de la
 // mecánica; este flag mide el TECHO de una estrategia óptima simple. El arco cambia la
 // estrategia dominante y el azar no la ve. Compone con --filo/--team; excluye --action
@@ -53,7 +57,7 @@ const FOCUS = !!args.focus;
 const TIER_ORDER = { master: 3, advanced: 2, intermediate: 1, basic: 0 };
 if (SMART && ACTION) { console.error("--smart y --action son excluyentes: el greedy ya decide la acción del día"); process.exit(1); }
 
-let fails = 0;
+let fails = 0, avisoFormacion = false;
 const assert = (cond, msg, ctx) => { if (!cond) { fails++; console.error("FAIL:", msg, ctx || ""); } };
 
 // ---------- el DT greedy del techo (--smart, heurísticas acordadas con el PO en M1) ----------
@@ -68,7 +72,7 @@ const assert = (cond, msg, ctx) => { if (!cond) { fails++; console.error("FAIL:"
 const SMART_RECOVER_AT = E.ENERGY_OK; // el umbral de la banda verde: una sola fuente
 function smartDayAction(run, opts) {
   const has = id => opts.find(a => a.id === id);
-  const { lineup } = E.currentLineup(run.squad, null, null);
+  const { lineup } = E.currentLineup(run.squad, null, FORMACION);
   const avg = lineup.reduce((s, p) => s + p.energia, 0) / (lineup.length || 1);
   if (avg < SMART_RECOVER_AT && has("recuperar")) return has("recuperar");
   if ((run.moral ?? 50) <= 40 && has("bonding")) return has("bonding");
@@ -96,7 +100,15 @@ function playMatch(run, oppId) {
   // Misma puerta que usan las pantallas: arma el once, lo ordena por slots y asigna los
   // puestos (limpiando los que quedaron del partido anterior). Llamar a autoLineup pelado
   // dejaría `posJugada` pegado de un cambio previo y castigaría a ese jugador para siempre.
-  const { lineup } = E.currentLineup(run.squad, null, null);
+  const { lineup, formationId } = E.currentLineup(run.squad, null, FORMACION);
+  // TRAMPA DEL BANCO (hallazgo del sprint del Eje Horizontal): si el plantel no puede
+  // armar el dibujo pedido, currentLineup cae a otro EN SILENCIO — y la medición pasa a
+  // ser de una formación distinta a la que dice el flag. BRA, por ejemplo, tiene 2
+  // defensas: --formacion=3-1-1 medía un 2-1-2. Se avisa una vez y se sigue.
+  if (FORMACION && formationId !== FORMACION && !avisoFormacion) {
+    avisoFormacion = true;
+    console.log(`  ⚠️  el plantel de ${run.teamId} no puede armar ${FORMACION}: se está jugando ${formationId}`);
+  }
   const val = E.validateLineup(available, lineup);
   assert(val.ok, "autoLineup debe producir alineación válida",
     `[${val.msg}] once: ${lineup.map(p => `${p.pos}:${p.name}`).join(", ")} · fuera: ${run.squad.filter(p => p.suspendido || p.lesionadoPartidos > 0).map(p => `${p.name}(${p.pos}${p.suspendido ? " susp" : " les" + p.lesionadoPartidos})`).join(", ") || "nadie"}`);

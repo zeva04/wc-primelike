@@ -80,13 +80,17 @@ tipo nuevo hereda el fútbol sin declarar nada.
 1. **La densidad de jugadas** (deuda previa, intacta a propósito): hoy 2-6 por partido. El
    territorio abre una puerta natural —más momentos cuando el partido se juega en zonas
    calientes— pero subirla mueve ~+8pp hacia el favorito y exige su propio sprint.
-2. **La tercera jugada territorial**: el **cambio de frente** (banda → banda) es la que quedó
-   fuera del presupuesto de 2-3. Es la única que usaría el eje horizontal como protagonista;
-   hoy los carriles alimentan el mapa de calor y el desborde, nada más.
+2. ~~**La tercera jugada territorial**: el cambio de frente~~ — ✅ **RESUELTO (30-jul-2026,
+   arco del Eje Horizontal)**: `cambio_frente` entró al catálogo con su acto propio, y con él
+   la amplitud del dibujo, los centros que dependen de dónde se centra y el balón parado que
+   se cobra distinto desde la banda que de frente. Ver CORE §El Eje Horizontal.
 3. **`ui/screens/match.js` en 881 líneas** (presupuesto §6: >500 exige discusión). El corte
    natural es extraer la pizarra de plantilla a `ui/screens/match-squad.js`.
-4. **El eje horizontal está subutilizado en la generación**: ningún tipo cambia de peso por el
-   carril. Un rasgo de "juego por dentro / por fuera" sería su primer consumidor real.
+4. ~~**El eje horizontal está subutilizado en la generación**~~ — ✅ **RESUELTO**: los tipos
+   pesan por carril (`zoneWeight` con `lane`), el dibujo decide cuánto fútbol por afuera
+   existe y la amplitud defensiva se cobra en la contención y en el remate rival que nace de
+   una banda. Queda abierto lo natural que sigue: un **rasgo** que compre juego por dentro o
+   por fuera — hoy ningún rasgo lee el carril.
 5. ~~**La altura no se comunicaba como scouting previo**~~ — ✅ **RESUELTO (30-jul-2026)**: el
    Informe del Rival dice con qué altura se va a parar el que viene (`field.baseHeight`, la misma
    fuente que usa el partido) y qué camino deja abierto, y ofrece **ahí mismo** el selector de la

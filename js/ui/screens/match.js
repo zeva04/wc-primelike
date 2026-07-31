@@ -13,7 +13,7 @@ import { Match } from "../../game/match/Match.js";
 import { startPress, pressState } from "../../game/match/press.js";
 import { matchStats } from "../../game/match/stats.js";
 import { momentumBars, markMomentum } from "../../game/match/match-momentum.js";
-import { heatCells, fieldState, setHeight, HEIGHT_DEFAULT } from "../../game/match/field.js";
+import { heatCells, fieldState, setHeight, HEIGHT_DEFAULT, widthHint } from "../../game/match/field.js";
 import { teamPowers } from "../../game/match/powers.js";
 import { filoCtx } from "../../game/philosophy.js";
 import { PHILOSOPHIES, FILO_LEVELS, xpLevelOf } from "../../content/philosophies.js";
@@ -708,7 +708,8 @@ function openSquadModal(caido = null) {
          fuera de puesto y paga su ❗ — que es exactamente la decisión del DT. -->
     <div class="flex items-center gap-1.5 mb-3 flex-wrap">
       <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mr-1">Dibujo</span>
-      ${FORMATIONS.map(f => `<button data-form="${f.id}" title="${f.def} defensa(s) · ${f.med} medio(s) · ${f.del} delantero(s)"
+      ${FORMATIONS.map(f => `<button data-form="${f.id}" title="${f.def} defensa(s) · ${f.med} medio(s) · ${f.del} delantero(s)${
+        widthHint(f.def, f.med, f.del).txt ? ` — ${widthHint(f.def, f.med, f.del).txt}` : ""}"
         class="form-btn px-2 py-1 rounded-lg text-[11px] font-black border cursor-pointer transition-colors"></button>`).join("")}
       <!-- El SALDO real del dibujo, en vivo (OJO: nada de backticks en estos comentarios,
            que viven dentro de un template literal y lo cortan). Nació como mitigación de un

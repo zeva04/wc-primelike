@@ -12,6 +12,7 @@ import { ASSIST_CHANCE, POS_ASSIST_WEIGHT } from "../assists.js";
 import { effStat } from "./powers.js";
 import { noteFiloHit } from "./sequences.js"; // ciclo benigno (como en sequence-acts): solo se llama en runtime
 import { noteMomentum, markMomentum } from "./match-momentum.js";
+import { inWing, defenseWidth } from "./field.js";
 
 /**
  * Protagonista rival de una ocasión: un DEL/MED en cancha (o cualquiera si no queda ninguno).
@@ -48,7 +49,12 @@ export function ambientShotOpp(m, mine) {
   const prot = oppShooter(m);
   const q = effStat(prot, "tiro");
   const porQ = mine.por ? (effStat(mine.por, "atajadas", m.my.buffs) * 0.65 + effStat(mine.por, "reflejos", m.my.buffs) * 0.35) : 1;
-  const pGoal = clamp(0.12 + q * 0.08 - porQ * 0.06 - (mine.def - 2.5) * 0.04, 0.05, 0.55);
+  // LA AMPLITUD DEFENSIVA (Eje Horizontal): la llegada rival que nace de una banda la
+  // paga quien no tiene a nadie parado ahí. Es el canal de MÁS volumen del rival (~1,5
+  // remates ambiente por partido), y por eso es donde una zaga de tres se siente de
+  // verdad. Solo por afuera: por el centro, el ancho no cambia nada.
+  const ancho = inWing(m) ? 0.06 * defenseWidth(m) : 0;
+  const pGoal = clamp(0.12 + q * 0.08 - porQ * 0.06 - (mine.def - 2.5) * 0.04 - ancho, 0.05, 0.55);
   if (rnd() < pGoal) goalOpp(m, prot);
   else m.log("chance", `min ${m.clock()}' — ${prot.name} remata para ${m.oppTeam.name}... ${pick([`¡atajadón de ${mine.por ? mine.por.name : "tu arquero"}!`, "¡se va desviado!", "¡la defensa la saca!"])}`);
 }
