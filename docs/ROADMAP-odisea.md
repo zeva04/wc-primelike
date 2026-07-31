@@ -202,6 +202,8 @@ de plantilla abierto.
   41.9 en R3): **48.5%** a n=4000. Volvió a **41.9-42.2** con una palanca nueva, y de paso
   salió una ley: ningún dial global puede bajar el techo. Todo el detalle en
   `docs/ROADMAP-rebalance.md` §R4.
-- **DENSIDAD**: sigue en 2-6 jugadas (`SEQ_MIN`/`SEQ_MAX`). Subirla a 4-10 arregla los huecos
-  del reloj pero mueve +8pp de campeón: su propio sprint, con su propia recalibración.
+- ~~**DENSIDAD**~~ — **CERRADA el 31-jul-2026** con su propio sprint: **5-9 jugadas**, ventana
+  territorial, y los dos contrapesos que hicieron falta (remates ambiente y presupuesto de XP).
+  El desvío real no era +8pp sino **+12.4**, y no venía de donde se creía. Detalle en
+  `docs/ROADMAP-territorio.md` §Sprint de la Densidad y CORE §7.
 - Backlog del arco anterior: títulos del DT en el hub · bautismo del híbrido.

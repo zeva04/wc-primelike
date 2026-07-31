@@ -242,13 +242,13 @@ con su resolución **intacta**; los remates no interactivos pasaron a `chances.a
 **`game/match/sequences.js` — el GENERADOR** (+ `content/sequences.js` = los tipos como datos):
 | Función | Qué hace |
 |---|---|
-| `maybeStartSequence(m)` | ¿Arranca una secuencia este tick? Sobre la marcha, apuntando al objetivo del partido (2-6). El lado sale de `mineShare` (ventaja + mentalidad VIVA **+ contexto A3**: marcador tardío ±0.07/−0.05 desde el 75' y rojas ±0.06 por expulsado, leídos EN VIVO). |
+| `maybeStartSequence(m)` | ¿Arranca una secuencia este tick? Sobre la marcha, apuntando al objetivo del partido (5-9). Cada jugada tiene una **ventana** `abre`…`cierra` (sprint de la Densidad): sale en cuanto la pelota deja el mediocampo (`zonaViva`) y, si el partido sigue trabado, al vencer. El lado sale de `mineShare` (ventaja + mentalidad VIVA **+ contexto A3**: marcador tardío ±0.07/−0.05 desde el 75' y rojas ±0.06 por expulsado, leídos EN VIVO). |
 | `seqPlan(m)` (interna) | Objetivo, ventaja y `rivalProfile`; cacheado en `m._seqPlan` (el contexto de partido NUNCA se cachea acá). |
 | `rivalProfile(m)` (interna, A2) | Perfil 0..1 del rival desde los promedios de su once (atk/def/pase/cab) — decisión #14, sin datos nuevos. |
 | `typeWeights(m,side,prof)` (interna, A2+A3) | Pesos por tipo desde el perfil rival, la mentalidad y el **contexto A3** (todo leído AL GENERAR): perder tarde → directo ×1.5 · ganar tarde → repliegue ×1.4 · fatiga <55 → recuperación ×0.6, pelotazo/salida_fondo ×1.4 · **Moral** (decisión #10, por `matchCtx.moral`): nubes/alta → valientes ×1.5/×1.2, suelo/baja → pelotazo ×1.5/×1.2 y recuperación ×0.6/×0.8 · el último tipo generado pesa 0 (no repetir). |
 | `startSequence(m,type)` | Elige protagonista(s) (por lado y `protWeight` **× `protMomentum` A3**; el córner rival usa su mejor cabeceador, la salida bajo presión a MI mejor pasador del fondo), registra `m._lastSeqType` y `m._flow`, y crea la decisión del acto 1. |
 | `protMomentum(p)` (A3, decisión #15) | Factor de presencia por Momento: `1 + 0.12·(momento−4)` (7→1.36×, 1→0.64×). Pondera QUIÉN protagoniza (también en la conversión def→of), nunca el éxito. |
-| `SEQ_MIN`/`SEQ_MAX`, `SEQUENCE_TYPES`, `sequenceType(id)` | Rango 2-6 y el catálogo: 8 tipos base (A2) + las 4 **SECUENCIAS AVANZADAS** (M2, `advFor` = filosofía dueña, números de desenlace en `adv`, texto de vitrina en `vitrina`). |
+| `SEQ_MIN`/`SEQ_MAX`, `SEQUENCE_TYPES`, `sequenceType(id)` | Rango **5-9** (nació 2-6; sprint de la Densidad 31-jul-2026) y el catálogo: 8 tipos base (A2) + las 4 **SECUENCIAS AVANZADAS** (M2, `advFor` = filosofía dueña, números de desenlace en `adv`, texto de vitrina en `vitrina`). |
 | `ADVANCED_BY_FILO` | **content/sequences** (M2): la avanzada de cada filosofía (`{press: fila, …}`), derivado de los datos. La leen el gating del pool, la vitrina, el sorteo y la conquista narrada. |
 
 **`game/match/sequence-acts.js` — EL CONTRATO Y EL DESPACHO** (68 líneas): `buildActDecision`
@@ -666,7 +666,7 @@ La pantalla más grande del juego, partida en cuatro módulos que operan sobre e
 - **`sequences.test.js`** (Sprints A1-A2) — la capa de secuencias: el catálogo (8 tipos, esquema,
   sides, los 6 del roadmap presentes), las Football Actions (bien formadas y **monótonas** en la stat
   que las rige; contener corta más que presionar), y la máquina sobre un Match real: arranca, avanza
-  multi-acto y **cierra sin loops**, respeta el objetivo 2-6, TODOS los tipos aparecen jugando, el
+  multi-acto y **cierra sin loops**, respeta el objetivo 5-9, las **ventanas territoriales** no se solapan y la mayoría de las jugadas las dispara el territorio, TODOS los tipos aparecen jugando, el
   último hombre sigue asomando (absorción + pelotazo a la espalda), la **salida bajo presión
   convierte en transición** (y también castiga), y reventarla es siempre segura.
 - **`momentum.test.js`** — el Momento 1..7: mapa nivel→% con tope (derivado de `MOMENTO_PCT_STEP`

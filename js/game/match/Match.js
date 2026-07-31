@@ -65,8 +65,8 @@ const PEN_OPP_TICK = 0.010;    // ≈0.18/partido, como cuando vivía en oppChan
 // derivó +2.3..+2.7pp hacia el favorito —quien mejor explota las secuencias extra— y este
 // canal PLANO es el contrapeso pactado (sensibilidad A2: ~−0.2pp por +0.001).
 const BREAKAWAY_TICK = 0.025;
-const AMBIENT_MINE = 0.85;     // el remate simulado propio cede algo de terreno a las secuencias
-const AMBIENT_OPP = 0.70;
+const AMBIENT_MINE = 0.28;     // el remate simulado propio cede algo de terreno a las secuencias
+const AMBIENT_OPP = 0.40;
 // Relato de ambiente: es NARRACIÓN pura (no toca el balance). Subió 0.35 → 0.55 con el
 // reloj continuo: el partido dura ahora ~3 minutos de reloj de pared en vez de ~15
 // segundos, y con la frecuencia vieja el relato quedaba muerto entre jugada y jugada.
@@ -247,7 +247,7 @@ export class Match {
     tickField(this, mine, opp);
 
     // Key Sequences (Bible §7): la columna interactiva del partido. Reemplazan a las
-    // ocasiones sueltas de myChance/oppChance; 2-6 por partido moduladas por la preparación.
+    // ocasiones sueltas de myChance/oppChance; 5-9 por partido moduladas por la preparación.
     if (Sequences.maybeStartSequence(this)) return true;
 
     // Eventos interactivos INDEPENDIENTES de las secuencias (penal y último hombre, intactos

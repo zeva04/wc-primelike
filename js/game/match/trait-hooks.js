@@ -16,7 +16,7 @@
    los 5+ rasgos que lo consumen (T1 y T3) no lo reinventen.
 
    Reglas del motor:
-   - Una secuencia REACTIVA no cuenta contra el objetivo 2-6 del
+   - Una secuencia REACTIVA no cuenta contra el objetivo 5-9 del
      partido (nace del fútbol, no del generador)… pero un partido
      no encadena sin límite: MAX_CHAINS por partido lo acota (el
      mismo espíritu del rebote único por secuencia).

@@ -24,7 +24,7 @@
    secuencia sale, cuándo y con qué protagonista.
 
    GENERACIÓN (decisión PO): sobre la marcha, apuntando a un
-   objetivo de 2-6 por partido modulado por la preparación (Bible:
+   objetivo de 5-9 por partido modulado por la preparación (Bible:
    la preparación determina cuántas oportunidades recibes). Se
    decide por tick para que A3 pueda meter contexto (marcador,
    minuto, fatiga) sin reescribir esto.
@@ -43,8 +43,13 @@ import { noteCorner as noteCornerStat } from "./stats.js";
 import { setBall, myHeight, oppHeight, HEIGHT_DEFAULT, zoneWeight, originOf, attackWidth, defenseWidth } from "./field.js";
 import { noteMomentum } from "./match-momentum.js";
 
-// Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
-export const SEQ_MIN = 2, SEQ_MAX = 6;
+/* Rango objetivo de secuencias por partido. El Bible §7 decía "aproximadamente 2 a 6", y
+   con ticks de 5' eso alcanzaba: el partido entero duraba ~15 segundos de reloj de pared.
+   EL RELOJ CONTINUO lo rompió — con 1 minuto cada 2 s, cuatro jugadas en 90' dejan huecos
+   de 16 a 21 minutos de mediana (34-42 s mirando correr el minutero) y el PO lo reportó
+   como bug. `seqSlots` arregló la COLA repartiendo los momentos; la MEDIA solo la arregla
+   subir el número. Sprint de la Densidad (31-jul-2026, decisión PO): 5-9. */
+export const SEQ_MIN = 5, SEQ_MAX = 9;
 
 /**
  * Factor de presencia por Momento (A3, decisión #15): el encendido (7) pide la pelota
@@ -98,11 +103,34 @@ function rivalProfile(m) {
  * Misma cuenta por partido —el objetivo no se toca, el balance no se mueve—, sin sequías.
  * TODO lo que decide QUÉ secuencia sale (lado, tipo, protagonista, contexto A3/F2/T1/presión)
  * sigue pasando al DISPARARLA, no acá: esto solo reemplaza el "¿ahora?" del sorteo.
+ *
+ * SPRINT DE LA DENSIDAD (decisión PO): cada secuencia deja de tener un MINUTO y pasa a
+ * tener una VENTANA de verdad — `abre` … `cierra`. Dentro de la ventana la jugada espera
+ * a que haya fútbol (la pelota fuera del mediocampo, ver `zonaViva`) y sale ahí; si el
+ * partido se queda trabado en el medio toda la ventana, sale igual al vencer `cierra`.
+ * El NÚMERO de jugadas del partido no cambia por territorio —esa sigue siendo la ley del
+ * sprint del Territorio (la zona decide QUÉ jugada, nunca CUÁNTAS)—: lo único que decide
+ * la geografía es CUÁL de los minutos de la ventana se usa. Una jugada que nace con la
+ * pelota ya movida es una jugada que el jugador entiende.
  */
+const ANTICIPO = 0.40;   // cuánto se abre la ventana antes de su vencimiento, en fracción de L
+
 function seqSlots(count, desde, hasta) {
   const L = (hasta - desde) / count;
-  return Array.from({ length: count }, (_, i) => desde + L * (i + 0.15 + 0.7 * rnd()));
+  // El jitter es [0.30, 0.85] de cada tramo: deja 0.45·L de separación mínima entre dos
+  // vencimientos, o sea MÁS que el ANTICIPO — así una ventana nunca abre antes de que la
+  // anterior haya vencido y dos jugadas no pueden pisarse.
+  return Array.from({ length: count }, (_, i) => {
+    const cierra = desde + L * (i + 0.30 + 0.55 * rnd());
+    return { abre: cierra - L * ANTICIPO, cierra };
+  });
 }
+
+/** ¿Hay fútbol AHORA? La pelota fuera del mediocampo: alguien está atacando o defendiendo
+ *  de verdad. Medido: pasa el 35% de los minutos, así que es una puerta real —ni un
+ *  pase-libre ni un cuello de botella—. No gasta azar (lee el territorio, que es
+ *  determinista: la ley de la deriva). */
+const zonaViva = m => (m.field?.v ?? 3) !== 3;
 
 /**
  * Objetivo de secuencias del partido, ventaja y perfil rival. Se calcula UNA vez por partido
@@ -113,7 +141,13 @@ function seqPlan(m) {
   if (m._seqPlan) return m._seqPlan;
   const { mine, opp } = m.powers();
   const edge = (mine.atk - opp.atk) + (mine.def - opp.def); // ~[-6, 6]
-  const target = clamp(Math.round(4 + edge * 0.32 + ri(-1, 1) * 0.5), SEQ_MIN, SEQ_MAX);
+  // La BASE sube (4 → 7) y la pendiente del edge NO se toca (decisión PO): el aumento de
+  // densidad es PAREJO. Es deliberado y se midió por separado — la prueba vieja que dio
+  // +8pp al favorito movía las dos cosas a la vez (base 4→6.5 Y pendiente 0.32→0.52), o
+  // sea que una parte de ese desvío no era "más jugadas" sino "más jugadas EXTRA para el
+  // que ya era favorito". Con la pendiente quieta, el débil gana en términos relativos:
+  // recibe las mismas +3 jugadas sobre una base menor.
+  const target = clamp(Math.round(7 + edge * 0.32 + ri(-1, 1) * 0.5), SEQ_MIN, SEQ_MAX);
   // La identidad del RIVAL (F2, decisión PO #4): curada o derivada, es fija por
   // partido — se cachea con el plan. El proxy de stats (prof) queda como BASE:
   // la filosofía multiplica encima, no lo reemplaza (un bloque de élite sigue
@@ -480,7 +514,10 @@ export function maybeStartSequence(m) {
     plan.target += plan.extra;
   }
   if (done >= plan.target) return false;
-  if (m.min < plan.slots[done]) return false;
+  // La ventana de esta jugada: sale en cuanto haya fútbol, y al vencer sale sí o sí.
+  // (Sin slot —los tests fuerzan `slots = []`— arranca en el acto, como siempre.)
+  const slot = plan.slots[done];
+  if (slot && m.min < slot.cierra && !(m.min >= slot.abre && zonaViva(m))) return false;
   const mentShift = m.my.mentalidad === "ofensiva" ? 0.10 : m.my.mentalidad === "defensiva" ? -0.10 : 0;
   // Contexto dinámico (A3): el partido inclina el reparto EN VIVO — perder tarde te vuelca
   // al ataque (+0.07, y te expones: el rival gana repliegues/contras), ganar tarde te

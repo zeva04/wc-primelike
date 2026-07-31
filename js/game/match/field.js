@@ -19,7 +19,7 @@
 
    ── LA LEY DEL AZAR (la misma de stats.js y match-momentum.js) ──
    La DERIVA AMBIENTE —los ~90 minutos en los que no hay una Key
-   Sequence— NO consume `rnd()`. Ni una tirada. Con 2-6 secuencias
+   Sequence— NO consume `rnd()`. Ni una tirada. Con 5-9 secuencias
    por partido, un mapa de calor alimentado solo por jugadas
    tendría 5 muestras; el relleno sale DETERMINISTA de la posesión
    ya derivada del juego (`Match.flow`), los poderes y las dos

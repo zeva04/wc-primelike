@@ -4,7 +4,7 @@
    - Football Actions game/match/actions.js (bien formadas y
      monótonas en la stat que las rige)
    - la máquina game/match/sequences.js: arranca, avanza multi-acto
-     y CIERRA sin loops; respeta el objetivo 2-6; protagonista por
+     y CIERRA sin loops; respeta el objetivo 5-9; protagonista por
      lado; el contrato §3.2 de la decisión `sequence`
    Uso: node tests/sequences.test.js
    ============================================================ */
@@ -127,7 +127,7 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
   assert(m.seq === null, "el repliegue cierra sin quedar colgado");
 }
 
-// ---------- generación: respeta el objetivo 2-6 y el catálogo entero aparece ----------
+// ---------- generación: respeta el objetivo 5-9 y el catálogo entero aparece ----------
 {
   let sawGen = false, overshoot = false, sawLastMan = false;
   const seen = new Set();
@@ -147,7 +147,7 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
     }
     const plan = m._seqPlan;
     if (plan) {
-      assert(plan.target >= E.SEQ_MIN && plan.target <= E.SEQ_MAX, "el objetivo cae en [2,6]", plan.target);
+      assert(plan.target >= E.SEQ_MIN && plan.target <= E.SEQ_MAX, `el objetivo cae en [${E.SEQ_MIN},${E.SEQ_MAX}]`, plan.target);
       if ((m._seqCount || 0) > plan.target) overshoot = true;
     }
   }
@@ -186,11 +186,56 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
     gaps.push(90 - prev);  // y el hueco final, hasta el pitazo
   }
   const max = Math.max(...gaps);
-  const largos = gaps.filter(g => g >= 40).length;
-  // Cota generosa a propósito (el objetivo mínimo son 2 secuencias = ventanas de 45'): lo que
-  // se está prohibiendo es la COLA del sorteo memoryless, que llegaba a 77'.
-  assert(max <= 55, "ningún partido pasa 55 minutos sin una jugada", `max ${max}'`);
-  assert(largos / gaps.length < 0.05, "los huecos de 40'+ son raros (<5%)", `${largos}/${gaps.length}`);
+  const largos = gaps.filter(g => g >= 25).length;
+  // SPRINT DE LA DENSIDAD: repartir arregló la cola, pero la MEDIA la arregla el número.
+  // Con el objetivo en 5-9 la cota se puede apretar de verdad: medido sobre 20.000 partidos
+  // en el banco, el peor hueco de todos fue 29' (antes eran 51'). Esta cota es la que
+  // defiende el bug original del PO — "17 minutos sin ninguna jugada" ya no puede volver.
+  assert(max <= 40, "ningún partido pasa 40 minutos sin una jugada", `max ${max}'`);
+  assert(largos / gaps.length < 0.05, "los huecos de 25'+ son raros (<5%)", `${largos}/${gaps.length}`);
+}
+
+/* ---------- LA VENTANA TERRITORIAL (sprint de la Densidad) ------------------------------
+   Cada secuencia tiene una ventana `abre`…`cierra` y sale en cuanto hay fútbol (la pelota
+   fuera del mediocampo); si el partido se queda trabado en el medio toda la ventana, sale
+   igual al vencer. Las dos propiedades que hay que blindar son OPUESTAS entre sí y por eso
+   se miden juntas:
+     1. el territorio NO cambia CUÁNTAS jugadas hay (la ley del sprint del Territorio) —
+        todo partido llega EXACTO a su objetivo, se juegue donde se juegue;
+     2. el territorio SÍ cambia CUÁNDO — si casi todas salieran por vencimiento, la ventana
+        sería decorativa y este sprint no habría hecho nada.
+   ------------------------------------------------------------------------------------- */
+{
+  let porTerritorio = 0, porVencimiento = 0, incompletos = 0, solapadas = 0;
+  for (let t = 0; t < 40; t++) {
+    const m = makeMatch(t % 2 ? "ARG" : "MAR");
+    let guard = 0, prevCount = 0;
+    while (!m.finished && guard++ < 500) {
+      m.tick();
+      if ((m._seqCount || 0) > prevCount) {
+        prevCount = m._seqCount;
+        // Salió ANTES de vencer su ventana ⇒ la disparó la pelota, no el reloj.
+        if (m.min < m._seqPlan.slots[prevCount - 1].cierra) porTerritorio++; else porVencimiento++;
+      }
+      if (m.decision) {
+        const d = m.decision;
+        if (d.id === "sequence") m.resolveSequenceAct(d.options[Math.floor(Math.random() * d.options.length)].key);
+        else m.decision = null;
+      }
+    }
+    if ((m._seqCount || 0) !== m._seqPlan.target) incompletos++;
+    // Dos ventanas nunca se pisan: la siguiente abre después de que venció la anterior
+    // (es lo que garantiza el jitter de seqSlots contra ANTICIPO — si alguien toca uno de
+    // los dos números sin mirar el otro, dos jugadas podrían dispararse pegadas).
+    const s = m._seqPlan.slots;
+    for (let i = 1; i < s.length; i++) if (s[i].abre < s[i - 1].cierra) solapadas++;
+  }
+  assert(incompletos === 0, "el partido siempre llega EXACTO a su objetivo de jugadas", `${incompletos}/40 partidos cortos`);
+  assert(solapadas === 0, "las ventanas de dos jugadas nunca se solapan", solapadas);
+  const total = porTerritorio + porVencimiento;
+  assert(porTerritorio / total > 0.5, "la mayoría de las jugadas las dispara el TERRITORIO, no el vencimiento",
+    `${(100 * porTerritorio / total).toFixed(0)}% territorio`);
+  assert(porVencimiento > 0, "el vencimiento sigue siendo la red: un partido trabado igual genera fútbol");
 }
 
 // ---------- M2: el gating por nivel de las avanzadas, y sus desenlaces nuevos ----------

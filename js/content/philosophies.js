@@ -73,8 +73,8 @@ export const FILO_LEVELS = Array.from({ length: 10 }, (_, i) => ({
    fútbol que el equipo propone; la EFECTIVIDAD paga por cada acto que sale bien
    (y por el gol que la corona). Con ~10 jugadas y ~10 aciertos del tipo propio,
    el reparto queda 140/60 = 70/30 exacto. Los dos son diales del arco. */
-export const XP_INTENCION = 125;
-export const XP_ACIERTO = 55;
+export const XP_INTENCION = 73;
+export const XP_ACIERTO = 32;
 
 /* Qué filosofía APRENDE cada tipo de secuencia del catálogo (content/sequences):
    la arista ya mapeaba tipo↔fútbol, esto lo lleva a la filosofía dueña. Las

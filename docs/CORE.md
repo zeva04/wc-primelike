@@ -805,10 +805,13 @@ aristas: acción del día y post-partido): nivel 1 = "¡Conquista! ya es nuestro
 tarjetas al rival de estos desenlaces son LOCALES al partido (rivalBans sigue siendo cosa
 del mundo vivo, como las lesiones rivales).
 
-**Generación** (`sequences.seqPlan` + `maybeStartSequence`): **2-6 por partido**, objetivo modulado
-por la **preparación** (ventaja atk+def sobre el rival) y la mentalidad. El favorito recibe más
-secuencias y más ofensivas; el superado, menos y más defensivas — el pago visible de prepararse
-(Bible §7).
+**Generación** (`sequences.seqPlan` + `maybeStartSequence`): **5-9 por partido** (sprint de la
+Densidad, 31-jul-2026 — nació 2-6 con ticks de 5'), objetivo modulado por la **preparación**
+(ventaja atk+def sobre el rival) y la mentalidad. El favorito recibe más secuencias y más
+ofensivas; el superado, menos y más defensivas — el pago visible de prepararse (Bible §7).
+La base subió 4 → 7 y la **pendiente del `edge` NO se tocó** (0.32): el aumento es parejo, +3
+jugadas para todos. Medido en el banco de partidos: 4.66→7.68 con el favorito claro y
+3.33→6.33 con el underdog, exactamente +3.0 en los cinco duelos.
 
 **CUÁNDO sale cada una (`seqSlots`, fix del PO 28-jul-2026).** Antes se sorteaba tick a tick con
 una probabilidad **sin memoria** (`faltan / ticksQuedan`). El número por partido salía perfecto,
@@ -822,12 +825,59 @@ propios momentos a prorrata de sus 30'. Lo que decide **QUÉ** secuencia sale (l
 protagonista, contexto A3/F2/T1/presión) sigue pasando **al dispararla** — el Sprint A3 no se
 tocó; solo se reemplazó el "¿ahora?" del sorteo.
 
-> **Deuda abierta — la DENSIDAD.** Repartir arregla la cola, no la media: con 2-6 secuencias en
-> 90', el hueco medio es ~24' pase lo que pase (mediana medida 19' = ~38 s de reloj de pared).
-> El reloj continuo diluyó la interactividad: las secuencias pasaron de ser ~2/3 del reloj de
-> pared del partido a ~1/9. Subir el rango a 4-10 lo arregla de verdad (mediana 12', máx 25')
-> pero **mueve el balance +8pp de campeón (23.9 → 32.0, n=2000)** — es un sprint de calibración
-> como A1/A2/A3, no un ajuste suelto. **Decisión del PO, pendiente.**
+**LA VENTANA TERRITORIAL (sprint de la Densidad).** Cada secuencia dejó de tener un *minuto* y
+pasó a tener una **ventana** (`abre`…`cierra`, con `ANTICIPO` = 0.40 del tramo): dentro de ella
+la jugada **espera a que haya fútbol** —la pelota fuera del mediocampo, `zonaViva`— y sale ahí;
+si el partido se queda trabado en el medio toda la ventana, sale igual al vencer. Medido: **73%
+de las jugadas las dispara el territorio** y 27% el vencimiento. El **número** de jugadas sigue
+sin depender de la zona (la ley del sprint del Territorio: la geografía decide QUÉ jugada, nunca
+CUÁNTAS) — lo único que decide es *cuál* de los minutos de la ventana se usa. El jitter de
+`seqSlots` ([0.30, 0.85] del tramo) deja 0.45·L de separación mínima entre vencimientos, o sea
+**más que el `ANTICIPO`**: dos ventanas nunca se solapan (`sequences.test` lo fija).
+
+> **Deuda SALDADA — la DENSIDAD** (31-jul-2026). Repartir arregló la cola, no la media: con 2-6
+> secuencias en 90' el hueco medio era ~24' pase lo que pase, y el reloj continuo había diluido
+> la interactividad de ~2/3 del reloj de pared a ~1/9. Resuelto subiendo el objetivo a **5-9**.
+> Medido en 20.000 partidos del banco: hueco **mediana 16-21' → 11-13'**, **p90 25-35' → 16-19'**
+> y **máximo 51' → 29'**. El bug original del PO ("17 minutos sin ninguna jugada") ya no puede
+> volver a ocurrir. Los dos contrapesos que costó, abajo.
+
+#### Los dos contrapesos de la densidad (y por qué el banco por sí solo mentía)
+
+Subir la densidad a secas movía **campeón 25.5% → 39.5%** (n=1200), casi el doble del +8pp que
+se había estimado. El banco de partidos, en cambio, decía que la BRECHA favorito−underdog casi
+no se movía (30.1 → 31.2pp). Las dos mediciones eran ciertas y medían cosas distintas:
+
+1. **La conversión del favorito (el grueso, ~11pp).** Más jugadas → **+27% de goles** → los
+   **empates se derrumban** (BRA vs POL: 14.5% → 9.8%) → el favorito convierte su superioridad
+   con más fiabilidad. Un +6.7pp de win% por partido parece poco, pero una run son ~6 partidos
+   encadenados: `(85.7/79.0)^6 = 1.62`, y `25.5% × 1.62 ≈ 41%`. **Lección de método: en este
+   juego un efecto de partido chico se eleva a la sexta potencia en el KPI.** El banco no
+   miente, pero hay que componerlo a mano antes de compararlo con el smoke.
+   **Contrapeso (decisión PO): bajar los remates AMBIENTE** — más jugadas interactivas
+   REEMPLAZAN simulación, no se suman a ella. `AMBIENT_MINE` **0.85 → 0.28** y `AMBIENT_OPP`
+   **0.70 → 0.40**. La asimetría está medida y es deliberada: con densidad plena mi ataque
+   creció +27% y el rival solo +14% (mis jugadas las decido yo y las convierto mejor), así que
+   restaurar el marcador de los dos lados exige cortar más de mi lado. Resultado: GF
+   2.69/2.33/2.07/1.45/1.29 vs 2.67/2.33/2.03/1.50/1.29 de base, GC 0.37/0.54/0.56/0.86/0.86 vs
+   0.40/0.57/0.57/0.85/0.86.
+2. **La velocidad de la progresión (~2.7pp).** La XP de identidad se gana **por secuencia**
+   (`noteFiloIntent` 70% + `noteFiloHit` 30%), así que la densidad es de hecho el dial de
+   velocidad de TODO el arco de Progresión: sin tocar nada más, la filosofía tope pasaba de
+   **6.0 a 8.2/10**, el DT de 12.4 a 17.6/20, los rasgos de 11.3 a 16.5 y el Master del 0.0% al
+   4.7%. El propio arco declara su banda ("una run promedio deja a la principal en **6-8**"), o
+   sea que la densidad la rompía por arriba.
+   **Contrapeso: devolver el presupuesto de XP por partido a su nivel calibrado**, escalando los
+   dos diales por la razón de densidad medida (0.58): `XP_INTENCION` **125 → 73** y `XP_ACIERTO`
+   **55 → 32**. La relación "más jugadas enseñan más" queda intacta (un partido de 9 sigue
+   enseñando más que uno de 5); lo que se restaura es el ritmo absoluto. Verificado: filo **6.0**,
+   DT **12.7**, rasgos **11.5**, Master **0.1%** — la banda del arco, clavada.
+
+**Gate del sprint** (BRA, n=4000): campeón **28.4% vs 27.1%** de base = **+1.3pp, dentro de
+±2pp**. Techo `--smart` **44.9% vs 40.0%** y `--smart --focus` **46.1% vs 39.9%** con Master
+**21.9% vs 19.8%**: ningún dial global bajó el techo (LEY del arco del Rebalance) — al contrario,
+la brecha piso→techo se ensanchó de 14.5 a 16.5pp, que es lo que se espera de un partido con más
+fútbol interactivo: **hay más decisiones donde el DT humano puede sacar diferencia**.
 
 **Ritmo** (`screens/match.js`, decisión PO "ráfaga" + reloj continuo 27-jul): un tick **es un
 minuto** y se ve correr — **2000 ms/minuto** en normal (un partido son ~3'30" de reloj de pared
@@ -1416,11 +1466,18 @@ del DT: se fija al empezar y no cambia nunca.
 
 | Fuente | Constante | Cuándo |
 |---|---|---|
-| **Intención** | `XP_INTENCION` = 125 | cada secuencia de ese fútbol que ARRANCA (`noteFiloIntent` en `startSequence`) |
-| **Efectividad** | `XP_ACIERTO` = 55 | cada acto que sale bien + el gol que corona (`noteFiloHit`) |
+| **Intención** | `XP_INTENCION` = 73 | cada secuencia de ese fútbol que ARRANCA (`noteFiloIntent` en `startSequence`) |
+| **Efectividad** | `XP_ACIERTO` = 32 | cada acto que sale bien + el gol que corona (`noteFiloHit`) |
 
 Con ~2-3 jugadas y ~2-3 aciertos por partido de un mismo tipo el reparto queda ~70/30,
 que es la distribución objetivo del GDD.
+
+> Nacieron en **125/55**, calibrados contra una densidad de **2-6 jugadas por partido**. El
+> sprint de la Densidad (31-jul-2026) los bajó a **73/32** ×0.58 —la razón de densidad medida—
+> para que el presupuesto de XP POR PARTIDO no se moviera al pasar el objetivo a 5-9. Es el
+> mismo cuidado que la lección de calibración del arco: **la escalera está calibrada contra un
+> número de jugadas, así que cualquier sprint que toque la densidad tiene que tocar esto**.
+> Verificado tras el cambio: filosofía tope 6.0/10 y DT 12.7/20, idénticos a antes del sprint.
 
 Qué filosofía aprende cada tipo de secuencia (`FILO_BY_TIPO`; las avanzadas mandan con
 su `advFor`):
@@ -1518,9 +1575,14 @@ en los objetivos del GDD (run promedio 12-15 · muy buena 16-18 · perfecta 20).
 **21.7%** de las runs al dial actual, no en el 5%. Respuesta del sistema al dial, medida
 (BRA `--smart --focus` n=600):
 
+Tabla medida con la densidad VIEJA (2-6 jugadas) y el dial en 125/55; tras el sprint de la
+Densidad el dial es 73/32 con 5-9 jugadas, que da el mismo punto de trabajo (Master 21.9%,
+filosofía tope 8.0, DT 15.4 con `--smart --focus`). Las **pendientes** de la tabla siguen
+valiendo: lo que se lee acá es cuánto responde el sistema a mover el dial, no su valor absoluto.
+
 | dial | Master | filosofía tope | DT medio | campeón |
 |---|---|---|---|---|
-| **125/55 (actual)** | 21.7% | 7.9 | **14.8** | 44.7% |
+| **125/55 (con densidad 2-6)** | 21.7% | 7.9 | **14.8** | 44.7% |
 | +20% (150/66) | 34.8% | 8.5 | 16.4 | 44.2% |
 | +40% (175/77) | 45.7% | 8.8 | 17.4 | 48.0% |
 | +60% (200/88) | 57.2% | 9.2 | 18.3 | 44.3% |
@@ -1693,7 +1755,8 @@ momentum, la narración y qué jugadas aparecen.
 
 ### La deriva ambiente (y por qué NO consume azar)
 
-Con 2-6 secuencias por partido, un mapa de calor alimentado solo por jugadas tendría 5 muestras.
+Con 5-9 secuencias por partido (2-6 cuando nació el sprint del Territorio), un mapa de calor
+alimentado solo por jugadas tendría un puñado de muestras.
 El relleno de los ~90 minutos sale **determinista** de la posesión ya derivada del juego
 (`Match.flow`), los poderes y las dos alturas de bloque — misma ley que `stats.js` y
 `match-momentum.js`: el sistema territorial puede existir **sin correr el flujo del RNG ni
