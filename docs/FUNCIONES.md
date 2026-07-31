@@ -425,7 +425,7 @@ entre pantallas es `go("nombre", ...args)` — así no hay imports circulares (�
 | `ui/screens/squad.js` | §7: Gestión de Plantilla (las reglas viven en `game/lineup`) |
 | `ui/screens/worldcup.js` | §7: Estado del Mundial + tarjetas de posición reutilizables |
 | `ui/screens/journal.js` | §7: Diario de Campaña |
-| `ui/screens/match.js` | §8: partido en vivo, decisiones, cambios, reloj |
+| `ui/screens/match/` | §8: partido en vivo — `index` (pantalla, reloj, decisiones) · `panels` (columna de lectura) · `tactics` (palancas del DT) · `squad` (plantilla en vivo) |
 | `ui/screens/shootout.js` | §9: tanda de penales |
 | `ui/screens/post-match.js` | §10: pinta resultados y rutea según `flow.advanceStage` |
 | `ui/screens/end.js` | §11: desenlace |
@@ -526,7 +526,21 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 | `partnersFor(p)` / `onPick(name)` | Recambios válidos (solo misma posición: la posición ES la formación) y clic sobre una ficha: permuta si es recambio, si no abre su ficha. |
 | `showRandomEvent(ev)` | Modal de un conflicto con decisión y aplicación del efecto elegido. |
 
-### 8. Partido en vivo — `ui/screens/match.js`
+### 8. Partido en vivo — `ui/screens/match/` (carpeta desde el 30-jul-2026)
+
+La pantalla más grande del juego, partida en cuatro módulos que operan sobre el MISMO DOM
+(mudanza pura: ninguna regla cambió). Quién hace qué:
+
+| Módulo | Responsabilidad | Exporta hacia afuera |
+|---|---|---|
+| `index.js` | La pantalla: estructura fija (marcador, controles, relato), el **reloj del relato** y el **ruteo de decisiones**. Registra `start-match`. | `stopTimer`, `startTimer`, `updateMatchUI` |
+| `panels.js` | La **columna de lectura**: estadísticas, XP de identidad en vivo, Match Momentum, mapa de calor y el carrusel que alterna los dos últimos. Es PINTURA pura: el motor sirve los datos masticados. | `paintStats`, `paintFiloXp`, `paintMomentum`, `paintHeat`, `wireCarousel`, `resetCarousel` |
+| `tactics.js` | Las **palancas del DT** en juego: botón de presión y pizarra de la altura del bloque. Las reglas viven en `game/match/press` y `game/match/field`. | `wireTactics`, `paintTactics` |
+| `squad.js` | La **Gestión de plantilla en vivo**: cancha, dibujo, plan de cambios. | `openSquadModal` |
+
+**Dos reglas de la frontera**: (1) cada módulo cablea SUS controles —el estado de la vista
+(`slide`, `heatSide`) no cruza a mano—; (2) `tactics` y `squad` importan `updateMatchUI` /
+`startTimer` de `index`: ciclo **benigno de runtime**, igual que `sequences` ↔ `sequence-acts`.
 | Función | Qué hace |
 |---|---|
 | `openSquadModal()` | **Gestión de plantilla en vivo**: la cancha de `ui/pitch.js` con el partido en pausa. Arrastrar titular sobre titular reubica (azul, gratis) — **salvo dos que jueguen el MISMO puesto** (enrocar dos defensas no cambia nada: se prohíbe, pedido del PO); traer a alguien del banco es un cambio (verde, gasta 1 de 3). **Nada toca el partido hasta Confirmar**: los cambios se arman como plan y se aplican juntos; "Salir sin guardar" lo descarta. Las reubicaciones sí mutan `posJugada` en el momento (es lo que la cancha lee para previsualizar), por eso se guarda el estado previo y se restaura al cancelar. Al confirmar se aplican **primero los cambios y después las posiciones finales**: si el DT reubicó a alguien DESPUÉS de meterlo, `makeSub` le pondría el puesto del que salió y el plan quedaría pisado. |

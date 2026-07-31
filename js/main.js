@@ -19,7 +19,7 @@ import "./ui/screens/squad.js";
 import "./ui/screens/worldcup.js";
 import "./ui/screens/scorers.js";
 import "./ui/screens/journal.js";
-import "./ui/screens/match.js";
+import "./ui/screens/match/index.js";
 import "./ui/screens/shootout.js";
 import "./ui/screens/post-match.js";
 import "./ui/screens/end.js";

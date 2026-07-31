@@ -11,7 +11,7 @@ import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, closeModal } from "../components.js";
 import { TROPHY_SVG } from "../theme.js";
 import { saveHistoryEntry } from "../../storage/history.js";
-import { stopTimer } from "./match.js";
+import { stopTimer } from "./match/index.js";
 
 // Datos del desenlace actual (para re-render al volver desde el Diario sin re-guardar)
 let lastEnd = null;

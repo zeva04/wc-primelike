@@ -121,7 +121,11 @@ js/
       squad.js                 ← Gestión de Plantilla (~120)
       worldcup.js              ← Estado del Mundial (~60)
       journal.js               ← Diario de Campaña (~60)
-      match.js                 ← partido en vivo: relato, decisiones, cambios (~260)
+      match/                   ── la pantalla más grande del juego, partida por responsabilidad ──
+        index.js               ← la pantalla: estructura, reloj del relato y ruteo de decisiones (~350)
+        panels.js              ← la columna de lectura: stats, XP de identidad, momentum, mapa de calor (~200)
+        tactics.js             ← las palancas del DT: botón de presión y pizarra de la altura (~135)
+        squad.js               ← la Gestión de plantilla en vivo (~290)
       shootout.js              ← UI de la tanda (~90)
       post-match.js            ← resultado + otros marcadores (~80)
       end.js                   ← desenlace + estadísticas (~95)
@@ -425,8 +429,13 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
     pasos no se toca. Un acto nuevo son 2 pasos: constructor + resolver en `sequence-acts.js`.
   - **Ventanas tácticas**: recurso nuevo del partido (3), independiente de los 3 cambios. Vive
     en `field.windows` y solo lo gasta `setHeight` con el partido en juego.
-  - **Deuda registrada**: `ui/screens/match.js` quedó en 881 líneas (presupuesto §6: >500 exige
-    discusión en este documento). El corte natural es extraer la pizarra de plantilla
-    (`openSquadModal`, ~250 líneas) a `ui/screens/match-squad.js`. No se hizo en este sprint
-    para no mezclar mudanza con feature (regla "mover ≠ mejorar"); queda como primera tarea de
-    cualquier sprint que vuelva a tocar la pantalla de partido.
+  - ~~**Deuda registrada**: `ui/screens/match.js` quedó en 881 líneas~~ — ✅ **SALDADA
+    (30-jul-2026)**: la pantalla pasó a ser la CARPETA `ui/screens/match/` con cuatro módulos
+    (index · panels · tactics · squad), aplicando la regla de §6 ("un sistema se convierte en
+    carpeta cuando acumula 2+ archivos propios"). Fue una **mudanza pura**: cero cambios de
+    regla, la batería y el % de campeón intactos por construcción. Lo único que se movió de
+    sitio fue el CABLEADO — cada módulo engancha sus propios controles (`wireCarousel`,
+    `wireTactics`), porque el estado de la vista (`slide`, `heatSide`) no puede cruzar la
+    frontera a mano. `tactics.js` y `squad.js` importan `updateMatchUI`/`startTimer` de
+    `index.js`: es un ciclo **benigno de runtime**, el mismo patrón que ya usa `game/match`
+    entre `sequences` y `sequence-acts`.

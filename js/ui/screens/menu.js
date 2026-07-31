@@ -11,7 +11,7 @@ import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, starsHtml, posBadge, numTag } from "../components.js";
 import { spriteSvg } from "../sprites.js";
 import { applyTeamColors, TROPHY_SVG, BALL_SVG } from "../theme.js";
-import { stopTimer } from "./match.js";
+import { stopTimer } from "./match/index.js";
 
 let menuSel = null;      // id del equipo mostrado en el carrusel
 let menuConfed = null;   // confederación (pestaña) activa

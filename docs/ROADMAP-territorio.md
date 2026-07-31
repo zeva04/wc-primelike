@@ -84,8 +84,9 @@ tipo nuevo hereda el fútbol sin declarar nada.
    arco del Eje Horizontal)**: `cambio_frente` entró al catálogo con su acto propio, y con él
    la amplitud del dibujo, los centros que dependen de dónde se centra y el balón parado que
    se cobra distinto desde la banda que de frente. Ver CORE §El Eje Horizontal.
-3. **`ui/screens/match.js` en 881 líneas** (presupuesto §6: >500 exige discusión). El corte
-   natural es extraer la pizarra de plantilla a `ui/screens/match-squad.js`.
+3. ~~**`ui/screens/match.js` en 881 líneas**~~ — ✅ **SALDADA (30-jul-2026)**: la pantalla es
+   ahora la carpeta `ui/screens/match/` (index · panels · tactics · squad). Mudanza pura: cero
+   cambios de regla. Ver ARQUITECTURA §2.2 y FUNCIONES §8.
 4. ~~**El eje horizontal está subutilizado en la generación**~~ — ✅ **RESUELTO**: los tipos
    pesan por carril (`zoneWeight` con `lane`), el dibujo decide cuánto fútbol por afuera
    existe y la amplitud defensiva se cobra en la contención y en el remate rival que nace de

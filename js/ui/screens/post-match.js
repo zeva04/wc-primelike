@@ -12,7 +12,7 @@ import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, modal, closeModal, heatPitch } from "../components.js";
 import { heatCells, heatHalves } from "../../game/match/field.js";
 import { renderGroupTableCard } from "./worldcup.js";
-import { stopTimer } from "./match.js";
+import { stopTimer } from "./match/index.js";
 
 // Guardas de UN SOLO DISPARO para el cierre del partido (bug del PO, 21-jul-2026: "los días
 // posteriores al juego a veces tenían doble evento"). Tanto `finishMatch` como `routeAdvance`

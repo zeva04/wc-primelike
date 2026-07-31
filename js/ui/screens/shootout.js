@@ -7,7 +7,7 @@ import { currentAura } from "../../game/ratings.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { modal, closeModal, flagImg, numTag, posBadge } from "../components.js";
-import { updateMatchUI } from "./match.js";
+import { updateMatchUI } from "./match/index.js";
 
 /** Inicia la tanda y lanza el primer turno. */
 function startShootoutUI() {
