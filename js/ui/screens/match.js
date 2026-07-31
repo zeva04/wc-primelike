@@ -411,7 +411,9 @@ function openHeightModal() {
         <div class="text-xs text-slate-400">${o.desc}</div>
       </button>`).join("")}
     </div>
-    <p class="text-[11px] text-slate-500 mt-3">🔎 ${match.oppTeam.name} está jugando con <b class="text-slate-300">línea ${st.rival}</b>.</p>
+    <!-- La lectura del rival, en PALABRAS (nunca su número): es scouting en vivo. Dice
+         "bloque" y no "línea" por concordancia — las etiquetas son masculinas. -->
+    <p class="text-[11px] text-slate-500 mt-3">🔎 ${match.oppTeam.name} está parado con un <b class="text-slate-300">bloque ${st.rival}</b>.</p>
     <button id="h-close" class="w-full mt-3 text-sm font-bold py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 cursor-pointer">Volver al partido</button>
   `);
   const cerrar = () => {
@@ -513,8 +515,8 @@ export function updateMatchUI() {
     const st = fieldState(match);
     bh.textContent = `${st.icon} ${st.label}`;
     bh.title = st.gratis
-      ? `Bloque ${st.label.toLowerCase()}. Ahora moverlo es gratis.`
-      : `Bloque ${st.label.toLowerCase()}. Moverlo en juego consume una ventana táctica (quedan ${st.ventanas}).`;
+      ? `Bloque ${st.label.toLowerCase()}. Ahora moverlo es gratis. El rival está parado con un bloque ${st.rival}.`
+      : `Bloque ${st.label.toLowerCase()}. Moverlo en juego consume una ventana táctica (quedan ${st.ventanas}). El rival está parado con un bloque ${st.rival}.`;
   }
   const feed = $("#feed");
   while (S.feedRendered < match.feed.length) {

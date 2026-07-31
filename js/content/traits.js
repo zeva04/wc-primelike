@@ -195,7 +195,7 @@ export const TRAITS = [
   {
     id: "angriffpressing", filo: "press", rama: "firma", tier: "advanced", icon: "🦁",
     nombre: "Angriffpressing",
-    desc: "La presión se adelanta hasta el saque de meta rival: el error se fuerza en el último tercio, con el arco enfrente.",
+    desc: "La presión se adelanta hasta el saque de meta rival: el error se fuerza en el último tercio, con el arco enfrente. Exige jugar con el BLOQUE ALTO: no se salta sobre el saque de meta desde el propio área.",
     momento: "Robo al central y gol de vestuario.",
     req: { nivel: 6, previo: "mittelfeldpressing" },
     pos: { x: 710, y: 128 },
@@ -505,7 +505,7 @@ export const TRAITS = [
   {
     id: "la_frontera", filo: "posesion", rama: "respuesta", tier: "advanced", icon: "\u{1F6A9}",
     nombre: "La Frontera",
-    desc: "La linea sube y se sostiene: cuando la pierden arriba y el rival busca la espalda, el equipo levanta la mano en bloque.",
+    desc: "La linea sube y se sostiene: cuando la pierden arriba y el rival busca la espalda, el equipo levanta la mano en bloque. Exige jugar con el BLOQUE ALTO: sin linea adelantada no hay trampa que tender.",
     momento: "El contragolpe rival muriendo en offside con toda la linea levantando el brazo.",
     req: { nivel: 6, previo: "salida_lavolpiana" },
     pos: { x: 710, y: 390 },

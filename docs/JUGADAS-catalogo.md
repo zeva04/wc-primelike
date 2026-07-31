@@ -10,6 +10,16 @@ Documento de referencia para el sprint de **situaciones de juego**. Fuente:
 [incidents.js](../js/game/match/incidents.js) (faltas y lesiones),
 [Match.js](../js/game/match/Match.js) (el tick).
 
+## El territorio manda (sprint del Territorio, 30-jul-2026)
+
+Desde este sprint, **todo lo que sigue depende de dónde está la pelota**. La cancha se lee en
+cinco alturas —área propia · salida · mediocampo · tres cuartos · área rival— y tres carriles.
+Cada jugada declara desde qué alturas **nace**, y cuanto más lejos está la pelota de esa cuna,
+menos probable es que esa jugada aparezca. Cada acto **mueve** la pelota.
+
+El jugador nunca ve ese número: lo lee en el **mapa de calor**, en el momentum, en la narración
+y en qué jugadas le van saliendo.
+
 ## Las tres capas
 
 1. **Secuencias** — la columna interactiva. Un tipo de jugada que se despliega en
@@ -25,25 +35,27 @@ Los actos marcados con 🔓 solo existen si el DT compró el rasgo que los desbl
 
 # 1. Las secuencias
 
-Catorce tipos. `mine` = yo ataco · `opp` = yo defiendo. Las cuatro **avanzadas** son
+Quince tipos. `mine` = yo ataco · `opp` = yo defiendo. Las cuatro **avanzadas** son
 el fútbol superior de cada filosofía y solo salen cuando esa identidad está
 desarrollada.
 
-| Tipo | Lado | Actos que la componen |
-|---|---|---|
-| 🎼 Circulación posicional | mine | Construcción → Construcción → Definición |
-| 🎼 **La sinfonía** *(avanzada · Posesión)* | mine | Construcción ×3 (×4 con Desesperantes) → Definición |
-| ⚡ Transición rápida | mine | Conducción → Definición |
-| ⚡ **Contragolpe letal** *(avanzada · Contragolpe)* | mine | Conducción → Conducción → Definición |
-| 🏃 Desborde por la banda | mine | Banda → Centro → Definición |
-| 🦁 Recuperación alta | mine | Presión → Definición |
-| 🦁 **Cacería total** *(avanzada · High Press)* | mine | Presión → Presión → Definición |
-| 🌩️ Pelotazo largo | mine | Duelo aéreo → Definición |
-| 🎯 Balón parado a favor | mine | Balón parado (acto único) |
-| 🧱 Repliegue defensivo | opp | Contención → Remate rival |
-| 🧱 **La fortaleza castiga** *(avanzada · Bloque bajo)* | opp | Contención → Remate rival |
-| 🚨 Balón parado en contra | opp | Córner defendido (acto único) |
-| 🗼 Salida bajo presión | opp | Salida (acto único) |
+| Tipo | Lado | Nace en | Actos que la componen |
+|---|---|---|---|
+| 🎼 Circulación posicional | mine | salida → tres cuartos | Construcción → Construcción → Definición |
+| 🎼 **La sinfonía** *(avanzada · Posesión)* | mine | salida → tres cuartos | Construcción ×3 (×4 con Desesperantes) → Definición |
+| ⚡ Transición rápida | mine | salida → tres cuartos | Conducción → Definición |
+| ⚡ **Contragolpe letal** *(avanzada · Contragolpe)* | mine | salida → tres cuartos | Conducción → Conducción → Definición |
+| 🏃 Desborde por la banda | mine | tres cuartos, **por afuera** | Banda → Centro → Definición |
+| 🦁 Recuperación alta | mine | **campo rival** | Presión → Definición |
+| 🦁 **Cacería total** *(avanzada · High Press)* | mine | **campo rival** | Presión → Presión → Definición |
+| 🌩️ Pelotazo largo | mine | mi campo (y el envío **vuela**) | Duelo aéreo → Definición |
+| 🎯 Balón parado a favor | mine | cerca del área rival | Balón parado (acto único) |
+| 🧱 Repliegue defensivo | opp | mi campo | Contención → Remate rival |
+| 🧱 **La fortaleza castiga** *(avanzada · Bloque bajo)* | opp | mi campo | Contención → Remate rival |
+| 🚨 Balón parado en contra | opp | **mi área** | Córner defendido (acto único) |
+| 🗼 Salida bajo presión | opp | **mi área / mi salida** | Salida (acto único) |
+| 🧤 **Salida desde el área** *(Territorio)* | mine | **mi área / mi salida** | Salida propia → Construcción → Definición |
+| 🏹 **Pelota a la espalda** *(Territorio)* | mine | mediocampo → tres cuartos | Pase a la espalda → Definición |
 
 ---
 
@@ -67,10 +79,16 @@ frente. 🔓
 
 | Opción | Resolución |
 |---|---|
-| 🏃 **Conducir al espacio** | Si se va: gana metros y escala. Si lo derriban: **penal**. Si la pierde: contragolpe rival. |
+| 🏃 **Conducir al espacio** | Si se va: gana metros y escala. Si lo derriban: **falta a favor, cobrada donde lo bajaron** (ver abajo). Si la pierde: contragolpe rival. |
 | 🎯 **Pase al pie** | Seguro: siempre progresa. La pelota cambia de pies. |
 
-**En el Contragolpe letal la falta tiene geografía:** derribarlo lejos del área es
+**La falta tiene GEOGRAFÍA (Territorio).** Se cobra donde derribaron al jugador: dentro del
+área es **penal**; al borde del área, **tiro libre peligroso**; lejos, uno modesto. Los dos
+tiros libres siguen como balón parado a favor — la jugada no muere, cambia de forma. (Antes,
+una falta en el mediocampo cobraba penal: era el agujero más grande que dejaba el motor sin
+territorio.)
+
+**En el Contragolpe letal la falta tiene además su propia escala:** derribarlo lejos del área es
 **amarilla al rival + tiro libre encadenado**; derribarlo en zona letal es **penal**.
 Y en el segundo tramo, un rival desesperado puede cometer la falta de último hombre:
 **roja directa + tiro libre al borde del área**.
@@ -119,6 +137,24 @@ y el equipo vuelva a lanzar 🔓, o que la zaga rival, incómoda, la mande al **
 | 🎯 **Pase atrás rasante** | Busca al mejor rematador, que entra **de frente al arco**. |
 
 Si el envío no llega, la jugada muere ahí.
+
+## 🧤 Salida propia — *"El rival espera arriba, ¿cómo la sacan?"*
+*(Salida desde el área — jugada del Territorio: solo existe con la pelota en el fondo propio)*
+
+| Opción | Resolución |
+|---|---|
+| 💎 **Salir jugando en corto** | Si el pase rompe la primera línea: el equipo sale del embudo **dos zonas de golpe** y la jugada sigue construyendo. Si la pierde: regalo en la puerta del área — el rival remata casi solo. |
+| 🌩️ **Buscar al punta** | La jugada **se convierte en un pelotazo**: duelo aéreo arriba. |
+| 🚀 **Afuera y a respirar** | Se cede la pelota sin arriesgar nada. La jugada muere ahí. |
+
+## 🏹 Pase a la espalda — *"La zaga rival está adelantadísima"*
+*(Pelota a la espalda — jugada del Territorio: contra un bloque rival metido atrás casi no
+aparece, porque no hay espalda que atacar)*
+
+| Opción | Resolución |
+|---|---|
+| 🏹 **Pelota a la espalda** | Doble exigencia: el envío **y** la carrera contra el defensor que vuelve. Si gana las dos: queda **solo dentro del área**. Si el central le gana el metro, la pelota muere en el arquero; si el envío se corta, contragolpe rival. |
+| 🎯 **Entre líneas al pie** | Llega más seguido, pero sin ventaja de campo: la jugada escala normal. |
 
 ## 🎯 Definición — *"¡Momento de definir!"*
 *(el último acto de toda jugada ofensiva)*
@@ -241,10 +277,10 @@ Nada de esto existe hasta que el DT lo compra en la pizarra.
 
 | Jugada | Dónde aparece |
 |---|---|
-| 🔙 **Retroceso de posesión** | Acto de construcción |
+| 🔙 **Retroceso de posesión** | Acto de construcción, **con el equipo ya adelantado** |
 | 🧊 **Congelar el partido** | Definición, tramo final, sin ir perdiendo |
-| 🚀 **Reventar el balón** | Acto de contención |
-| 🎯 **Pivoteo al área** | Duelo aéreo |
+| 🚀 **Reventar el balón** | Acto de contención, **defendiendo en campo propio** |
+| 🎯 **Pivoteo al área** | Duelo aéreo, **cerca del área rival** |
 | 🎯 **Pase Atrás** | Definición de un contraataque |
 
 ## Cadenas reactivas (una jugada que nace del resultado de otra)
@@ -264,7 +300,7 @@ Nada de esto existe hasta que el DT lo compra en la pizarra.
 ## Variantes de arranque
 
 Una jugada puede **nacer distinta**: la recuperación que nace sobre el saque de meta
-rival, la circulación que arranca con un mediocampista descolgado entre los centrales,
+rival (solo **con la línea adelantada**), la circulación que arranca con un mediocampista descolgado entre los centrales,
 la circulación que de pronto se va por arriba, el contraataque que se juega a un solo
 pase, o el contraataque que **nace ya resuelto en mano a mano**.
 
@@ -290,3 +326,8 @@ No son jugadas, pero cambian lo que ocurre en ellas:
 - 🔁 **Gestión de plantilla en vivo** — cambios, incluidos los forzados por lesión.
 - 🎚️ **Mentalidad** — ofensiva / normal / defensiva: inclina cuántas jugadas propone
   el equipo y cuántas sufre.
+- 🧱 **Altura del bloque** (Territorio) — muy bajo · bajo · medio · alto · muy alto. Decide
+  **dónde vive el equipo**, y con eso qué jugadas aparecen: arriba se roba arriba y no se
+  revienta la pelota; abajo se revienta, se sale de contra y aparece la salida desde el área.
+  Jugar alto regala espacio a la espalda y cuesta piernas. Gratis antes del partido y en el
+  entretiempo; **en juego consume una de las 3 ventanas tácticas**.

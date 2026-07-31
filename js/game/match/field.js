@@ -318,7 +318,7 @@ export function setHeight(m, n) {
   if (!gratis) m.field.windows = (m.field.windows || 0) + 1;
   const h = heightOf(destino);
   const verbo = destino > antes ? "ADELANTA" : "RETRASA";
-  m.log("info", `📢 min ${m.clock()}' — El banco ${verbo} el bloque: ${h.icon} línea ${h.label.toLowerCase()}. ${h.desc}`);
+  m.log("info", `📢 min ${m.clock()}' — El banco ${verbo} las líneas: ${h.icon} bloque ${h.label.toLowerCase()}. ${h.desc}`);
   return true;
 }
 

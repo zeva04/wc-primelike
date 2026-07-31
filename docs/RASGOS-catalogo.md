@@ -310,3 +310,31 @@ suma a los 9 puntos de nivel).
 runs; el DT que invierte con criterio (heurística `--smart`, entrena siempre su Principio
 propio más bajo) lo alcanza en ~99.8%. Es, literalmente, el rasgo que separa "jugué una
 run" de "construí una doctrina".
+
+
+---
+
+## Los rasgos con GEOGRAFÍA (sprint del Territorio, 30-jul-2026)
+
+Desde que el motor sabe dónde está la pelota, ocho rasgos existen **solo donde su fútbol
+existe**. La regla de diseño fue: gatear únicamente lo que el fútbol pide y **compensarle la
+frecuencia**, para que el rasgo cambie de carácter y no de valor (el árbol recién calibrado no
+se mueve).
+
+| Rasgo | Dónde existe ahora | Compensación |
+|---|---|---|
+| 🔙 **La Trampa** (retroceso de posesión) | Solo con el equipo ya adelantado (mediocampo en adelante): retroceder desde tu propia salida no saca a nadie de su bloque. | bonus 0.05 → 0.06 |
+| 🚀 **Pelotazo Fuera** (reventar el balón) | Solo defendiendo en campo propio. | — (el gate cubre todo el repliegue) |
+| 🦁 **Angriffpressing** | Solo con **bloque alto o muy alto**: no se salta sobre el saque de meta desde el propio área. | p 0.35 → 0.45 |
+| 🚩 **La Frontera** (trampa del offside) | Solo con **bloque alto o muy alto**: sin línea adelantada no hay trampa que tender. | p 0.35 → 0.50 |
+| 🎯 **Hombre Objetivo** (pivotear al área) | Solo cerca del área rival. | bonus 0.07 → 0.08 |
+| 🎯 **Al Área** (cabeza de playa) | Solo cerca del área rival. | p 0.35 → 0.42 |
+| 🛡️ **Rest Defense** | El corte del avance rival ocurre **antes** de que llegue al área. | p 0.28 → 0.36 |
+| 🎼 **La Máquina Colectiva** (pelota servida) | Solo con la circulación ya metida en zona de remate. | p 0.30 → 0.38 |
+
+Los dos gates por **altura de bloque** son los únicos que el jugador necesita leer, y por eso
+están escritos en la descripción del rasgo: los demás se explican solos, porque la opción
+aparece (o no) en la pizarra del acto correspondiente.
+
+Un rasgo nuevo puede pedir geografía con dos datos en su hook: `zone: [min, max]` (alturas donde
+existe) o `minHeight: n` (altura de bloque que exige). Sin ellos, aplica siempre.

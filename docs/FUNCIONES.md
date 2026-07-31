@@ -198,6 +198,25 @@ sobrevive a cualquier re-agendado.
 | `gkQuality(por,buffs)` | Calidad global del arquero (atajadas 60% · reflejos 25% · salidas 15%). |
 | `teamPowers(lineup,ment,buffs)` | Ataque y defensa (~0–5) de una alineación, con mentalidad e inferioridad numérica. El bonus de `buffs.tactica` MURIÓ en F1 (la táctica ya no compra poder: construye identidad). |
 
+### 8b. El TERRITORIO — `js/game/match/field.js` (sprint del Territorio, 30-jul-2026)
+Dónde está la pelota, cómo están paradas las dos líneas y dónde se jugó cada tiempo. **Marco
+absoluto anclado a mi arco** (`v1` = mi área … `v5` = área rival · `h1..h3` = izquierda, centro,
+derecha) y **cero `rnd()`**: la deriva ambiente es determinista a propósito (misma ley que
+`stats.js` y `match-momentum.js` — el sistema no le mueve un dial al balance calibrado).
+
+| Función | Qué hace |
+|---|---|
+| `newField(oppTeam,koRound,laneSeed)` | El estado territorial que cuelga del Match: pelota, identidad rival cacheada (para su altura), mapas de calor y ventanas tácticas gastadas. |
+| `tickField(m,mine,opp)` | **Un minuto de territorio, sin azar**: de quién es la pelota (Bresenham por bloques de 3'), hacia dónde tira (alturas + poderes), el carril, el calor del minuto y el sobrecosto físico del bloque adelantado. Lo llama `Match.tick` **antes** que las jugadas. |
+| `ballZone(m)` / `setBall(m,{h,v,side})` / `moveBall(m,dv,dh)` | Leer y mover la pelota. Mover deja calor de jugada real (`HEAT_ACT` = 3 vs `HEAT_TICK` = 1). |
+| `myHeight(m)` / `oppHeight(m)` | La altura de bloque 1..5. La mía es una orden del DT y vive en `matchCtx.altura` (se lee en vivo); la del rival sale de su identidad, se radicaliza si está consolidada y la mueve el marcador. |
+| `setHeight(m,n)` / `canChangeHeight(m,n)` / `heightFree(m)` | Mover el bloque. Gratis antes del partido y en el entretiempo; en juego consume una de las `TACTIC_WINDOWS` (3). Narra la orden — el jugador se entera por el relato, nunca por un número. |
+| `backlineRisk(m)` | Cuánto multiplica MI altura el pelotazo a la espalda (`Match.BREAKAWAY_TICK`). ×1 con bloque medio; **asimétrico** hacia abajo (ver CORE §Territorio). |
+| `zoneWeight(type,v)` / `originOf(m,type)` | La geografía de las jugadas: cuánto pesa un tipo desde donde está la pelota (×0.55 por altura de lejanía) y dónde la planta al arrancar. |
+| `ADVANCE` / `inOppBox(m)` | Cuánto avanza la pelota cada gesto, y si estamos dentro del área (lo pregunta la falta: solo ahí hay penal). |
+| `startHalfField(m,nominal)` | Mapa de calor limpio y pelota al medio: cada tiempo tiene el suyo. |
+| `heatCells(m,side,mapIdx)` / `heatHalves(m)` / `fieldState(m)` | Salidas para la UI, ya masticadas: celdas normalizadas 0..1, los tiempos etiquetados y la altura con nombre, icono, explicación, ventanas y **la lectura del rival en palabras**. |
+
 ### 8. Partido interactivo — clase `Match` (`js/game/match/Match.js` + `sequences.js` / `actions.js` / `chances.js` / `incidents.js` / `shootout.js`)
 La UI la maneja así: `tick()` cada ~600 ms → si hay `decision`, muestra modal y llama al
 `resolve*` correspondiente → en `"pens"` gestiona la tanda → al final `result()`.
@@ -511,7 +530,9 @@ Dos detalles que NO son estéticos y no conviene "arreglar":
 | `startMatch(oppId)` | Crea el `Match` y arranca el reloj. |
 | `renderMatchScreen()` | Estructura fija: marcador, controles, relato, alineaciones. |
 | `step()` / `startTimer()` / `stopTimer()` / `togglePause()` | Control del reloj. **Ritmo ráfaga (A1, recalibrado 22-jul)**: el reloj se auto-agenda con `setTimeout` (no `setInterval`), corre entre secuencias (`CRUISE` ~600 ms, ~260 en Rápido) y **frena** en cada decisión; un gol pausa `GOAL_HOLD` 1600 ms. **Aire entre actos**: la intro de una secuencia respira `SEQ_INTRO_HOLD` (900) antes del primer modal, cada acto resuelto respira `ACT_HOLD` (1300) antes del siguiente, y el desenlace `SEQ_END_HOLD` (900) antes de que el reloj retome — todo vía `presentDecision`, que además rutea `injury_sub` a la Gestión en vivo en lugar del modal genérico. |
-| `updateMatchUI()` | Refresca marcador, minuto, relato y panel "En cancha". |
+| `updateMatchUI()` | Refresca marcador, minuto, relato, estadísticas, momentum, mapa de calor y el botón del bloque. |
+| `paintCarousel()` / `moveCarousel(d)` / `paintHeat(match)` | **El carrusel de lectura** (Territorio): Match Momentum ↔ Mapa de calor en el mismo sitio, con toggle mío/rival. El mapa se repinta una vez por minuto (15 nodos con desenfoque), no en cada refresco. |
+| `openHeightModal()` | **La pizarra de la altura**: las 5 alturas con su explicación y el costo a la vista (gratis / consume ventana táctica). El motor manda (`fieldState` dice qué se puede elegir); acá solo se pinta y se rutea. Muestra cómo está parado el rival **con palabras**. |
 | `showDecision()` / `handleDecision(d,key)` | Muestran y enrutan las decisiones al motor. `sequence` → `resolveSequenceAct`; penales y último hombre como antes. |
 | `showHalftime()` | Pausa de entretiempo. |
 | `openSubsModal()` | Modal de cambios con reglas (sustituido en gris, POR solo por POR). |

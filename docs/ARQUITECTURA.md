@@ -93,6 +93,7 @@ js/
       sim.js                   ← quickSim (Poisson IA) (~35)
     match/
       Match.js                 ← clase: estado, tick, fases, cambios, resultado (~200)
+      field.js                 ← EL TERRITORIO: zona de la pelota, alturas de bloque, deriva, mapa de calor (~400)
       powers.js                ← effStat, gkQuality, teamPowers, MENT_MOD (~55)
       actions.js               ← Football Actions: pase, regate, remate, duelo aéreo, contención (Bible §7) (~95)
       sequences.js             ← GENERADOR de Key Sequences: perfil rival, pesos, arranque (~145)
@@ -195,6 +196,7 @@ Formato: **propósito · contiene · NUNCA debe contener**.
 | `game/journal.js` | Memoria de la run | addJournal, tonos válidos | Render del diario, decisiones de qué anotar (cada sistema anota lo suyo) |
 | `game/tournament/*` | La copa alrededor tuyo | tablas, fechas, clasificación, brackets, quickSim, nextOpponentId | Nada del partido interactivo |
 | `game/match/Match.js` | Máquina de estados del partido | constructor, tick, fases, subs, result | Resolución de ocasiones/faltas (delegada), textos de UI de pantalla |
+| `game/match/field.js` | **El territorio**: dónde está la pelota (marco absoluto anclado a mi arco), las dos alturas de bloque, la deriva ambiente SIN azar, el mapa de calor por tiempo y las ventanas tácticas | zona/carril, `myHeight`/`oppHeight`, `setHeight`, `backlineRisk`, `zoneWeight`/`originOf`, `ADVANCE`, `heatCells` | Elegir QUÉ jugada sale (eso es sequences), narrar una jugada, consumir `rnd()` en la deriva |
 | `game/match/powers.js` | Fórmulas de poder | effStat, gkQuality, teamPowers | Estado, azar de eventos |
 | `game/match/actions.js` | Football Actions (Bible §7) | actPass/actDribble/actShot/actContain/actOppShot — gestos que devuelven resultado estructurado | Narración, mutar el marcador, hilo de la secuencia |
 | `game/match/sequences.js` | Generador de Key Sequences | objetivo 2-6/partido, rivalProfile, typeWeights (mentalidad viva), startSequence | Fórmulas de gesto (actions), datos de tipo (content), resolución de actos (sequence-acts) |
@@ -239,6 +241,7 @@ Este mapa es ley: si un módulo escribe un campo que no le pertenece, es un bug 
 | `dtXp`, `dtNivel` | `coach.js` (`addCoachXp`, solo desde subidas de filosofía) | ui/hub, ui/philosophy |
 | `identityPoints` | `coach.js` (+1 por nivel de DT) · `philosophy.js` (el PI inicial) · `traits.js` (los gasta) | ui/philosophy, ui/hub |
 | `rasgos` | `traits.js` (`buyTrait`, {filoId: [ids]} — todos activos a la vez) | match (vía matchCtx.filo.rasgos), ui |
+| `altura` | `ui/hub` (la orden permanente del DT, 1..5) | match (vía `matchCtx.altura`), ui |
 | `buffs` | efectos de `content/` (+), `flow` (reset) | match/powers, ui |
 | `peleaEntre`, `filtrador` | efectos de `content/conflicts` (NOMBRES, no referencias — regla de serialización) | el propio conflicto al aplicar la opción elegida |
 | `journal` | `journal.js` (todos anotan vía addJournal) | ui/journal |
@@ -371,7 +374,8 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
 | Nuevo conflicto (aun multi-opción) | content/conflicts | content/conflicts | calendar, hub |
 | Nuevo tipo de lesión | content/injuries | content/injuries | medical, match |
 | Cambiar regla de amarillas (p.ej. 3 en vez de 2) | game/discipline + CORE.md | game/discipline | match/incidents (solo detecta faltas), ui |
-| Nuevo tipo de secuencia | content/sequences (datos) + sequences.js (si necesita un acto nuevo) + actions.js (si el gesto no existe) | esos archivos | Match.js (tick), powers, screens |
+| Nuevo tipo de secuencia | content/sequences (datos, **incluida su `zone.from`: desde qué alturas nace**) + sequences.js (su peso en el pool) + actions.js (si el gesto no existe) + sequence-acts.js (el resolver, que debe MOVER la pelota) | esos archivos | Match.js (tick), powers, screens |
+| Que un rasgo dependa del territorio | match/field (el marco) + match/trait-hooks (`zoneOk`) | `content/traits`: `zone: [min,max]` o `minHeight: n` en el hook **y compensarle la frecuencia** | el motor (el gate ya existe: es un dato del rasgo) |
 | Nuevo skill moment suelto (no secuencia) | match/chances + contrato §3.2 | match/chances (creador+resolver) + screens/match (ruteo) | Match.js (tick), powers |
 | Nueva pantalla | screens/ vecinas + components | screens/nueva.js + navegación en la pantalla origen | game/** |
 | **Sistema de Filosofía** | Bible §5 + sequences.js + flow | NUEVOS: game/philosophy.js, content/philosophies.js, screens/philosophy.js + hooks: **sequences.js (sesga el pool de secuencias — es un GENERADOR, no un modificador de powers)**, flow (progresión, la alimenta el PARTIDO vía applyFiloXp), game/coach.js (el DT y los PI), hub (card) | tournament, discipline, storage, powers (Filosofía NO es un modificador estadístico escondido) |
@@ -411,3 +415,18 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
   - La migración F0→F7 está **cerrada**. Las secciones §2–§7 de este documento describen ahora el estado real del código, con una enmienda: la navegación entre pantallas usa el registro `ui/nav.js` (ver entrada F6).
 - **Recomendación abierta al PO**: `git init` — la migración se hizo sin control de versiones a punta de tests y backups manuales; no volvamos a tentar la suerte para el desarrollo de features.
 - Este documento se revisa al cerrar cada fase y cada vez que una feature contradiga una regla (gana el que tenga mejor argumento, pero queda escrito).
+- **30-jul-2026 — SPRINT DEL TERRITORIO** (T1-T5, decisiones PO al arrancar): el partido pasa a
+  saber DÓNDE se juega. Nace `game/match/field.js` (el único módulo nuevo del sprint) con el
+  marco absoluto anclado a mi arco, la deriva ambiente **sin consumir `rnd()`** (misma ley que
+  `stats`/`match-momentum`: así una capa de estado nueva puede existir sin moverle un dial al
+  balance calibrado), el mapa de calor por tiempo y la altura de bloque como palanca del DT.
+  - **Enmienda a §3.2**: el sprint NO agrega ids de decisión. Los dos actos nuevos (`buildout`,
+    `throughball`) viajan por la decisión `sequence`, que ya era multi-acto — el contrato de 3
+    pasos no se toca. Un acto nuevo son 2 pasos: constructor + resolver en `sequence-acts.js`.
+  - **Ventanas tácticas**: recurso nuevo del partido (3), independiente de los 3 cambios. Vive
+    en `field.windows` y solo lo gasta `setHeight` con el partido en juego.
+  - **Deuda registrada**: `ui/screens/match.js` quedó en 881 líneas (presupuesto §6: >500 exige
+    discusión en este documento). El corte natural es extraer la pizarra de plantilla
+    (`openSquadModal`, ~250 líneas) a `ui/screens/match-squad.js`. No se hizo en este sprint
+    para no mezclar mudanza con feature (regla "mover ≠ mejorar"); queda como primera tarea de
+    cualquier sprint que vuelva a tocar la pantalla de partido.

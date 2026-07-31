@@ -542,8 +542,12 @@ siguen valiendo exactamente lo mismo.
 Desde el **Sprint A1** (rework del partido) la columna interactiva son las **Key Sequences**
 (Bible §7); lo demás se simula. En cada tick, en orden (probabilidades **por cada 5 minutos**):
 
+0. **El TERRITORIO** (`field.tickField`, sprint del Territorio 30-jul-2026): la deriva del
+   minuto —de quién es la pelota y en qué zona— y su calor. Va **antes** que todo lo demás
+   porque las jugadas que nacen abajo LEEN la zona resultante. No consume `rnd()`.
 1. **¿Arranca una secuencia?** (`sequences.maybeStartSequence`) — la capa interactiva.
-2. **¿Penal a favor?** ~1.6% · **¿Último hombre?** ~5% (si hay un DEF mío) · **¿Penal en contra?** ~1%
+2. **¿Penal a favor?** ~1.6% · **¿Último hombre?** ~5% × `field.backlineRisk` (el espacio a la
+   espalda que regala MI altura de bloque) · **¿Penal en contra?** ~1%
 3. **Ocasiones SIMULADAS** (no interactivas): un remate ambiente propio y otro rival, a
    `(0.12 + 0.22 × ratioMy) × 0.78` y `(0.09 + 0.24 × ratioOpp) × 0.55` — la parte "el resto se
    simula" del Bible. Producen gol o relato sin pedir nada al DT.
@@ -1661,3 +1665,105 @@ gate 29-31 del arco del Rebalance. Compensado (decisión PO) por el mismo canal:
 que la pasiva le importa menos). La brecha Recuperar↔Entrenar se comprimió de 4.8pp a
 1.4pp. La tesis del arco se sostiene —Recuperar sigue siendo el piso— pero con menos
 margen que antes.
+
+
+## El Territorio (sprint del Territorio, 30-jul-2026)
+
+El partido pasa a saber **dónde** se juega. Hasta acá el motor sabía qué jugada salía y qué tan
+buena quedaba (el canal `bonus`), pero no existía el concepto de posición: un penal y una
+circulación nacían del mismo sitio, que era ninguno. Todo esto vive en `game/match/field.js`.
+
+### El marco
+
+**Absoluto y anclado a MI arco**, siempre, sin importar de quién sea la pelota:
+
+| Altura (`v`) | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| | mi área | mi salida | mediocampo | tres cuartos | área rival |
+
+| Carril (`h`) | 1 | 2 | 3 |
+|---|---|---|---|
+| | banda izquierda | centro | banda derecha |
+
+Cuando el rival ataca, la pelota **baja por el mismo eje**. Una sola verdad: el mapa de calor se
+lee como una transmisión y las jugadas rivales no necesitan traducirse a otro marco.
+
+**El jugador NUNCA ve un número de zona.** Todo esto se comunica por el mapa de calor, el
+momentum, la narración y qué jugadas aparecen.
+
+### La deriva ambiente (y por qué NO consume azar)
+
+Con 2-6 secuencias por partido, un mapa de calor alimentado solo por jugadas tendría 5 muestras.
+El relleno de los ~90 minutos sale **determinista** de la posesión ya derivada del juego
+(`Match.flow`), los poderes y las dos alturas de bloque — misma ley que `stats.js` y
+`match-momentum.js`: el sistema territorial puede existir **sin correr el flujo del RNG ni
+moverle un dial al balance calibrado**. El azar se gasta donde hay fútbol de verdad.
+
+- **De quién es la pelota**: Bresenham sobre la posesión, en bloques de 3 minutos (con 1 la
+  posesión alternaba cada minuto y el balón quedaba clavado en el mediocampo: el mapa salía una
+  mancha central en todos los partidos).
+- **Hacia dónde tira**: `3 + 0.55·(miAltura−3) + 3·ventajaAtaque − 0.25·(suAltura−3)`, con paso
+  máximo de 0.8 alturas por minuto y un tirón extra de 0.7 en el minuto del robo. El espejo
+  exacto para su posesión.
+- **El carril**: un ciclo fijo (~50% centro, 25% cada banda) desfasado por partido.
+
+### El mapa de calor
+
+Cada minuto suma **1** a la celda donde está la pelota, del lado de quien la tiene; cada acto de
+una jugada real suma **3** (es fútbol, no relleno). **Cada tiempo tiene su propio mapa** y se
+reinicia al empezar el siguiente; los anteriores se conservan para el post-partido. La UI lo
+recibe normalizado 0..1 contra la celda más caliente de ese mapa (`heatCells`).
+
+### La altura del bloque (1..5)
+
+La orden estructural del DT. Vive en `matchCtx.altura` (como la mentalidad) y por defecto en
+`run.altura`. Gratis antes del partido y en cualquier entretiempo; **con el partido en juego
+consume una VENTANA TÁCTICA** — recurso nuevo, 3 por partido, que no toca los 3 cambios.
+
+Con el **bloque medio todos los multiplicadores valen ×1**: la línea base medida del juego no se
+mueve por el hecho de que la palanca exista.
+
+| Canal | Efecto por escalón sobre el bloque medio |
+|---|---|
+| Territorio | ±0.55 alturas de deriva |
+| Pool propio | recuperación ×(1+0.28·a) · pelotazo ×(1−0.20·a) · circulación ×(1+0.06·a) · transición ×(1−0.10·a) |
+| Reparto de iniciativa | +0.045 por escalón (−0.02 por escalón del rival) |
+| Espacio a la espalda | `backlineRisk` = 1 + 0.30·a hacia arriba, 1 + 0.12·a hacia abajo (**asimétrico**: con la pendiente simétrica, el bloque muy bajo salía la mejor estrategia del juego para un favorito) |
+| Piernas | +0.10 minutos equivalentes de fatiga por minuto y escalón, solo hacia arriba |
+
+**La IA rival juega con las mismas reglas**: su altura sale de su identidad (Press y Posesión 4 ·
+Contra y Bloque 2), la radicaliza si está consolidada y la mueve el marcador igual que a mí.
+
+### La geografía de las jugadas
+
+Cada tipo declara `zone.from` (desde qué alturas nace) y el generador lo pondera por distancia
+(×0.55 por cada altura de lejanía). Como el sorteo normaliza dentro de cada lado, esto cambia la
+**mezcla** de jugadas y **nunca cuántas hay** (la densidad no se toca en este sprint: medido
+4.23 vs 4.28 jugadas/partido). La jugada planta la pelota en su cuna al arrancar.
+
+Cada acto la mueve (tabla `ADVANCE`): pase seguro +1 · filtrado +2 · retroceso −1 · conducción
++1 · pelotazo +2 (el envío **vuela**: el duelo se disputa arriba) · peinada +2 · centro y línea
+de fondo → área · contención rota −1 (el rival progresa).
+
+**La geografía de la falta**: el penal deja de nacer en el mediocampo. Se cobra donde derribaron
+al jugador — dentro del área es penal; al borde, tiro libre peligroso; lejos, uno modesto (los
+dos siguen como balón parado encadenado, así que la jugada no muere: cambia de forma).
+
+### Los rasgos con geografía
+
+Un hook puede declarar `zone: [min,max]` (dónde existe su fútbol) o `minHeight: n` (qué altura
+de bloque exige). Solo se gatea lo que el fútbol pide y **se le compensa la frecuencia**: el
+rasgo cambia de carácter, no de valor. Gateados hoy: Retroceso de posesión (3-5) · Reventar el
+balón (1-3) · Angriffpressing (bloque alto) · La Frontera (bloque alto) · Pivotear al área (4-5)
+· Cabeza de Playa (4-5) · Rest Defense (2-5) · La Máquina Colectiva (4-5).
+
+### Balance medido (n=4000, BRA)
+
+| Medición | Antes | Después |
+|---|---|---|
+| BRA campeón (piso, juego al azar) | 27.5% | **27.7%** |
+| BRA campeón (techo, `--smart`, n=1500) | 42.3% | **42.6%** |
+| Jugadas por partido | 4.28 | **4.23** |
+
+Barrido de alturas (n=1500, BRA): 26.3 · 25.9 · 27.2 · 28.1 · 27.7 — **ninguna altura domina**
+(el criterio de "ningún dibujo dominado" aplicado a esta palanca).
