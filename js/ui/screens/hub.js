@@ -152,6 +152,40 @@ const RES_CHIP = { V: "text-emerald-400 border-emerald-500/50", E: "text-slate-3
  * nivel cualitativo, la figura, la forma reciente y las bajas confirmadas.
  * Gratis e ilimitado — mirar nunca gasta el día.
  */
+/**
+ * LA ALTURA DEL BLOQUE (sprint del Territorio): los 5 botones y la explicación de la elegida.
+ * Vive en DOS sitios —la card del día de partido y el Informe del Rival— porque la decisión
+ * se toma LEYENDO al rival: por eso el markup y el cableado se comparten en vez de copiarse.
+ * Acá es gratis; dentro del partido, moverla consume una ventana táctica. Queda puesta para
+ * los partidos siguientes (`run.altura`).
+ */
+function alturaPicker() {
+  return `<div class="alt-picker">
+    <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">🧱 Nuestra altura del bloque</div>
+    <div class="flex items-center justify-center gap-1 flex-wrap">
+      ${HEIGHTS.map(h => `<button data-alt="${h.n}" title="${h.desc}"
+        class="alt-btn px-2 py-1 rounded-lg text-[11px] font-black border cursor-pointer transition-colors">${h.icon} ${h.label}</button>`).join("")}
+    </div>
+    <p class="alt-desc text-[11px] text-slate-400 mt-2 text-center"></p>
+  </div>`;
+}
+
+/** Cablea TODOS los pickers del documento a la vez: si el DT decide leyendo el informe, la
+ *  card del hub que quedó detrás tiene que quedar contando lo mismo. */
+function wireAlturaPicker() {
+  const paint = () => {
+    const n = S.run.altura ?? HEIGHT_DEFAULT;
+    document.querySelectorAll(".alt-btn").forEach(b => {
+      const on = +b.dataset.alt === n;
+      b.className = `alt-btn px-2 py-1 rounded-lg text-[11px] font-black border cursor-pointer transition-colors ${
+        on ? "border-amber-400 bg-amber-400/20 text-amber-200" : "border-slate-600 bg-slate-800 text-slate-400 hover:border-amber-400/60 hover:text-slate-200"}`;
+    });
+    document.querySelectorAll(".alt-desc").forEach(d => { d.textContent = heightOf(n).desc; });
+  };
+  document.querySelectorAll(".alt-btn").forEach(b => b.onclick = () => { S.run.altura = +b.dataset.alt; paint(); });
+  paint();
+}
+
 function showScoutReport(oppId) {
   const rep = buildOpponentReport(S.run, oppId);
   const opp = getTeam(oppId);
@@ -185,6 +219,15 @@ function showScoutReport(oppId) {
           </div>
           <p class="text-[11px] text-slate-400 mt-1">${rep.filosofia.detalle}</p>
         </div>
+        <!-- CÓMO SE VA A PARAR (Territorio): la altura rival y, debajo, la nuestra — la
+             decisión se toma acá, leyendo al que viene, y no a ciegas en la pizarra. -->
+        <div class="rounded-xl border tp-border tp-bg-soft p-3">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-sm">${rep.bloque.icon} Cómo se van a parar: bloque ${rep.bloque.label.toLowerCase()}</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">${rep.bloque.detalle}</p>
+          <div class="mt-3 pt-3 border-t border-slate-700/70">${alturaPicker()}</div>
+        </div>
         ${Object.entries(rep.lineas).map(([k, l]) => `
           <div class="rounded-xl border border-slate-700 bg-slate-900/50 p-3">
             <div class="flex items-center justify-between">
@@ -212,6 +255,7 @@ function showScoutReport(oppId) {
       <button id="scout-close" class="btn-primary w-full mt-4">Cerrar informe</button>
     </div>
   `, "max-w-lg").querySelector("#scout-close").onclick = closeModal;
+  wireAlturaPicker();
 }
 
 /**
@@ -644,17 +688,7 @@ function renderHub(opts = {}) {
               <div class="text-4xl mb-2">⚽</div>
               <h3 class="text-xl font-black">¡Hoy se juega!</h3>
               <p class="text-sm text-slate-400 mt-1">${me.name} enfrenta a ${opp.name}. Revisa tu plantilla y cuando estés listo, salta a la cancha.</p>
-              <!-- LA ALTURA DEL BLOQUE (sprint del Territorio): la decisión táctica que se
-                   toma ANTES de saltar a la cancha. Acá es gratis; en el partido, moverla
-                   consume una ventana. Queda puesta para los partidos siguientes. -->
-              <div class="mt-4 pt-4 border-t border-slate-700/70">
-                <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">🧱 Altura del bloque</div>
-                <div class="flex items-center justify-center gap-1 flex-wrap">
-                  ${HEIGHTS.map(h => `<button data-alt="${h.n}" title="${h.desc}"
-                    class="alt-btn px-2 py-1 rounded-lg text-[11px] font-black border cursor-pointer transition-colors">${h.icon} ${h.label}</button>`).join("")}
-                </div>
-                <p id="alt-desc" class="text-[11px] text-slate-400 mt-2"></p>
-              </div>
+              <div class="mt-4 pt-4 border-t border-slate-700/70">${alturaPicker()}</div>
             </div>`
           : actionCard()}
       </div>
@@ -711,19 +745,7 @@ function renderHub(opts = {}) {
   // partido: renunciar al boost de hoy por crecimiento permanente es una decisión válida).
   document.querySelectorAll(".canje-opt").forEach(b => b.onclick = () => showCanje(b.dataset.key));
   if (isMatchDay) {
-    // Los 5 botones de la altura: escriben la orden permanente del DT (`run.altura`) y
-    // repintan en el sitio — la regla de qué significa cada altura vive en el motor.
-    const paintAlt = () => {
-      const n = S.run.altura ?? HEIGHT_DEFAULT;
-      document.querySelectorAll(".alt-btn").forEach(b => {
-        const on = +b.dataset.alt === n;
-        b.className = `alt-btn px-2 py-1 rounded-lg text-[11px] font-black border cursor-pointer transition-colors ${
-          on ? "border-amber-400 bg-amber-400/20 text-amber-200" : "border-slate-600 bg-slate-800 text-slate-400 hover:border-amber-400/60 hover:text-slate-200"}`;
-      });
-      $("#alt-desc").textContent = heightOf(n).desc;
-    };
-    document.querySelectorAll(".alt-btn").forEach(b => b.onclick = () => { S.run.altura = +b.dataset.alt; paintAlt(); });
-    paintAlt();
+    wireAlturaPicker();
     const play = $("#btn-play");
     // validateLineup no mira disponibilidad (eso lo hacía el auto-reemplazo retirado):
     // con una baja en el once no se juega — el DT la resuelve en Gestión de Plantilla.

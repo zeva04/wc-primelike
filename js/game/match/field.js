@@ -123,11 +123,20 @@ export const myHeight = m => clamp(m.my?.altura ?? HEIGHT_DEFAULT, 1, 5);
  * La IA rival juega con las MISMAS reglas territoriales que el DT (entregable del sprint).
  */
 export function oppHeight(m) {
-  const f = m.field?.oppFilo;
-  const base = OPP_HEIGHT[f?.id] ?? HEIGHT_DEFAULT;
-  const conv = f && f.nivel >= 2 ? (base >= 4 ? 1 : base <= 2 ? -1 : 0) : 0;
   const late = m.min >= 70 ? (m.gOpp < m.gMy ? 1 : m.gOpp > m.gMy ? -1 : 0) : 0;
-  return clamp(base + conv + late, 1, 5);
+  return clamp(baseHeight(m.field?.oppFilo) + late, 1, 5);
+}
+
+/**
+ * La altura de una identidad SIN contexto de partido: su idea la fija y su nivel la
+ * radicaliza. Es PURA (no necesita un Match) a propósito — así el Informe del Rival puede
+ * decir, ANTES de jugar, cómo se va a parar el que viene: la altura propia es una decisión
+ * de pizarra, y una decisión de pizarra sin información previa es una moneda al aire.
+ */
+export function baseHeight(filo) {
+  const base = OPP_HEIGHT[filo?.id] ?? HEIGHT_DEFAULT;
+  const conv = filo && filo.nivel >= 2 ? (base >= 4 ? 1 : base <= 2 ? -1 : 0) : 0;
+  return clamp(base + conv, 1, 5);
 }
 
 /**

@@ -1734,6 +1734,10 @@ mueve por el hecho de que la palanca exista.
 **La IA rival juega con las mismas reglas**: su altura sale de su identidad (Press y Posesión 4 ·
 Contra y Bloque 2), la radicaliza si está consolidada y la mueve el marcador igual que a mí.
 
+**Y se scoutea antes de jugar** (`field.baseHeight`, pura): el Informe del Rival dice con qué
+altura se va a parar el que viene y qué camino deja abierto, y ofrece ahí mismo el selector de la
+altura propia. Una decisión de pizarra sin información previa era una moneda al aire.
+
 ### La geografía de las jugadas
 
 Cada tipo declara `zone.from` (desde qué alturas nace) y el generador lo pondera por distancia

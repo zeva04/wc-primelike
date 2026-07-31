@@ -102,6 +102,27 @@ const byRating = [...qualified].sort((a, b) => E.teamRating(b) - E.teamRating(a)
   assert(!!rival, "la previa nombra la identidad rival y cita el informe (F3)", JSON.stringify(daily.items.filter(i => i.tag === "RIVAL").map(i => i.text)));
 }
 
+
+// ---------- CÓMO SE VA A PARAR (sprint del Territorio) ----------
+{
+  const run = E.newRun("BRA");
+  const rep = E.buildOpponentReport(run, run.groups[run.myGroupIdx].teamIds.find(t => t !== "BRA"));
+  assert(rep.bloque && rep.bloque.n >= 1 && rep.bloque.n <= 5, "el informe dice con qué altura se va a parar el rival", rep.bloque?.n);
+  assert(rep.bloque.label && rep.bloque.icon && rep.bloque.detalle, "con nombre, icono y una lectura accionable");
+  assert(!/\d/.test(rep.bloque.detalle), "y esa lectura NO le canta un número al jugador", rep.bloque.detalle);
+  // La altura reportada es EXACTAMENTE la que va a jugar (misma fuente que el partido).
+  assert(rep.bloque.n === E.baseHeight({ id: rep.filosofia.id, nivel: rep.filosofia.consolidada ? 2 : 1 })
+      || rep.bloque.n === E.baseHeight({ id: rep.filosofia.id, nivel: 0 }),
+    "y sale de la MISMA fuente que la altura del partido (field.baseHeight)", rep.bloque.n);
+  // El que presiona se para arriba; el que se encierra, abajo.
+  const alturas = ["press", "posesion", "contra", "bloque"].map(id => E.baseHeight({ id, nivel: 1 }));
+  assert(alturas[0] > alturas[3] && alturas[1] > alturas[2],
+    "las identidades proactivas se paran más arriba que las que esperan", alturas.join(","));
+  assert(E.baseHeight({ id: "press", nivel: 2 }) > E.baseHeight({ id: "press", nivel: 1 }),
+    "y la identidad consolidada radicaliza su altura");
+  assert(E.baseHeight(null) === E.HEIGHT_DEFAULT, "sin identidad conocida, se asume bloque medio");
+}
+
 console.log(`scouting.test: ${checks} checks`);
 console.log(fails ? "❌ scouting con fallos" : "✅ scouting OK");
 process.exit(fails ? 1 : 0);

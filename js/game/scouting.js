@@ -11,9 +11,11 @@
      ataque, su arquero contra el tuyo.
    - Solo datos que el motor YA tiene: poderes esperados (stats
      sin ruido, opponents.expectedOpponentLineup), resultados
-     jugados por el mundo vivo, bajas de run.rivalBans y la
-     figura del rival. Nada de "filosofía del rival" hasta que
-     exista Filosofía.
+     jugados por el mundo vivo, bajas de run.rivalBans, la figura
+     del rival, su identidad (F2) y —desde el sprint del
+     Territorio— la ALTURA DE BLOQUE con la que va a jugar: es la
+     información que le faltaba a la decisión más nueva del DT,
+     que hasta ahora se tomaba a ciegas.
    - PURO: no consume rng, no muta la run (mirar el informe es
      gratis e ilimitado — la curiosidad no se castiga).
    ============================================================ */
@@ -24,6 +26,7 @@ import { teamPowers, gkQuality } from "./match/powers.js";
 import { rivalFilo, rivalFiloLevel, identityGapMult, filoEtapa, filoLevel } from "./philosophy.js";
 import { koRoundOf } from "./tournament/knockout.js";
 import { getPhilosophy, FILO_ETAPAS } from "../content/philosophies.js";
+import { baseHeight, heightOf } from "./match/field.js";
 
 // La lectura táctica de cada identidad rival (F2): qué te propone y por dónde
 // se le entra — el "España quiere la pelota: presiónala o enciérrate" del roadmap.
@@ -32,6 +35,18 @@ const FILO_SCOUT = {
   press: "Te va a asfixiar la salida desde el minuto uno: salir jugando contra ellos es jugar con fuego — el pelotazo no es cobardía.",
   contra: "Espera agazapado y vive de tus pérdidas: cada pelota regalada en campo rival vuelve convertida en puñalada.",
   bloque: "Se encierra y revienta la pelota: derribar la muralla exige paciencia, y sus balones parados son su gol de vestuario.",
+};
+
+/* CÓMO SE VA A PARAR (sprint del Territorio): la altura de bloque que va a jugar el rival y,
+   sobre todo, QUÉ CAMINO DEJA ABIERTO. Es la información que le faltaba a la decisión más
+   nueva del DT —su propia altura—, que se toma en la pizarra y antes se tomaba a ciegas.
+   Dicho como lo diría un ojeador: dónde te esperan y por dónde se les entra. */
+const BLOQUE_SCOUT = {
+  1: "Se meten todos en su área y no te van a dejar un metro a la espalda: hay que tener paciencia, mover la pelota de lado a lado y confiar en el balón parado.",
+  2: "Bloque replegado que espera tu error para salir de contra: cuidado con perderla adelantado, porque cada regalo vuelve convertido en carrera.",
+  3: "Se paran en el mediocampo sin regalar nada: el partido se va a disputar en el medio y lo va a definir quién gane esa zona.",
+  4: "Adelantan líneas para incomodarte la salida: te van a apretar arriba, pero detrás de su zaga hay espacio — la pelota a la espalda y el desborde son el camino.",
+  5: "Juegan con los centrales cerca del círculo central: te van a asfixiar la salida desde el minuto uno… y toda su espalda queda descubierta para el que se anime a atacarla.",
 };
 
 // Umbral en escala de poder (~0-5): ±0.25 ≈ 5 puntos de rating de diferencia
@@ -123,6 +138,9 @@ export function buildOpponentReport(run, oppId) {
     oppId,
     name: opp.name,
     filosofia: { id: rf.id, name: rfData.name, icon: rfData.icon, nivel: FILO_ETAPAS[rf.nivel].label, consolidada: rf.nivel === 2, detalle: FILO_SCOUT[rf.id] },
+    // CÓMO SE VA A PARAR: la misma altura que va a jugar en el partido (field.baseHeight
+    // la deriva de su identidad y su nivel; el marcador la mueve después, ya en la cancha).
+    bloque: (n => ({ n, ...heightOf(n), detalle: BLOQUE_SCOUT[n] }))(baseHeight(rf)),
     modoMundial: koRound ? {
       pct: Math.round((tourneyFormaMult(koRound) - 1) * 100),
       madura: rivalFiloLevel(opp, koRound) > rivalFiloLevel(opp),

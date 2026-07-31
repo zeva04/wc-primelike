@@ -87,5 +87,8 @@ tipo nuevo hereda el fútbol sin declarar nada.
    natural es extraer la pizarra de plantilla a `ui/screens/match-squad.js`.
 4. **El eje horizontal está subutilizado en la generación**: ningún tipo cambia de peso por el
    carril. Un rasgo de "juego por dentro / por fuera" sería su primer consumidor real.
-5. **La altura no se comunica al rival como scouting previo**: el informe del rival (hub) no
-   dice todavía cómo se para. Hoy solo se ve dentro del partido, en la pizarra del bloque.
+5. ~~**La altura no se comunicaba como scouting previo**~~ — ✅ **RESUELTO (30-jul-2026)**: el
+   Informe del Rival dice con qué altura se va a parar el que viene (`field.baseHeight`, la misma
+   fuente que usa el partido) y qué camino deja abierto, y ofrece **ahí mismo** el selector de la
+   altura propia — el picker es el mismo componente que la card del día de partido y los dos se
+   repintan juntos. El loop queda cerrado: leer al rival → elegir el bloque → jugar.
