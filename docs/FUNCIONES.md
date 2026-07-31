@@ -251,7 +251,22 @@ con su resolución **intacta**; los remates no interactivos pasaron a `chances.a
 | `SEQ_MIN`/`SEQ_MAX`, `SEQUENCE_TYPES`, `sequenceType(id)` | Rango 2-6 y el catálogo: 8 tipos base (A2) + las 4 **SECUENCIAS AVANZADAS** (M2, `advFor` = filosofía dueña, números de desenlace en `adv`, texto de vitrina en `vitrina`). |
 | `ADVANCED_BY_FILO` | **content/sequences** (M2): la avanzada de cada filosofía (`{press: fila, …}`), derivado de los datos. La leen el gating del pool, la vitrina, el sorteo y la conquista narrada. |
 
-**`game/match/sequence-acts.js` — los ACTOS** (extraído de sequences.js en A2, presupuesto §6):
+**`game/match/sequence-acts.js` — EL CONTRATO Y EL DESPACHO** (68 líneas): `buildActDecision`
+monta la decisión del acto en curso desde la tabla `BUILDERS` y `resolveSequenceAct` la resuelve
+desde `RESOLVERS`. Los actos viven en **`game/match/acts/`**, un archivo por familia de fútbol —
+cada uno con SUS constructores y SUS resolvers, así que agregar un acto es tocar un solo archivo:
+
+| Módulo | Actos | Qué más trae |
+|---|---|---|
+| `acts/build.js` | build · buildout · switch · carry · press | los actos que hacen AVANZAR la jugada |
+| `acts/attack.js` | throughball · duel · wing · cross · finish | llegar y definir |
+| `acts/setpiece.js` | setpiece · defend_sp | el balón parado, sus dos caras |
+| `acts/defense.js` | playout · contain · clear | defender (y `clear`, el único acto que se resuelve solo) |
+| `acts/chains.js` | — | los desenlaces transversales: `escalate`, rebote, contragolpe, encadenados, la geografía de la falta y los dos cierres |
+| `acts/block.js` | — | lo que el árbol del Bloque le hace al remate rival (`oppShotBlockMalus` y su familia) |
+| `acts/common.js` | — | los helpers compartidos: `planOf`, `passTo`, `dtOk`/`dtFail`, `wingChaser`, `canFreeze` |
+
+Lo que sigue documenta los actos por dentro (dónde vive cada uno se lee en la tabla de arriba):
 | Función | Qué hace |
 |---|---|
 | `buildActDecision(m)` | Crea la decisión `sequence` del acto actual según su `kind` (build/carry/press/duel/setpiece/finish/contain/defend_sp/playout). |

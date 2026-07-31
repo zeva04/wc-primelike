@@ -97,7 +97,15 @@ js/
       powers.js                ← effStat, gkQuality, teamPowers, MENT_MOD (~55)
       actions.js               ← Football Actions: pase, regate, remate, duelo aéreo, contención (Bible §7) (~95)
       sequences.js             ← GENERADOR de Key Sequences: perfil rival, pesos, arranque (~145)
-      sequence-acts.js         ← los ACTOS: decisiones, resolución, rebote/contra/último hombre (~340)
+      sequence-acts.js         ← EL CONTRATO §3.2 y los dos despachadores: qué se pregunta y quién resuelve (~70)
+      acts/                    ── los actos, por FAMILIA de fútbol ──
+        build.js               ← construir: circular, salir del área, cambiar el frente, conducir, presionar (~360)
+        attack.js              ← llegar y definir: espalda, duelo aéreo, banda, centro, desenlace (~390)
+        setpiece.js            ← el balón parado, sus dos caras (~125)
+        defense.js             ← defender: salida asfixiada, contención y el remate rival (~200)
+        chains.js              ← los desenlaces transversales: rebote, contra, encadenados, cierres (~215)
+        block.js               ← lo que el árbol del Bloque le hace al remate rival (~80)
+        common.js              ← los helpers compartidos por todas las familias (~60)
       chances.js               ← penales en juego, último hombre, remate ambiente, VAR (~200)
       incidents.js             ← faltas, tarjetas, lesiones en juego (~120)
       shootout.js              ← tanda de penales (~90)
@@ -204,7 +212,8 @@ Formato: **propósito · contiene · NUNCA debe contener**.
 | `game/match/powers.js` | Fórmulas de poder | effStat, gkQuality, teamPowers | Estado, azar de eventos |
 | `game/match/actions.js` | Football Actions (Bible §7) | actPass/actDribble/actShot/actContain/actOppShot — gestos que devuelven resultado estructurado | Narración, mutar el marcador, hilo de la secuencia |
 | `game/match/sequences.js` | Generador de Key Sequences | objetivo 2-6/partido, rivalProfile, typeWeights (mentalidad viva), startSequence | Fórmulas de gesto (actions), datos de tipo (content), resolución de actos (sequence-acts) |
-| `game/match/sequence-acts.js` | Los actos de una secuencia | buildActDecision, resolveSequenceAct, escalada, rebote/contra (regla 7), ruteo al último hombre | Generación (qué/cuándo sale), fórmulas de gesto (actions) |
+| `game/match/sequence-acts.js` | **El contrato §3.2 y el despacho**: qué se le pregunta al DT y quién resuelve lo que eligió | buildActDecision, resolveSequenceAct, las dos tablas (BUILDERS/RESOLVERS) | Cualquier regla de un acto (eso es `acts/`), generación (sequences) |
+| `game/match/acts/*` | **Un archivo por FAMILIA de fútbol**: cada uno trae SUS constructores de decisión y SUS resolvers — agregar un acto es tocar un solo archivo | build · attack · setpiece · defense · chains (desenlaces transversales) · block (lo que el Bloque le hace al remate rival) · common (helpers) | Generación (qué/cuándo sale), fórmulas de gesto (actions) |
 | `game/match/chances.js` | Penales, último hombre, remate simulado | penales en juego, lastManChance, ambientShot*, goles, VAR | Tarjetas/lesiones, secuencias interactivas |
 | `game/match/incidents.js` | Incidencias | faltas, tarjetas, lesiones en juego | Fórmulas de gol |
 | `game/match/shootout.js` | Tanda de penales | start/shoot/check-end | Nada fuera de la tanda |
@@ -378,7 +387,7 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
 | Nuevo conflicto (aun multi-opción) | content/conflicts | content/conflicts | calendar, hub |
 | Nuevo tipo de lesión | content/injuries | content/injuries | medical, match |
 | Cambiar regla de amarillas (p.ej. 3 en vez de 2) | game/discipline + CORE.md | game/discipline | match/incidents (solo detecta faltas), ui |
-| Nuevo tipo de secuencia | content/sequences (datos, **incluida su `zone.from`: desde qué alturas nace**) + sequences.js (su peso en el pool) + actions.js (si el gesto no existe) + sequence-acts.js (el resolver, que debe MOVER la pelota) | esos archivos | Match.js (tick), powers, screens |
+| Nuevo tipo de secuencia | content/sequences (datos, **incluida su `zone.from`: desde qué alturas nace**) + sequences.js (su peso en el pool) + actions.js (si el gesto no existe) + **la familia de `match/acts/` que corresponda** (su constructor y su resolver, que debe MOVER la pelota) | esos archivos | Match.js (tick), `sequence-acts.js` salvo para sumar el acto a las tablas, powers, screens |
 | Que un rasgo dependa del territorio | match/field (el marco) + match/trait-hooks (`zoneOk`) | `content/traits`: `zone: [min,max]` o `minHeight: n` en el hook **y compensarle la frecuencia** | el motor (el gate ya existe: es un dato del rasgo) |
 | Nuevo skill moment suelto (no secuencia) | match/chances + contrato §3.2 | match/chances (creador+resolver) + screens/match (ruteo) | Match.js (tick), powers |
 | Nueva pantalla | screens/ vecinas + components | screens/nueva.js + navegación en la pantalla origen | game/** |
@@ -426,7 +435,8 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
   balance calibrado), el mapa de calor por tiempo y la altura de bloque como palanca del DT.
   - **Enmienda a §3.2**: el sprint NO agrega ids de decisión. Los dos actos nuevos (`buildout`,
     `throughball`) viajan por la decisión `sequence`, que ya era multi-acto — el contrato de 3
-    pasos no se toca. Un acto nuevo son 2 pasos: constructor + resolver en `sequence-acts.js`.
+    pasos no se toca. Un acto nuevo son 2 pasos: constructor + resolver, hoy en su familia
+    de `match/acts/` (más su entrada en las dos tablas del despachador).
   - **Ventanas tácticas**: recurso nuevo del partido (3), independiente de los 3 cambios. Vive
     en `field.windows` y solo lo gasta `setHeight` con el partido en juego.
   - ~~**Deuda registrada**: `ui/screens/match.js` quedó en 881 líneas~~ — ✅ **SALDADA
@@ -439,3 +449,21 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
     frontera a mano. `tactics.js` y `squad.js` importan `updateMatchUI`/`startTimer` de
     `index.js`: es un ciclo **benigno de runtime**, el mismo patrón que ya usa `game/match`
     entre `sequences` y `sequence-acts`.
+- **30-jul-2026 — `sequence-acts.js` PARTIDO POR FAMILIAS**: el archivo más grande del motor
+  (1.283 líneas contra un presupuesto de 500) pasó a ser `sequence-acts.js` (el contrato §3.2 y
+  los dos despachadores, 68 líneas) + la carpeta `game/match/acts/` con siete módulos. El corte
+  es por FAMILIA DE FÚTBOL, no por tipo de código: construir · llegar y definir · balón parado ·
+  defender · los desenlaces transversales · lo que el Bloque le hace al remate rival · los
+  helpers compartidos. Cada familia trae SUS constructores de decisión y SUS resolvers, así que
+  **agregar un acto es tocar un solo archivo**.
+  - **Mudanza pura, y esta vez DEMOSTRADA**: es el módulo más sensible al balance del proyecto,
+    así que además de la batería se comparó el original contra la suma de los módulos nuevos
+    línea por línea (sin comentarios ni imports, normalizando indentación). Las ÚNICAS líneas
+    que difieren son las cuatro transformaciones declaradas: `if (kind === "x") {` →
+    `export function resolveX(m, s, key, f) {`, `x: () => …` → `x: (m, s) => …`, los helpers
+    privados que ganaron `export` al cruzar una frontera, y el diccionario `{…}[kind]()` que
+    pasó a ser las dos tablas del despachador. **Cero líneas de lógica de juego cambiadas.**
+  - Ciclos benignos de runtime (documentados en cada cabecera): las familias ↔ la entrada
+    (`buildActDecision` para reconstruir la decisión, `resolveSequenceAct` para las opciones que
+    caen a la básica) y las familias ↔ `chains` (escalar y cerrar). Nada se usa en la evaluación
+    del módulo, solo dentro de las funciones.
