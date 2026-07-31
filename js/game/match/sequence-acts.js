@@ -14,13 +14,14 @@
 import { rnd, pick } from "../../core/rng.js";
 import { playedPos } from "../ratings.js";
 import { sequenceType } from "../../content/sequences.js";
-import { protMomentum, noteFiloHit, familyOf } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
+import { protMomentum, protStatW, noteFiloHit, familyOf } from "./sequences.js"; // ciclo benigno: solo se llama en runtime
 import { hookOf, hooksOf, rollChain, chainMine, traitMoment, hasTrait } from "./trait-hooks.js"; // el árbol de rasgos (T1/T2)
 import { effStat } from "./powers.js";
 import * as A from "./actions.js";
 import { goalMine, goalOpp, myPenalty, lastManChance } from "./chances.js";
 import { noteCorner } from "./stats.js";
 import { noteMomentum } from "./match-momentum.js";
+import { moveBall, setBall, ADVANCE, inOppBox, BOX_OPP, BOX_MINE } from "./field.js";
 
 // El plan de actos de la secuencia: el propio si lo tiene (rasgo de Posesión:
 // un acto más de circulación, lo arma startSequence) o el del catálogo.
@@ -101,7 +102,12 @@ export function buildActDecision(m) {
         { label: "🕸️ Cerrar líneas de pase", hint: "Roba más seguido, en posición más discreta", key: "lineas" },
       ],
     }),
-    duel: () => ({
+    duel: () => {
+      // El pelotazo VUELA (T4): el duelo se disputa arriba, no donde se lanzó la pelota
+      // — por eso el balón viaja ANTES de que el DT elija cómo jugarlo (y por eso las
+      // opciones de área, como pivotear, existen en un pelotazo lanzado desde el fondo).
+      moveBall(m, 2, 0);
+      return {
       title: `🌩️ min ${m.clock()}' — Pelotazo a ${s.prot.name}: se viene el duelo aéreo`,
       text: "¿Cómo lo juega?",
       options: [
@@ -114,7 +120,8 @@ export function buildActDecision(m) {
           ? [{ label: "🎯 Pivotear al área", hint: "La aguanta de espaldas y la baja al mejor rematador, de frente al arco", key: "pivotear" }]
           : []),
       ],
-    }),
+      };
+    },
     setpiece: () => {
       const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
       s.target = mates.sort((a, b) => (b.stats.cabezazo || 0) - (a.stats.cabezazo || 0))[0] || s.prot;
@@ -162,6 +169,32 @@ export function buildActDecision(m) {
         { label: "🎯 Pase atrás rasante", hint: `Pase corto ${s.prot.stats.pase_corto} — al que llega de frente al arco`, key: "atras" },
       ],
     }),
+    // ═══ LAS DOS JUGADAS DEL TERRITORIO (T4) ═══
+    // La salida desde el área propia: la primera decisión del partido que solo existe
+    // porque el motor sabe DÓNDE está la pelota. Tres fútbols distintos para el mismo
+    // problema — y el del medio ni siquiera sigue siendo esta jugada.
+    buildout: () => ({
+      title: `🧤 min ${m.clock()}' — Salida desde el área: la tiene ${s.prot.name}`,
+      text: "El rival espera arriba y el equipo está metido en su campo. ¿Cómo la sacan?",
+      options: [
+        { label: "💎 Salir jugando en corto", hint: `Pase corto ${s.prot.stats.pase_corto} — romper la primera línea y salir de verdad`, key: "corto" },
+        { label: "🌩️ Buscar al punta", hint: `Pase largo ${s.prot.stats.pase_largo} — la jugada se vuelve un duelo aéreo arriba`, key: "largo" },
+        { label: "🚀 Afuera y a respirar", hint: "Seguro: se cede la pelota, no se arriesga nada", key: "seguro" },
+      ],
+    }),
+    // El ataque a la ESPALDA del bloque adelantado: la otra jugada que el territorio
+    // habilita — no tiene sentido contra un equipo metido atrás, y el generador lo sabe.
+    throughball: () => {
+      s.chaser = wingChaser(m);
+      return {
+        title: `🏹 min ${m.clock()}' — ${s.prot.name} pica al espacio: la zaga rival está adelantadísima`,
+        text: "Hay toda una pradera detrás de los centrales rivales. ¿Qué pelota le ponen?",
+        options: [
+          { label: "🏹 Pelota a la espalda", hint: `Pase largo ${s.prot.stats.pase_largo} + carrera (Velocidad ${s.prot.stats.velocidad} vs ${s.chaser ? s.chaser.stats.velocidad : "la zaga"}) — si gana, queda solo`, key: "espalda" },
+          { label: "🎯 Entre líneas al pie", hint: `Pase largo ${s.prot.stats.pase_largo} — llega más seguido, pero sin ventaja de campo`, key: "lineas" },
+        ],
+      };
+    },
     playout: () => ({
       title: `🗼 min ${m.clock()}' — ${m.oppTeam.name} asfixia la salida: la tiene ${s.prot.name}`,
       text: "¿Cómo salen del fondo?",
@@ -232,10 +265,12 @@ export function resolveSequenceAct(m, key) {
     // pérdida más duele, así que el pase se juega de verdad y su fallo abre contra.
     if (key === "atras") {
       const bp = hookOf(m, "backPass");
+      if (!bp) return resolveSequenceAct(m, "seguro");
       s.backUsed = true;                      // se marca ANTES de tirar: el recurso ya se gastó
       if (!A.actPass(m, s.prot).ok)
         return maybeCounter(m, `min ${m.clock()}' — ¡Le roban el pase hacia atrás a ${s.prot.name} con el equipo adelantado!`, true);
       s.bonus += bp.bonus;
+      moveBall(m, ADVANCE.paseAtras);   // la jugada RETROCEDE: es el precio del recurso
       traitMoment(m, bp.traitId, [bp.texto]);
       passTo(m, s);
       buildActDecision(m);                    // el MISMO acto se vuelve a jugar: la jugada se reinicia
@@ -279,9 +314,80 @@ export function resolveSequenceAct(m, key) {
       buildActDecision(m);
       return false;
     }
+    // El pase MUEVE la pelota: el seguro progresa un tramo, el filtrado rompe una línea
+    // entera (T4 — "cada acto modifica la ubicación del balón").
+    moveBall(m, key === "filtrado" ? ADVANCE.paseFiltrado : ADVANCE.paseSeguro);
     const recibe = passTo(m, s); // seguro o filtrado: el pase cambia la pelota de pies
     m.log("plain", `min ${m.clock()}' — ${f.buildOk}${recibe ? ` La recibe ${s.prot.name}.` : ""}`);
     if (key === "filtrado") dtOk(m);
+    return escalate(m);
+  }
+
+  // ═══ SALIDA DESDE EL ÁREA (T4) ═══
+  if (kind === "buildout") {
+    if (key === "seguro") {
+      // Cederla no es gratis ni es un desastre: el equipo respira y sale del embudo.
+      setBall(m, { v: 3, side: "opp" });
+      return closeSeq(m, "plain", `min ${m.clock()}' — ${f.outSafe}`);
+    }
+    if (key === "largo") {
+      // El pelotazo CONVIERTE la jugada (mismo patrón def→of de la salida bajo presión):
+      // deja de ser una salida y pasa a ser el duelo aéreo de un bloque bajo.
+      m.log("plain", `min ${m.clock()}' — ${f.outLong}`);
+      const t = sequenceType("pelotazo");
+      const cands = m.activeMine().filter(p => p.pos !== "POR");
+      const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p) * protStatW(t, p)));
+      setBall(m, { v: 3, h: 2 });
+      m.seq = { type: t, prot, actIdx: 0, bonus: 0, assistFrom: s.prot };
+      buildActDecision(m);
+      return false;
+    }
+    const r = A.actPass(m, s.prot);
+    if (!r.ok) {
+      // Perderla en la puerta del área propia es EL regalo: el rival remata de una.
+      m.log("chance", `min ${m.clock()}' — ${f.outFail(s.prot)}`);
+      dtFail(m);
+      setBall(m, { v: BOX_MINE, side: "opp" });
+      const th = hookOf(m, "playoutRescue");   // El Tercer Hombre también salva ESTA salida
+      if (th && rnd() < th.p) return closeSeq(m, "plain", `min ${m.clock()}' — ${th.texto}`);
+      const { mine } = m.powers();
+      const alive = m.oppLineup.filter(p => !p.expulsado && p.pos !== "POR");
+      const sh = alive.length ? pick(alive) : null;
+      if (sh) {
+        const shot = A.actOppShot(m, sh, mine, { bonus: 0.10 + oppShotBlockMalus(m) });
+        if (shot.ok) { goalOpp(m, sh); return closeSilent(m); }
+        return closeSeq(m, "chance", `min ${m.clock()}' — ${sh.name} remata el regalo pero ${mine.por ? mine.por.name : "el arquero"} la saca.`);
+      }
+      return closeSilent(m);
+    }
+    moveBall(m, ADVANCE.paseFiltrado);   // romper la primera línea son DOS zonas de golpe
+    s.bonus += 0.03;
+    m.log("event", `min ${m.clock()}' — ${f.outShort(s.prot)}`);
+    dtOk(m);
+    passTo(m, s);
+    return escalate(m);
+  }
+
+  // ═══ PELOTA A LA ESPALDA (T4) ═══
+  if (kind === "throughball") {
+    const espalda = key === "espalda";
+    const r = A.actPass(m, s.prot, { hard: true });
+    if (!r.ok) return maybeCounter(m, `min ${m.clock()}' — ${espalda ? f.throughFail : f.lineFail}`, espalda);
+    if (!espalda) {
+      moveBall(m, ADVANCE.filtradoEspalda);
+      s.bonus += 0.04;
+      m.log("plain", `min ${m.clock()}' — ${f.lineOk(s.prot)}`);
+      return escalate(m);
+    }
+    // La pelota es buena: ahora hay que GANARLE LA CARRERA al que vuelve. Es el mismo
+    // duelo de piernas del desborde (actSprint), acá contra la zaga que retrocede.
+    const run = A.actSprint(m, s.prot, { chaser: s.chaser, handicap: 0.06 });
+    if (!run.ok) return closeSeq(m, "chance", `min ${m.clock()}' — ${s.prot.name} pica pero el central le gana el metro y la deja pasar al arquero.`);
+    setBall(m, { v: BOX_OPP, h: 2 });
+    s.bonus += 0.08;   // calibrado: con 0.12 la jugada nueva era la mejor ocasión del juego
+    s.oneOnOne = true;
+    m.log("event", `min ${m.clock()}' — ${f.throughOk(s.prot)}`);
+    dtOk(m);
     return escalate(m);
   }
 
@@ -303,7 +409,14 @@ export function resolveSequenceAct(m, key) {
         // del área) es la falta desesperada — amarilla + tiro libre encadenado; en el
         // segundo (zona letal) es PENAL, como la conducción de siempre.
         if (s.type.advFor === "contra" && s.actIdx === 0) return advFoulSetPiece(m, f.foulText, s.type.adv.freekickBonus);
-        m.log("event", `min ${m.clock()}' — ¡Derriban a ${s.prot.name}! ¡PENAL!`); closeSilent(m); return myPenalty(m);
+        // LA GEOGRAFÍA GENERAL (T4): la falta se cobra DONDE LO BAJARON, y bajarlo es
+        // justamente impedir que avance — así que la pelota NO progresa antes de juzgar
+        // (medido: adelantarla primero metía media conducción de más dentro del área y
+        // los penales SUBÍAN, que es lo contrario de lo que este arreglo busca). Dentro
+        // del área es penal; fuera, tiro libre que vale más cuanto más cerca. Antes, una
+        // falta en el mediocampo cobraba penal: el agujero más grande del motor sin
+        // territorio.
+        return foulGeography(m, s.prot);
       }
       if (!r.ok) {
         // 2º tramo del letal (M2): el rival YA está partido, replegando a la desesperada.
@@ -337,6 +450,7 @@ export function resolveSequenceAct(m, key) {
       // desde T2 lo compra La Trampa Cerrada (migración al árbol).
       s.bonus += (s.type.advFor === "contra" ? s.type.adv.carryBonus[Math.min(s.actIdx, 1)] : 0.05)
         + (s.type.advFor === "contra" && s.actIdx === 0 && hasTrait(m, "ataque_relampago") ? s.type.adv.deepBonus : 0);
+      moveBall(m, ADVANCE.conduccion);   // conducir al espacio ES ganar terreno
       m.log("plain", `min ${m.clock()}' — ${f.carryOk(s.prot)}`);
       dtOk(m);
     } else {
@@ -344,6 +458,7 @@ export function resolveSequenceAct(m, key) {
       // metros de verdad (adv.passBonus): con el rival partido, el pase al pie es progreso.
       s.bonus += (s.type.advFor === "contra" ? s.type.adv.passBonus[Math.min(s.actIdx, 1)] : 0.02) + tiredBonus;
       if (tiredBonus && rnd() < 0.3) traitMoment(m, legs.traitId, [legs.texto]);
+      moveBall(m, ADVANCE.paseAlPie);
       const pasador = s.prot;
       m.log("plain", passTo(m, s) // el pase al pie también se desprende de la pelota
         ? `min ${m.clock()}' — ${pasador.name} la juega al pie y ${s.prot.name} toma la posta.`
@@ -383,6 +498,7 @@ export function resolveSequenceAct(m, key) {
     }
     // El 2º robo de la cacería es en ZONA LETAL (+trapBonus); el deepBonus era el rasgo
     // F2 de Consolidada — desde T2 lo compra Cacería Letal (migración al árbol).
+    if (total) moveBall(m, ADVANCE.robo);   // el robo en zona letal es MÁS cerca del arco
     s.bonus += (total ? 0.15 : 0.05) + (caza && s.actIdx === 1 ? s.type.adv.trapBonus + (hasTrait(m, "gegenpressing") ? s.type.adv.deepBonus : 0) : 0);
     m.log("event", `min ${m.clock()}' — ${caza && s.actIdx === 1 ? f.press2Ok : f.pressOk}`);
     if (total) dtOk(m);
@@ -437,6 +553,7 @@ export function resolveSequenceAct(m, key) {
       return out;
     }
     m.log("event", `min ${m.clock()}' — ${f.duelOk(winner)}`);
+    moveBall(m, key === "peinar" ? ADVANCE.peinada : ADVANCE.duelo);   // la pelota ganada por arriba progresa
     if (pv) {
       // La bajada: la pelota cambia de pies hacia el MEJOR rematador de los que llegan
       // (mismo criterio que Superioridad Numérica) y el remate es de frente, no de cabeza.
@@ -468,8 +585,9 @@ export function resolveSequenceAct(m, key) {
     // rematar; si la pierde encarando hacia el medio, el equipo queda partido → contra.
     if (key === "adentro") {
       const r = A.actDribble(m, s.prot, { bonus: 0.04 });
-      if (r.foul) { m.log("event", `min ${m.clock()}' — ¡Lo cruzan cuando entraba al área! ¡PENAL!`); closeSilent(m); return myPenalty(m); }
+      if (r.foul) { moveBall(m, ADVANCE.conduccion); return foulGeography(m, s.prot); }
       if (!r.ok) return maybeCounter(m, `min ${m.clock()}' — ${s.prot.name} se cierra hacia adentro pero lo achican entre dos.`, true);
+      setBall(m, { v: BOX_OPP, h: 2 });   // se cierra al medio: la jugada ya no va por afuera
       m.log("plain", `min ${m.clock()}' — ${s.prot.name} se perfila hacia adentro y busca el remate.`);
       dtOk(m);
       s.finishStat = "tiro";
@@ -490,6 +608,7 @@ export function resolveSequenceAct(m, key) {
     // rival de espaldas a su arco — el centro que sigue es el mejor del juego.
     const r = A.actSprint(m, s.prot, { chaser: s.chaser, handicap: 0.10 });
     if (!r.ok) return maybeCounter(m, `min ${m.clock()}' — ${f.wingFail}`, false);
+    setBall(m, { v: BOX_OPP });        // la línea de fondo: la zaga rival queda de espaldas
     m.log("plain", `min ${m.clock()}' — ${f.wingOk(s.prot)}`);
     dtOk(m);
     s.crossBonus = 0.07;
@@ -512,6 +631,7 @@ export function resolveSequenceAct(m, key) {
       s.assistFrom = s.prot;
       s.prot = mates.sort((a, b) => (b.stats[rasante ? "tiro" : "cabezazo"] || 0) - (a.stats[rasante ? "tiro" : "cabezazo"] || 0))[0];
     }
+    setBall(m, { v: BOX_OPP, h: 2 });   // el centro mete la pelota EN el área
     s.finishStat = rasante ? "tiro" : "cabezazo";
     s.bonus += rasante ? 0.05 : 0.02;   // el rasante llega de frente al arco: mejor perfil
     m.log("event", `min ${m.clock()}' — ${rasante
@@ -526,6 +646,7 @@ export function resolveSequenceAct(m, key) {
     // una decisión honesta: resignás atacar para proteger el resultado.
     if (key === "congelar") {
       const ice = hookOf(m, "iceGame");
+      if (!ice) return resolveSequenceAct(m, "rematar");
       m._frozen = (m._frozen || 0) + 1;
       traitMoment(m, ice.traitId, [ice.texto]);
       return closeSeq(m, "info", `min ${m.clock()}' — ${s.prot.name} la devuelve al área propia. El equipo se queda con la pelota y el reloj corre.`);
@@ -536,6 +657,7 @@ export function resolveSequenceAct(m, key) {
     // compra Sitio al Área (migración al árbol). Si no hay penal, el remate llega limpio.
     if (s.type.advFor === "posesion" && (s.buildOks || 0) >= planOf(s).filter(k => k === "build").length
         && rnd() < (hasTrait(m, "desesperantes") ? s.type.adv.penaltyChanceDeep : s.type.adv.penaltyChance)) {
+      setBall(m, { v: BOX_OPP, h: 2 });
       m.log("event", `min ${m.clock()}' — ${f.penaltyText(s.prot)}`);
       closeSilent(m);
       return myPenalty(m);
@@ -574,6 +696,7 @@ export function resolveSequenceAct(m, key) {
     // contra); a cambio, el remate que sigue llega servido y de frente.
     if (key === "pase_atras") {
       const sq = hookOf(m, "squarePass");
+      if (!sq) return resolveSequenceAct(m, "rematar");
       const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
       const mate = mates.length ? [...mates].sort((a, b) => (b.stats.tiro || 0) - (a.stats.tiro || 0))[0] : s.prot;
       const pass = A.actPass(m, s.prot);
@@ -697,6 +820,7 @@ export function resolveSequenceAct(m, key) {
       if (th && rnd() < th.p) return closeSeq(m, "plain", `min ${m.clock()}' — ${th.texto}`);
       m.log("chance", `min ${m.clock()}' — ${f.playoutFail(s.prot)}`);
       dtFail(m);
+      setBall(m, { v: BOX_MINE, side: "opp" });   // el regalo se produce EN mi área
       const { mine } = m.powers();
       const shot = A.actOppShot(m, s.shooter, mine, { bonus: 0.12 + oppShotBlockMalus(m) });
       if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
@@ -704,6 +828,7 @@ export function resolveSequenceAct(m, key) {
     }
     m.log("event", `min ${m.clock()}' — ${f.playoutOk(s.prot)}`);
     dtOk(m);
+    setBall(m, { v: 3, side: "mine" });   // romper la presión SACA al equipo del embudo
     const t = sequenceType("transicion");
     const cands = m.activeMine().filter(p => p.pos !== "POR");
     const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
@@ -719,7 +844,10 @@ export function resolveSequenceAct(m, key) {
     // es doble: se resigna todo lo que la contención podía dar (la fortaleza que convierte,
     // la contra que encadena) y `p` de las veces el despeje apurado sale al córner.
     if (key === "reventar") {
+      // El hook se vuelve a pedir al resolver: si el rasgo ya no aplica acá (gate
+      // territorial), la orden simplemente no existe y la jugada sigue su curso normal.
       const cb = hookOf(m, "clearBall");
+      if (!cb) return resolveSequenceAct(m, "contener");
       traitMoment(m, cb.traitId, [cb.texto]);
       if (rnd() < cb.p) {
         m.log("chance", `min ${m.clock()}' — el despeje sale apurado y se va al CÓRNER de ${m.oppTeam.name}.`);
@@ -743,6 +871,7 @@ export function resolveSequenceAct(m, key) {
       bonus: (est ? est.bonus : 0) + (fortaleza && hasTrait(m, "area_blindada") ? s.type.adv.deepContain : 0) });
     if (est && r.ok && rnd() < 0.2) traitMoment(m, est.traitId, [est.texto]);
     if (r.ok) {
+      setBall(m, { side: "mine" });   // cortar es recuperar: la pelota pasa a ser mía
       // La fortaleza CASTIGA (M2): la contención exitosa convierte — pelotazo inmediato
       // con el rival desarmado (def→of, el patrón de la salida bajo presión). El convert
       // profundo era el rasgo F2 de Consolidada — desde T2 lo compra Dueños del Área.
@@ -767,6 +896,7 @@ export function resolveSequenceAct(m, key) {
       const out = closeSeq(m, "event", `min ${m.clock()}' — 🧱 ${f.containOk}`); if (r.press) dtOk(m); noteOppDead(m); return out;
     }
     if (r.press) s.bonus = 0.05; // presión fallida: el rival queda mejor perfilado
+    moveBall(m, ADVANCE.avanceRival);   // el rival progresa HACIA mi arco
     m.log("chance", `min ${m.clock()}' — ${f.containFail(m.oppTeam)}`);
     if (r.press) dtFail(m);
     // T1 — Oficio de Trinchera: el avance rival puede morir CORTADO (falta táctica,
@@ -886,6 +1016,7 @@ function chainOppCorner(m) {
   const alive = m.oppLineup.filter(p => !p.expulsado && p.pos !== "POR");
   const shooter = alive.sort((a, b) => (b.stats.cabezazo || 0) - (a.stats.cabezazo || 0))[0] || pick(m.oppLineup);
   noteCorner(m, "opp"); noteMomentum(m, "corner", "opp");
+  setBall(m, { v: BOX_MINE, h: 2, side: "opp" });
   m.seq = { type: t, shooter, actIdx: 0, bonus: 0 };
   m.log("event", `${t.icon} min ${m.clock()}' — ${t.flavor.intro(m.oppTeam)}`);
   buildActDecision(m);
@@ -960,6 +1091,8 @@ function maybeCounter(m, failText, risky = false) {
   m.log("chance", failText);
   if (risky) dtFail(m);
   noteMomentum(m, "contraataque", "opp");
+  // La pelota cambia de dueño DONDE se perdió y sale disparada hacia mi arco.
+  setBall(m, { v: Math.max(BOX_MINE, (m.field?.v ?? 3) - 2), side: "opp" });
   m.log("event", `min ${m.clock()}' — ¡${m.oppTeam.name} sale de CONTRA con el equipo partido!`);
   // LA FRONTERA (Posesión): la línea alta sube junta y la transición muere en offside.
   // Es el espejo exacto de su otro hook, breakawayGuard, que ya mata el pelotazo
@@ -996,6 +1129,7 @@ function maybeCounter(m, failText, risky = false) {
  */
 function chainSetPiece(m, bonus = 0) {
   const t = sequenceType("balon_parado");
+  setBall(m, { v: BOX_OPP, h: 2, side: "mine" });
   const cands = m.activeMine().filter(p => p.pos !== "POR");
   const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
   m.seq = { type: t, prot, actIdx: 0, bonus };
@@ -1021,6 +1155,25 @@ function advFoulSetPiece(m, foulText, bonus = 0) {
     }
   }
   return chainSetPiece(m, bonus);
+}
+
+/**
+ * LA GEOGRAFÍA DE LA FALTA (T4): a un jugador derribado se le cobra donde LO
+ * DERRIBARON. Dentro del área rival, penal; al borde, tiro libre peligroso; lejos,
+ * uno modesto. Los dos tiros libres siguen como balón parado encadenado, así que la
+ * jugada no muere — cambia de forma, que es la regla 7 del Bible.
+ */
+function foulGeography(m, victima) {
+  if (inOppBox(m)) {
+    m.log("event", `min ${m.clock()}' — ¡Derriban a ${victima.name} DENTRO del área! ¡PENAL!`);
+    closeSilent(m);
+    return myPenalty(m);
+  }
+  const cerca = (m.field?.v ?? 3) >= 4;
+  m.log("event", `min ${m.clock()}' — ¡Falta sobre ${victima.name}! ${cerca
+    ? "Tiro libre peligroso, al borde del área."
+    : "Tiro libre lejano: el equipo sube a todos al área."}`);
+  return chainSetPiece(m, cerca ? 0.06 : 0.01);
 }
 
 /** Cierra la secuencia con una línea de relato. */

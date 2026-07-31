@@ -219,6 +219,67 @@ export function startHalfField(m, nominal) {
   f._pos = 0.5;
 }
 
+/* ── LA GEOGRAFÍA DE LAS JUGADAS (T4) ─────────────────────────────────────────
+   Cada tipo de Key Sequence declara DESDE QUÉ ALTURAS puede nacer (`zone.from` en
+   content/sequences). Un penal casi solo puede originarse en el área rival; una
+   circulación larga no arranca dentro de esa misma área; una recuperación alta
+   necesita, por definición, que la pelota esté arriba.
+
+   No es un filtro duro: es un PESO. Cuanto más lejos está la pelota del sitio
+   donde ese fútbol nace, menos probable es que ese fútbol aparezca — y como el
+   sorteo normaliza dentro de cada lado, esto cambia la MEZCLA de jugadas, nunca
+   cuántas hay (la densidad no se toca en este sprint).
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/** Caída del peso por cada altura de distancia entre la pelota y la cuna del tipo. */
+const ZONE_FALLOFF = 0.55;
+
+/** Cuánto pesa un tipo desde donde está la pelota (1 = nace justo acá). */
+export function zoneWeight(type, v) {
+  const z = type?.zone?.from;
+  if (!z) return 1;
+  const d = v < z[0] ? z[0] - v : v > z[1] ? v - z[1] : 0;
+  return ZONE_FALLOFF ** d;
+}
+
+/**
+ * Dónde PLANTA la pelota un tipo que arranca: la altura actual llevada al borde más
+ * cercano de su cuna (la jugada nace donde está la pelota si puede; si no, en el
+ * sitio más cercano donde ese fútbol existe). El carril lo pide el tipo: `wide` la
+ * abre a una banda —alternando, sin gastar azar— y `center` la trae al medio.
+ */
+export function originOf(m, type) {
+  const f = m.field;
+  const z = type?.zone?.from || [1, ROWS];
+  const v = clamp(f?.v ?? 3, z[0], z[1]);
+  const lane = type?.zone?.lane;
+  const h = lane === "wide" ? (f._lane % 2 ? 1 : LANES) : lane === "center" ? 2 : (f?.h ?? 2);
+  return { h, v };
+}
+
+/* Cuánto AVANZA la pelota cada gesto, en alturas. El fútbol del sprint, en una tabla
+   (decisión PO: "cada acto ahora deberá modificar la ubicación del balón"). Los
+   resolvers de sequence-acts la leen; nadie más tiene permitido inventar números. */
+export const ADVANCE = {
+  paseSeguro: 1,      // la circulación progresa un tramo
+  paseFiltrado: 2,    // el filtrado rompe una línea entera
+  paseAtras: -1,      // el retroceso de posesión saca al rival de su bloque
+  conduccion: 1,      // conducir al espacio gana metros
+  paseAlPie: 1,
+  robo: 1,            // el robo alto deja la pelota más cerca aún
+  duelo: 1,           // el pelotazo ganado por arriba prolonga
+  peinada: 2,         // la peinada al espacio deja al que llega de frente
+  sprint: 2,          // llegar a la línea de fondo
+  filtradoEspalda: 2, // la pelota a la espalda del bloque alto
+  avanceRival: -1,    // el rival progresa hacia MI arco
+};
+
+/** El área rival (donde se remata y donde se cobra un penal) y la mía. */
+export const BOX_OPP = ROWS, BOX_MINE = 1;
+
+/** ¿La pelota está dentro del área rival? Lo pregunta la falta: solo ahí hay penal. */
+export const inOppBox = m => (m.field?.v ?? 3) >= BOX_OPP;
+
 /* ── LA ALTURA COMO PALANCA DEL DT ─────────────────────────────────────────────
    Mover el bloque antes del partido y en el entretiempo es GRATIS: ahí el equipo
    está parado y el DT habla. Moverlo CON EL PARTIDO EN JUEGO cuesta una VENTANA

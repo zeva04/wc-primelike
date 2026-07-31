@@ -199,7 +199,7 @@ export const TRAITS = [
     momento: "Robo al central y gol de vestuario.",
     req: { nivel: 6, previo: "mittelfeldpressing" },
     pos: { x: 710, y: 128 },
-    hooks: { variantDeep: { of: "recuperacion", p: 0.35, bonus: 0.06,
+    hooks: { variantDeep: { of: "recuperacion", minHeight: 4, p: 0.45, bonus: 0.06,
       intro: p => `¡Presión sobre el SAQUE DE META rival! ${p.name} salta sobre el central que recibe.` } },
   },
   {
@@ -461,7 +461,7 @@ export const TRAITS = [
       // iniciativa se inclina de raiz y el pool rival se estrangula por falta de balon.
       masterPosesion: { shareShift: 0.06 },
       // La circulación larga deja la pelota servida: el remate llega casi hecho.
-      tapIn: { p: 0.30, bonus: 0.22, texto: "La máquina la dejó servida: solo hay que empujarla." },
+      tapIn: { zone: [4, 5], p: 0.38, bonus: 0.22, texto: "La máquina la dejó servida: solo hay que empujarla." },
     },
   },
   {
@@ -489,7 +489,7 @@ export const TRAITS = [
         texto: "Mordieron el anzuelo y salieron: cuando la recuperan, estan lejos y el remate no asusta." },
       // Sin `p`: esta no se sortea, la ELIGE el DT — es una opción nueva del acto de
       // construcción, una sola vez por secuencia (ver match/sequence-acts).
-      backPass: { bonus: 0.05, texto: "El equipo la devuelve atrás y vuelve a armar: el rival tiene que salir de su bloque." },
+      backPass: { zone: [3, 5], bonus: 0.06, texto: "El equipo la devuelve atrás y vuelve a armar: el rival tiene que salir de su bloque." },
     },
   },
   {
@@ -514,7 +514,7 @@ export const TRAITS = [
       // el pelotazo ambiente muere leido por la linea.
       breakawayGuard: { p: 0.40,
         texto: "La linea sube junta y lo deja en offside: la frontera aguanto y el contragolpe no existio." },
-      offsideTrap: { p: 0.35, texto: "¡Trampa del offside! La línea sube junta, el brazo en alto y la contra queda anulada." },
+      offsideTrap: { minHeight: 4, p: 0.50, texto: "¡Trampa del offside! La línea sube junta, el brazo en alto y la contra queda anulada." },
     },
   },
   {
@@ -526,7 +526,7 @@ export const TRAITS = [
     pos: { x: 960, y: 390 },
     // Hereda el hook del Rest Defense que vivia en el Press: el concepto —tener el
     // ataque ordenado para defender— pertenece a la filosofia que ATACA con la pelota.
-    hooks: { oppLoseActs: { p: 0.28,
+    hooks: { oppLoseActs: { zone: [2, 5], p: 0.36,
       texto: "El resto defensivo estaba armado: recuperaron, miraron arriba y no habia a quien pasarla." } },
   },
 
@@ -752,7 +752,7 @@ export const TRAITS = [
     // LA JUGADA NUEVA (como el Retroceso de La Trampa o el Congelar de Fríos): una
     // tercera opción del acto de contención, que NO se sortea — la elige el DT. Mata
     // la jugada rival sin remate, y `p` es su precio: a veces el despeje sale al córner.
-    hooks: { clearBall: { p: 0.30,
+    hooks: { clearBall: { zone: [1, 3], p: 0.30,
       texto: "¡A REVENTARLA! La zaga la manda lejos del área y el rival tiene que armar todo otra vez desde atrás." } },
   },
   {
@@ -765,7 +765,7 @@ export const TRAITS = [
     // RECICLADO de Cabeza de Playa: el pelotazo que muere sin gol no se pierde — la
     // pelota sale por el lateral y el saque largo vuelve a poblar el área (balón
     // parado encadenado). El ciclo del Bloque: despeje → pelotazo → área → parado.
-    hooks: { beachhead: { p: 0.35,
+    hooks: { beachhead: { zone: [4, 5], p: 0.42,
       texto: "¡Saque largo AL ÁREA! La pelota salió por el lateral y el envío vuelve a llenar el área rival." } },
   },
   {
@@ -779,7 +779,7 @@ export const TRAITS = [
     pos: { x: 960, y: 420 },
     // La otra JUGADA NUEVA: tercera opción del duelo aéreo (tampoco se sortea). El
     // que gana por arriba no remata: descarga al mejor rematador, que llega de frente.
-    hooks: { pivot: { bonus: 0.07,
+    hooks: { pivot: { zone: [4, 5], bonus: 0.08,
       texto: "El hombre objetivo la aguanta de espaldas y la BAJA: llega uno de frente al arco." } },
   },
 

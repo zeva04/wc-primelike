@@ -213,15 +213,19 @@ function forcePlay(m, typeId, optIdx = 0) {
   assert(salto, "Tres Pases o Nada salta directo a la definición (fútbol sin escalas)");
 
   // Asfixia en Salida: la recuperación puede nacer sobre el saque de meta (variante profunda)
-  let asfixia = false;
-  for (let i = 0; i < 200 && !asfixia; i++) {
-    const m = makeMatch("ESP", "press", ["angriffpressing"]);
-    m.min = 30;
-    E.startSequence(m, E.sequenceType("recuperacion"));
-    if (m.feed.some(l => l.text.includes("SAQUE DE META"))) asfixia = true;
-    m.seq = null; m.decision = null;
-  }
-  assert(asfixia, "Angriffpressing abre su variante profunda con relato propio");
+  // GATE TERRITORIAL (sprint del Territorio): saltar sobre el saque de meta rival exige
+  // jugar con la línea adelantada. Con el bloque medio, este rasgo no tiene dónde existir.
+  const asfixiaCon = alt => {
+    for (let i = 0; i < 300; i++) {
+      const m = makeMatch("ESP", "press", ["angriffpressing"]);
+      m.min = 30; m.my.altura = alt;
+      E.startSequence(m, E.sequenceType("recuperacion"));
+      if (m.feed.some(l => l.text.includes("SAQUE DE META"))) return true;
+    }
+    return false;
+  };
+  assert(asfixiaCon(5), "Angriffpressing abre su variante profunda con relato propio (con bloque alto)");
+  assert(!asfixiaCon(2), "y con el bloque replegado no existe: no se presiona el saque de meta desde el propio área");
 
   // Las secuencias reactivas NO cuentan contra el objetivo del generador
   {
@@ -528,6 +532,7 @@ function forcePlay(m, typeId, optIdx = 0) {
     while (guard++ < 600 && !anulada) {
       const m = makeMatch("ARG", "posesion", ["la_frontera"]);
       m.min = 30;
+      m.my.altura = 5;   // la trampa del offside EXIGE línea alta (gate territorial)
       const feed = forcePlay(m, "circulacion", 1);   // filtrado: la perdida arriesgada abre contra
       if (/sale de CONTRA/.test(feed) && /offside/.test(feed)) anulada = true;
     }
@@ -766,7 +771,9 @@ function forcePlay(m, typeId, optIdx = 0) {
         E.startSequence(m, E.sequenceType("transicion"));
         const antes = m.feed.length;
         if (m.decision?.options?.some(o => o.key === "conducir")) m.resolveSequenceAct("conducir");
-        if (m.feed.slice(antes).some(l => /PENAL/.test(l.text))) faltas++;
+        // Con la geografía de la falta (Territorio, T4) derribarlo lejos del área ya no es
+        // penal sino tiro libre: lo que este rasgo ensancha es la FALTA, se cobre donde se cobre.
+        if (m.feed.slice(antes).some(l => /PENAL|Falta sobre/.test(l.text))) faltas++;
         m.seq = null; m.decision = null;
       }
       return faltas;

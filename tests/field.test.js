@@ -228,6 +228,163 @@ function centroV(map) {
     "y basta UN escalón para que salga otro fútbol");
 }
 
+// ---------- T4: LA GEOGRAFÍA DE LAS JUGADAS ----------
+{
+  // Todo tipo declara desde dónde nace, y con un rango de cancha válido.
+  for (const t of E.SEQUENCE_TYPES) {
+    const z = t.zone?.from;
+    assert(Array.isArray(z) && z.length === 2, `${t.id} declara su cuna territorial`, JSON.stringify(t.zone));
+    assert(z[0] >= 1 && z[1] <= E.ROWS && z[0] <= z[1], `${t.id} nace en un rango de cancha válido`, JSON.stringify(z));
+  }
+  // El fútbol que el catálogo tiene que decir: el penal casi solo nace arriba; la
+  // circulación larga no arranca dentro del área rival; el córner en contra, en la mía.
+  assert(E.sequenceType("balon_parado").zone.from[0] >= 4, "el balón parado a favor nace cerca del área rival");
+  assert(E.sequenceType("circulacion").zone.from[1] < E.ROWS, "la circulación no arranca dentro del área rival");
+  assert(E.sequenceType("balon_parado_def").zone.from[1] === 1, "el córner en contra se defiende en mi área");
+  assert(E.sequenceType("recuperacion").zone.from[0] >= 4, "presionar la salida rival exige estar arriba");
+  assert(E.sequenceType("salida_corta").zone.from[1] <= 2, "la salida desde el área nace en el área propia");
+
+  // El PESO por distancia: máximo en su cuna, y cae cuanto más lejos está la pelota.
+  const rec = E.sequenceType("recuperacion");
+  assert(E.zoneWeight(rec, 5) === 1 && E.zoneWeight(rec, 4) === 1, "dentro de su cuna, el tipo pesa entero");
+  assert(E.zoneWeight(rec, 3) < 1 && E.zoneWeight(rec, 1) < E.zoneWeight(rec, 3),
+    "y pesa menos cuanto más lejos está la pelota", `${E.zoneWeight(rec, 3).toFixed(2)} / ${E.zoneWeight(rec, 1).toFixed(2)}`);
+
+  // El ORIGEN: la jugada nace donde está la pelota si puede, y si no, en el borde más cercano.
+  const m = nuevo();
+  m.field.v = 1;
+  assert(E.originOf(m, rec).v === 4, "con la pelota atrás, la presión alta nace en el borde bajo de su cuna");
+  m.field.v = 3;
+  assert(E.originOf(m, E.sequenceType("circulacion")).v === 3, "y si la pelota ya está en su cuna, la jugada nace ahí");
+  assert(E.originOf(m, E.sequenceType("banda")).h !== 2, "el desborde nace ABIERTO, nunca por el centro");
+  assert(E.originOf(m, E.sequenceType("balon_parado")).h === 2, "el balón parado se juega por el centro");
+}
+
+// ---------- T4: la jugada planta la pelota, y cada acto la mueve ----------
+{
+  // Arrancar una secuencia deja la pelota dentro de la cuna de ESA jugada.
+  for (const id of ["recuperacion", "balon_parado", "salida_corta", "espalda", "repliegue"]) {
+    const m = nuevo();
+    m.min = 20;
+    const t = E.sequenceType(id);
+    E.startSequence(m, t);
+    const z = t.zone.from;
+    assert(m.field.v >= z[0] && m.field.v <= z[1], `${id} planta la pelota en su cuna`, `v=${m.field.v} vs ${JSON.stringify(z)}`);
+  }
+  // El pelotazo es la excepción que confirma la regla: NACE atrás (donde se lanza) pero
+  // la pelota VUELA — el duelo aéreo se disputa arriba, no en el punto de partida.
+  {
+    const m = nuevo();
+    m.min = 20; m.field.v = 2;
+    const t = E.sequenceType("pelotazo");
+    assert(E.originOf(m, t).v === 2, "el pelotazo se lanza desde donde está la pelota");
+    E.startSequence(m, t);
+    assert(m.field.v === 4, "y el envío la manda dos zonas arriba: ahí se disputa el duelo", m.field.v);
+  }
+  // El pase progresa; el filtrado progresa más; el pase de la salida rompe la primera línea.
+  const avance = key => {
+    const m = nuevo();
+    m.min = 20;
+    E.startSequence(m, E.sequenceType("circulacion"));
+    const antes = m.field.v;
+    m.resolveSequenceAct(key);
+    return m.seq ? m.field.v - antes : null;   // null = la perdió (la jugada murió)
+  };
+  let seguros = [], filtrados = [];
+  for (let i = 0; i < 60; i++) { const a = avance("seguro"); if (a !== null) seguros.push(a); }
+  for (let i = 0; i < 60; i++) { const a = avance("filtrado"); if (a !== null) filtrados.push(a); }
+  assert(seguros.length && seguros.every(a => a === 1), "el pase seguro avanza una zona", seguros[0]);
+  assert(filtrados.length && filtrados.every(a => a === 2), "el pase filtrado rompe una línea entera (dos zonas)", filtrados[0]);
+}
+
+// ---------- T4: LA GEOGRAFÍA DE LA FALTA (el penal deja de nacer en el mediocampo) ----------
+{
+  let penales = 0, libres = 0, penalFuera = 0;
+  for (let i = 0; i < 800; i++) {
+    const m = nuevo();
+    m.min = 20;
+    E.startSequence(m, E.sequenceType("transicion"));
+    const antes = m.feed.length;
+    if (!m.decision?.options?.some(o => o.key === "conducir")) continue;
+    m.resolveSequenceAct("conducir");
+    const nuevas = m.feed.slice(antes).map(l => l.text).join(" ");
+    if (/PENAL/.test(nuevas)) { penales++; if (m.field.v < E.ROWS) penalFuera++; }
+    else if (/Falta sobre/.test(nuevas)) libres++;
+  }
+  assert(penales + libres > 0, "la conducción produce faltas a favor", `${penales} penales · ${libres} tiros libres`);
+  assert(penalFuera === 0, "NINGÚN penal se cobra fuera del área rival (el agujero que cerró el territorio)", penalFuera);
+  assert(libres > 0, "y las faltas lejos del área se cobran como tiro libre", libres);
+}
+
+// ---------- T4: las dos jugadas nuevas ----------
+{
+  // La salida desde el área: tres fútbols distintos, y el largo CONVIERTE la jugada.
+  const salida = key => {
+    const m = nuevo();
+    m.min = 20;
+    E.startSequence(m, E.sequenceType("salida_corta"));
+    const keys = m.decision.options.map(o => o.key);
+    m.resolveSequenceAct(key);
+    return { m, keys };
+  };
+  assert(salida("seguro").keys.join(",") === "corto,largo,seguro", "la salida ofrece los tres caminos");
+  const largo = salida("largo");
+  assert(largo.m.seq && largo.m.seq.type.id === "pelotazo", "buscar al punta CONVIERTE la salida en un pelotazo");
+  assert(salida("seguro").m.seq === null, "sacarla afuera cierra la jugada sin drama");
+  let sali = false, perdi = false;
+  for (let i = 0; i < 120 && !(sali && perdi); i++) {
+    const { m } = salida("corto");
+    if (m.seq) sali = true; else perdi = true;
+  }
+  assert(sali && perdi, "salir jugando en corto a veces sale y a veces es un regalo en la puerta del área");
+  // La pelota a la espalda: solo se ofrece contra bloque adelantado y deja al punta solo.
+  let solo = false;
+  for (let i = 0; i < 300 && !solo; i++) {
+    const m = nuevo();
+    m.min = 20;
+    E.startSequence(m, E.sequenceType("espalda"));
+    m.resolveSequenceAct("espalda");
+    if (m.seq?.oneOnOne && m.field.v === E.ROWS) solo = true;
+  }
+  assert(solo, "ganar la carrera a la espalda deja al atacante SOLO dentro del área");
+  // Y el generador la propone mucho más contra un rival adelantado que contra uno metido atrás.
+  const peso = filo => {
+    const m = nuevo();
+    m.min = 20;
+    m.field.oppFilo = { id: filo, nivel: 2 };
+    return E.typeWeightsFor(m, "mine").espalda;
+  };
+  assert(peso("press") > peso("bloque") * 2, "la espalda es la respuesta al bloque ALTO, no al que se mete atrás",
+    `${peso("press").toFixed(2)} vs ${peso("bloque").toFixed(2)}`);
+}
+
+// ---------- T4: los rasgos con geografía ----------
+{
+  // Reventar el balón solo se ofrece defendiendo en mi campo; pivotear, solo cerca del área.
+  const opcion = (id, rasgo, filo, key, v) => {
+    const m = nuevo();
+    m.min = 20;
+    m.my.filo = { id: filo, nivel: 5, etapa: 1, rasgos: [rasgo], mult: {}, xp: {} };
+    E.startSequence(m, E.sequenceType(id));
+    m.field.v = v;                       // se fuerza la zona DESPUÉS de plantar la jugada
+    m.decision = null;
+    E.buildActDecision(m);
+    return m.decision.options.some(o => o.key === key);
+  };
+  assert(opcion("repliegue", "pelotazo_fuera", "bloque", "reventar", 2), "reventar el balón se ofrece defendiendo en mi campo");
+  assert(!opcion("repliegue", "pelotazo_fuera", "bloque", "reventar", 5), "y no se ofrece con la pelota en el área rival");
+  assert(opcion("pelotazo", "hombre_objetivo", "bloque", "pivotear", 5), "pivotear al área se ofrece dentro del área");
+  assert(!opcion("pelotazo", "hombre_objetivo", "bloque", "pivotear", 1), "y no se ofrece cuando el pelotazo sale desde el fondo del área propia");
+  // El gate por ALTURA: la trampa del offside necesita la línea alta.
+  const conAltura = alt => {
+    const m = nuevo();
+    m.my.altura = alt;
+    m.my.filo = { id: "posesion", nivel: 5, etapa: 1, rasgos: ["la_frontera"], mult: {}, xp: {} };
+    return !!E.hookOf(m, "offsideTrap");
+  };
+  assert(conAltura(5) && !conAltura(2), "la trampa del offside existe con línea alta y no con el bloque metido atrás");
+}
+
 // ---------- lo que se le sirve a la UI ----------
 {
   const m = jugar();

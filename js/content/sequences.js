@@ -44,6 +44,7 @@ import { pick } from "../core/rng.js";
 export const SEQUENCE_TYPES = [
   {
     id: "circulacion", side: "mine", icon: "🎼", name: "Circulación posicional",
+    zone: { from: [2, 4] },                 // se construye desde la salida hasta tres cuartos
     // Ofensiva paciente: dos toques de construcción y definición. Pesa el Pase; una buena
     // construcción deja mejor perfil de remate (bonus alto). Mapea a Posesión (A2+).
     protWeight: { DEL: 2, MED: 3, DEF: 1 },
@@ -57,6 +58,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "transicion", side: "mine", icon: "⚡", name: "Transición rápida",
+    zone: { from: [2, 4] },                 // el robo que la lanza puede pasar en cualquier tramo propio
     // Ofensiva vertical: robo y ataque directo, corto y letal. Un solo pase de conducción
     // y remate; el remate llega mejor perfilado que en la circulación (bonus mayor) pero
     // hay menos actos para construir. Mapea a Contragolpe (A2+).
@@ -82,6 +84,7 @@ export const SEQUENCE_TYPES = [
     // pregunta es "¿tenés piernas?" en vez de "¿tenés pase?". Enseña Contragolpe: desbordar
     // es atacar el espacio, que es exactamente lo que mide su arista Verticalidad.
     id: "banda", side: "mine", icon: "🏃", name: "Desborde por la banda",
+    zone: { from: [3, 4], lane: "wide" },   // el fútbol por afuera nace ABIERTO, nunca por el medio
     protWeight: { DEL: 3, MED: 2, DEF: 1 }, protStat: "velocidad",   // la corre el rápido
     plan: ["wing", "cross", "finish"],
     flavor: {
@@ -99,6 +102,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "recuperacion", side: "mine", icon: "🦁", name: "Recuperación alta",
+    zone: { from: [4, 5] },                 // presionar la salida rival EXIGE estar arriba
     // Presión alta: cazar la salida rival y definir corto. Mapea a High Press (A3+/Filosofía).
     // La presión total roba más ARRIBA (mejor remate); cerrar líneas roba más seguido pero
     // en peor posición. La presión fallida es una pérdida ARRIESGADA: puede abrir contra rival.
@@ -113,6 +117,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "pelotazo", side: "mine", icon: "🌩️", name: "Pelotazo largo",
+    zone: { from: [1, 3] },                 // se lanza desde atrás: es la salida del bloque bajo
     // Fútbol directo: pelotazo y duelo aéreo (POR FIN juega el Cabezazo). Mapea a Bloque
     // bajo (el equipo replegado vive de esto). Ganar el duelo de cabeza habilita el remate.
     protWeight: { DEL: 3, MED: 1, DEF: 1 },
@@ -126,6 +131,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "balon_parado", side: "mine", icon: "🎯", name: "Balón parado a favor",
+    zone: { from: [4, 5], lane: "center" }, // córner o tiro libre cerca del área rival
     // Córner/tiro libre: UNA decisión y desenlace (Bible: algunas secuencias son un solo
     // duelo decisivo). El centro busca al mejor cabeceador; la jugada preparada, un remate limpio.
     protWeight: { MED: 3, DEL: 2, DEF: 1 }, // el lanzador
@@ -136,6 +142,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "balon_parado_def", side: "opp", icon: "🚨", name: "Balón parado en contra",
+    zone: { from: [1, 1], lane: "center" }, // el córner en contra se defiende DENTRO de mi área
     // El espejo defensivo: córner rival. Zona = seguro; salir a despejar corta más, pero si
     // se falla el cabeceador remata solo.
     protWeight: { DEF: 3, MED: 1, DEL: 0 },
@@ -146,6 +153,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "salida_fondo", side: "opp", icon: "🗼", name: "Salida bajo presión",
+    zone: { from: [1, 2] },                 // me asfixian donde nace mi salida
     // El rival me presiona la salida (SU iniciativa: cuenta como secuencia rival). Salir
     // jugando limpio CONVIERTE la jugada en transición mía (def→of, la secuencia más
     // novedosa del catálogo); perder la pelota ahí es regalarle un remate al rival.
@@ -160,6 +168,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "repliegue", side: "opp", icon: "🧱", name: "Repliegue defensivo",
+    zone: { from: [1, 3] },                 // su ataque me llega a mi campo
     // Defensiva: el rival ataca y yo contengo. Un acto de contención y el remate a atajar.
     // Mapea a Bloque bajo (A2+). El protagonista lo elige la máquina entre mis DEF en cancha.
     protWeight: { DEF: 3, MED: 1, DEL: 0 },
@@ -168,6 +177,51 @@ export const SEQUENCE_TYPES = [
       intro: opp => `${opp.name} llega con peligro y el equipo se repliega para defender.`,
       containOk: "¡La zaga corta la jugada antes del remate!",
       containFail: opp => `${opp.name} progresa y encara el área.`,
+    },
+  },
+  /* ---------- Las 2 jugadas del TERRITORIO (T4, decisión PO 30-jul-2026) ----------
+     No son tipos más: son los dos fútbols que ANTES NO PODÍAN EXISTIR porque el motor
+     no sabía dónde estaba la pelota. Uno solo aparece con el balón en el área propia
+     (¿la sacamos jugando o la reventamos?) y el otro solo tiene sentido contra un
+     bloque rival adelantado (el espacio a su espalda). La geografía los gatea sola:
+     `zone.from` decide desde dónde nacen y el generador pondera por distancia. */
+  {
+    id: "salida_corta", side: "mine", icon: "🧤", name: "Salida desde el área",
+    zone: { from: [1, 2] },
+    // La saca el que sabe jugarla: el DEF de mejor pase (o el volante que baja a recibir).
+    protWeight: { DEF: 3, MED: 2, DEL: 0 }, protStat: "pase_corto",
+    plan: ["buildout", "build", "finish"],
+    flavor: {
+      intro: p => pick([
+        `El arquero se la deja a ${p.name} en el borde del área. Hay que sacarla de acá.`,
+        `${p.name} baja a recibir al área propia: el equipo tiene que empezar la jugada desde el fondo.`,
+      ]),
+      buildOk: "El equipo sale del embudo y la pelota respira.",
+      buildFail: "Se corta la salida: la pierden en tres cuartos propios.",
+      outShort: p => `¡${p.name} rompe la primera línea con un pase al pie! El equipo sale jugando de verdad.`,
+      outFail: p => `¡${p.name} la pierde en la puerta del área! Se le viene el mundo encima…`,
+      outLong: "Pelotazo a buscar al punta: la salida se juega por arriba.",
+      outSafe: "La sacan al lateral sin arriesgar: pelota afuera y a respirar.",
+      finishStat: "tiro", finishBonus: 0.12,
+    },
+  },
+  {
+    id: "espalda", side: "mine", icon: "🏹", name: "Pelota a la espalda",
+    zone: { from: [3, 4] },
+    // La ataca el que CORRE: es la jugada del punta veloz contra la línea adelantada.
+    protWeight: { DEL: 3, MED: 2, DEF: 0 }, protStat: "velocidad",
+    plan: ["throughball", "finish"],
+    flavor: {
+      intro: p => pick([
+        `La zaga rival está partida en la mitad de cancha y ${p.name} mira ese espacio.`,
+        `${p.name} amaga con venir y pica al hueco: los centrales rivales están adelantadísimos.`,
+        `Toda la espalda del bloque rival está descubierta. ${p.name} arranca.`,
+      ]),
+      throughOk: p => `¡Pelota a la espalda y ${p.name} GANA la carrera! Se le abre el arco.`,
+      throughFail: "La pelota a la espalda se pasa de largo: la levanta el arquero rival.",
+      lineOk: p => `Rompen líneas al pie: ${p.name} recibe de espaldas entre los centrales.`,
+      lineFail: "El pase entre líneas lo lee la zaga y corta.",
+      finishStat: "tiro", finishBonus: 0.10,
     },
   },
   /* ---------- Las 4 SECUENCIAS AVANZADAS (arco del Meta M2, diseños PO 22-jul) ----------
@@ -179,6 +233,7 @@ export const SEQUENCE_TYPES = [
      lógica: la máquina los lee. */
   {
     id: "caceria", side: "mine", icon: "🦁", name: "Cacería total", advFor: "press",
+    zone: { from: [4, 5] },                 // la cacería vive en el campo rival
     // Presión ENCADENADA (3 actos): cazar la salida, cerrar la trampa sobre el reseteo y
     // definir en zona letal. Si el rival la rompe, un % de las veces la rompe CON FALTA:
     // amarilla (acumula: la 2ª expulsa) + tiro libre encadenado — la jugada sigue.
@@ -202,6 +257,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "sinfonia", side: "mine", icon: "🎼", name: "La sinfonía", advFor: "posesion",
+    zone: { from: [2, 4] },
     // Circulación LARGA (3 compases; 4 en Consolidada — el rasgo viejo vive acá): cada
     // build acertado suma desesperación. Con la desesperación llena, un % de las veces el
     // rival ya no llega y te baja DENTRO del área: penal. Si no, remate limpio de alta calidad.
@@ -222,6 +278,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "contra_letal", side: "mine", icon: "⚡", name: "Contragolpe letal", advFor: "contra",
+    zone: { from: [2, 4] },
     // Doble conducción con el rival partido. La falta tiene GEOGRAFÍA: en el primer tramo
     // (lejos) es la falta desesperada — amarilla + tiro libre encadenado; en el segundo
     // (zona letal) es PENAL, como la conducción de siempre.
@@ -260,6 +317,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "fortaleza", side: "opp", icon: "🧱", name: "La fortaleza castiga", advFor: "bloque",
+    zone: { from: [1, 3] },
     // La única avanzada DEFENSIVA: arranca como repliegue, pero la contención exitosa
     // CONVIERTE (def→of, el patrón de la salida bajo presión): pelotazo inmediato con el
     // rival desarmado. Si el duelo aéreo se pierde, % de córner ganado encadenado — la

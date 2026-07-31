@@ -31,6 +31,7 @@ import { traitById } from "../../content/traits.js";
 import { sequenceType } from "../../content/sequences.js";
 import { playedPos } from "../ratings.js";
 import { protMomentum } from "./sequences.js"; // ciclo benigno: solo runtime (mismo patrón que sequence-acts)
+import { setBall, originOf, myHeight } from "./field.js";
 
 // Tope de encadenamientos reactivos por partido (todos los rasgos suman al mismo
 // contador): el fútbol reactivo debe sentirse ocasión especial, no metralleta.
@@ -66,13 +67,32 @@ export function traitHooks(m) {
 export function hookOf(m, name, family) {
   const list = traitHooks(m)[name];
   if (!list?.length) return null;
-  if (family === undefined) return list[0];
-  return list.find(h => (h.of ?? h.seq) === family) || null;
+  if (family === undefined) return list.find(h => zoneOk(m, h)) || null;
+  return list.find(h => (h.of ?? h.seq) === family && zoneOk(m, h)) || null;
 }
 
 /** Todos los hooks `name` activos (los que se APILAN: transitionPass, pressStamina). */
 export function hooksOf(m, name) {
-  return traitHooks(m)[name] || [];
+  return (traitHooks(m)[name] || []).filter(h => zoneOk(m, h));
+}
+
+/**
+ * EL GATE TERRITORIAL DE LOS RASGOS (sprint del Territorio, T4). Un rasgo puede
+ * declarar DÓNDE existe su fútbol:
+ *   `zone: [vMin, vMax]` — solo con la pelota en esas alturas (reventar el balón es
+ *      de zona propia; pivotear al área, del área rival)
+ *   `minHeight: n`       — solo con MI bloque en esa altura o más arriba (la trampa
+ *      del offside no se puede tender con la línea metida en el área)
+ * Sin declaración, el rasgo aplica siempre — solo se gatea lo que el fútbol pide, y
+ * a lo gateado se le COMPENSA la frecuencia (decisión PO) para no mover el balance
+ * del árbol recién calibrado: el rasgo cambia de carácter, no de valor.
+ */
+function zoneOk(m, h) {
+  if (h.zone) {
+    const v = m.field?.v ?? 3;
+    if (v < h.zone[0] || v > h.zone[1]) return false;
+  }
+  return !h.minHeight || myHeight(m) >= h.minHeight;
 }
 
 /** ¿El DT compró este rasgo? — EL GATE DE LA MIGRACIÓN F2 (T2): donde antes
@@ -98,7 +118,7 @@ export function rollChain(m, name, pPlus = 0) {
   // sitio hacia jugadas distintas —el córner defendido lanza pelotazo en el Bloque y
   // contra en el Contragolpe— y tenerlas las dos debe dar las dos chances, no una.
   for (const h of list) {
-    if (rnd() >= h.p + pPlus) continue;
+    if (rnd() >= h.p + pPlus) continue;   // (la lista ya viene filtrada por zona: hooksOf)
     m._chainCount = (m._chainCount || 0) + 1;
     return h;
   }
@@ -119,6 +139,9 @@ export function chainMine(m, typeId, { bonus = 0, intro = null, buildDecision } 
   if (!t || !cands.length) return false;
   const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
   m._flow.push({ min: m.min, side: "mine", w: 3 }); // el fútbol reactivo también pesa en posesión/momentum
+  // El territorio también manda en el fútbol reactivo: la cadena nace donde ESE fútbol
+  // nace (T4), no donde quedó la jugada anterior.
+  setBall(m, { ...originOf(m, t), side: "mine" });
   m.seq = { type: t, prot, actIdx: 0, bonus, reactive: true };
   m.log("event", `${t.icon} min ${m.clock()}' — ${intro ? intro(prot) : t.flavor.intro(prot)}`);
   buildDecision(m); // lo inyecta sequence-acts (evita el ciclo de imports)

@@ -40,7 +40,7 @@ import { buildActDecision } from "./sequence-acts.js";
 import { hookOf, hasTrait, traitHooks, traitMoment } from "./trait-hooks.js";
 import { pressOn, PRESS_POOL } from "./press.js";
 import { noteCorner as noteCornerStat } from "./stats.js";
-import { noteZone, myHeight, oppHeight, HEIGHT_DEFAULT } from "./field.js";
+import { setBall, myHeight, oppHeight, HEIGHT_DEFAULT, zoneWeight, originOf } from "./field.js";
 import { noteMomentum } from "./match-momentum.js";
 
 // Rango objetivo de secuencias por partido (Bible §7: "aproximadamente 2 a 6").
@@ -165,6 +165,13 @@ function typeWeights(m, side, plan) {
     // así el desborde discrimina por el rival sin aparecer más seguido en promedio.
     banda: (1.0 + 1.5 * prof.def + 1.0 * (1 - prof.vel)) * (losingLate ? 1.4 : 1) * (tired ? 0.7 : 1) * brave,
     balon_parado: 1.5,
+    // LAS DOS JUGADAS DEL TERRITORIO (T4). La salida desde el área no necesita un
+    // multiplicador de contexto: su gate es GEOGRÁFICO — solo aparece cuando la pelota
+    // está de verdad en mi fondo (el bloque bajo la ve mucho; el alto, casi nunca).
+    salida_corta: 2.2,
+    // La espalda, en cambio, sí lee al rival: es la respuesta al bloque adelantado y
+    // contra un equipo metido atrás prácticamente no existe (no hay espalda que atacar).
+    espalda: Math.max(0.3, 1 + 0.55 * (oppHeight(m) - HEIGHT_DEFAULT)) * 1.4 * (losingLate ? 1.3 : 1),
     caceria: 0, sinfonia: 0, contra_letal: 0,
   } : {
     repliegue: (2 + 3 * prof.atk) * (winningLate ? 1.4 : 1),
@@ -467,7 +474,10 @@ export function maybeStartSequence(m) {
   }
   const pool = SEQUENCE_TYPES.filter(t => t.side === side);
   const w = typeWeights(m, side, plan);
-  startSequence(m, m._weightedPick(pool, pool.map(t => w[t.id] ?? 1)));
+  // [EL TERRITORIO DECIDE QUÉ JUGADA SALE] (T4): además de todo lo anterior, cada tipo
+  // pesa según cuán lejos está la pelota de la altura donde ese fútbol NACE. Como el
+  // sorteo normaliza dentro del lado, esto cambia la MEZCLA y nunca el número de jugadas.
+  startSequence(m, m._weightedPick(pool, pool.map(t => (w[t.id] ?? 1) * zoneWeight(t, m.field?.v ?? 3))));
   return true;
 }
 
@@ -477,10 +487,10 @@ export function startSequence(m, type) {
   noteFiloIntent(m, type);   // la INTENCIÓN: proponer ese fútbol ya enseña (70% de la XP)
   m._lastSeqType = type.id; // memoria del contexto dinámico: no repetir tipo dos veces seguidas
   m._flow.push({ min: m.min, side: type.side, w: 3 }); // posesión/momentum derivados (A3, #11)
-  // EL TERRITORIO: una jugada REAL deja mucho más calor que un minuto de relleno, y del
-  // lado de quien la propone (una defensiva es SU posesión). Dónde nace cada tipo lo
-  // decide el catálogo (T4); acá solo se marca el mapa.
-  noteZone(m, type.side);
+  // EL TERRITORIO: la jugada PLANTA la pelota donde ese fútbol nace (`zone.from` del
+  // catálogo, llevado al borde más cercano) y deja mucho más calor que un minuto de
+  // relleno. Del lado de quien la propone: una defensiva es SU posesión.
+  setBall(m, { ...originOf(m, type), side: type.side });
   m.stats.decisiones++;
   if (type.side === "mine") {
     const cands = m.activeMine().filter(p => p.pos !== "POR");

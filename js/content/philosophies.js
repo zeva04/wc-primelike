@@ -87,6 +87,8 @@ export const FILO_BY_TIPO = {
   banda: "contra",            // desbordar es atacar el espacio (Odisea, decisión PO)
   pelotazo: "bloque",         // el duelo directo
   repliegue: "bloque",        // defender organizado y neutralizar
+  salida_corta: "posesion",   // sacarla jugada desde el área propia (Territorio, T4)
+  espalda: "contra",          // atacar el espacio detrás del bloque alto (Territorio, T4)
 };
 export const filoOfType = (type) => type?.advFor || FILO_BY_TIPO[type?.id] || null;
 
