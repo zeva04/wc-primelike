@@ -123,6 +123,48 @@ const byRating = [...qualified].sort((a, b) => E.teamRating(b) - E.teamRating(a)
   assert(E.baseHeight(null) === E.HEIGHT_DEFAULT, "sin identidad conocida, se asume bloque medio");
 }
 
+// ---------- EL CRUCE, ANTICIPADO (sprint del Rival que Decide) ----------
+// Gate del PO: *"que el informe lo anticipe SIEMPRE: si no lo veo venir es un impuesto,
+// no una decisión"*. El ciclo muerde 4.9pp de win% por partido, así que callarlo sería
+// exactamente el impuesto que el PO prohibió.
+{
+  const run = E.newRun("BRA");
+  const oppId = run.groups[run.myGroupIdx].teamIds.find(t => t !== "BRA");
+
+  // Sin identidad elegida no hay cruce del que hablar (el informe del sorteo).
+  assert(E.buildOpponentReport(run, oppId).filosofia.cruce === null, "sin identidad elegida el informe no inventa un cruce");
+
+  // Con identidad, el informe lo nombra SIEMPRE y con el signo correcto.
+  for (const mia of E.COUNTER_CYCLE) {
+    E.choosePhilosophy(run, mia);
+    const rep = E.buildOpponentReport(run, oppId);
+    const c = rep.filosofia.cruce;
+    assert(c, "con identidad elegida el cruce se nombra siempre", `${mia} vs ${rep.filosofia.id}`);
+    assert(c.signo === E.counterEdge(mia, rep.filosofia.id), "y el signo es el del ciclo, no una prosa aparte", `${mia}|${rep.filosofia.id}`);
+    assert(c.titulo && c.texto, "con titular y una lectura accionable");
+    // La regla declarada del módulo: CUALITATIVO, nunca porcentajes. El ciclo se mide en
+    // pp de win% y en share, y ninguno de los dos puede filtrarse al informe.
+    assert(!/\d/.test(c.texto) && !/\d/.test(c.titulo), "y sin un solo número: el ojeador no es una planilla", c.texto);
+  }
+
+  // Las tres lecturas son DISTINTAS: si el cruce malo y el bueno dijeran lo mismo, el
+  // informe estaría cumpliendo la forma y no la función. Se fabrican los tres signos
+  // contra el MISMO rival, eligiendo yo la identidad que caza / la que es cazada / la
+  // neutra — que es exactamente la decisión que el DT toma leyendo esta card.
+  {
+    const suya = E.rivalFilo(E.getTeam(oppId), 0).id;
+    const mias = { 1: E.CAZADOR_DE[suya], [-1]: E.PRESA_DE[suya], 0: suya };
+    const vistos = new Map();
+    for (const [signo, mia] of Object.entries(mias)) {
+      E.choosePhilosophy(run, mia);
+      const c = E.buildOpponentReport(run, oppId).filosofia.cruce;
+      assert(c.signo === +signo, "el cruce fabricado da el signo esperado", `${mia} vs ${suya} → ${c.signo}`);
+      vistos.set(c.titulo + c.texto, signo);
+    }
+    assert(vistos.size === 3, "las tres lecturas del cruce son textos distintos", vistos.size);
+  }
+}
+
 console.log(`scouting.test: ${checks} checks`);
 console.log(fails ? "❌ scouting con fallos" : "✅ scouting OK");
 process.exit(fails ? 1 : 0);

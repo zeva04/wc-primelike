@@ -36,6 +36,7 @@
 import { clamp } from "../../core/math.js";
 import { rivalFilo } from "../philosophy.js";
 import { playedPos } from "../ratings.js";
+import { momentumTrend } from "./match-momentum.js";
 
 /** Carriles (horizontal) y alturas (vertical) de la grilla. */
 export const LANES = 3, ROWS = 5;
@@ -117,15 +118,58 @@ export const ballZone = m => (m.field ? { h: m.field.h, v: m.field.v, side: m.fi
  *  no en el estado del simulador — por eso se lee EN VIVO en cada consulta. */
 export const myHeight = m => clamp(m.my?.altura ?? HEIGHT_DEFAULT, 1, 5);
 
+/* EL RIVAL QUE REACCIONA (sprint del Rival que Decide, decisión PO 1-ago-2026).
+
+   El PO fijó el alcance: *"el rival mantiene su formación de esencia y su filosofía de
+   esencia; puede cambiar durante un partido si el partido se le empieza a escapar, pero
+   no antes de iniciarlo. Con las tarjetas rojas sí se readapta estratégicamente."*
+
+   O sea: **no contra-elige, reacciona**. Y eso es mejor diseño de lo que parece, porque
+   el gate del propio sprint pedía que el informe lo anticipe SIEMPRE — con una identidad
+   que se elige antes del partido, el ojeador tendría que adivinar una decisión que
+   todavía no ocurrió. Con esencia fija el informe es verdadero por construcción: dice a
+   qué juegan, y a eso juegan. Lo que cambia es la POSTURA, y eso el DT lo ve pasar.
+
+   Se expresa donde ya vivía —la altura del bloque— y no en un canal nuevo, por dos
+   razones medidas: (1) la altura ya arrastra territorio Y reparto de pelota
+   (`heightShareShift` descuenta 0.02 por escalón rival), o sea que subir el bloque YA
+   es salir a buscar la pelota; (2) es lo único VISIBLE — el informe anuncia la altura de
+   esencia antes del partido, así que cuando el bloque se mueve el DT lo reconoce.
+
+   Lo que había antes era un escalón de ±1 desde el minuto 70 mirando solo el marcador.
+   Un equipo no espera al minuto 70 para darse cuenta de que se le está escapando. */
+const REACCION_DOMINIO = 20;   // tendencia de match-momentum que ya es "me están comiendo"
+                               // (el asistente técnico usa 22 para decir lo mismo)
+
+/**
+ * Cómo está reaccionando el rival AHORA: −1 se atrinchera · 0 sigue con su plan ·
+ * +1 sale a buscarlo. Puro y sin azar (la ley del sprint del Territorio).
+ */
+export function oppReaction(m) {
+  // Las ROJAS mandan sobre todo lo demás y son inmediatas: con uno menos te metés atrás
+  // aunque vayas perdiendo, y con uno más salís a buscarlo aunque vayas ganando. Hasta
+  // hoy una roja solo restaba poder — el rival no se reordenaba nunca.
+  const rojas = m.my.lineup.filter(p => p.expulsado).length - m.oppLineup.filter(p => p.expulsado).length;
+  if (rojas !== 0) return clamp(rojas, -1, 1);
+  // El marcador pesa cada vez más con el reloj: a los 20' un 0-1 se remonta caminando,
+  // a los 80' no. Antes de la media hora el rival no se mueve de su plan.
+  const urgencia = m.min >= 65 ? 1 : m.min >= 30 ? 0.5 : 0;
+  const marcador = m.gOpp < m.gMy ? 1 : m.gOpp > m.gMy ? -1 : 0;
+  // Y el DOMINIO adelanta la reacción aunque el marcador todavía no lo diga: si lo
+  // tengo contra su arco hace diez minutos, sale a despegarse antes de que entre.
+  const ahogado = m.min >= 30 && momentumTrend(m, 8) > REACCION_DOMINIO ? 1 : 0;
+  const r = marcador * urgencia + ahogado * 0.5;
+  return r >= 0.5 ? 1 : r <= -0.5 ? -1 : 0;
+}
+
 /**
  * La altura del bloque RIVAL: su identidad la fija (el Press y la Posesión adelantan
- * líneas; la Contra y el Bloque esperan), su nivel la radicaliza, y el marcador la
- * mueve igual que a mí — el que va perdiendo tarde sube, el que gana se agacha.
+ * líneas; la Contra y el Bloque esperan), su nivel la radicaliza, y su REACCIÓN al
+ * partido la mueve — el que se le está escapando sube, el que administra se agacha.
  * La IA rival juega con las MISMAS reglas territoriales que el DT (entregable del sprint).
  */
 export function oppHeight(m) {
-  const late = m.min >= 70 ? (m.gOpp < m.gMy ? 1 : m.gOpp > m.gMy ? -1 : 0) : 0;
-  return clamp(baseHeight(m.field?.oppFilo) + late, 1, 5);
+  return clamp(baseHeight(m.field?.oppFilo) + oppReaction(m), 1, 5);
 }
 
 /**

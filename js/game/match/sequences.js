@@ -34,7 +34,7 @@ import { clamp } from "../../core/math.js";
 import { playedPos } from "../ratings.js";
 import { moraleBand } from "../morale.js";
 import { SEQUENCE_TYPES, ADVANCED_BY_FILO } from "../../content/sequences.js";
-import { FIRMA_TYPE, FILO_LEVELS, FILO_ETAPAS, getPhilosophy, filoOfType, xpLevelOf, XP_INTENCION, XP_ACIERTO } from "../../content/philosophies.js";
+import { FIRMA_TYPE, FILO_LEVELS, FILO_ETAPAS, getPhilosophy, filoOfType, xpLevelOf, XP_INTENCION, XP_ACIERTO, counterEdge } from "../../content/philosophies.js";
 import { rivalFilo } from "../philosophy.js";
 import { buildActDecision } from "./sequence-acts.js";
 import { hookOf, hasTrait, traitHooks, traitMoment } from "./trait-hooks.js";
@@ -308,22 +308,64 @@ function widthWeights(m, side, w) {
  */
 export const heightShareShift = m => 0.045 * (myHeight(m) - HEIGHT_DEFAULT) - 0.02 * (oppHeight(m) - HEIGHT_DEFAULT);
 
-/* [MATRIZ DE COUNTERS] (F2, decisión PO #7 — celdas aprobadas 22-jul): "mi filo|su filo"
-   → multiplicadores sobre el pool del lado indicado. Direccionales del roadmap: mi Press
-   brilla contra Posesión · mi Posesión se estrella contra Bloque (pelotazo forzado) · mi
-   Contra vive del rival con iniciativa y muere contra el que también espera · mi Bloque
-   sufre al que elabora (te sitian: más repliegues en tu área). */
+/* [MATRIZ DE COUNTERS] — el CICLO, contado en fútbol (sprint del Rival que Decide,
+   decisión PO 1-ago-2026; nació en F2 como 7 celdas ad hoc con 9 cruces vacíos).
+
+   La LEY vive en content/philosophies.COUNTER_CYCLE (Press > Posesión > Bloque >
+   Contra > Press). Esta tabla NO decide quién le gana a quién: solo cuenta, en tipos
+   de jugada, lo que el ciclo ya decidió. `philosophy.test` verifica celda por celda
+   que la dirección de cada una coincida con `counterEdge` — la prosa y los números no
+   pueden divergir de la ley nunca más.
+
+   El patrón es uno solo: en cada arista A > B, la FIRMA de A se agranda contra B
+   (×1.35/1.40) y la FIRMA de B se achica contra A (×0.72 ≈ 1/1.35, para que el pool
+   se conserve). Los neutros del ciclo —Press↔Bloque y Posesión↔Contra— no tienen
+   celda, y eso es la ausencia diciendo algo, no un hueco.
+
+   OJO CON EL CANAL. Está medido (ROADMAP-rival §2, n=2000/celda): la matriz mueve el
+   share de tipos hasta ×2 y el win% **0.0pp** — la interacción del matchup era cero.
+   Esta tabla es el NARRADOR del ciclo: cambia qué fútbol sale, que es lo que el Bible
+   §5 le pide a una filosofía. Los DIENTES viven en `filoShareShift`, el canal de
+   posesión, que sí muerde (~0.8pp de win% por 0.01 de share). */
 const MATRIX = {
   mine: {
+    // Press > Posesión — su salida es mi festín; y sin nadie a quien cazar, mi presión
+    // corre al vacío contra el que espera (Contra me gana).
     "press|posesion": { recuperacion: 1.4 },
-    "posesion|bloque": { circulacion: 0.65, pelotazo: 1.3 },
-    "contra|press": { transicion: 1.35 }, "contra|posesion": { transicion: 1.35 },
-    "contra|contra": { transicion: 0.6 }, "contra|bloque": { transicion: 0.6 },
+    "press|contra": { recuperacion: 0.72 },
+    // Posesión > Bloque — LA CELDA QUE SE DIO VUELTA. Era ×0.65 + pelotazo forzado, y
+    // convivía con `bloque|posesion` (abajo) haciendo el cruce LOSE-LOSE: las dos
+    // sillas penalizadas. Ahora la paciencia rompe la muralla, como decía su propia
+    // prosa de scouting ("derribar la muralla exige paciencia").
+    "posesion|bloque": { circulacion: 1.35 },
+    "posesion|press": { circulacion: 0.72 },
+    // Bloque > Contra — el duelo directo contra el que también espera lo gana el que
+    // no necesita la pelota; y mi pelotazo muere contra el que no me la devuelve.
+    "bloque|contra": { pelotazo: 1.35 },
+    "bloque|posesion": { pelotazo: 0.72 },
+    // Contra > Press — el que se adelanta me deja la espalda; el que se encierra la tapa.
+    "contra|press": { transicion: 1.35 },
+    "contra|bloque": { transicion: 0.6 },
+    // ESPEJO, no ciclo: dos que esperan hacen un partido muerto. Fuera de la ley del
+    // ciclo a propósito (`counterEdge` da 0 acá) — es sabor, y El Anzuelo lo neutraliza.
+    "contra|contra": { transicion: 0.6 },
   },
   opp: {
+    // La otra silla de Posesión > Bloque: me sitian, más repliegues en mi área. Sobrevive
+    // intacta al rediseño porque el ciclo mantiene la dirección — y con ella sobrevive su
+    // neutralizador, La Fortaleza Inexpugnable.
     "bloque|posesion": { repliegue: 1.35 },
   },
 };
+/** La celda del cruce, o null. EXPUESTA para que los tests puedan verificar dos cosas
+ *  que antes se escribían a mano y por lo tanto derivaban: (1) que la dirección de cada
+ *  celda coincide con `counterEdge` —la matriz no puede contradecir al ciclo—, y (2) que
+ *  los rasgos neutralizadores devuelven a tablas la celda REAL y no una copiada. */
+export const counterCell = (side, myId, oppId) => MATRIX[side]?.[`${myId}|${oppId}`] || null;
+/** Todos los cruces declarados, como [side, miFilo, suFilo, pesos]. Solo para tests. */
+export const counterCells = () => Object.entries(MATRIX).flatMap(([side, cells]) =>
+  Object.entries(cells).map(([k, w]) => [side, ...k.split("|"), w]));
+
 // La firma del RIVAL en el lado opp (su iniciativa, con SU nivel como magnitud): el que
 // presiona te asfixia la salida; el que quiere la pelota te sitia. Contra y Bloque no
 // suman tipos: CEDEN pelota (filoShareShift) — y el Bloque vive del córner (celda fija).
@@ -423,12 +465,39 @@ function applyFiloWeights(m, side, w, oppFilo) {
   }
 }
 
+/* EL DIENTE DEL CICLO (sprint del Rival que Decide, decisión PO 1-ago-2026).
+
+   Por qué acá y no en la matriz de pool. Medido en banco de plantel fijo, BRA vs GER,
+   n=2000 por celda, nivel 10, grupos (ROADMAP-rival §2): descomponiendo el win% en
+   fila + columna + interacción, **el residuo de interacción máximo fue 0.65pp contra
+   un error estándar de 1.02pp**. La matriz movía el share de tipos hasta ×2 —Contra
+   pasaba de 27.4% de transiciones contra Press a 13.5% contra otro Contra— y el
+   resultado no se movía NADA. Es la misma lección que R3 ya había dejado escrita:
+   "los sesgos de pool miden ~0pp".
+
+   Toda la variación real de matchup que existía hoy salía de ESTA función. Su tabla
+   predecía el win% medido casi punto por punto: el rival que espera me cede pelota y
+   yo gano más. El tipo de cambio del canal, medido: **~0.8pp de win% por 0.01 de
+   share**. Así que el ciclo se muda acá, que es donde el fútbol se decide.
+
+   Y es VISIBLE por construcción, que era el otro requisito: la posesión se ve en las
+   estadísticas del partido y se siente en cuántas jugadas propone cada uno. No hace
+   falta una línea de UI para que el DT note que le están quitando la pelota. */
+export const CICLO_SHARE = 0.05;
+
 /**
- * Cuánto inclina la FILOSOFÍA el reparto de iniciativa (F2, costos de identidad):
- * mi Contra cede posesión (−0.05) y mi Bloque cede volumen ofensivo (−0.08 — era
- * −0.10, ajuste PO tras medir el gate: el Bloque cargaba −5.5pp de piso); el
- * rival que espera me la cede a mí (contra +0.04 · bloque +0.06). Posesión y
- * Press no tocan el reparto (sus costos son la matriz y la energía). Puro.
+ * Cuánto inclina la FILOSOFÍA el reparto de iniciativa. Dos sumandos:
+ *
+ * 1. COSTOS DE IDENTIDAD (F2, intactos): mi Contra cede posesión (−0.05) y mi Bloque
+ *    cede volumen ofensivo (−0.08 — era −0.10, ajuste PO tras medir el gate: el
+ *    Bloque cargaba −5.5pp de piso); el rival que espera me la cede a mí (contra
+ *    +0.04 · bloque +0.06). Son de la IDENTIDAD, no del cruce: se pagan contra todos.
+ *
+ * 2. EL CICLO (nuevo): ±CICLO_SHARE según `counterEdge`. Es de suma cero por
+ *    construcción —`mineShare` es un solo número, así que lo que gano se lo saco—,
+ *    y por eso el ciclo no puede inflar el partido: solo decide de quién es.
+ *
+ * Puro.
  */
 export function filoShareShift(myFilo, oppFilo) {
   let d = 0;
@@ -436,7 +505,7 @@ export function filoShareShift(myFilo, oppFilo) {
   if (myFilo?.id === "bloque") d -= 0.08;
   if (oppFilo?.id === "contra") d += 0.04;
   if (oppFilo?.id === "bloque") d += 0.06;
-  return d;
+  return d + CICLO_SHARE * counterEdge(myFilo?.id, oppFilo?.id);
 }
 
 /* filoRasgo() MURIÓ en T2 (migración F2, decisión PO #2): el efecto profundo que

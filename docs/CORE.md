@@ -817,12 +817,59 @@ acorde vía `bestSixShaped` — y derivada determinista para el resto: débiles 
 mediocampo con jerarquía → posesión · resto → contra; el Press no se infiere, solo curado.
 Nivel por jerarquía: r≥84 Consolidada · r≥78 En desarrollo · resto Aprendiendo).
 
-**[MATRIZ DE COUNTERS] (F2, decisión PO #7 — regla 4: sin build ganadora).** Celdas
-mía×rival sobre el pool (`MATRIX` + `applyFiloWeights`, extraída para que typeWeights no
-sea sopa): mi Press vs Posesión → recuperación ×1.4 · mi Posesión vs Bloque → circulación
-×0.65 y pelotazo ×1.3 (forzado) · mi Contra vs Press/Posesión → transición ×1.35, vs
-Contra/Bloque → ×0.6 (partido muerto) · mi Bloque vs Posesión → repliegue ×1.35 (te
-sitian). La firma rival sesga SU lado con SU nivel (press→salida_fondo ·
+**[EL CICLO DE COUNTERS] (sprint del Rival que Decide, decisión PO 1-ago-2026 — reemplaza
+la matriz ad hoc de F2).** La LEY vive en **`content/philosophies.COUNTER_CYCLE`**, y el
+array ES el ciclo: `["press","posesion","bloque","contra"]`, cada uno le gana al siguiente
+y da la vuelta. Los **neutros** (Press↔Bloque y Posesión↔Contra) caen solos como los que
+quedan a distancia 2 — no se declaran, así que no pueden divergir. De ahí salen `PRESA_DE`,
+`CAZADOR_DE` y `counterEdge(mío, suyo) → +1/0/−1`, la única primitiva que decide quién le
+gana a quién: la consumen el pool, el reparto de pelota, el informe del ojeador y el DT
+contra-elector del smoke.
+
+> ⚠️ **LA LECCIÓN MÁS CARA DEL SPRINT, y vale para cualquier mecánica futura: EL POOL NO
+> MUEVE EL RESULTADO.** F2 había construido la matriz entera sobre pesos de tipo. Medido en
+> banco de plantel fijo (BRA vs GER, n=2000/celda, nivel 10), descomponiendo el win% en
+> fila + columna + interacción: **el residuo de interacción máximo era 0.65pp contra un
+> error estándar de 1.02pp — la interacción del matchup no existía.** Y no era que la matriz
+> estuviera apagada: movía el share de tipos **hasta ×2** (mi Contra pasaba de 27.4% de
+> transiciones contra Press a 13.5% contra otro Contra) con el resultado quieto. El propio
+> R3 ya lo había escrito —*"la lección de R2 es que los sesgos de pool miden ~0pp"*— y la
+> matriz seguía viviendo ahí. **Tipo de cambio de los tres canales, medido:** poder
+> (`p.forma`) −0.33 a −0.52pp de win% por 1% · posesión (`mineShare`) ~0.75-1.05pp por 0.01
+> de share · **pool 0.00pp**. Corolario incómodo: consolidar la identidad de nivel 1 a 10
+> vale **+0.6pp de win% en el partido** — el valor de la progresión está en los rasgos que
+> desbloquea, no en el ×1.35→×2.10.
+
+Así que el ciclo vive en **dos capas**:
+
+- **EL DIENTE — `filoShareShift` (`CICLO_SHARE` = 0.05).** ±0.05 de reparto según
+  `counterEdge`, apilado sobre los costos de identidad de F2. Es de **suma cero** por
+  construcción (`mineShare` es un solo número), así que el ciclo no infla el partido: decide
+  de quién es. Y es **visible** sin una línea de UI — la posesión se ve en las estadísticas
+  y se siente en cuántas jugadas propone cada uno. Medido en runs reales (piso, n=4000):
+  **gano el cruce 74.2% · neutro 73.1% · pierdo 70.6%**, y los cruces con elección al azar
+  salen **24.8/50.1/25.1**, que es por qué el piso no se mueve.
+- **EL NARRADOR — `MATRIX` sobre el pool.** Las 4 aristas contadas desde las dos sillas
+  (8 celdas + el espejo `contra|contra`), patrón único: la firma del que gana ×1.35/1.40, la
+  del que pierde ×0.72 ≈ 1/1.35. Cambia **qué fútbol sale**, que es lo que el Bible §5 le
+  pide a una filosofía; no pretende decidir el partido.
+
+**EL CANDADO QUE FALTABA.** `philosophy.test` verifica que la matriz **no pueda contradecir
+al ciclo**: celda por celda que la firma se mueva en la dirección de `counterEdge`, que las
+4 aristas estén contadas desde las dos sillas, y que los cruces neutros **no** lleven celda.
+Es justo el agujero por el que F2 llegó a **9 de 16 cruces vacíos** y a un cruce
+**LOSE-LOSE** (Posesión↔Bloque penalizado en las DOS sillas, con la prosa de `bloque`
+contradiciéndose a sí misma) sin que nadie lo notara durante cuatro arcos.
+
+**La curación también es balance.** Los 16 curados son los 16 de más rating, o sea **los que
+llegan al final del cuadro**: con 7 posesión contra 1 bloque, la final se jugaba contra
+Posesión el **52%** de las veces y contra Bloque el **3.8%** — sobre un campo así un ciclo no
+es un ciclo (~2.2pp de campeón entre el mejor y el peor pick). Se verificó primero que la
+DERIVACIÓN no alcanzaba (cambiarla movía la final de 52.0% a 52.3%: nada, porque trabaja
+sobre los 36 que la selectividad KO elimina). El reparto pasó a **5·4·4·4** con ITA entrando
+curado, y un test fija que ninguna identidad pueda volver a duplicar a otra.
+
+La firma rival sesga SU lado con SU nivel (press→salida_fondo ·
 posesión→repliegue · bloque→balón parado ×1.3 + salida ×0.6). Los **costos de identidad**:
 Press −6 de energía post-partido (`applyFiloCosts`) · Contra cede posesión (mineShare
 −0.05) · Bloque cede volumen ofensivo (−0.08) · el rival que espera te la cede a ti
@@ -1737,6 +1784,15 @@ nadie tiene la copa asegurada, que es exactamente el espíritu roguelike.
 > quince sprints derivando sin gate (ver el trinquete en §La Escalada). Medido el 1-ago-2026:
 > piso 18.8 · techo 30.6 (n=4000 cada uno), que cuadra con el 19.0/31.4 del cierre de la
 > Escalada. **Un dial que mueva cualquiera de los dos más de ~2pp necesita ok del PO.**
+>
+> 🆕 **UN TERCER NÚMERO, Y NO ROMPE EL TRINQUETE** (sprint del Rival que Decide): `--counter`
+> mide **~34%** — el mismo DT greedy, pero que lee la identidad del rival en el informe y
+> declara el Plan que la caza. **No reemplaza al techo: lo acompaña.** El techo sigue siendo
+> `--smart` (~30-31%) porque es contra esa vara que se fijaron las anclas, y cambiar su
+> política habría re-basado el número en silencio. Lo que mide `--counter` es otra cosa y hace
+> falta: **cuánto paga jugar mejor con la información que el juego ya da gratis.** Antes del
+> sprint ese DT medía 30.4% (nada), ahora 33.8%. Si algún día esa distancia se achica a cero,
+> el ciclo de counters se murió y nadie se iba a enterar sin esta vara.
 
 ### La escalera de estrategias, y el PISO PLANO (decisión PO 1-ago-2026)
 

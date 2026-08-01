@@ -25,16 +25,20 @@ import { bestSix, expectedOpponentLineup } from "./opponents.js";
 import { teamPowers, gkQuality } from "./match/powers.js";
 import { rivalFilo, rivalFiloLevel, identityGapMult, filoEtapa, filoLevel } from "./philosophy.js";
 import { koRoundOf } from "./tournament/knockout.js";
-import { getPhilosophy, FILO_ETAPAS } from "../content/philosophies.js";
+import { getPhilosophy, FILO_ETAPAS, counterEdge } from "../content/philosophies.js";
 import { baseHeight, heightOf } from "./match/field.js";
 
 // La lectura táctica de cada identidad rival (F2): qué te propone y por dónde
 // se le entra — el "España quiere la pelota: presiónala o enciérrate" del roadmap.
+// El CONSEJO de cada línea nombra al cazador de esa identidad en el ciclo (Press >
+// Posesión > Bloque > Contra > Press): lo que el ojeador te dice que hagas es
+// exactamente lo que el motor premia. Antes no cuadraban — la línea de `posesion`
+// recomendaba "enciérrate", que bajo el ciclo nuevo es justo el cruce que se pierde.
 const FILO_SCOUT = {
-  posesion: "Quiere la pelota y te va a hacer correr detrás de ella: presiónale la salida o enciérrate y espera tu momento.",
-  press: "Te va a asfixiar la salida desde el minuto uno: salir jugando contra ellos es jugar con fuego — el pelotazo no es cobardía.",
-  contra: "Espera agazapado y vive de tus pérdidas: cada pelota regalada en campo rival vuelve convertida en puñalada.",
-  bloque: "Se encierra y revienta la pelota: derribar la muralla exige paciencia, y sus balones parados son su gol de vestuario.",
+  posesion: "Quiere la pelota y te va a hacer correr detrás de ella: la única forma de quitársela es ir a buscarla arriba — encerrarse solo les da la tarde entera para pensar.",
+  press: "Te va a asfixiar la salida desde el minuto uno: salir jugando contra ellos es jugar con fuego, pero si aguantas el primer salto la espalda que dejan es enorme.",
+  contra: "Espera agazapado y vive de tus pérdidas: cada pelota regalada en campo rival vuelve convertida en puñalada — no les regales el espacio que necesitan.",
+  bloque: "Se encierra y revienta la pelota: derribar la muralla exige paciencia y mover el balón hasta que se parta, y ojo con sus balones parados, que son su gol de vestuario.",
 };
 
 /* CÓMO SE VA A PARAR (sprint del Territorio): la altura de bloque que va a jugar el rival y,
@@ -76,6 +80,23 @@ const MODO_MUNDIAL = {
 const BRECHA_SCOUT = {
   lead: "Encima nos tienen miedo: saben a qué jugamos y van a dar el partido de su torneo. Al favorito nadie le juega de igual a igual.",
   behind: "Encima llegan con más idea que nosotros: a la final no se llega improvisando — consolidar nuestra identidad es la vacuna.",
+};
+
+/* EL CRUCE, ANTICIPADO (sprint del Rival que Decide, gate del PO: *"que el informe lo
+   anticipe SIEMPRE: si no lo veo venir es un impuesto, no una decisión"*).
+
+   Es el dato más accionable del informe, porque es el único que el DT puede CAMBIAR con
+   un día: declarar el Plan de Partido que caza a esa idea. Y se puede decir sin mentir
+   porque la identidad del rival es su ESENCIA y no una elección de último momento
+   (decisión PO: el rival reacciona durante el partido, no contra-elige antes).
+
+   Cualitativo como todo el módulo: ni el multiplicador ni los puntos porcentuales. Lo
+   que se nombra es de quién va a ser la pelota, que es exactamente donde muerde el ciclo
+   (`filoShareShift`) y lo que el DT va a ver en la pantalla. */
+const CRUCE_SCOUT = {
+  1: { tono: "bien", titulo: "El cruce nos favorece", texto: "Nuestra idea es justo la que a ellos les incomoda: si el equipo juega a lo que sabe, la pelota va a ser nuestra más tiempo del que ellos quisieran." },
+  0: { tono: "neutro", titulo: "El cruce es parejo", texto: "Ninguna de las dos ideas incomoda especialmente a la otra. Acá no va a decidir el pizarrón: va a decidir quién ejecuta mejor." },
+  [-1]: { tono: "mal", titulo: "El cruce nos viene mal", texto: "Su idea está hecha para hacerle daño a la nuestra: van a tener la pelota más de lo que nos conviene. Cambiar el plan de partido cuesta un día — y este es el día para pensarlo." },
 };
 
 // Umbral en escala de poder (~0-5): ±0.25 ≈ 5 puntos de rating de diferencia
@@ -166,7 +187,13 @@ export function buildOpponentReport(run, oppId) {
   return {
     oppId,
     name: opp.name,
-    filosofia: { id: rf.id, name: rfData.name, icon: rfData.icon, nivel: FILO_ETAPAS[rf.nivel].label, consolidada: rf.nivel === 2, detalle: FILO_SCOUT[rf.id] },
+    filosofia: {
+      id: rf.id, name: rfData.name, icon: rfData.icon, nivel: FILO_ETAPAS[rf.nivel].label,
+      consolidada: rf.nivel === 2, detalle: FILO_SCOUT[rf.id],
+      // EL CRUCE: cómo se lleva MI idea con la suya. `null` mientras no haya elegido
+      // identidad (el informe del sorteo no puede hablar de un cruce que no existe).
+      cruce: run.filoId ? { signo: counterEdge(run.filoId, rf.id), ...CRUCE_SCOUT[counterEdge(run.filoId, rf.id)] } : null,
+    },
     // CÓMO SE VA A PARAR: la misma altura que va a jugar en el partido (field.baseHeight
     // la deriva de su identidad y su nivel; el marcador la mueve después, ya en la cancha).
     bloque: (n => ({ n, ...heightOf(n), detalle: BLOQUE_SCOUT[n] }))(baseHeight(rf)),

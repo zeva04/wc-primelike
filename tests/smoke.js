@@ -54,10 +54,32 @@ const SMART = !!args.smart;
 // árbol: sin esto el árbitro compra al azar entre los 4 árboles y casi nunca completa
 // una rama hasta el Maestro, así que la tasa de Master del smoke subestima al jugador.
 const FOCUS = !!args.focus;
+// --counter: el DT CONTRA-ELECTOR (sprint del Rival que Decide). Igual que --smart,
+// pero antes de cada partido lee la identidad del rival en el informe y declara el
+// Plan de Partido que la CAZA (content/philosophies.COUNTER_CYCLE). Es un flag aparte
+// y NO un cambio de --smart a propósito: los anclajes de CORE §10 (piso ~19% · techo
+// ~30%) se fijaron contra la política de --smart, y re-basarla en silencio volvería a
+// dejar el techo derivando, que es justo el trinquete que el PO cerró el 1-ago.
+// Calibración del instrumento: ANTES del sprint tiene que medir lo mismo que --smart
+// (la interacción del matchup medía 0.0pp); si separa después, el sprint mordió.
+// `--counter` = contra-elige SIEMPRE que el cruce no esté ya ganado (el greedy literal).
+// `--counter=huir` = contra-elige SOLO para escapar de un cruce PERDIDO, y en cualquier
+// otro caso sigue consolidando. Es la hipótesis del DT humano: la Acción del Día es
+// escasa y repartir la XP entre cuatro ideas cuesta caro, así que el cambio se guarda
+// para cuando de verdad duele. Los dos se miden porque la diferencia ES el hallazgo.
+const COUNTER = !!args.counter;
+const COUNTER_HUIR = args.counter === "huir";
 const TIER_ORDER = { master: 3, advanced: 2, intermediate: 1, basic: 0 };
 if (SMART && ACTION) { console.error("--smart y --action son excluyentes: el greedy ya decide la acción del día"); process.exit(1); }
+if (COUNTER && !SMART) { console.error("--counter necesita --smart: es el mismo DT greedy, con contra-elección"); process.exit(1); }
 
 let fails = 0, avisoFormacion = false;
+// [−1, 0, +1] → cuántos partidos se jugaron con el cruce del ciclo perdido / neutro / ganado,
+// y cuántos de esos se GANARON. Sin el win% por cruce no se puede distinguir "el ciclo no
+// paga" de "el DT no llega a usarlo": el banco de partidos y el smoke miden cosas distintas
+// y la lección del sprint de la Densidad es que hay que componerlas a mano antes de comparar.
+const CRUCES = [0, 0, 0], CRUCES_W = [0, 0, 0];
+let cruceActual = 1;
 const assert = (cond, msg, ctx) => { if (!cond) { fails++; console.error("FAIL:", msg, ctx || ""); } };
 
 // ---------- el DT greedy del techo (--smart, heurísticas acordadas con el PO en M1) ----------
@@ -76,6 +98,19 @@ function smartDayAction(run, opts) {
   const avg = lineup.reduce((s, p) => s + p.energia, 0) / (lineup.length || 1);
   if (avg < SMART_RECOVER_AT && has("recuperar")) return has("recuperar");
   if ((run.moral ?? 50) <= 40 && has("bonding")) return has("bonding");
+  // CONTRA-ELECCIÓN (--counter): la identidad del próximo rival es información que el
+  // informe ya da gratis, así que un DT competente la usa. Declara el Plan que CAZA a
+  // esa idea si no es la que ya está jugando. Paga el precio completo del sistema —
+  // gasta la Acción del Día y reparte su XP entre varias filosofías en vez de
+  // consolidar una— y ese precio es justamente lo que el gate del sprint tiene que ver.
+  if (COUNTER) {
+    const oppId = E.nextOpponentId(run);
+    const rf = oppId ? E.rivalFilo(E.getTeam(oppId), E.koRoundOf(run.stage)) : null;
+    const cazador = rf ? E.CAZADOR_DE[rf.id] : null;
+    // En modo `huir` solo se paga el cambio si el cruce actual está PERDIDO.
+    const duele = !COUNTER_HUIR || E.counterEdge(run.filoId, rf?.id) < 0;
+    if (cazador && duele && cazador !== run.filoId && has(`plan_${cazador}`)) return has(`plan_${cazador}`);
+  }
   // Arco de Progresión: el greedy declara el PLAN DE PARTIDO de su ESCUELA mientras esa
   // idea no esté en el techo (×2 de afinidad × ×1.5 del plan = la vía más rápida al nivel
   // 10 y, por la escalera de recompensas, al DT 20). En el techo abre la siguiente más afín.
@@ -305,10 +340,17 @@ function playRun(teamId) {
     const matchDaily = E.buildDaily(run);
     assert(matchDaily.isMatchDay && matchDaily.items[0].tag === "PORTADA", "el Daily de día de partido abre con la tapa del partido");
     const oppId = E.nextOpponentId(run);
+    // GATE DEL SPRINT DEL RIVAL QUE DECIDE: con cuánta frecuencia se llega al partido con
+    // el cruce ganado, empatado o perdido. Sin esto no se puede saber si un `--counter`
+    // que mide poco es que el ciclo rinde poco o que el DT casi nunca llega a contra-elegir
+    // —la Acción del Día es un recurso escaso y compite con recuperar y con entrenar—.
+    cruceActual = E.counterEdge(run.filoId, E.rivalFilo(E.getTeam(oppId), E.koRoundOf(run.stage)).id) + 1;
+    CRUCES[cruceActual]++;
     // Oxidación (R1): al partido se llega con la racha de la ventana — el estampado del
     // plantel tiene que ser coherente con ella (el rival jamás lleva el campo: nace sin él).
     assert(run.squad.every(p => (p.oxid ?? 1) === E.oxidMult(run.diasSinEntrenar)), "p.oxid coherente con la racha al llegar al partido", run.diasSinEntrenar);
     const match = playMatch(run, oppId);
+    if (match.gMy > match.gOpp) CRUCES_W[cruceActual]++;
 
     // foto previa para validar la acumulación de amarillas del cierre
     const before = run.squad.map(p => ({ p, am: p.amarillas || 0, amP: p.amarillaPartido || 0, exp: p.expulsado, susp: p.suspendido }));
@@ -455,6 +497,15 @@ for (const r of results) {
     const salto = c[0].gana - c[c.length - 1].gana;
     console.log(`    CURVA (de los que llegan, cuántos ganan): ${c.map(x => `${x.lbl} ${x.gana.toFixed(1)}%`).join(" · ")} → salto ${salto.toFixed(1)}pp`);
   }
+}
+// EL CICLO, en partidos jugados (sprint del Rival que Decide). Es la línea que separa
+// "el ciclo rinde poco" de "el DT casi nunca llega a contra-elegir": son diagnósticos
+// distintos y piden diales distintos.
+{
+  const tot = CRUCES[0] + CRUCES[1] + CRUCES[2] || 1;
+  const w = i => CRUCES[i] ? (100 * CRUCES_W[i] / CRUCES[i]).toFixed(1) : "—";
+  console.log(`    CICLO (cruces jugados): gano ${(100 * CRUCES[2] / tot).toFixed(1)}% · neutro ${(100 * CRUCES[1] / tot).toFixed(1)}% · pierdo ${(100 * CRUCES[0] / tot).toFixed(1)}%`);
+  console.log(`    CICLO (win% del partido según el cruce): gano ${w(2)}% · neutro ${w(1)}% · pierdo ${w(0)}%  ← el diente, medido en runs reales`);
 }
 console.log(fails ? "❌ smoke con fallos" : "✅ smoke OK");
 process.exit(fails ? 1 : 0);

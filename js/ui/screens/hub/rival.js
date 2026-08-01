@@ -47,6 +47,16 @@ const MODO_TONO = {
   5: { icon: "🏆", borde: "border-red-500", fondo: "bg-red-500/20", titulo: "text-red-200", texto: "text-red-100/80" },
 };
 
+/* EL CRUCE del ciclo de counters, en color (sprint del Rival que Decide). Verde/ámbar/
+   rojo y no la escala de temperatura del Modo Mundial: aquello escala con la RONDA (todo
+   ámbar→rojo), esto es un semáforo de tres estados que puede ser BUENA noticia. Si los
+   dos usaran la misma paleta, un cruce a favor se leería como una amenaza. */
+const CRUCE_TONO = {
+  1: { icon: "✅", titulo: "text-emerald-300", texto: "text-emerald-200/75" },
+  0: { icon: "⚖️", titulo: "text-slate-300", texto: "text-slate-400" },
+  [-1]: { icon: "⚠️", titulo: "text-red-300", texto: "text-red-200/75" },
+};
+
 const NIVEL_CHIP = {
   Alto: "border-red-500/60 bg-red-500/10 text-red-400",
   Medio: "border-slate-500/60 bg-slate-500/10 text-slate-300",
@@ -88,6 +98,15 @@ export function showScoutReport(oppId) {
             <span class="px-2 py-0.5 rounded-full border ${rep.filosofia.consolidada ? "border-amber-500/60 bg-amber-500/10 text-amber-300" : "border-slate-600 bg-slate-800/60 text-slate-300"} text-[10px] font-black uppercase tracking-widest">${rep.filosofia.nivel}</span>
           </div>
           <p class="text-[11px] text-slate-400 mt-1">${rep.filosofia.detalle}</p>
+          <!-- EL CRUCE (sprint del Rival que Decide): cómo se lleva MI idea con la suya.
+               Va DENTRO de la card de su identidad y no en una card propia a propósito:
+               es una propiedad del cruce, no una noticia aparte — y así se lee pegado al
+               dato que lo causa. El color hace el trabajo de un vistazo; el texto dice
+               qué hacer. Se pinta solo con identidad elegida (en el sorteo no hay cruce). -->
+          ${(c => c ? `<div class="mt-2 pt-2 border-t border-slate-700/70 flex items-start gap-2">
+            <span class="text-sm leading-none mt-0.5">${CRUCE_TONO[c.signo].icon}</span>
+            <p class="text-[11px] ${CRUCE_TONO[c.signo].texto}"><b class="${CRUCE_TONO[c.signo].titulo}">${c.titulo}.</b> ${c.texto}</p>
+          </div>` : "")(rep.filosofia.cruce)}
         </div>
         <!-- CÓMO SE VA A PARAR (Territorio): la altura rival y, debajo, la nuestra — la
              decisión se toma acá, leyendo al que viene, y no a ciegas en la pizarra. -->

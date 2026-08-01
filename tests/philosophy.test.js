@@ -175,7 +175,18 @@ assert(E.filoLevel(run) === 9, "la escalera tiene techo: XP de sobra no desborda
 // ---------- F2: la identidad del rival (curación + derivación) ----------
 {
   const IDS = Object.keys(E.TEAM_PHILOSOPHIES);
-  assert(IDS.length === 16, "los 16 curados del roadmap, ni uno más", IDS.length);
+  assert(IDS.length === 17, "los 16 del roadmap + ITA (rebalance de la curación, sprint del Rival que Decide)", IDS.length);
+  // EL REPARTO de la curación es parte del balance, no un detalle: los curados son los
+  // 16 de más rating, o sea LOS QUE LLEGAN A LA FINAL. Un ciclo de counters sobre un
+  // campo desparejo no es un ciclo — F2 tenía 7 posesión contra 1 bloque y eso valía
+  // ~2.2pp de campeón entre el mejor y el peor pick. Ninguna identidad puede volver a
+  // duplicar a otra sin que alguien lo note acá.
+  {
+    const n = f => IDS.filter(id => E.TEAM_PHILOSOPHIES[id] === f).length;
+    const cuentas = E.COUNTER_CYCLE.map(n);
+    assert(Math.max(...cuentas) - Math.min(...cuentas) <= 1,
+      "la curación reparte las 4 identidades parejo (±1)", E.COUNTER_CYCLE.map((f, i) => `${f}:${cuentas[i]}`).join(" "));
+  }
   for (const id of IDS) {
     const team = E.getTeam(id);
     assert(team, "todo curado existe en la base de datos", id);
@@ -221,11 +232,75 @@ assert(E.filoLevel(run) === 9, "la escalera tiene techo: XP de sobra no desborda
   assert(r.squad.slice(6).every(p => p.energia === 100), "los que no jugaron no pagan");
   r.filoId = "posesion";
   assert(E.applyFiloCosts(r, { my: { lineup } }) === null, "solo el Press paga energía");
-  // Contra/Bloque ceden posesión; el rival que espera me la cede a mí
+  // Contra/Bloque ceden posesión; el rival que espera me la cede a mí. Los COSTOS DE
+  // IDENTIDAD (F2) se miden en cruces NEUTROS del ciclo, para que el diente del ciclo
+  // (±CICLO_SHARE) no los contamine: son costos de la identidad, no del cruce.
   assert(E.filoShareShift({ id: "contra" }, null) === -0.05, "mi Contra cede posesión");
-  assert(E.filoShareShift({ id: "bloque" }, { id: "posesion" }) === -0.08, "mi Bloque cede volumen (−0.08, ajuste PO post-gate)");
+  assert(E.filoShareShift({ id: "bloque" }, { id: "press" }) === -0.08, "mi Bloque cede volumen (−0.08, ajuste PO post-gate)");
   assert(E.filoShareShift(null, { id: "bloque" }) === 0.06, "el bloque rival me cede la pelota");
   assert(E.filoShareShift({ id: "press" }, { id: "press" }) === 0, "el Press no toca el reparto (paga energía)");
+}
+
+/* ---------- EL CICLO DE COUNTERS (sprint del Rival que Decide) ---------- */
+{
+  const F = E.COUNTER_CYCLE;
+  assert(F.length === 4 && new Set(F).size === 4, "el ciclo son las 4 identidades, sin repetir");
+  assert(F.join() === "press,posesion,bloque,contra", "el ciclo es Press > Posesión > Bloque > Contra > Press", F.join());
+
+  // LA LEY: cada uno le gana a UNO, pierde con UNO y empata con UNO. Es lo que el PO
+  // pidió literalmente ("fuerte contra uno, débil contra otro, indiferente con el
+  // tercero") y lo único que hace que ninguna identidad quede dominada por estructura.
+  for (const f of F) {
+    const signos = F.filter(o => o !== f).map(o => E.counterEdge(f, o)).sort();
+    assert(signos.join() === "-1,0,1", `${f}: gana a uno, pierde con uno, empata con uno`, signos.join());
+    assert(E.counterEdge(f, f) === 0, `${f} contra sí mismo es espejo, no cruce`);
+    assert(E.counterEdge(f, E.PRESA_DE[f]) === 1, `${f} caza a su presa`);
+    assert(E.counterEdge(E.CAZADOR_DE[f], f) === 1, `al cazador de ${f} le gana el cruce`);
+  }
+  // ANTISIMETRÍA: si te gano, me ganás al revés. Sin esto un "ciclo" puede tener dos
+  // ganadores del mismo cruce y nadie se entera hasta medirlo.
+  for (const a of F) for (const b of F) {
+    assert(E.counterEdge(a, b) === -E.counterEdge(b, a), `el cruce ${a}|${b} es antisimétrico`);
+  }
+  assert(E.counterEdge(null, "press") === 0 && E.counterEdge("press", null) === 0, "sin identidad no hay cruce");
+
+  // EL DIENTE está en el canal de POSESIÓN (ROADMAP-rival §2: el pool medía 0.0pp de
+  // interacción, la posesión ~0.8pp de win% por 0.01 de share). Se mide en los cruces
+  // Press↔Posesión, que son los únicos donde ninguna de las dos paga costo de identidad:
+  // ahí el término del ciclo queda solo y se puede leer.
+  assert(E.filoShareShift({ id: "press" }, { id: "posesion" }) === E.CICLO_SHARE, "cazar inclina el reparto a mi favor");
+  assert(E.filoShareShift({ id: "posesion" }, { id: "press" }) === -E.CICLO_SHARE, "ser cazado me lo quita");
+  assert(E.filoShareShift({ id: "press" }, { id: "bloque" }) === 0.06, "en el cruce neutro solo quedan los costos de identidad");
+
+  // LA MATRIZ DE POOL NO PUEDE CONTRADECIR AL CICLO. Es el candado que faltaba en F2:
+  // las celdas se escribían a mano y se habían vuelto 7 celdas ad hoc con un cruce
+  // LOSE-LOSE (Posesión↔Bloque penalizado en las dos sillas) que nadie detectó hasta
+  // medirlo. La firma de cada identidad solo puede AGRANDARSE en un cruce que gana y
+  // ACHICARSE en uno que pierde.
+  for (const [side, mio, suyo, pesos] of E.counterCells()) {
+    const edge = E.counterEdge(mio, suyo);
+    if (mio === suyo) continue;                       // el espejo es sabor, no ciclo
+    assert(edge !== 0, `la celda ${side} ${mio}|${suyo} existe: el cruce no puede ser neutro`);
+    // Solo el lado `mine` se verifica contra la firma: ahí la celda habla de MI fútbol
+    // y la lectura es directa (mi firma crece si gano el cruce). Las celdas `opp` son
+    // el rival haciéndome algo (el sitio del que elabora), otro tipo y otra gramática.
+    if (side !== "mine") continue;
+    const mult = pesos[E.FIRMA_TYPE[mio]];
+    if (mult === undefined) continue;
+    assert(edge > 0 ? mult > 1 : mult < 1,
+      `mine ${mio}|${suyo}: la firma se mueve en la dirección del ciclo`, `${E.FIRMA_TYPE[mio]} ×${mult}`);
+  }
+  // Y el ciclo tiene que estar COMPLETO en el pool: las 4 aristas contadas desde las dos
+  // sillas. F2 tenía 9 de 16 cruces vacíos y por eso "elegir identidad daba igual".
+  for (const f of F) {
+    assert(E.counterCell("mine", f, E.PRESA_DE[f]), `el pool cuenta que ${f} caza a ${E.PRESA_DE[f]}`);
+    assert(E.counterCell("mine", f, E.CAZADOR_DE[f]), `el pool cuenta que a ${f} lo caza ${E.CAZADOR_DE[f]}`);
+  }
+  // Los NEUTROS no tienen celda, y esa ausencia es parte del diseño.
+  for (const a of F) for (const b of F) {
+    if (a === b || E.counterEdge(a, b) !== 0) continue;
+    assert(!E.counterCell("mine", a, b), `el cruce neutro ${a}|${b} no lleva celda`);
+  }
 }
 
 // ---------- R2/R3: la escalada — madurez por ronda y la brecha de identidad ----------

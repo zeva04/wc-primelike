@@ -107,6 +107,52 @@ export const AFINIDAD = {
 export const AFINIDAD_LABEL = { 2: "tu escuela", 1.25: "afín", 1: "neutral", 0.6: "opuesta" };
 export const afinidadMult = (inicial, target) => AFINIDAD[inicial]?.[target] ?? 1;
 
+/* ============================================================
+   EL CICLO DE COUNTERS (sprint del Rival que Decide, decisión
+   PO 1-ago-2026). El array ES el ciclo: cada identidad le gana
+   a la SIGUIENTE, y da la vuelta.
+
+     Press > Posesión > Bloque > Contra > Press
+
+   Los neutros caen solos —son los que quedan a distancia 2—:
+   Press↔Bloque y Posesión↔Contra. No hay que declararlos, y por
+   eso no pueden divergir del ciclo.
+
+   Se declara UNA vez y de acá lo derivan todos: la matriz de
+   pool (match/sequences), el reparto de pelota (filoShareShift,
+   que es donde MUERDE — ver ROADMAP-rival §2), el informe del
+   ojeador y el DT contra-elector del smoke.
+
+   Por qué este ciclo y no otro (diagnóstico medido): respeta 3
+   de las 4 aristas que F2 ya había implementado —Press>Posesión,
+   Bloque>Contra y Contra>Press— y solo da vuelta la que estaba
+   rota. El cruce Posesión↔Bloque era LOSE-LOSE (las dos
+   direcciones penalizadas) y su prosa se contradecía a sí misma.
+   ============================================================ */
+export const COUNTER_CYCLE = ["press", "posesion", "bloque", "contra"];
+
+/** La PRESA de cada identidad: a quién le gana. Derivado del ciclo. */
+export const PRESA_DE = Object.fromEntries(
+  COUNTER_CYCLE.map((f, i) => [f, COUNTER_CYCLE[(i + 1) % COUNTER_CYCLE.length]])
+);
+/** El CAZADOR de cada identidad: quién le gana. El espejo exacto del anterior. */
+export const CAZADOR_DE = Object.fromEntries(
+  Object.entries(PRESA_DE).map(([cazador, presa]) => [presa, cazador])
+);
+
+/**
+ * El signo del cruce: +1 si MI identidad le gana a la del rival, −1 si la mía
+ * pierde, 0 si el cruce es neutro (distancia 2) o espejo (la misma idea). Es la
+ * primitiva que consumen el pool, el share y el informe: nadie más decide quién
+ * le gana a quién.
+ */
+export function counterEdge(myId, oppId) {
+  if (!myId || !oppId) return 0;
+  if (PRESA_DE[myId] === oppId) return 1;
+  if (PRESA_DE[oppId] === myId) return -1;
+  return 0;
+}
+
 /* Las 4 filosofías (decisión PO #5): combinación de 2 aristas; `firma` es la
    arista que define su fútbol (su `tipo` es el tipo firma del pool). `fuerte` y
    `advertencia` anticipan la matriz de counters de F2 (regla 4 del Bible: toda
@@ -119,10 +165,12 @@ export const PHILOSOPHIES = [
     aristas: ["presion", "verticalidad"], firma: "presion",
     lema: "Cazar arriba y atacar el espacio antes de que el rival respire.",
     fuerte: "Brilla contra los que quieren la pelota: más robos en salida rival.",
-    advertencia: "Correr arriba los 90' pasa factura física, y un pelotazo sobre la presión te parte.",
+    advertencia: "Correr arriba los 90' pasa factura física, y el que te espera agazapado te deja cazando sombras.",
     rasgo: "La cacería roba aún más letal, y al rival solo le queda la falta: más amarillas, más tiros libres tuyos.",
-    // Mi fila de la matriz en cualitativo (F3, pantalla de identidad — regla 4: visible)
-    counters: { brilla: "contra los que quieren la pelota (Posesión): su salida es tu festín", sufre: "el costo es físico: −6 de energía extra cada partido, y el pelotazo por arriba te parte" },
+    // Mi fila del CICLO en cualitativo (F3, pantalla de identidad — regla 4: visible).
+    // Press > Posesión > Bloque > Contra > Press: cazo a uno, me caza otro, y con el
+    // tercero (Bloque) el cruce es parejo.
+    counters: { brilla: "contra los que quieren la pelota (Posesión): su salida es tu festín", sufre: "contra el Contragolpe: presionar al que no quiere la pelota es correr al vacío, y su espalda queda a tiro. Encima el costo es físico: −6 de energía cada partido" },
     // El relato de MI firma cuando la identidad es mía (F3): el pressing tiene nombre
     firmaIntros: [
       p => `¡El pressing que entrenamos toda la semana! ${p.name} salta a cazar la salida rival.`,
@@ -134,10 +182,10 @@ export const PHILOSOPHIES = [
     id: "posesion", icon: "🎼", name: "Posesión",
     aristas: ["elaboracion", "presion"], firma: "elaboracion",
     lema: "Tener la pelota es atacar y defender a la vez; si se pierde, se caza al toque.",
-    fuerte: "Domina los partidos: más circulación, y el contrapressing sostiene el control.",
-    advertencia: "Se estrella contra un bloque bajo bien plantado: circular sin morder no gana partidos.",
+    fuerte: "Derriba murallas: contra el que se encierra, la paciencia termina abriendo la lata.",
+    advertencia: "Contra el que te salta a la yugular no hay tiempo de pensar: la presión alta te roba en tu propio campo.",
     rasgo: "La sinfonía gana su 4º compás: más desesperación acumulada, más penales.",
-    counters: { brilla: "cuando el partido se juega con la pelota: tu circulación manda y el control es tuyo", sufre: "contra un Bloque bajo cerrado: la circulación rinde menos y terminas reventando pelotazos" },
+    counters: { brilla: "contra el Bloque bajo: mover la pelota hasta que la muralla se parta es exactamente tu fútbol", sufre: "contra el High Press: te cazan la salida y tu circulación se corta antes de empezar" },
     firmaIntros: [
       p => `El fútbol que ensayamos: ${p.name} baja a recibir y la pelota empieza a caminar.`,
       p => `Paciencia de manual: ${p.name} le pone el pie a la pelota y el equipo teje.`,
@@ -148,10 +196,10 @@ export const PHILOSOPHIES = [
     id: "contra", icon: "⚡", name: "Contragolpe",
     aristas: ["solidez", "verticalidad"], firma: "verticalidad",
     lema: "Orden atrás, y a la que pierden la pelota: puñalada al espacio.",
-    fuerte: "Vive del rival que ataca: cada avance suyo es una contra tuya en potencia.",
-    advertencia: "Cede la iniciativa: contra otro que también espera, el partido se muere.",
+    fuerte: "Vive del que se adelanta: cada salto de su presión es una contra tuya en potencia.",
+    advertencia: "Cede la iniciativa: contra el que se atrinchera no hay espalda que atacar, y el partido se muere.",
     rasgo: "El primer tramo deja al rival AÚN más partido: el segundo llega lanzado.",
-    counters: { brilla: "contra el que toma la iniciativa (Press y Posesión): su espalda es tu autopista", sufre: "cedes posesión por identidad, y contra otro que espera (Contra/Bloque) el partido se muere" },
+    counters: { brilla: "contra el High Press: el que salta a cazarte deja la espalda abierta, y esa es tu autopista", sufre: "contra el Bloque bajo: no hay espacio detrás del que ya está metido atrás. Encima cedes posesión por identidad" },
     firmaIntros: [
       p => `¡La puñalada que entrenamos! ${p.name} pica al espacio con el rival partido.`,
       p => `Robo y vértigo, como pide la idea: ${p.name} arranca la contra.`,
@@ -162,10 +210,10 @@ export const PHILOSOPHIES = [
     id: "bloque", icon: "🧱", name: "Bloque bajo",
     aristas: ["solidez", "directo"], firma: "directo",
     lema: "Muralla atrás y pelotazo al duelo: fútbol de trinchera.",
-    fuerte: "Dificilísimo de romper: invita al rival y lo seca en el bloque.",
+    fuerte: "Seca al que también espera: en un partido de trinchera, el que va al duelo gana.",
     advertencia: "Sufre al que elabora con paciencia, y renuncia a generar volumen ofensivo.",
     rasgo: "La muralla contiene mejor — y castiga casi siempre.",
-    counters: { brilla: "en la trinchera: el balón parado es tu gol (×1.3) y el que se te viene encima se seca", sufre: "cedes volumen ofensivo por identidad, y el que elabora con paciencia (Posesión) te sitia" },
+    counters: { brilla: "contra el Contragolpe: no le regalas la espalda que necesita, y el duelo directo lo ganas tú", sufre: "contra la Posesión: el que elabora con paciencia te sitia. Encima cedes volumen ofensivo por identidad" },
     firmaIntros: [
       p => `El plan de siempre: pelotazo a la guerra y a correr. ${p.name} va al duelo.`,
       p => `Fútbol de trinchera, como lo entrenamos: bombazo largo buscando a ${p.name}.`,

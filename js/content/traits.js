@@ -439,15 +439,19 @@ export const TRAITS = [
   {
     id: "osciladores", filo: "posesion", rama: "firma", tier: "advanced", icon: "\u{1F30A}",
     nombre: "Osciladores",
-    desc: "El equipo mueve el balon de un lado al otro hasta que el bloque rival se parte: tras cada cambio de orientacion aparece un hombre sin marca.",
-    momento: "El cambio de cuarenta metros y el bloque entero descolocado.",
+    desc: "El equipo mueve el balon de un lado al otro hasta que la presion rival se parte: cada cambio de orientacion deja la jauria corriendo el carril equivocado.",
+    momento: "El cambio de cuarenta metros con los tres que venian a presionar mirando como pasa por arriba.",
     req: { nivel: 6, previo: "tercer_hombre" }, // AJENO: el cambio largo ES juego directo
     pos: { x: 710, y: 275 },
-    // LA NEUTRALIZACION del matchup debil, heredada de Amplitud + Abrir la Lata en
-    // un solo nodo: 0.65 x 1.54 ~ 1.00 (la circulacion vuelve a rendir contra el
-    // bloque) y 1.30 x 0.77 ~ 1.00 (el pelotazo forzado desaparece). A TABLAS —
-    // nunca invertido: sigue siendo el espejo exacto de La Fortaleza del Bloque.
-    hooks: { poolMod: { vsFilo: "bloque", weights: { circulacion: 1.54, pelotazo: 0.77 } } },
+    // LA NEUTRALIZACION del matchup debil de la Posesion. RE-APUNTADA en el sprint del
+    // Rival que Decide: su presa vieja (el Bloque) dejo de ser una amenaza cuando el
+    // ciclo dio vuelta esa celda —ahora la Posesion GANA ese cruce— asi que el nodo
+    // apunta al depredador nuevo: el High Press. 0.72 x 1.39 ~ 1.00, la circulacion
+    // vuelve a rendir contra la presion. A TABLAS, nunca invertido: sigue siendo el
+    // espejo exacto de La Fortaleza Inexpugnable, que si conservo su celda.
+    // El concepto no se forzo: cambiar de orientacion ES la respuesta clasica a un
+    // pressing orientado, y el nombre le queda mejor ahora que antes.
+    hooks: { poolMod: { vsFilo: "press", weights: { circulacion: 1.39 } } },
   },
   {
     id: "maquina_colectiva", filo: "posesion", rama: "firma", tier: "master", icon: "\u{1F451}",

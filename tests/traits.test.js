@@ -236,17 +236,18 @@ function forcePlay(m, typeId, optIdx = 0) {
     assert((m._seqCount || 0) === antes + 1, "la cadena reactiva no infla _seqCount (solo la original cuenta)");
   }
 
-  // Osciladores: el pool contra el Bloque rival NEUTRALIZA la celda de la matriz
+  // Osciladores: el pool contra el PRESS rival NEUTRALIZA la celda de la matriz
+  // (era contra el Bloque; el ciclo dio vuelta ese cruce — ver el bloque del catálogo)
   {
     // Plumbing: el hook viaja al Match y se resuelve desde los ids del ctx
-    const m0 = makeMatch("SWE", "posesion", ["osciladores"]);    // SWE = bloque curado
-    assert(E.traitHooks(m0).poolMod?.[0]?.weights?.circulacion === 1.54, "el hook poolMod viaja al Match vía matchCtx.filo.rasgos");
-    assert(Object.keys(E.traitHooks(makeMatch("SWE", "posesion", []))).length === 0, "sin rasgos no hay hooks");
+    const m0 = makeMatch("GER", "posesion", ["osciladores"]);    // GER = press curado
+    assert(E.traitHooks(m0).poolMod?.[0]?.weights?.circulacion === E.traitById("osciladores").hooks.poolMod.weights.circulacion,
+      "el hook poolMod viaja al Match vía matchCtx.filo.rasgos");
+    assert(Object.keys(E.traitHooks(makeMatch("GER", "posesion", []))).length === 0, "sin rasgos no hay hooks");
     // Efecto: entre los arranques MÍOS, la circulación sale más seguido con el rasgo.
-    // Muestra grande (3000 arranques mine por lado) para que la señal (~16%→~20%)
-    // supere el ruido con holgura.
+    // Muestra grande (3000 arranques mine por lado) para que la señal supere el ruido.
     const share = rasgos => {
-      const m = makeMatch("SWE", "posesion", rasgos);
+      const m = makeMatch("GER", "posesion", rasgos);
       m.min = 30;
       let mine = 0, circ = 0, guard = 0;
       while (mine < 3000 && guard++ < 60000) {
@@ -259,7 +260,7 @@ function forcePlay(m, typeId, optIdx = 0) {
       return circ / mine;
     };
     const con = share(["osciladores"]), sin = share([]);
-    assert(con > sin, "Osciladores sube la circulación contra el Bloque (celda a tablas, no invertida)", `con=${(con * 100).toFixed(1)}% sin=${(sin * 100).toFixed(1)}%`);
+    assert(con > sin, "Osciladores sube la circulación contra el Press (celda a tablas, no invertida)", `con=${(con * 100).toFixed(1)}% sin=${(sin * 100).toFixed(1)}%`);
   }
 }
 
@@ -431,13 +432,19 @@ function forcePlay(m, typeId, optIdx = 0) {
   assert(hijosDe("sorpresivos") === "polivalentes" && hijosDe("desesperantes") === "polivalentes",
     "las dos maneras de romper una línea vuelven a juntarse en Polivalentes");
 
-  // LA NEUTRALIZACIÓN de Posesión sobrevive al rediseño: la celda posesion|bloque
-  // (circulación 0.65 · pelotazo 1.30) vuelve a tablas, sin invertirse.
+  // LA NEUTRALIZACIÓN de Posesión, RE-APUNTADA (sprint del Rival que Decide): su presa
+  // vieja era el Bloque, y el ciclo dio vuelta ese cruce (ahora la Posesión lo gana), así
+  // que el nodo apunta al depredador nuevo — el High Press.
+  // Se lee la celda REAL del motor en vez de copiar sus números: así el rasgo no puede
+  // volver a quedar apuntando a una celda que cambió de signo sin que nadie se entere,
+  // que es exactamente lo que pasó con la matriz de F2.
   const osc = E.traitById("osciladores").hooks.poolMod;
-  assert(osc.vsFilo === "bloque", "Osciladores neutraliza SOLO contra el Bloque");
-  assert(Math.abs(0.65 * osc.weights.circulacion - 1) < 0.03, "la circulación vuelve a ~1.00 contra el bloque", (0.65 * osc.weights.circulacion).toFixed(3));
-  assert(Math.abs(1.30 * osc.weights.pelotazo - 1) < 0.03, "el pelotazo forzado vuelve a ~1.00", (1.30 * osc.weights.pelotazo).toFixed(3));
-  assert(osc.weights.circulacion * 0.65 < 1.05, "empareja el matchup, NO lo invierte (regla del arco)");
+  assert(osc.vsFilo === E.CAZADOR_DE.posesion, "Osciladores neutraliza contra el cazador de la Posesión", osc.vsFilo);
+  const celda = E.counterCell("mine", "posesion", osc.vsFilo);
+  assert(celda && celda.circulacion < 1, "la celda que neutraliza es la que castiga a la Posesión");
+  const neto = celda.circulacion * osc.weights.circulacion;
+  assert(Math.abs(neto - 1) < 0.03, "la circulación vuelve a ~1.00 contra su cazador", neto.toFixed(3));
+  assert(neto < 1.05, "empareja el matchup, NO lo invierte (regla del arco)");
 }
 
 // ---------- Las 3 mecanicas del arbol de Posesion (26-jul-2026) ----------

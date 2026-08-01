@@ -131,6 +131,51 @@ function centroV(map) {
   assert(perdiendo > E.oppHeight(m), "el rival que va perdiendo tarde sube el bloque", `${perdiendo} vs ${E.oppHeight(m)}`);
 }
 
+// ---------- EL RIVAL QUE REACCIONA (sprint del Rival que Decide) ----------
+// Decisión PO: el rival NO contra-elige antes del partido (su idea y su formación son su
+// esencia, y por eso el informe puede anticiparlas sin mentir) — reacciona DURANTE.
+{
+  const m = nuevo();
+  m.field.oppFilo = { id: "contra", nivel: 1 };
+  const reset = () => { m.min = 0; m.gMy = 0; m.gOpp = 0; m.mm = E.newMomentum(); m.my.lineup.concat(m.oppLineup).forEach(p => { p.expulsado = false; }); };
+
+  // 1. Antes de la media hora nadie se mueve de su plan: un 0-1 al minuto 10 no es nada.
+  reset(); m.min = 10; m.gMy = 1;
+  assert(E.oppReaction(m) === 0, "al minuto 10 el rival sigue con su plan aunque vaya perdiendo");
+
+  // 2. El marcador pesa cada vez más con el reloj (era un escalón seco en el minuto 70).
+  reset(); m.min = 40; m.gMy = 1;
+  const media = E.oppReaction(m);
+  reset(); m.min = 80; m.gMy = 1;
+  assert(E.oppReaction(m) >= media && E.oppReaction(m) === 1, "cuanto más tarde, más sale a buscarlo", `40'→${media} 80'→${E.oppReaction(m)}`);
+  reset(); m.min = 80; m.gOpp = 1;
+  assert(E.oppReaction(m) === -1, "el que administra una ventaja tarde se agacha");
+
+  // 3. EL DOMINIO adelanta la reacción aunque el marcador todavía no lo diga: un equipo
+  //    no espera a que le entre para despegarse. Es lo que el PO pidió con "si el partido
+  //    se le empieza a escapar", y lo que el escalón por marcador no podía ver.
+  reset(); m.min = 45;
+  assert(E.oppReaction(m) === 0, "0-0 y partido parejo: el rival no se mueve");
+  for (let i = 0; i < 10; i++) m.mm.bars.push({ min: 35 + i, val: 40, half: 45, marks: [] });
+  assert(E.oppReaction(m) === 1, "0-0 pero ahogado diez minutos: sale a despegarse igual");
+
+  // 4. LAS ROJAS mandan sobre todo y son inmediatas (hasta hoy una roja solo restaba
+  //    poder — el rival no se reordenaba nunca).
+  reset(); m.min = 80; m.gMy = 1;
+  m.oppLineup[1].expulsado = true;
+  assert(E.oppReaction(m) === -1, "con uno menos se atrinchera AUNQUE vaya perdiendo tarde");
+  reset(); m.min = 80; m.gOpp = 1;
+  m.my.lineup[1].expulsado = true;
+  assert(E.oppReaction(m) === 1, "con uno más sale a buscarlo AUNQUE vaya ganando");
+
+  // 5. Y la reacción se paga en PELOTA sola, por el canal que ya existía: subir el bloque
+  //    rival me descuenta reparto (heightShareShift). No hizo falta un canal nuevo.
+  reset(); m.min = 80; m.gMy = 1;
+  const sube = E.heightShareShift(m);
+  reset(); m.min = 80; m.gOpp = 1;
+  assert(sube < E.heightShareShift(m), "el rival que sale a buscarla me quita pelota", `${sube.toFixed(3)} vs ${E.heightShareShift(m).toFixed(3)}`);
+}
+
 // ---------- el mapa de calor ----------
 {
   const m = jugar();

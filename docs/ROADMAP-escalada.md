@@ -163,7 +163,18 @@ pintado en las cinco rondas, sin un solo porcentaje en pantalla y con el tono es
    final casi no cuesta cuerpo, y la gestión de plantel es casi gratis. Es el siguiente
    sprint natural de este arco y el único que endurecería la fase final **sin tocar ninguna
    probabilidad del partido**.
-4. **El rival sigue sin decidir.** La asimetría más grande no son las stats: el DT elige y el
+4. ~~**El rival sigue sin decidir.**~~ La asimetría más grande no son las stats: el DT elige y el
    rival no. Un rival de semis/final que "elija bien" cambiaría la sensación más que cualquier
    multiplicador. Es lo más caro y lo más difícil de calibrar — se dejó para después de ver
    qué daban estos dos cambios.
+
+   > ✅ **RESUELTO por el [sprint del Rival que Decide](ROADMAP-rival.md) (1-ago-2026)**, y con
+   > una vuelta de tuerca del PO: el rival **no contra-elige antes del partido** —su idea y su
+   > formación son su esencia— sino que **reacciona durante**. Es mejor diseño de lo que este
+   > punto proponía, porque una identidad elegida a último momento habría hecho imposible el
+   > gate del informe ("si no lo veo venir es un impuesto"): el ojeador tendría que adivinar una
+   > decisión que todavía no ocurrió. Lo que decide el rival ahora es su POSTURA (sube el bloque
+   > si el partido se le escapa, se atrinchera si administra, se reordena ante una roja), y eso
+   > el DT lo ve pasar en la cancha. En el camino se descubrió que la matriz de counters de F2
+   > medía **0.0pp de interacción** porque vivía en el canal del pool — ver la advertencia en
+   > CORE §4.
