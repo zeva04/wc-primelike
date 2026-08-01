@@ -203,6 +203,13 @@ los arcos posteriores y esta recalibración lo empuja *hacia* la banda. Cerrarlo
 propio sprint — y ojo, la tesis "ganar sin jugar no tiene sentido" es la ley de este
 documento, así que la deuda es real.
 
+> ✅ **CERRADA el 1-ago-2026 sin gastar el sprint: la pagó el sprint de la Escalada.** El
+> recuperador cayó a **10.0** (banda 10-15 ✓). **Y la escalera de cierre de arriba quedó
+> OBSOLETA** — bajó entera: entrenar 10.7 · mixto 18.8 · smart 30.6. La vigente vive en
+> CORE §10. La tesis del arco no solo se sostiene, se endureció: el PO adoptó el **PISO
+> PLANO** (recuperar ≈ entrenar ≈ 10, empatados a propósito) como ley de diseño — ninguna
+> estrategia de un solo botón debe acercarse a la copa.
+
 ## Riesgos declarados
 
 | Riesgo | Contención |

@@ -21,7 +21,7 @@
    ============================================================ */
 import { getTeam } from "../data/teams-repo.js";
 import { playerOverall, teamFigure } from "./ratings.js";
-import { bestSix, expectedOpponentLineup, tourneyFormaMult } from "./opponents.js";
+import { bestSix, expectedOpponentLineup } from "./opponents.js";
 import { teamPowers, gkQuality } from "./match/powers.js";
 import { rivalFilo, rivalFiloLevel, identityGapMult, filoEtapa, filoLevel } from "./philosophy.js";
 import { koRoundOf } from "./tournament/knockout.js";
@@ -47,6 +47,35 @@ const BLOQUE_SCOUT = {
   3: "Se paran en el mediocampo sin regalar nada: el partido se va a disputar en el medio y lo va a definir quién gane esa zona.",
   4: "Adelantan líneas para incomodarte la salida: te van a apretar arriba, pero detrás de su zaga hay espacio — la pelota a la espalda y el desborde son el camino.",
   5: "Juegan con los centrales cerca del círculo central: te van a asfixiar la salida desde el minuto uno… y toda su espalda queda descubierta para el que se anime a atacarla.",
+};
+
+/* EL MODO MUNDIAL, EN PALABRAS (sprint de la Escalada, decisión PO 31-jul-2026).
+
+   El informe decía "🔥 Modo Mundial: llega un +18% encendido". Era el ÚNICO porcentaje
+   del módulo y contradecía su propia regla declarada acá arriba ("CUALITATIVO, nunca
+   porcentajes"). Con la escalada convexa ese número habría llegado a +45%, que es
+   exactamente el problema: convierte una amenaza en una planilla de cálculo, y el DT
+   termina leyendo un dial en vez de leer un partido.
+
+   Cada ronda tiene ahora su propia voz, y lo que sube no es un multiplicador: es lo que
+   el rival se está jugando. La información sigue siendo accionable —el texto dice qué
+   esperar y qué hacer— pero se lee como un ojeador, no como una hoja de balance. */
+const MODO_MUNDIAL = {
+  1: { titulo: "Se acabaron los ensayos", texto: "En eliminatoria no hay revancha, y eso solo ya los pone a otra intensidad: nadie quiere ser el que se vuelve a casa en la primera." },
+  2: { titulo: "Ya no queda ningún equipo de relleno", texto: "El que llegó hasta acá no llegó de casualidad. Se les nota en cómo aprietan los últimos veinte minutos." },
+  3: { titulo: "Acá el Mundial se pone serio", texto: "Este no es el equipo que viste en la primera semana. A esta altura del torneo son otro animal, y lo saben." },
+  4: { titulo: "Una semifinal se juega una vez en la vida", texto: "Van a dejar hasta lo que no tienen. Nadie se guarda nada cuando la final está a noventa minutos." },
+  5: { titulo: "Es LA FINAL", texto: "No hay reserva, no hay mañana, no hay cálculo. Van a morir en la cancha — y hay que llegar dispuesto a lo mismo." },
+};
+
+/* La BRECHA DE IDENTIDAD, también en palabras: las dos caras del mismo multiplicador
+   (R3 + la vara alta del techo). `lead` = les llevo ventaja de idea y me respetan;
+   si no, es que llego corto y me van a pasar por encima con la suya. */
+// Arrancan con "Encima" y no con "Y" a propósito: la frase de `madura` que puede
+// precederlas ya empieza con "Y", y pintadas juntas quedaban dos "Y" seguidas.
+const BRECHA_SCOUT = {
+  lead: "Encima nos tienen miedo: saben a qué jugamos y van a dar el partido de su torneo. Al favorito nadie le juega de igual a igual.",
+  behind: "Encima llegan con más idea que nosotros: a la final no se llega improvisando — consolidar nuestra identidad es la vacuna.",
 };
 
 // Umbral en escala de poder (~0-5): ±0.25 ≈ 5 puntos de rating de diferencia
@@ -141,18 +170,22 @@ export function buildOpponentReport(run, oppId) {
     // CÓMO SE VA A PARAR: la misma altura que va a jugar en el partido (field.baseHeight
     // la deriva de su identidad y su nivel; el marcador la mueve después, ya en la cancha).
     bloque: (n => ({ n, ...heightOf(n), detalle: BLOQUE_SCOUT[n] }))(baseHeight(rf)),
+    // MODO MUNDIAL: la escalada de la ronda, dicha por un ojeador y no por una planilla.
+    // `ronda` viaja igual que el texto porque la UI necesita saber cuán fuerte pintarlo:
+    // una final no puede verse como unos 16avos. Es el ÚNICO número que sale de acá, y
+    // no es una magnitud del motor — es en qué ronda estás, que el DT ya sabe.
     modoMundial: koRound ? {
-      pct: Math.round((tourneyFormaMult(koRound) - 1) * 100),
+      ronda: koRound,
+      ...MODO_MUNDIAL[koRound],
       madura: rivalFiloLevel(opp, koRound) > rivalFiloLevel(opp),
       // La identidad, en los dos sentidos: si su idea supera a la mía se nombra el
       // castigo (R3, accionable: consolidar ANTES de KO es la vacuna); si la mía lo
       // supera, se nombra la vara alta (al favorito le juegan la final). El informe
-      // tiene que decir el multiplicador COMPLETO que va a llevar el rival — reportar
-      // solo una mitad sería mentirle al DT sobre el partido que le espera.
-      brechaPct: Math.round((identityGapMult(opp, filoEtapa(run), koRound, filoLevel(run)) - 1) * 100),
-      // Cuál de las dos: el relato del informe no dice lo mismo si te respetan que si
-      // te subestiman. `lead` = me tienen miedo; si no, es que llego corto de idea.
-      lead: filoLevel(run) > 0 && identityGapMult(opp, filoEtapa(run), koRound, filoLevel(run)) > identityGapMult(opp, filoEtapa(run), koRound),
+      // tiene que nombrar el multiplicador COMPLETO que va a llevar el rival — callar
+      // una de las dos mitades sería mentirle al DT sobre el partido que le espera.
+      brecha: (gap => gap <= 1 ? null
+        : BRECHA_SCOUT[filoLevel(run) > 0 && gap > identityGapMult(opp, filoEtapa(run), koRound) ? "lead" : "behind"]
+      )(identityGapMult(opp, filoEtapa(run), koRound, filoLevel(run))),
     } : null,
     lineas: {
       ataque: { nivel: nivel(oppP.atk - myP.def), detalle: DETALLE.ataque[nivel(oppP.atk - myP.def)] },

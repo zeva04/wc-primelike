@@ -6,13 +6,12 @@ dependencias para desbloquear cada uno. Diseño narrativo completo en
 [ROADMAP-rasgos.md](ROADMAP-rasgos.md); datos fuente en
 [content/traits.js](../js/content/traits.js).
 
-> ⚠️ **Deuda de documentación.** Las cuatro filosofías se REDISEÑARON después de cerrar
-> el arco y este documento está al día en dos: **Bloque bajo** y **Contragolpe**
-> (30-jul-2026). **High Press** (18 rasgos, 25-jul) y **Posesión** (15 rasgos, 26-jul)
-> siguen listados con su árbol viejo de 9, y todo lo que este documento dice sobre
-> **"Principios mínimos"** murió con las aristas en el arco de Progresión: los requisitos
-> vivos son **nivel de la filosofía del rasgo + 1 PI**. La fuente de verdad es siempre
-> [content/traits.js](../js/content/traits.js).
+> ✅ **Al día con el código al 1-ago-2026** (64 rasgos: Press 18 · Posesión 15 ·
+> Contragolpe 16 · Bloque bajo 15), regenerado desde
+> [content/traits.js](../js/content/traits.js), que es siempre la fuente de verdad.
+> *Historia: las cuatro filosofías se rediseñaron DESPUÉS de cerrar el arco T1-T3, y este
+> documento quedó describiendo el árbol viejo de 9 nodos para Press y Posesión hasta que se
+> regeneró.*
 
 ## Cómo leer esto
 
@@ -22,22 +21,37 @@ dependencias para desbloquear cada uno. Diseño narrativo completo en
 - **PI se gana** subiendo de nivel la filosofía **activa** (1 PI por nivel, 10 niveles
   posibles). Cambiar de filosofía **no** imprime PI de la herencia (anti-farming): solo
   jugar la identidad que tienes puesta paga.
-- **Los 4 tiers y sus 4 candados** (GDD §5): rasgo previo en la rama · Principio(s)
-  mínimo(s) · nivel de Filosofía · 1 PI.
+- **Los candados vivos son DOS**: el **rasgo previo** en la rama (`previo`, o `alguno` de
+  dos cuando la rama se bifurca) y el **nivel de la filosofía** — 1 · 3 · 6 · 10 para
+  Basic · Intermediate · Advanced · Master. Más el PI.
+  > ⚠️ Los **"Principios mínimos"** del GDD §5 **murieron** con las aristas en el arco de
+  > Progresión. Ningún rasgo del juego los pide hoy. Si ves esa condición mencionada en un
+  > comentario del código o en un roadmap viejo, está desactualizada.
 - **El tradeoff real no es un "debuff"**: por regla de diseño, ningún rasgo resta
   estadísticas. El costo verdadero es **de oportunidad**:
-  - **Principio AJENO**: varios rasgos piden entrenar un Principio que NO es de tu
-    filosofía. Como el nivel de identidad se calcula sumando **solo tus 2 Principios
-    propios**, entrenar el ajeno no te da PI ni sube tu nivel — es tiempo de juego
-    invertido en algo que solo sirve para abrir ESE candado.
-  - **Rasgos de ESTADO**: alguno de los Master (Uno a Cero) solo funciona bajo una
-    condición del partido (ir ganando) — fuera de ella, no aporta nada.
-  - **Neutralizar, no invertir**: los Advanced/algunos que responden a un matchup débil
-    llevan la cuota de esa jugada de vuelta a la referencia neutra — nunca la superan.
+  - **El nivel 10 es carísimo**: el Master exige Consolidada, y toda la Sesión Táctica de
+    la run tiene que apuntar a un solo lado. Medido: el DT al azar llega al Master en
+    ~2.7% de las runs; el que invierte con criterio, en ~99.8%.
+  - **Rasgos de ESTADO**: algunos (Muralla, Fríos) solo funcionan bajo una condición del
+    partido — fuera de ella, no aportan nada.
+  - **Neutralizar, no invertir**: los que responden a un matchup débil llevan la cuota de
+    esa jugada de vuelta a la referencia neutra — nunca la superan.
 
-## Los 5 Principios (para ubicar qué es "propio" y qué es "ajeno")
+> 🔤 **DEUDA abierta (detectada 1-ago-2026): el árbol de Posesión está escrito SIN TILDES.**
+> Son **20 campos que ve el jugador** — `nombre`, `desc`, `momento` y textos de hook:
+> `Pitagoricos`, `La Maquina Colectiva`, "presion", "linea", "atras", "vacia", "ahi",
+> "habia", "triangulacion", "aereo", "posesion", "transicion". Las otras tres filosofías
+> están bien escritas (`Presión Intensificada`, `Compactación`, `Egoístas`, `Estóicos`), así
+> que se ve que ese bloque se tipeó de corrido sin acentos. **No confundir con los
+> identificadores internos** (`to: "recuperacion"`, `of: "transicion"`), que van sin tilde a
+> propósito y NO se muestran. Pendiente de ok del PO por ser copy de cara al jugador.
 
-| Icono | Principio | Filosofías que lo tienen propio |
+## Las 5 aristas (para leer de qué está hecha cada filosofía)
+
+Ya **no gatean rasgos** — hoy solo componen la identidad y su nivel (`content/philosophies`).
+Se dejan porque explican por qué cada árbol juega a lo que juega.
+
+| Icono | Arista | Filosofías que la llevan |
 |---|---|---|
 | 🦁 | Presión | High Press, Posesión |
 | 🎼 | Elaboración | Posesión |
@@ -52,17 +66,34 @@ dependencias para desbloquear cada uno. Diseño narrativo completo en
 **Fuerte:** brilla contra el que quiere la pelota (Posesión) · **Advertencia:** correr 90'
 cansa físicamente, y el pelotazo por arriba sobre la presión te parte.
 
-| Rama | Tier | Rasgo | Buff (qué cambia en el partido) | Tradeoff / costo real |
+Árbol de **18 rasgos** — el más grande del juego (rediseño del 25-jul-2026). Su rama de
+**Expansión es la más ancha**: cuatro Masters distintos, dos por cada Advanced.
+
+| Rama | Tier | Rasgo | Qué cambia en el partido | Requisitos |
 |---|---|---|---|---|
-| Firma | Basic | 🐺 Morder Tras Pérdida | 30% de encadenar una recuperación reactiva tras perder el balón (no cuenta contra el cupo de secuencias del partido). | Ninguno — solo PI + nivel 1. |
-| Respuesta | Basic | 🕸️ Trampa en la Banda | 30% de convertir el acto de presión directamente en transición (ataque inmediato). | Ninguno — solo PI + nivel 1. |
-| Expansión | Basic | 🦁 Asfixia en Salida | 35% de que la recuperación nazca en su variante profunda (robo sobre el saque de meta rival). | Ninguno — solo PI + nivel 1. |
-| Firma | Intermediate | 🩸 Cacería Letal | Migración F2: sube el % de que la Cacería total rota deje falta (amarilla + tiro libre) en vez de simplemente morir. | Exige Presión 🦁 2 — **propia**: entrena tu propio nivel igual. |
-| Respuesta | Intermediate | 🛡️ Anticipar la Espalda | 40% de cortar el pelotazo ambiente a la espalda ANTES de que se vuelva mano a mano. | Exige Solidez 🧱 2 — **AJENA**: no suma a tu nivel de Press. |
-| Expansión | Intermediate | 🎯 Arco a la Vista | El desenlace de la variante profunda de la recuperación llega a quemarropa (+bonus de definición). | Exige Verticalidad ⚡ 2 — **propia**. |
-| Firma | Advanced | 🌪️ Asfixia Total | Bozal a la firma del rival (×0.6 a su mult de identidad): el rival deja de jugar SU fútbol, no ataca menos. | Exige Presión 4, Cacería Letal + Asfixia en Salida, nivel 6. |
-| Respuesta | Advanced | 📦 Cancha Chica | Las secuencias rivales pierden continuidad (mueren antes del remate) — el achique corta el partido. | Exige Solidez 🧱 3 — **AJENA**. |
-| Master | Master | 👑 El Robo es el Pase | Toda la familia de la recuperación define mejor (+bonus) y la mordida caza más seguido (chainPlus +0.15). Dispara consagración de prensa. | Exige un Advanced (Asfixia Total o Cancha Chica) + los 3 básicos + nivel 10 + Presión 4 **y** Verticalidad 4 — la doctrina completa. |
+| Firma | Basic | 🔥 Presión Intensificada | 28% de que el acierto de la presión convierta directo en recuperación: presionar deja de ser recurso y pasa a ser la primera opción. | Nivel 1. |
+| Firma | Intermediate | 🧲 Mittelfeldpressing | La línea se planta en el círculo central: más recuperaciones en el pool (×1.22). | Nivel 3 + Presión Intensificada. |
+| Firma | Advanced | 🦁 Angriffpressing | 45% de que la recuperación nazca profunda (robo sobre el saque de meta). **Exige BLOQUE ALTO** (altura ≥4): no se salta desde el propio área. | Nivel 6 + Mittelfeldpressing. |
+| Firma | Advanced | 🐺 Gegenpressing | 30% de cazar la pelota en los 5" siguientes a perderla + **migración F2** del Press. | Nivel 6 + Mittelfeldpressing. |
+| Firma | Master | 👑 Pressingfalle | Toda la familia de la recuperación define mejor (+0.07) y la trampa caza más seguido (chainPlus +0.12). | Nivel 10 + Angriffpressing **o** Gegenpressing. |
+| Respuesta | Basic | 🫁 Pulmones de Acero | El botón de presión cuesta 15% menos energía: se presiona igual de arriba en el minuto 80. | Nivel 1. |
+| Respuesta | Intermediate | 🛡️ Vigilancia Defensiva | 40% de cortar el pelotazo a la espalda ANTES de que se vuelva mano a mano. | Nivel 3 + Pulmones de Acero. |
+| Respuesta | Advanced | 🪃 Repliegue | La contra rival remata desde donde no se hace gol (−0.06 a su remate en transición). | Nivel 6 + Vigilancia Defensiva. |
+| Respuesta | Master | 👑 Elasticidad | 32% de que el repliegue contenido se convierta en recuperación mía: cortar y volver a estar arriba en diez segundos. | Nivel 10 + Repliegue. |
+| Expansión | Basic | 🎯 Directo | 26% de que la recuperación se saltee los actos intermedios: robo y pase al espacio en el mismo movimiento. | Nivel 1. |
+| Expansión | Intermediate | 🧊 Egoístas | 35% de reciclar la posesión cuando el pase se intercepta: recuperada, la pelota se esconde. | Nivel 3 + Directo. |
+| Expansión | Intermediate | 🏇 Contragolpistas | 28% de que el rechace de un duelo aéreo perdido lance transición mía. | Nivel 3 + Directo. |
+| Expansión | Advanced | ♟️ Pacientes | El "buscar al mejor ubicado" del desenlace mejora (+0.05): el pase de gol sin apuro. | Nivel 6 + Egoístas. |
+| Expansión | Advanced | 🗡️ Tres Toques | El salto directo al desenlace llega mejor (+0.06): robo, pase, gol en ocho segundos. | Nivel 6 + Contragolpistas. |
+| Expansión | Master | 👑 Fríos | **Rasgo de ESTADO**: con ventaja, devolverla atrás para comer reloj. ⚠️ *Ver deuda abajo.* | Nivel 10 + Pacientes. |
+| Expansión | Master | 👑 Calientes | El rival se repliega más (×1.28 en su pool): diez minutos metido en su área. | Nivel 10 + Pacientes. |
+| Expansión | Master | 👑 Carrileños | El desenlace de la transición llega en su versión profunda (+0.06): el centro del lateral que arrancó de su propia área. | Nivel 10 + Tres Toques. |
+| Expansión | Master | 👑 El Jaguar | 28% de que el desenlace de la transición se acelere al mano a mano (+0.06). | Nivel 10 + Tres Toques. |
+
+> ⚠️ **Deuda declarada: `iceGame` (Fríos) no está implementado.** Es un rasgo de ESTADO que
+> habilita una decisión nueva en partido —devolver la pelota al área propia para comer reloj
+> con ventaja— y es la pieza de motor más cara del rediseño. Hoy el hook existe con su texto
+> pero sin la jugada detrás.
 
 ---
 
@@ -71,17 +102,26 @@ cansa físicamente, y el pelotazo por arriba sobre la presión te parte.
 **Fuerte:** domina los partidos (más circulación, contrapressing) · **Advertencia:** se
 estrella contra un bloque bajo bien plantado.
 
-| Rama | Tier | Rasgo | Buff (qué cambia en el partido) | Tradeoff / costo real |
+Árbol de **15 rasgos** (rediseño del 26-jul-2026). Es el único con **dos Masters en la
+Firma**, y su rama de Respuesta es la que carga la neutralización del matchup débil.
+
+| Rama | Tier | Rasgo | Qué cambia en el partido | Requisitos |
 |---|---|---|---|---|
-| Firma | Basic | 🔑 Buscar al Hombre Libre | 40% de reciclar la posesión cuando el pase filtrado se intercepta (la jugada no muere). | Ninguno. |
-| Respuesta | Basic | ↔️ Amplitud Máxima | Suaviza (no invierte) la celda floja vs Bloque: circulación ×1.25 contra esa identidad. | Ninguno. |
-| Expansión | Basic | 🎼 Pausa | 30% de que el desenlace de la circulación llegue con aceleración súbita (mejor perfil de gol). | Ninguno. |
-| Firma | Intermediate | 🔺 El Tercer Hombre | 40% de rescatar la salida bajo presión rival cuando el pase falla (sin regalar remate). | Exige Elaboración 🎼 2 — **propia**. |
-| Respuesta | Intermediate | 🌊 Cambio de Frente | Variante de circulación condicional (solo vs Bloque): 30% de arrancar ya con el bloque descolocado. | Exige Juego directo 🌩️ 2 — **AJENA**. |
-| Expansión | Intermediate | 🏟️ Sitio al Área | Migración F2: la sinfonía gana su 4º compás y el % de penal profundo. | Exige Presión 🦁 2 — **propia**. |
-| Firma | Advanced | ♟️ Juego Posicional | El reciclaje de Hombre Libre se vuelve estructural: hasta 2 veces por jugada, al 60%. | Exige Elaboración 4, Tercer Hombre + Pausa, nivel 6. |
-| Respuesta | Advanced | 🥫 Abrir la Lata | **Neutralización real**: circulación ×1.23 + pelotazo ×0.77 vs Bloque — la celda floja vuelve EXACTO a tablas (medido: no la supera). | Exige Juego directo 🌩️ 3 — **AJENA**. |
-| Master | Master | 👑 La Pelota es Nuestra | El reparto de iniciativa se inclina de raíz (+0.06 a mi favor): el rival se estrangula por falta de balón. El costo de siempre permanece (perderla sigue doliendo). | Exige un Advanced (Juego Posicional o Abrir la Lata) + los 3 básicos + nivel 10 + Elaboración 4 **y** Presión 4. |
+| Firma | Basic | 🦶 Buen Pie | 35% de reciclar la posesión cuando el pase se intercepta: la jugada no se muere ahí. | Nivel 1. |
+| Firma | Intermediate | 🔺 El Tercer Hombre | 40% de rescatar la salida bajo presión cuando el pase falla — sin regalar el remate. | Nivel 3 + Buen Pie. |
+| Firma | Advanced | 📐 Pitagóricos | El desenlace busca al mejor ubicado de verdad, no al más cercano (+0.05). | Nivel 6 + El Tercer Hombre. |
+| Firma | Advanced | 🌊 Osciladores | **Neutralización del matchup débil**: solo vs Bloque, circulación ×1.54 y pelotazo ×0.77 — la celda floja vuelve a tablas, nunca la supera. | Nivel 6 + El Tercer Hombre. |
+| Firma | Master | 👑 La Máquina Colectiva | El reparto de iniciativa se inclina de raíz (+0.06) **y** 38% de "pelota servida" cerca del área (+0.22): el gol a puerta vacía tras treinta pases. | Nivel 10 + Pitagóricos. |
+| Firma | Master | 👑 Hombre Libre | 30% de que el desenlace de la circulación se acelere (+0.06): veinte pases y el nueve de cara al arquero. | Nivel 10 + Osciladores. |
+| Respuesta | Basic | 🪤 La Trampa | Cuando el rival recupera está lejos y su remate no asusta (−0.06) + devolverla atrás para sacarlo de su bloque (+0.06, solo ya adelantado). | Nivel 1. |
+| Respuesta | Intermediate | 🧩 Salida Lavolpiana | Variante de circulación **solo vs Press**: 30% de arrancar ya saltando su primera línea (+0.07). | Nivel 3 + La Trampa. |
+| Respuesta | Advanced | 🚩 La Frontera | 40% de cortar el pelotazo a la espalda + 50% de anular la contra por **offside**. **Exige BLOQUE ALTO** (altura ≥4): sin línea adelantada no hay trampa. | Nivel 6 + Salida Lavolpiana. |
+| Respuesta | Master | 👑 Rest Defense | 36% de que la secuencia rival pierda continuidad antes de llegar al área: recuperan, miran arriba y no hay a quién pasarla. | Nivel 10 + La Frontera. |
+| Expansión | Basic | 🔄 El Rondo | Más circulación en el pool (×1.2) **y el rival se cansa más** (×1.1): diez minutos de toque en campo rival. | Nivel 1. |
+| Expansión | Intermediate | 🗡 Profundos | 26% de que la circulación se saltee los actos intermedios: el filtrado que parte a la defensa tras veinte toques. | Nivel 3 + El Rondo. |
+| Expansión | Advanced | 🪂 Sorpresivos | 30% de que la circulación nazca en su variante profunda (+0.06): el pelotazo aéreo tras cuarenta toques. | Nivel 6 + Profundos. |
+| Expansión | Advanced | 😤 Desesperantes | **Migración F2** de Posesión: la sinfonía gana su 4º compás y el penal profundo. | Nivel 6 + Profundos. |
+| Expansión | Master | 👑 Polivalentes | El reciclaje se vuelve estructural: hasta 2 veces por jugada, al 60%. | Nivel 10 + Sorpresivos **o** Desesperantes. |
 
 ---
 
@@ -152,58 +192,80 @@ son solo **nivel de la filosofía + 1 PI** (los Principios murieron con las aris
 
 ## El árbol de dependencias
 
-Cada filosofía es un árbol independiente de 9 rasgos. Las 3 ramas (Firma · Respuesta ·
-Expansión) nacen del sorteo del nivel 1; el Master converge las tres arriba de todo.
+Cada filosofía es un árbol independiente de **3 ramas** (Firma · Respuesta · Expansión) que
+nacen de su propio Basic y suben en cadena. **No hay convergencia entre ramas**: cada una
+llega a su(s) Master por su lado. Tamaños: Press 18 · Contragolpe 16 · Posesión 15 ·
+Bloque 15.
 
 ```mermaid
 flowchart TD
-  subgraph PRESS["🦁 High Press"]
+  subgraph PRESS["🦁 High Press — 18"]
     direction TB
-    P1["🐺 Morder Tras Pérdida\nBasic · Nv1"]
-    P2["🕸️ Trampa en la Banda\nBasic · Nv1"]
-    P3["🦁 Asfixia en Salida\nBasic · Nv1"]
-    P4["🩸 Cacería Letal\nInt · Nv3 · Presión2"]
-    P5["🛡️ Anticipar la Espalda\nInt · Nv3 · Solidez2 (ajena)"]
-    P6["🎯 Arco a la Vista\nInt · Nv3 · Vertical2"]
-    P7["🌪️ Asfixia Total\nAdv · Nv6 · Presión4"]
-    P8["📦 Cancha Chica\nAdv · Nv6 · Solidez3 (ajena)"]
-    P9["👑 El Robo es el Pase\nMaster · Nv10 · Presión4+Vert4"]
-    P1 --> P4 --> P7
-    P3 --> P7
-    P2 --> P5 --> P8
-    P1 --> P8
-    P3 --> P6
-    P7 --> P9
-    P8 -.->|"alguno"| P9
-    P1 --> P9
-    P2 --> P9
-    P3 --> P9
+    P1["🔥 Presión Intensificada\nBasic · Nv1"]
+    P2["🧲 Mittelfeldpressing\nInt · Nv3"]
+    P3["🦁 Angriffpressing\nAdv · Nv6 · bloque alto"]
+    P4["🐺 Gegenpressing\nAdv · Nv6 · deepPress"]
+    P5["👑 Pressingfalle\nMaster · Nv10"]
+    P6["🫁 Pulmones de Acero\nBasic · Nv1"]
+    P7["🛡️ Vigilancia Defensiva\nInt · Nv3"]
+    P8["🪃 Repliegue\nAdv · Nv6"]
+    P9["👑 Elasticidad\nMaster · Nv10"]
+    P10["🎯 Directo\nBasic · Nv1"]
+    P11["🧊 Egoístas\nInt · Nv3"]
+    P12["🏇 Contragolpistas\nInt · Nv3"]
+    P13["♟️ Pacientes\nAdv · Nv6"]
+    P14["🗡️ Tres Toques\nAdv · Nv6"]
+    P15["👑 Fríos (ESTADO)\nMaster · Nv10"]
+    P16["👑 Calientes\nMaster · Nv10"]
+    P17["👑 Carrileños\nMaster · Nv10"]
+    P18["👑 El Jaguar\nMaster · Nv10"]
+    P1 --> P2
+    P2 --> P3
+    P2 --> P4
+    P3 -.->|"alguno"| P5
+    P4 -.->|"alguno"| P5
+    P6 --> P7 --> P8 --> P9
+    P10 --> P11
+    P10 --> P12
+    P11 --> P13
+    P12 --> P14
+    P13 --> P15
+    P13 --> P16
+    P14 --> P17
+    P14 --> P18
   end
 ```
 
 ```mermaid
 flowchart TD
-  subgraph POS["🎼 Posesión"]
+  subgraph POS["🎼 Posesión — 15"]
     direction TB
-    O1["🔑 Hombre Libre\nBasic · Nv1"]
-    O2["↔️ Amplitud Máxima\nBasic · Nv1"]
-    O3["🎼 Pausa\nBasic · Nv1"]
-    O4["🔺 Tercer Hombre\nInt · Nv3 · Elab2"]
-    O5["🌊 Cambio de Frente\nInt · Nv3 · Directo2 (ajena)"]
-    O6["🏟️ Sitio al Área\nInt · Nv3 · Presión2"]
-    O7["♟️ Juego Posicional\nAdv · Nv6 · Elab4"]
-    O8["🥫 Abrir la Lata\nAdv · Nv6 · Directo3 (ajena)"]
-    O9["👑 La Pelota es Nuestra\nMaster · Nv10 · Elab4+Pres4"]
-    O1 --> O4 --> O7
-    O3 --> O7
-    O2 --> O5 --> O8
-    O1 --> O8
-    O3 --> O6
-    O7 --> O9
-    O8 -.->|"alguno"| O9
-    O1 --> O9
-    O2 --> O9
-    O3 --> O9
+    O1["🦶 Buen Pie\nBasic · Nv1"]
+    O2["🔺 El Tercer Hombre\nInt · Nv3"]
+    O3["📐 Pitagóricos\nAdv · Nv6"]
+    O4["🌊 Osciladores\nAdv · Nv6 · neutraliza vs Bloque"]
+    O5["👑 La Máquina Colectiva\nMaster · Nv10"]
+    O6["👑 Hombre Libre\nMaster · Nv10"]
+    O7["🪤 La Trampa\nBasic · Nv1"]
+    O8["🧩 Salida Lavolpiana\nInt · Nv3 · vs Press"]
+    O9["🚩 La Frontera\nAdv · Nv6 · bloque alto"]
+    O10["👑 Rest Defense\nMaster · Nv10"]
+    O11["🔄 El Rondo\nBasic · Nv1"]
+    O12["🗡 Profundos\nInt · Nv3"]
+    O13["🪂 Sorpresivos\nAdv · Nv6"]
+    O14["😤 Desesperantes\nAdv · Nv6 · deepPosesion"]
+    O15["👑 Polivalentes\nMaster · Nv10"]
+    O1 --> O2
+    O2 --> O3
+    O2 --> O4
+    O3 --> O5
+    O4 --> O6
+    O7 --> O8 --> O9 --> O10
+    O11 --> O12
+    O12 --> O13
+    O12 --> O14
+    O13 -.->|"alguno"| O15
+    O14 -.->|"alguno"| O15
   end
 ```
 
@@ -286,30 +348,26 @@ son flechas sólidas de "todos" obligatorios.)*
 
 ## Costo acumulado de PI (camino mínimo)
 
-Todo rasgo cuesta 1 PI. La tabla suma el camino **más barato** desde cero hasta cada
-nodo — comprando solo lo estrictamente necesario para ese objetivo, en cualquier
-filosofía (la estructura es simétrica en las 4).
+Todo rasgo cuesta 1 PI. Como **las ramas no convergen entre sí**, el camino más barato a
+cualquier nodo es simplemente **su cadena hacia arriba**: no hace falta comprar las otras
+ramas.
 
 | Objetivo | PI acumulados | Qué se compró en el camino |
 |---|---|---|
-| 1 Basic cualquiera | **1 PI** | Ese básico. |
-| Los 3 Basic de la rama | **3 PI** | Los tres básicos (abren las tres ramas). |
-| 1 Intermediate | **2 PI** | Su básico previo + él mismo. |
-| 1 Advanced | **4 PI** | Básico(A) → Intermediate(A) → Basic(B, apoyo) → Advanced. |
-| **1 Master** (camino completo) | **6 PI** | Los 3 Basic + 1 Intermediate (de la rama que alimenta al Advanced elegido) + 1 Advanced + el Master. |
+| 1 Basic | **1 PI** | Ese básico. |
+| 1 Intermediate | **2 PI** | Su Basic + él. |
+| 1 Advanced | **3 PI** | Basic → Intermediate → Advanced. |
+| **1 Master** | **4 PI** | Basic → Intermediate → Advanced → Master. |
+| 1 Master **con convergencia Y** | **5 PI** | Igual, pero el Advanced pide DOS padres: la Firma del Contragolpe y la del Bloque bajo. |
 
-**El Master exige además nivel 10 de Filosofía (Consolidada)** — 9 puntos entre tus 2
-Principios propios — y ambos Principios propios a 4 (que ya cuentan para esos 9 puntos:
-4+4=8, más 1 punto en cualquiera de los dos para llegar a 9). En una run real esto
-significa: toda la Sesión Táctica de la run apuntando a un solo lado, sin desviarse a
-principios ajenos salvo lo estrictamente necesario para el Advanced elegido en el camino
-(que si es "Respuesta", pide 3-4 en un principio ajeno — un costo de tiempo extra que NO
-suma a los 9 puntos de nivel).
-
+**El candado caro no es el PI: es el nivel 10** (Consolidada) que exige el Master. En una
+run real eso significa toda la Sesión Táctica apuntando a un solo lado, sin desviarse.
 **Medido en el gate del arco**: el DT que juega al azar alcanza el Master en ~2.7% de las
-runs; el DT que invierte con criterio (heurística `--smart`, entrena siempre su Principio
-propio más bajo) lo alcanza en ~99.8%. Es, literalmente, el rasgo que separa "jugué una
-run" de "construí una doctrina".
+runs; el que invierte con criterio (heurística `--focus`), en ~**99.8%**. Es, literalmente,
+lo que separa "jugué una run" de "construí una doctrina".
+
+> Con 10 niveles se imprimen **10 PI** por run como máximo. Un árbol completo cuesta entre
+> 15 y 18: **ninguna run alcanza para comprarlo entero**, y esa es la decisión del jugador.
 
 
 ---

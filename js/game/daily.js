@@ -41,8 +41,11 @@ function scoutHint(run, oppId) {
   // F3 (deuda de F2): la previa NOMBRA la identidad rival — el informe completo da la lectura
   // R2: y anuncia el MODO MUNDIAL (la escalada de eliminatorias se narra, no se sufre a
   // ciegas). R3: si además nos gana en idea, la brecha se nombra — improvisar se paga.
+  // Sprint de la Escalada: acá tampoco va un porcentaje. El titular cita el TÍTULO de la
+  // ronda que arma el informe (una sola fuente para la voz del Modo Mundial) y deja el
+  // párrafo largo para el informe completo — la portada anuncia, no explica.
   const modo = rep.modoMundial
-    ? ` Llega en modo Mundial (+${rep.modoMundial.pct + rep.modoMundial.brechaPct}% de forma): en eliminatorias, cada rival es una final.${rep.modoMundial.brechaPct ? " Y nos gana en idea: su identidad está más consolidada que la nuestra." : ""}`
+    ? ` Llega en modo Mundial: ${rep.modoMundial.titulo.toLowerCase()}.${rep.modoMundial.brecha ? " Y nos gana en idea: su identidad está más consolidada que la nuestra." : ""}`
     : "";
   const filo = ` Juegan al ${rep.filosofia.name}${rep.filosofia.consolidada ? " y llegan consolidados en su idea" : ""}.${modo}`;
   const lineas = Object.entries(rep.lineas);

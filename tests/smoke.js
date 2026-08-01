@@ -421,10 +421,40 @@ for (const teamId of teamsToRun) {
 
 console.log(`\nsmoke: ${teamsToRun.length * RUNS} runs en ${((Date.now() - t0) / 1000).toFixed(1)}s · fallos: ${fails}`);
 const DEATH_COLS = [["groups", "grupos"], ["r32", "16avos"], ["r16", "8vos"], ["qf", "4tos"], ["sf", "semis"], ["final", "final"], ["champion", "🏆"]];
+const KO_COLS = [["r32", "16avos"], ["r16", "8vos"], ["qf", "4tos"], ["sf", "semis"], ["final", "FINAL"]];
+
+/**
+ * LA CURVA DE DIFICULTAD (sprint de la Escalada): de los que LLEGAN a cada ronda,
+ * ¿cuántos la ganan? Es una probabilidad CONDICIONAL y es lo único que mide si el
+ * torneo se endurece — el % de campeón cae de 100 a 28 solo porque hay que ganar cinco
+ * veces seguidas, y eso da la ilusión de dificultad creciente donde no la hay.
+ *
+ * Se deriva de las MISMAS caídas de arriba: no mide nada nuevo, solo lo lee bien. El
+ * `salto` (16avos − FINAL) es el gate del arco: hasta este sprint valía 5.7pp con
+ * decisiones al azar, o sea que la final era prácticamente igual de difícil que la
+ * primera eliminatoria mientras el DT llegaba a ella mucho más fuerte.
+ */
+function curva(deaths) {
+  let vivos = RUNS - (deaths.groups || 0);
+  const out = [];
+  for (const [k, lbl] of KO_COLS) {
+    if (vivos <= 0) break;
+    const gana = 100 * (vivos - (deaths[k] || 0)) / vivos;
+    out.push({ lbl, gana });
+    vivos -= deaths[k] || 0;
+  }
+  return out;
+}
+
 for (const r of results) {
   console.log(`  ${r.team.padEnd(7)} campeón ${(100 * r.champs / RUNS).toFixed(1).padStart(5)}%  · master ${(100 * r.masters / RUNS).toFixed(1)}% · diario ~${r.journal.toFixed(0)} entradas`);
   console.log(`    progresión: filosofía tope ~${r.filo.toFixed(1)}/10 · DT ~${r.dt.toFixed(1)}/20 (máx ${r.dtMax}) · rasgos ~${r.rasgos.toFixed(1)} | CAMPEONES: filo ~${r.champFilo.toFixed(1)} · DT ~${r.champDt.toFixed(1)}`);
   console.log(`    caídas: ${DEATH_COLS.map(([k, lbl]) => `${lbl} ${(100 * (r.deaths[k] || 0) / RUNS).toFixed(1)}%`).join(" · ")}`);
+  const c = curva(r.deaths);
+  if (c.length === KO_COLS.length) {
+    const salto = c[0].gana - c[c.length - 1].gana;
+    console.log(`    CURVA (de los que llegan, cuántos ganan): ${c.map(x => `${x.lbl} ${x.gana.toFixed(1)}%`).join(" · ")} → salto ${salto.toFixed(1)}pp`);
+  }
 }
 console.log(fails ? "❌ smoke con fallos" : "✅ smoke OK");
 process.exit(fails ? 1 : 0);

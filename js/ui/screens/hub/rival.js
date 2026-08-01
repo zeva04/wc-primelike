@@ -35,6 +35,18 @@ export function keyPlayers(team, max = 5) {
 }
 
 
+/* La TEMPERATURA del Modo Mundial por ronda (sprint de la Escalada): el bloque se pone
+   más caliente a medida que el torneo aprieta, para que el salto de la escalada se LEA
+   antes de jugarlo. Es puro estilo — el texto lo decide game/scouting, la vista no
+   conoce ninguna regla. */
+const MODO_TONO = {
+  1: { icon: "🔥", borde: "border-amber-500/50", fondo: "bg-amber-500/5", titulo: "text-amber-300", texto: "text-amber-200/70" },
+  2: { icon: "🔥", borde: "border-amber-500/60", fondo: "bg-amber-500/10", titulo: "text-amber-300", texto: "text-amber-200/70" },
+  3: { icon: "🔥", borde: "border-orange-500/60", fondo: "bg-orange-500/10", titulo: "text-orange-300", texto: "text-orange-200/70" },
+  4: { icon: "🔥", borde: "border-red-500/60", fondo: "bg-red-500/10", titulo: "text-red-300", texto: "text-red-200/70" },
+  5: { icon: "🏆", borde: "border-red-500", fondo: "bg-red-500/20", titulo: "text-red-200", texto: "text-red-100/80" },
+};
+
 const NIVEL_CHIP = {
   Alto: "border-red-500/60 bg-red-500/10 text-red-400",
   Medio: "border-slate-500/60 bg-slate-500/10 text-slate-300",
@@ -62,17 +74,14 @@ export function showScoutReport(oppId) {
         </div>
       </div>
       <div class="space-y-2 mt-4">
-        ${(mm => mm ? `<div class="rounded-xl border ${mm.brechaPct ? "border-red-500/60 bg-red-500/10" : "border-amber-500/60 bg-amber-500/10"} p-3">
-          <span class="font-semibold text-sm ${mm.brechaPct ? "text-red-300" : "text-amber-300"}">🔥 Modo Mundial: llega un +${mm.pct + mm.brechaPct}% encendido</span>
-          <p class="text-[11px] ${mm.brechaPct ? "text-red-200/70" : "text-amber-200/70"} mt-1">En eliminatorias los rivales suben con cada ronda — el Mundial de verdad se juega en finales.${mm.madura ? " Y a esta altura del torneo, su idea llega madurada: juega su fútbol en serio." : ""}${
-            // Las dos caras del mismo número. Antes el texto SIEMPRE decía "llega con más
-            // idea que nosotros", pero desde que existe la vara alta el extra también
-            // aparece cuando somos NOSOTROS los que llegamos con la idea armada — y ahí
-            // ese texto decía exactamente lo contrario de lo que pasa en la cancha.
-            !mm.brechaPct ? ""
-              : mm.lead ? ` <b>Nos tienen miedo (+${mm.brechaPct}% extra): saben a qué jugamos y van a dar el partido de su torneo. Al favorito nadie le juega de igual a igual.</b>`
-              : ` <b>Llega con más idea que nosotros (+${mm.brechaPct}% extra): a la final no se llega improvisando — consolidar nuestra identidad es la vacuna.</b>`}</p>
-        </div>` : "")(rep.modoMundial)}
+        <!-- MODO MUNDIAL (sprint de la Escalada): sin porcentajes — el informe entero es
+             cualitativo por regla del módulo, y este bloque era su única excepción. Lo que
+             escala con la ronda es la VOZ (el texto lo pone game/scouting) y la
+             TEMPERATURA visual: una final no puede verse igual que unos 16avos. -->
+        ${(mm => mm ? (tono => `<div class="rounded-xl border ${tono.borde} ${tono.fondo} p-3">
+          <span class="font-semibold text-sm ${tono.titulo}">${tono.icon} Modo Mundial — ${mm.titulo}</span>
+          <p class="text-[11px] ${tono.texto} mt-1">${mm.texto}${mm.madura ? " Y a esta altura del torneo su idea llega madurada: juegan su fútbol en serio." : ""}${mm.brecha ? ` <b>${mm.brecha}</b>` : ""}</p>
+        </div>` )(MODO_TONO[mm.ronda]) : "")(rep.modoMundial)}
         <div class="rounded-xl border tp-border tp-bg-soft p-3">
           <div class="flex items-center justify-between">
             <span class="font-semibold text-sm">${rep.filosofia.icon} Su idea: ${rep.filosofia.name}</span>

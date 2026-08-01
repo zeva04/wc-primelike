@@ -87,17 +87,28 @@ function curatedShape(team) {
   return filo ? getFormation(FILO_FORMATION[filo]) : null;
 }
 
-// FORMA DE TORNEO (arco del Rebalance R2, decisión PO 22-jul-2026): "el Mundial de
-// verdad se juega en 5 finales" — el rival de eliminatorias llega en MODO MUNDIAL:
-// +3% de rendimiento por ronda KO (16avos ×1.03 … final ×1.15). Entra como `p.forma`
-// en el once generado y multiplica effStat (match/powers) — el mismo patrón de
-// asimetría en los datos que energía/oxid: MIS jugadores nunca llevan el campo.
-// Solo MIS partidos: el mundo simulado (tournament/sim) no cambia. El perfil rival
-// (sequences.rivalProfile) lee los stats BASE a propósito: la escalada no cambia QUÉ
-// fútbol te genera, cambia lo bien que lo ejecuta.
-export const TOURNEY_FORM_PER_ROUND = 0.03;
+/* FORMA DE TORNEO (arco del Rebalance R2, decisión PO 22-jul-2026): "el Mundial de
+   verdad se juega en 5 finales" — el rival de eliminatorias llega en MODO MUNDIAL.
+   Entra como `p.forma` en el once generado y multiplica effStat (match/powers) — el
+   mismo patrón de asimetría en los datos que energía/oxid: MIS jugadores nunca llevan
+   el campo. Solo MIS partidos: el mundo simulado (tournament/sim) no cambia. El perfil
+   rival (sequences.rivalProfile) lee los stats BASE a propósito: la escalada no cambia
+   QUÉ fútbol te genera, cambia lo bien que lo ejecuta.
+
+   SPRINT DE LA ESCALADA (31-jul-2026, decisión PO): la escalada era LINEAL (+3% por
+   ronda, final ×1.15) y perdía la carrera contra el jugador. Medido: la escalada
+   aislada valía −10.9pp de win% en el banco, pero en runs reales la caída de 16avos a
+   la final era de solo **5.7pp** (3.1pp jugando bien) — la progresión del DT, que es
+   COMPUESTA (nivel de filosofía × rasgos × canje permanente × DT), se comía la mitad
+   de una escalada lineal, y se la comía MÁS cuanto mejor jugaba el DT.
+
+   Ahora es CONVEXA hasta ×1.45: los 16avos quedan exactamente como estaban (×1.03) y
+   el salto se concentra donde el jugador ya es fuerte. La tabla está declarada entera
+   —no calculada— porque cada escalón es un número de balance que hay que poder leer y
+   mover de a uno; la generó `0.45 · (ronda/5)^1.7`, redondeada al punto. */
+export const TOURNEY_FORM = [0, 0.03, 0.10, 0.19, 0.31, 0.45];
 /** Multiplicador de forma de torneo para una profundidad KO (0 en grupos → ×1). */
-export function tourneyFormaMult(koRound) { return 1 + TOURNEY_FORM_PER_ROUND * (koRound || 0); }
+export function tourneyFormaMult(koRound) { return 1 + TOURNEY_FORM[clamp(koRound || 0, 0, 5)]; }
 
 /**
  * Alineación de 6 titulares del rival (Game Vision: formato 6v6), excluyendo a

@@ -300,9 +300,12 @@ forma      = 1 + 0.03 × ronda_KO                SOLO el once rival (modo Mundia
   y el rival, que nunca lleva el campo, queda en ×1. Piso combinado banda×óxido:
   **×0.615**, fijado en unitario (`tests/oxidation.test.js`). En la UI el color ES la
   mecánica (`components.oxidCls`): gris bajo umbral · ámbar racha 3-4 · rojo 5+.
-- **factor forma = el MODO MUNDIAL del rival** (arco del Rebalance R2, 22-jul-2026): en
-  eliminatorias el once rival llega **+3% por ronda KO** (16avos ×1.03 … final ×1.15,
-  `opponents.tourneyFormaMult`), estampado como `p.forma` al generar su alineación — la
+- **factor forma = el MODO MUNDIAL del rival** (arco del Rebalance R2, 22-jul-2026; curva
+  rehecha en el sprint de la Escalada, 31-jul-2026): en eliminatorias el once rival llega
+  más encendido con cada ronda, por una curva **CONVEXA** declarada en `opponents.TOURNEY_FORM`
+  — 16avos ×1.03 · 8vos ×1.10 · 4tos ×1.19 · semis ×1.31 · **final ×1.45**. Nació lineal
+  (+3%/ronda, final ×1.15) y perdía la carrera contra el jugador: ver §La Escalada.
+  Se estampa como `p.forma` al generar su alineación — la
   asimetría espejo de `p.oxid`: solo el rival la lleva, y solo en MIS partidos (el mundo
   simulado no cambia). El perfil rival (`sequences.rivalProfile`) lee stats BASE a
   propósito: la escalada no cambia QUÉ fútbol te genera, cambia lo bien que lo ejecuta.
@@ -327,6 +330,68 @@ forma      = 1 + 0.03 × ronda_KO                SOLO el once rival (modo Mundia
   que invierte del que improvisa. De paso: la "inmunidad por construcción" del DT Consolidado
   que R3 daba por sentada **ya no existe** desde el arco de Progresión, porque llegar a
   Consolidada dejó de ser rutinario.
+
+### La Escalada: por qué el torneo no se endurecía (31-jul-2026)
+
+**La métrica que faltaba: la CURVA CONDICIONAL.** No "cuántas runs terminan campeonas" sino
+**de los que LLEGAN a cada ronda, cuántos la ganan**. El % de campeón cae de 100 a ~28 solo
+porque hay que ganar cinco veces seguidas, y eso da la ilusión de dificultad creciente donde
+no la hay. Medido antes del sprint, con decisiones al azar: 81.4 · 79.3 · 77.1 · 76.4 ·
+**75.7** — la final se ganaba casi tan seguido como los 16avos. Jugando bien era peor todavía
+(87.5 → **84.4**, un salto de 3.1pp). El smoke la imprime ahora en cada corrida.
+
+**El diagnóstico.** La escalada aislada SÍ mordía: en el banco de plantel fijo, subir solo
+`koRound` de 0 a 5 costaba **−10.9pp** de win% (79.2 → 68.3). Pero en runs reales la caída
+observada era de 5.7pp. **La progresión del DT se comía la mitad de la escalada — y más
+cuanto mejor jugaba.** El motivo es estructural: `tourneyFormaMult` era **lineal y ciega**
+(+3%/ronda, fija), y la progresión del jugador es **compuesta** (nivel de filosofía × rasgos
+× canje permanente × DT × Momento). Una compuesta le gana siempre a una lineal.
+
+**Los dos cambios (decisión PO).**
+
+1. **Curva CONVEXA hasta ×1.45** (`opponents.TOURNEY_FORM = [0, .03, .10, .19, .31, .45]`,
+   generada por `0.45·(ronda/5)^1.7` y declarada entera porque cada escalón es un número de
+   balance que hay que poder mover de a uno). Los 16avos quedan exactamente donde estaban
+   (×1.03): el salto se concentra donde el jugador ya es fuerte. `tests/escalada.test` fija
+   la FORMA, no los valores — un escalón plano en el medio devuelve el problema original.
+2. **El mundo simulado selecciona, pero solo en KO** (`sim.SPREAD_KO` 0.85 vs
+   `SPREAD_GROUPS` 0.55). Antes el rating pesaba igual en todo el torneo y el mundo apenas
+   filtraba: el rating medio del finalista subía de 76.1 a 80.3 en cinco rondas y **el 6% de
+   las finales se jugaban contra un rival ≤69**. Ahora la final es contra élite el **87%** de
+   las veces y contra un flojo el **2%**. Los grupos conservan su caos a propósito: la
+   cenicienta y el batacazo son el combustible del World Cup Daily, y es la única fase donde
+   una sorpresa no le arruina el bracket a nadie. La prórroga y la tanda tampoco escalan —
+   si el grande llegó empatado hasta ahí ya falló, y una tanda es una moneda.
+
+**Por qué esto es mejor que subir el multiplicador a secas:** la mitad del cambio es
+**visible**. Llegar a la final y encontrarse a Bélgica comunica dificultad en el escudo del
+rival, no en un número escondido dentro de `p.forma`.
+
+**Y el Modo Mundial pasó a decirse en PALABRAS.** El informe mostraba "🔥 llega un +18%
+encendido" — el único porcentaje de `game/scouting`, que declara en su cabecera ser
+CUALITATIVO. Con la curva nueva ese número habría llegado a +45%, que convierte una amenaza
+en una planilla. Cada ronda tiene ahora su voz ("Se acabaron los ensayos" → "Es LA FINAL")
+y la card sube de temperatura visual con la ronda. `tests/escalada.test` prohíbe que vuelva
+a salir cualquier magnitud numérica por esa puerta.
+
+**Gate (n=4000 piso / n=2000 techo).** El gate del arco **NO es el % de campeón** —moverlo
+era el objetivo— sino la forma de la curva:
+
+| | 16avos | 8vos | 4tos | semis | FINAL | salto |
+|---|---|---|---|---|---|---|
+| piso (azar) | 80.7 | 76.9 | 73.0 | 68.6 | **62.1%** | **18.6pp** (era 5.7) |
+| techo (`--smart`) | 88.1 | 84.4 | 82.3 | 74.1 | **69.6%** | **18.5pp** (era 3.1) |
+
+Campeón, que ahora se **reporta** y no se gatea: **19.0% piso · 31.4% techo** (eran 28.4 y
+44.9). Los planteles legendarios sobreviven — NZL 2.2%, CPV 2.4% — y su curva también
+escala: la banda "campaña legendaria 0-3%" de §10 se respeta. La franja media es la que más
+pagó (MEX 19.3% → 10.1%), que es lo correcto: era la que menos merecía la copa.
+
+> **Esto rompe el trinquete del gate.** Todos los sprints anteriores se gatearon contra "±2pp
+> del sprint anterior", sin ancla absoluta: quince sprints de +1.3pp cada uno son +20pp y
+> ningún gate se enciende nunca. Por eso §10 declaraba "favorito 12-17%" mientras el juego
+> medía 44.9%. La curva condicional es un ancla de FORMA, no de nivel, y no se puede
+> derivar sin que se note.
 
 > **Rebalance del 20-jul-2026 (decisión PO).** El factor de energía pesaba **35%**
 > (`0.65 + 0.35`) y bajó a **20%**, acoplado a subir el cansancio del partido de −10 a
@@ -440,6 +505,14 @@ forma      = 1 + 0.03 × ronda_KO                SOLO el once rival (modo Mundia
 > tesis del Rebalance (10-15). Medido con la palanca apagada da **17.0** — o sea que la
 > derivaron los arcos de Rasgos/Progresión y esta recalibración lo empuja *hacia* la banda,
 > no fuera. Cerrarlo es su propio sprint.
+>
+> ✅ **CERRADA el 1-ago-2026, sin gastar el sprint: la pagó la Escalada.** Re-medida la
+> escalera completa sobre el árbol post-Escalada (BRA, n=4000 por peldaño), el recuperador
+> cayó de **16.0 a 10.0** — dentro de la banda 10-15 y pegado a su borde inferior. La
+> escalera entera bajó ~6-11pp y **los números de arriba quedaron obsoletos**: la vigente
+> está en §10. El riesgo se dio vuelta y hay que anotarlo: el peldaño de abajo ya no
+> amenaza con salirse por arriba sino **por abajo**, así que cualquier dial futuro que
+> endurezca el torneo tiene que verificar de qué lado muerde (la LEY de R4, otra vez).
 
 > Este es el único punto donde se mezcla "escala 1–99" (datos) con "escala 0–5" (fórmulas).
 > Todo lo demás del partido razona en 0–5.
@@ -1153,6 +1226,28 @@ softlock. Regla nueva: si no llegas a 6, **presentas a los que queden en pie** �
 misma pena de inferioridad numérica que una roja (§5). Perder por diezmado es una
 historia; un botón bloqueado no.
 
+> 🐛 **El DOBLE castigo del plantel sin arquero (arreglado el 1-ago-2026).** La regla de
+> arriba dice que jugar corto se paga **una** vez, con la pena de inferioridad. Se pagaba
+> dos. Cadena: sin ningún POR disponible el once se arma con **5 de campo**;
+> `formationLabel` cuenta solo DEF/MED/DEL y **da por sentado el arquero**, así que devuelve
+> etiquetas como `"1-1-3"` que suman 5 y **coinciden con una formación real de 6**;
+> `currentLineup` la adoptaba y `orderBySlots` pedía entonces 6 slots para un pool de 5. Sin
+> nadie de `pos === "POR"`, su `findIndex` fallaba y caía en `pool[0]` — el slot del arquero
+> se comía a un defensor y **todos los demás se corrían una línea hacia atrás**: DEF→POR,
+> MED→DEF, DEL→MED, **tres castigos de −6** encima de jugar en inferioridad.
+>
+> **Arreglo**: el label solo identifica una formación si el once la cubre entera
+> (`lineup.length === 6`). Con `id = null`, `orderBySlots` no toca nada y cada uno juega en su
+> puesto natural. **La etiqueta de formación es ambigua por construcción** — describe cuatro
+> líneas con tres números — y esa ambigüedad solo aparece cuando falta el arquero.
+>
+> **Cómo se encontró, que es la lección**: lo cazaba `smoke.js:115` ~1 vez cada 4.000 runs y
+> **sin decir quién ni por qué** (el `assert` no llevaba contexto). Un barrido de balance a
+> n=4000 lo hizo saltar; reproducirlo pidió atacar `currentLineup` de frente con planteles
+> diezmados sintéticos (82.800 combinaciones → 6 firmas, todas `POR:0` + 5 de campo). Mismo
+> criterio que la ley de `powers.test`: **un invariante raro del smoke no es un test** — mide
+> la frecuencia, no la causa.
+
 ### La Acción Principal del Día (`DAY_ACTIONS`, `applyDayAction`)
 
 Además del suceso que le toca, **cada día sin partido el DT elige exactamente UNA
@@ -1164,7 +1259,7 @@ después el DT decide. No se puede pasar el día sin elegir. Las acciones
 | Acción | Efecto | Trade-off |
 |---|---|---|
 | 🎯/🛡️/🎩/🏹/💨 **Entrenar** (5 focos: ataque, defensa, pase corto, pase largo, velocidad) | +1 al buff de la stat elegida (`TRAIN_BUFF`) | **−5 de energía** a todo el plantel · el foco de **velocidad cansa −8** (`VELOCIDAD_FATIGUE_EXTRA`: son piques, no un rondo) |
-| 🧘 **Recuperar** | +10 de energía a todo el plantel | No mejora ninguna stat |
+| 🧘 **Recuperar** | +10 de energía a todo el plantel (`RECOVER_ENERGY`, **dial cerrado**: barrido 10/15/20/25 en §10 — inerte para quien lo usa a diario y solo abarata el error del descuidado) | No mejora ninguna stat |
 | 📋 **Plan de partido** (arco de Progresión) | **Declara la identidad del próximo partido** (4 focos = las 4 filosofías): pasa a ser la activa (sesga el pool) y su XP de ese partido rinde **×1.5** (`PLAN_XP_MULT`) | **No otorga NADA por sí mismo**: ni stats ni experiencia — el GDD prohíbe subir filosofías desde el menú. Se cobra jugando |
 | 🤝 **Team Bonding** (Sprint 3) | +10 a la **Moral del equipo** (`BONDING_MORAL`) | **−5 de energía** a todo el plantel (`BONDING_FATIGUE`) |
 
@@ -1215,7 +1310,10 @@ compra INTENCIÓN, que es exactamente el 70% del GDD. El cambio de identidad a m
 > mueve Entrenar (12→14%) y sí infla el mixto; bajar `CANJE_THRESHOLD` a 3 tampoco (12→12.9%);
 > y recortar `RECOVER_ENERGY` de 10 a 6 **no toca** a "siempre Recuperar" (39.5→39.1%) porque
 > esa estrategia ya vive con la energía al tope — lo que gana no es el +10, es **no pagar
-> costos**. El arreglo real exige rebalancear la economía de energía o su curva de impacto en
+> costos**. *(Comprobado en la dirección contraria el 1-ago-2026: subirlo a 15/20/25 tampoco lo
+> mueve — 10.0/10.9/9.8/10.4. La constante es inerte en las dos puntas para quien la usa a
+> diario; el barrido completo y por qué se descartó están en §10.)* El arreglo real exige
+> rebalancear la economía de energía o su curva de impacto en
 > `effStat`, que cambia la dificultad del juego entero. **El PO eligió exactamente eso**
 > (20-jul-2026) sobre las otras dos alternativas medidas: un "piso de energía" al entrenar
 > (arreglaba poco — 15.7%) y abaratar Entrenar subiendo el cansancio del partido (que
@@ -1616,9 +1714,86 @@ jugador humano competente), el % de veces que cada selección sale campeona:
 Con 48 equipos en el torneo, incluso un favorito ganando ~15% de las veces es coherente:
 nadie tiene la copa asegurada, que es exactamente el espíritu roguelike.
 
-> **Cómo re-medir.** El script `tests/smoke.js` simula runs completas sin
-> UI. `node tests/smoke.js --all` corre las 18 jugables (modo --smart pendiente de recrear). Es la herramienta para validar
-> cualquier cambio de balance antes de darlo por bueno.
+> ⚠️ **ESTA TABLA ES HISTÓRICA — el objetivo de una época con otro juego.** Se midió hace
+> muchos arcos, con 18 jugables (hoy son 23) y antes de que existiera `--smart`. Su banda de
+> favorito (12-17%) se fijó con "decisiones inteligentes", o sea con el equivalente del
+> **techo** actual, así que **no es comparable con el techo de hoy**: contra el piso (~19) la
+> distancia es mucho menor de lo que parece. Se conserva por su reparto entre niveles —
+> favorito > aspirante > sorpresa > legendaria, que sí sigue vigente y se cumple (NZL 2.2%,
+> CPV 2.4%).
+
+> ✅ **EL ANCLA VIGENTE DEL TECHO (decisión PO 1-ago-2026): ~30% para un favorito.** Había
+> tres números contradictorios y ninguno mandaba — el 12-17 de la tabla de arriba, el **~42
+> del arco del Rebalance** y lo que medía el juego. **Se resuelve así:**
+>
+> | | ancla |
+> |---|---|
+> | **piso** (BRA, decisiones al azar) | **~19%** |
+> | **techo** (BRA, `--smart`) | **~30%** |
+>
+> El **~42 pasa a ser historia**: era una medición pre-Escalada, nunca un objetivo. Y el
+> 12-17 se jubila como ancla por lo dicho arriba (se fijó contra un techo, con otro juego).
+> El ancla es de **dos números, no uno**: declarar solo el techo fue justamente lo que dejó
+> quince sprints derivando sin gate (ver el trinquete en §La Escalada). Medido el 1-ago-2026:
+> piso 18.8 · techo 30.6 (n=4000 cada uno), que cuadra con el 19.0/31.4 del cierre de la
+> Escalada. **Un dial que mueva cualquiera de los dos más de ~2pp necesita ok del PO.**
+
+### La escalera de estrategias, y el PISO PLANO (decisión PO 1-ago-2026)
+
+Medición vigente sobre el árbol post-Escalada (BRA, n=4000 por peldaño, `RECOVER_ENERGY=10`).
+**Reemplaza a la escalera del 29-jul que declara §4** (R4), obsoleta desde la Escalada:
+
+| estrategia fija | 29-jul (pre-Escalada) | **1-ago (vigente)** |
+|---|---|---|
+| siempre Recuperar | 16.0 | **10.0** |
+| siempre Entrenar | 18.1 | **10.7** |
+| mixto (azar) | 27.8 / 27.3 | **18.8** |
+| smart (techo) | 42.2 / 41.9 | **30.6** |
+
+> ⚖️ **LA LEY DEL PISO PLANO.** Recuperar (10.0) y Entrenar (10.7) quedaron **empatados
+> dentro del ruido** (0.7pp con ±0.9pp a n=4000). Los arcos anteriores lo habrían leído como
+> una deuda —la escalera del Rebalance se apoyaba en que Entrenar le ganara a descansar— y
+> **el PO decidió lo contrario: el empate es el objetivo.** Ninguna estrategia de un solo
+> botón, repetida a ciegas los 30 días, debe acercarse a la copa: *si no jugás inteligente,
+> difícilmente deberías ganar*. El premio no vive en elegir la acción correcta **una vez**,
+> vive en elegirla **según el día** — y eso es exactamente lo que separa al mixto (18.8) y
+> sobre todo al smart (30.6) del piso.
+>
+> **Qué se gatea de ahora en más:** no la brecha Recuperar↔Entrenar (que puede ser 0), sino
+> que **las dos se queden en ~10 y bien por debajo del mixto**. Si un dial futuro levanta a
+> cualquiera de las dos por encima de ~15, volvió a existir un botón que se puede apretar sin
+> pensar. La distancia que importa es **piso → smart (hoy ~20pp)**.
+
+> ⛔ **`RECOVER_ENERGY` NO es el dial para nada de esto (barrido del 1-ago-2026).** Medido en
+> 10/15/20/25 con las cuatro estrategias (n=4000 cada una), el resultado ordena el futuro:
+>
+> | `RECOVER_ENERGY` | recuperar | entrenar | mixto | smart | **smart − mixto** |
+> |---|---|---|---|---|---|
+> | **10** (vigente) | 10.0 | 10.7 | 18.8 | 30.6 | **11.8pp** |
+> | 15 | 10.9 | 11.0 | 19.4 | 33.0 | 13.6pp |
+> | 20 | 9.8 | 10.7 | 22.9 | 32.1 | 9.2pp |
+> | 25 | 10.4 | 11.3 | 23.2 | 31.4 | **8.2pp** |
+>
+> **1. El dial está saturado por arriba igual que por abajo.** El recuperador no se mueve
+> (10.0/10.9/9.8/10.4, rango 1.1pp = ruido): ya vive con la energía al tope. Es la misma
+> conclusión que el diagnóstico de §La Acción del Día sacó recortando 10→6, ahora comprobada
+> en la dirección contraria. **La constante es casi inerte para quien la usa todos los días.**
+>
+> **2. A quien SÍ le paga es al mixto (+4.4pp), y por eso se descarta.** Al DT que descansa al
+> azar, en días que no lo necesitaba: el dial **abarata el error**. La brecha smart−mixto se
+> comprime de 11.8pp a 8.2pp — **un 30% menos de premio por jugar bien**. Es la inversión
+> exacta de la LEY de R4: la palanca tiene que encenderse porque estoy fuerte, no porque soy
+> descuidado. Al techo no lo mueve (30.6/33.0/32.1/31.4: serrucho sin tendencia) porque al
+> greedy la energía no le ata las manos — descansa reactivo bajo `ENERGY_OK` y ya.
+>
+> **3. Y rompe el gate de la Escalada.** La CURVA del mixto en la final sube a **65.3% (20) y
+> 66.9% (25)** contra el objetivo ≤~62% del sprint. Los dos valores altos quedan descalificados
+> por dos motivos independientes. Se **mantiene en 10**.
+
+> **Cómo re-medir.** `tests/smoke.js` simula runs completas sin UI. `node tests/smoke.js --all`
+> corre las 23 jugables; `--smart` mide el techo de un DT competente y `--focus` el del árbol
+> de rasgos. **Mirá la línea CURVA antes que el % de campeón**: la probabilidad condicional
+> por ronda es lo único que dice si el torneo se endurece (ver §La Escalada).
 
 ---
 
@@ -1727,6 +1902,12 @@ gate 29-31 del arco del Rebalance. Compensado (decisión PO) por el mismo canal:
 que la pasiva le importa menos). La brecha Recuperar↔Entrenar se comprimió de 4.8pp a
 1.4pp. La tesis del arco se sostiene —Recuperar sigue siendo el piso— pero con menos
 margen que antes.
+
+> 📌 **Los números de esta tabla son HISTÓRICOS (pre-Escalada) — no los uses como gate.** La
+> Escalada bajó la escalera entera ~6-11pp; la vigente está en §10. Y el "a vigilar" de arriba
+> **dejó de ser una alerta**: la brecha siguió comprimiéndose de 1.4pp a 0.7pp y el PO la
+> adoptó como objetivo (la LEY DEL PISO PLANO, §10). Lo que hoy se vigila no es esa brecha,
+> sino que las dos puntas del piso no despeguen de ~10.
 
 
 ## El Territorio (sprint del Territorio, 30-jul-2026)

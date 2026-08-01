@@ -135,8 +135,17 @@ export function currentLineup(squad, prev, formationId) {
   const vigente = lineup && lineup.every(p => available.includes(p)) && validateLineup(available, lineup).ok;
   if (!vigente) {
     lineup = autoLineup(available, id);
-    // Si la formación elegida ya no se puede armar, la nueva sale del once que quedó.
-    if (!canUseFormation(available, id)) id = getFormation(formationLabel(lineup)) ? formationLabel(lineup) : null;
+    // Si la formación elegida ya no se puede armar, la nueva sale del once que quedó —
+    // pero SOLO si el once la cubre entera. `formationLabel` cuenta DEF/MED/DEL y da por
+    // sentado el arquero: un plantel SIN arquero arma 5 de campo cuyo label ("1-1-3")
+    // coincide con el de una formación de 6, y orderBySlots terminaba metiendo a un DEF
+    // en el arco y corriendo a todos una línea hacia atrás (tres castigos de −6 encima de
+    // jugar en inferioridad, que ya es el castigo que corresponde). Pedir las 6 cabezas
+    // desambigua el label sin tocar el caso sano.
+    if (!canUseFormation(available, id)) {
+      const label = formationLabel(lineup);
+      id = lineup.length === 6 && getFormation(label) ? label : null;
+    }
     lineup = orderBySlots(lineup, id);
   }
   assignPositions(squad, lineup, id);

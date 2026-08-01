@@ -206,6 +206,77 @@ const clon = p => ({ ...p, stats: { ...p.stats }, posJugada: null });
   t(Number.isFinite(E.teamPowers(lineup, "normal", {}).def), "el equipo sigue calculando tras las reubicaciones");
 }
 
+// ---------- 6f. Plantel SIN ARQUERO: jugar corto se paga UNA vez ----------
+// REGRESIÓN (1-ago-2026, lo cazó un barrido de balance a n=4000). §6b prueba lo mismo pero
+// con el plantel entero — y el agujero estaba exactamente en el plantel diezmado.
+//
+// La cadena: sin ningún POR disponible el once se arma con 5 de campo; `formationLabel`
+// cuenta solo DEF/MED/DEL y DA POR SENTADO el arquero, así que devuelve etiquetas que suman
+// 5 ("1-1-3") y COINCIDEN con las de una formación real de 6. currentLineup la adoptaba y
+// orderBySlots pedía 6 slots para un pool de 5: sin nadie de pos POR su findIndex fallaba,
+// metía al primero de la fila en el arco y CORRÍA A TODOS una línea (DEF→POR, MED→DEF,
+// DEL→MED). Tres castigos de −6 ENCIMA de la inferioridad numérica — que es el único
+// castigo que corresponde (§Plantel diezmado: perder por diezmado es una historia).
+//
+// Se barre exhaustivo: todos los quintetos de campo posibles de cada jugable, o sea todas
+// las formas que puede tomar un plantel sin arquero. Derivado, no hardcodeado.
+{
+  const combinaciones = (arr, k) => {
+    if (k === 0) return [[]];
+    if (arr.length < k) return [];
+    const [x, ...resto] = arr;
+    return [...combinaciones(resto, k - 1).map(c => [x, ...c]), ...combinaciones(resto, k)];
+  };
+
+  let casos = 0, conCastigo = null, conFormacion = null, noCorto = null, tamañoMal = null;
+  for (const equipo of E.allTeams().filter(t => t.players)) {
+    const base = E.newRun(equipo.id);
+    const campo = base.squad.filter(p => p.pos !== "POR");
+    for (const quinteto of combinaciones(campo.map(p => p.name), 5)) {
+      const run = E.newRun(equipo.id);
+      // Los dos arqueros afuera + todos los de campo salvo el quinteto elegido
+      for (const p of run.squad) p.suspendido = p.pos === "POR" || !quinteto.includes(p.name);
+      const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
+      const { lineup, formationId } = E.currentLineup(run.squad, null, null);
+      const val = E.validateLineup(available, lineup);
+      casos++;
+
+      const forma = `${equipo.id} [${available.map(p => p.pos).sort().join(",")}]`;
+      const castigados = lineup.filter(p => E.outOfPosPenalty(p) > 0);
+      if (castigados.length && !conCastigo) conCastigo = `${forma} → ${castigados.map(p => `${p.pos}→${E.playedPos(p)}`).join(" ")}`;
+      // Sin arquero NINGUNA formación aplica: sus slots piden 6 cabezas y hay 5.
+      if (E.getFormation(formationId) && !conFormacion) conFormacion = `${forma} → adoptó ${formationId}`;
+      if (lineup.length !== 5 && !tamañoMal) tamañoMal = `${forma} → once de ${lineup.length}`;
+      // El castigo que SÍ corresponde tiene que seguir ahí
+      if (!(val.ok && val.short) && !noCorto) noCorto = `${forma} → ok=${val.ok} short=${val.short}`;
+    }
+  }
+
+  t(casos > 0, `el barrido montó planteles sin arquero (${casos} casos)`);
+  t(!conCastigo, `sin arquero NADIE juega fuera de puesto: el diezmado se paga una sola vez (${conCastigo})`);
+  t(!conFormacion, `sin arquero no se adopta ninguna formación: la etiqueta de 5 es ambigua (${conFormacion})`);
+  t(!tamañoMal, `el once diezmado presenta a los 5 que quedan en pie (${tamañoMal})`);
+  t(!noCorto, `y sigue siendo válido en modo corto — la inferioridad numérica no se perdona (${noCorto})`);
+}
+
+// ---------- 6g. Con arquero, el diezmado tampoco improvisa puestos ----------
+// El otro lado de la misma moneda: 1 POR + 4 de campo son 5, pero la etiqueta suma 4 y no
+// choca con ninguna formación. Se fija para que un cambio futuro en FORMATIONS no lo rompa.
+{
+  for (const equipo of E.allTeams().filter(t => t.players)) {
+    const run = E.newRun(equipo.id);
+    const campo = run.squad.filter(p => p.pos !== "POR");
+    const arquero = run.squad.find(p => p.pos === "POR");
+    // Deja 1 arquero y los 4 primeros de campo
+    for (const p of run.squad) p.suspendido = p !== arquero && !campo.slice(0, 4).includes(p);
+    const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
+    const { lineup } = E.currentLineup(run.squad, null, null);
+    t(lineup.length === E.maxLineupSize(available), `${equipo.id}: con 1 arquero y 4 de campo presenta a los 5`);
+    t(lineup.every(p => E.outOfPosPenalty(p) === 0), `${equipo.id}: y ninguno juega fuera de puesto`);
+    t(lineup.filter(p => p.pos === "POR").length === 1, `${equipo.id}: el arquero que queda va al arco`);
+  }
+}
+
 // ---------- 7. El castigo llega al PARTIDO, no solo a la ficha ----------
 {
   const run = E.newRun("BRA");
