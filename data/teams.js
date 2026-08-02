@@ -82,7 +82,7 @@ export const WC_DATA = {
       colors: { primary: "#003893", secondary: "#CE1126", text: "#ffffff" },
       kits: { field: { shirt: "#003893", accent: "#FFFFFF" }, gk: { shirt: "#57534E", accent: "#F9E814" } },
       players: [
-        { name: "Vozinha",             pos: "POR", num:  1, stats: { atajadas: 77, reflejos: 79, salidas: 64, pase_corto: 57, pase_largo: 56, velocidad: 50, aura: 80 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "bald", beard: true } },
+        { name: "Vozinha",             pos: "POR", num:  1, stats: { atajadas: 77, reflejos: 79, salidas: 64, pase_corto: 57, pase_largo: 56, velocidad: 50, aura: 80 }, look: { skin: "#6B4226", hair: "#0E0C0A", style: "curly", beard: true } },
         { name: "Márcio Rosa",         pos: "POR", num: 12, stats: { atajadas: 61, reflejos: 63, salidas: 57, pase_corto: 52, pase_largo: 50, velocidad: 48, aura: 56 }, look: { skin: "#8D5524", hair: "#0E0C0A", style: "buzz", beard: false } },
 
         { name: "Logan Costa",         pos: "DEF", num:  5, stats: { tiro: 44, defensa: 70, cabezazo: 70, pase_corto: 61, pase_largo: 57, velocidad: 62, aura: 62 }, look: { skin: "#8D5524", hair: "#0E0C0A", style: "short", beard: true } },
