@@ -232,13 +232,24 @@ assert(E.filoLevel(run) === 9, "la escalera tiene techo: XP de sobra no desborda
   assert(r.squad.slice(6).every(p => p.energia === 100), "los que no jugaron no pagan");
   r.filoId = "posesion";
   assert(E.applyFiloCosts(r, { my: { lineup } }) === null, "solo el Press paga energía");
-  // Contra/Bloque ceden posesión; el rival que espera me la cede a mí. Los COSTOS DE
+  // Bloque cede volumen ofensivo; el rival que espera me la cede a mí. Los COSTOS DE
   // IDENTIDAD (F2) se miden en cruces NEUTROS del ciclo, para que el diente del ciclo
   // (±CICLO_SHARE) no los contamine: son costos de la identidad, no del cruce.
-  assert(E.filoShareShift({ id: "contra" }, null) === -0.05, "mi Contra cede posesión");
+  //
+  // LA FILA DE CONTRA (hallazgo post-cierre del sprint del Rival que Decide): el −0.05
+  // de "mi Contra cede posesión" SE RETIRÓ. Nació en F2 para compensar que el counter
+  // vivía en el pool, y con el pool degradado a narrador (0.0pp) quedó huérfano —
+  // apilado con el diente nuevo en el MISMO canal, cancelaba el diente en el cruce que
+  // Contra gana (vs Press: −0.05 + 0.05 = 0.00). Medido: Contra rendía −2.5pp de share
+  // neto contra los 4 rivales mientras Press y Posesión (sin costo) se quedaban con
+  // +2.5pp — Contra terminaba siendo la peor identidad de las cuatro pese a que Bloque
+  // paga MÁS costo en papel (su formación defensiva lo compensa; la de Contra no).
+  assert(E.filoShareShift({ id: "contra" }, null) === 0, "mi Contra NO paga costo de identidad (retirado, ver arriba)");
   assert(E.filoShareShift({ id: "bloque" }, { id: "press" }) === -0.08, "mi Bloque cede volumen (−0.08, ajuste PO post-gate)");
   assert(E.filoShareShift(null, { id: "bloque" }) === 0.06, "el bloque rival me cede la pelota");
   assert(E.filoShareShift({ id: "press" }, { id: "press" }) === 0, "el Press no toca el reparto (paga energía)");
+  // El diente del ciclo, en el cruce favorable de Contra, ya no se cancela.
+  assert(E.filoShareShift({ id: "contra" }, { id: "press" }) === E.CICLO_SHARE, "el diente de Contra vs Press llega entero, sin costo que lo anule");
 }
 
 /* ---------- EL CICLO DE COUNTERS (sprint del Rival que Decide) ---------- */
@@ -300,6 +311,21 @@ assert(E.filoLevel(run) === 9, "la escalera tiene techo: XP de sobra no desborda
   for (const a of F) for (const b of F) {
     if (a === b || E.counterEdge(a, b) !== 0) continue;
     assert(!E.counterCell("mine", a, b), `el cruce neutro ${a}|${b} no lleva celda`);
+  }
+
+  // LA LEY DE PARIDAD (hallazgo post-cierre): ningún costo de identidad puede cancelar
+  // el diente en el cruce que esa identidad GANA. Es exactamente el agujero que dejó a
+  // Contra −2.5pp de share neto mientras Press/Posesión (sin costo) se quedaban con el
+  // diente entero — apilar un costo viejo sobre un mecanismo nuevo en el MISMO canal, sin
+  // volver a mirar la interacción. En el cruce favorable, el shift total tiene que ser
+  // ESTRICTAMENTE mayor que 0 (el diente solo, sin costo, ya da +CICLO_SHARE > 0): si un
+  // costo de identidad futuro lo empuja a ≤0, este test explota antes de que alguien
+  // tenga que medirlo en un banco de 2000 partidos para encontrarlo.
+  for (const f of F) {
+    const presa = E.PRESA_DE[f];
+    assert(E.filoShareShift({ id: f }, { id: presa }) > 0,
+      `el cruce que ${f} gana (vs ${presa}) le queda share NETO positivo, no cancelado por su costo de identidad`,
+      E.filoShareShift({ id: f }, { id: presa }).toFixed(3));
   }
 }
 

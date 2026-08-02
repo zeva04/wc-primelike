@@ -199,7 +199,7 @@ export const PHILOSOPHIES = [
     fuerte: "Vive del que se adelanta: cada salto de su presión es una contra tuya en potencia.",
     advertencia: "Cede la iniciativa: contra el que se atrinchera no hay espalda que atacar, y el partido se muere.",
     rasgo: "El primer tramo deja al rival AÚN más partido: el segundo llega lanzado.",
-    counters: { brilla: "contra el High Press: el que salta a cazarte deja la espalda abierta, y esa es tu autopista", sufre: "contra el Bloque bajo: no hay espacio detrás del que ya está metido atrás. Encima cedes posesión por identidad" },
+    counters: { brilla: "contra el High Press: el que salta a cazarte deja la espalda abierta, y esa es tu autopista", sufre: "contra el Bloque bajo: no hay espacio detrás del que ya está metido atrás" },
     firmaIntros: [
       p => `¡La puñalada que entrenamos! ${p.name} pica al espacio con el rival partido.`,
       p => `Robo y vértigo, como pide la idea: ${p.name} arranca la contra.`,

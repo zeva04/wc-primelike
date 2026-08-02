@@ -871,10 +871,23 @@ curado, y un test fija que ninguna identidad pueda volver a duplicar a otra.
 
 La firma rival sesga SU lado con SU nivel (press→salida_fondo ·
 posesión→repliegue · bloque→balón parado ×1.3 + salida ×0.6). Los **costos de identidad**:
-Press −6 de energía post-partido (`applyFiloCosts`) · Contra cede posesión (mineShare
-−0.05) · Bloque cede volumen ofensivo (−0.08) · el rival que espera te la cede a ti
-(contra +0.04 · bloque +0.06) · Posesión sin costo físico (su costo ES la matriz). El
-Bloque además tiene su ARMA propia: balón parado ×1.3 (ajuste PO tras el primer gate —
+Press −6 de energía post-partido (`applyFiloCosts`) · Bloque cede volumen ofensivo
+(mineShare −0.08) · el rival que espera te la cede a ti (contra +0.04 · bloque +0.06) ·
+Posesión sin costo físico.
+
+> 🆕 **LA FILA DE CONTRA (sprint del Rival que Decide, hallazgo post-cierre): se retiró su
+> costo de identidad.** El −0.05 de "Contra cede posesión" nació en F2 para compensar que el
+> counter vivía en el pool. Con el pool degradado a narrador (0.0pp, ver arriba) ese costo
+> quedó huérfano y se apilaba con el diente nuevo en el MISMO canal: en el cruce que Contra
+> gana (vs Press), −0.05 + diente (+0.05) = 0.00 — el diente se anulaba a sí mismo. Posesión
+> y Press no pagan costo de identidad, así que se quedaban con el diente entero en su propio
+> cruce favorable. Medido (banco BRA vs GER, n=2500/celda): Contra rendía −2.5pp de share
+> neto medio contra los 4 rivales (Press y Posesión +2.5pp), y terminaba siendo la peor
+> identidad de las cuatro pese a que Bloque paga MÁS costo en papel — su formación defensiva
+> 3-1-1 lo compensa; la 2-2-1 de Contra no tiene ese colchón. Retirado el costo, Contra juega
+> el ciclo en pie de igualdad con Press y Posesión.
+
+El Bloque además tiene su ARMA propia: balón parado ×1.3 (ajuste PO tras el primer gate —
 medía −5.5pp de piso con puros palos; el córner es el gol del bloque). Los **rasgos de
 Consolidada de F2 se FUSIONARON en las secuencias avanzadas** (M2, decisión PO): ya no
 bufean los tipos base — profundizan la avanzada de cada identidad (ver [SECUENCIAS

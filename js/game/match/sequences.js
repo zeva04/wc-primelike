@@ -488,20 +488,33 @@ export const CICLO_SHARE = 0.05;
 /**
  * Cuánto inclina la FILOSOFÍA el reparto de iniciativa. Dos sumandos:
  *
- * 1. COSTOS DE IDENTIDAD (F2, intactos): mi Contra cede posesión (−0.05) y mi Bloque
- *    cede volumen ofensivo (−0.08 — era −0.10, ajuste PO tras medir el gate: el
+ * 1. COSTOS DE IDENTIDAD (F2, con la fila de Contra RETIRADA): mi Bloque sigue
+ *    cediendo volumen ofensivo (−0.08 — era −0.10, ajuste PO tras medir el gate: el
  *    Bloque cargaba −5.5pp de piso); el rival que espera me la cede a mí (contra
  *    +0.04 · bloque +0.06). Son de la IDENTIDAD, no del cruce: se pagan contra todos.
  *
- * 2. EL CICLO (nuevo): ±CICLO_SHARE según `counterEdge`. Es de suma cero por
- *    construcción —`mineShare` es un solo número, así que lo que gano se lo saco—,
- *    y por eso el ciclo no puede inflar el partido: solo decide de quién es.
+ *    LA FILA DEL CONTRA (sprint del Rival que Decide, hallazgo post-cierre): el −0.05
+ *    de "mi Contra cede posesión" nació en F2 para compensar que el counter vivía en
+ *    el pool y necesitaba un costo. Con el pool degradado a narrador (0.0pp) ese costo
+ *    quedó huérfano, y se APILABA con el diente nuevo en el MISMO canal: en el cruce
+ *    que Contra gana (vs Press), −0.05 + diente (+0.05) = 0.00 — el diente se anulaba
+ *    a sí mismo. Posesión y Press no pagan costo de identidad, así que se quedaban con
+ *    el diente entero en su propio cruce favorable. Medido (banco BRA vs GER,
+ *    n=2500/celda): la fila de Contra rendía −2.5pp de share NETO medio contra los 4
+ *    rivales — Press y Posesión +2.5pp cada una — y eso bajaba al Contra a la peor
+ *    identidad de las cuatro en el resultado, pese a que Bloque paga MÁS costo en
+ *    papel (su formación defensiva 3-1-1 lo compensa; la 2-2-1 de Contra no tiene ese
+ *    colchón). Se retira el costo: Contra vuelve a jugar el ciclo en pie de igualdad
+ *    con Press y Posesión, como ellas dos.
+ *
+ * 2. EL CICLO: ±CICLO_SHARE según `counterEdge`. Es de suma cero por construcción
+ *    —`mineShare` es un solo número, así que lo que gano se lo saco—, y por eso el
+ *    ciclo no puede inflar el partido: solo decide de quién es.
  *
  * Puro.
  */
 export function filoShareShift(myFilo, oppFilo) {
   let d = 0;
-  if (myFilo?.id === "contra") d -= 0.05;
   if (myFilo?.id === "bloque") d -= 0.08;
   if (oppFilo?.id === "contra") d += 0.04;
   if (oppFilo?.id === "bloque") d += 0.06;
