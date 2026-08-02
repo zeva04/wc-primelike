@@ -8,7 +8,6 @@ import { RANDOM_EVENTS } from "../content/conflicts.js";
 import { OPPORTUNITIES } from "../content/opportunities.js";
 import { RARITIES } from "../content/rarities.js";
 import { addJournal } from "./journal.js";
-import { applyDailyRecovery } from "./medical.js";
 import { moraleBand, MORAL_INICIAL } from "./morale.js";
 import { playWorldDay } from "./tournament/world.js";
 
@@ -116,11 +115,12 @@ export function advanceDay(run) {
   run.dayMod = null; // los modificadores duran exactamente un día
   run.dayOpp = null; // la oportunidad no tomada ayer se perdió para siempre
   playWorldDay(run); // "anoche" el resto del Mundial jugó lo suyo (run.lastNight → Daily)
-  // El descanso pasivo es de la NOCHE anterior, así que lo cobra todo día nuevo — también
-  // el de partido (bug reportado por el PO, 21-jul-2026: se llegaba al partido sin haber
-  // recuperado nada de la víspera, castigando doble al que ya venía cansado).
   const esDiaDePartido = run.day >= run.nextMatchDay;
-  applyDailyRecovery(run, esDiaDePartido); // descanso pasivo (medical); la víspera rinde menos
+  // EL DESCANSO PASIVO SE ELIMINÓ (decisión PO, 2-ago-2026): pasar un día ya no
+  // recupera energía por sí solo — la ÚNICA fuente es la acción 🧘 Recuperar
+  // (`RECOVER_ENERGY`, day-action.js) o el descanso del banco al no jugar un partido
+  // (`REST_RECOVERY`, medical.applyMedicalPostMatch, que sigue vivo: rotar sigue
+  // siendo una estrategia real y distinta de gastar el día en Recuperar).
   if (esDiaDePartido) { run.actionPending = false; return { type: "match" }; }
   run.actionPending = true;
   const plan = run.dayPlan[run.day];

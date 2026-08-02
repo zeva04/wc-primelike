@@ -22,21 +22,8 @@ export function rollInjury() {
 // rápido (rotar importa) pero estar cansado no te deja inservible — así Entrenar deja de
 // ser una trampa sin regalar dificultad. Ver CORE §4 y §Energía.
 export const FATIGUE_PER_30 = 14;
-// Recuperación del que descansó todo el partido.
+// Recuperación del que descansó todo el partido (rotar sigue siendo una estrategia real).
 export const REST_RECOVERY = 30;
-// Recuperación pasiva: cada día de preparación el plantel descansa un poco (sin esto, el
-// cansancio de −42/partido entra en espiral y no hay forma de reponer a un titular fijo).
-// En M1 se probó 8→9 para cerrar el gate de la banda verde y se REVIRTIÓ (decisión PO):
-// la pasiva no discrimina — le devuelve el bache post-partido también al que recupera a
-// diario (cerró ~0.4pp de gap por punto) y solo infló el global abriendo el spread. El
-// gate se cerró por el umbral de la banda (match/powers.ENERGY_OK), no por acá.
-export const DAILY_RECOVERY = 7;
-// La VÍSPERA del partido rinde menos (Sprint 4): el día de partido también cobra descanso
-// pasivo —antes no cobraba nada, bug reportado por el PO— pero a tasa reducida: viaje al
-// estadio, charla técnica y nervios no son una jornada de recuperación. Es además el dial
-// FINO de la economía de energía: `DAILY_RECOVERY` mueve ~5pp de título por punto (medido),
-// así que el arreglo del bug entra por acá y no subiendo la recuperación de todos.
-export const MATCHDAY_RECOVERY = 2;
 
 // SPRINT 4 — interacción cruzada Energía → Lesión (decisión PO 21-jul-2026): las piernas
 // cansadas se rompen más. La escala arranca en FATIGUE_INJURY_FROM (energía 50) y crece
@@ -81,16 +68,6 @@ export function drainOppEnergy(lineup, minutos, factor = 1) {
     if (p.expulsado || p.lesionado) continue;
     p.energia = clamp((p.energia ?? 100) - gasto, 5, 100);
   }
-}
-
-/**
- * Descanso pasivo de un día: +DAILY_RECOVERY a todo el plantel, o +MATCHDAY_RECOVERY si el
- * día que arranca es de partido (la víspera rinde menos). Lo llama calendar.advanceDay en
- * TODO día nuevo — también el de partido (bug del PO, 21-jul-2026).
- */
-export function applyDailyRecovery(run, esDiaDePartido = false) {
-  const v = esDiaDePartido ? MATCHDAY_RECOVERY : DAILY_RECOVERY;
-  for (const p of run.squad) p.energia = clamp(p.energia + v, 5, 100);
 }
 
 /**

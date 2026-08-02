@@ -1319,7 +1319,7 @@ después el DT decide. No se puede pasar el día sin elegir. Las acciones
 | Acción | Efecto | Trade-off |
 |---|---|---|
 | 🎯/🛡️/🎩/🏹/💨 **Entrenar** (5 focos: ataque, defensa, pase corto, pase largo, velocidad) | +1 al buff de la stat elegida (`TRAIN_BUFF`) | **−5 de energía** a todo el plantel · el foco de **velocidad cansa −8** (`VELOCIDAD_FATIGUE_EXTRA`: son piques, no un rondo) |
-| 🧘 **Recuperar** | +10 de energía a todo el plantel (`RECOVER_ENERGY`, **dial cerrado**: barrido 10/15/20/25 en §10 — inerte para quien lo usa a diario y solo abarata el error del descuidado) | No mejora ninguna stat |
+| 🧘 **Recuperar** | +15 de energía a todo el plantel (`RECOVER_ENERGY`, subido de 10 el 2-ago-2026: desde que se retiró el descanso pasivo diario es la ÚNICA fuente de energía fuera del banco — ver §Energía) | No mejora ninguna stat |
 | 📋 **Plan de partido** (arco de Progresión) | **Declara la identidad del próximo partido** (4 focos = las 4 filosofías): pasa a ser la activa (sesga el pool) y su XP de ese partido rinde **×1.5** (`PLAN_XP_MULT`) | **No otorga NADA por sí mismo**: ni stats ni experiencia — el GDD prohíbe subir filosofías desde el menú. Se cobra jugando |
 | 🤝 **Team Bonding** (Sprint 3) | +10 a la **Moral del equipo** (`BONDING_MORAL`) | **−5 de energía** a todo el plantel (`BONDING_FATIGUE`) |
 
@@ -1414,32 +1414,42 @@ Las palancas de la economía:
   (`matchFatigue`: un titular de 90' pierde −42; un suplente que entra a los 30' del final,
   −14). Subió de −10 a −14 en el rebalance del 20-jul-2026, acoplado a bajar el peso de la
   energía en el rendimiento — hoy ese peso es la **banda verde** (§4): sobre 65 no pesa,
-  bajo 65 castiga convexo. El que **descansó** recupera **+30**. Entre partidos hay **recuperación pasiva**:
-  **+8 por día de preparación** y **+2 el día de partido** (`applyDailyRecovery`, en
-  `advanceDay`), más la acción Recuperar y varios eventos. Sin la pasiva, el cansancio entra en espiral (no hay forma de
-  reponer a un titular fijo) — medido: BRA se hunde a 5.9%; con la pasiva vuelve a 28.8%
-  (decisión PO 18-jul: el cansancio se siente como dificultad extra). Alimenta el factor de
-  `effStat` (§4), así que descuidar la energía castiga de verdad; obliga a **rotar y
-  recuperar**. Los rivales siempre están al 100% (asimetría en contra del DT humano).
-  Para poder decidir la rotación, la **Gestión de Plantilla muestra la energía de TODO el
-  plantel** ordenada del más cansado al más entero (Sprint 3). Y la oportunidad rara
-  **🛌 Plan de descanso a medida** (`descanso_dirigido`) recupera **+25 a UN jugador que
-  elige el DT** — el PO la quiso como evento raro y no como Acción del Día, para que la
-  rotación fina sea un premio ocasional y no una herramienta permanente (que habría
-  inflado la ventaja de energía del humano).
+  bajo 65 castiga convexo. El que **descansó** (no jugó ese partido) recupera **+30**
+  (`REST_RECOVERY`) — rotar sigue siendo una estrategia real. Alimenta el factor de
+  `effStat` (§4), así que descuidar la energía castiga de verdad. Los rivales siempre están
+  al 100% (asimetría en contra del DT humano). Para poder decidir la rotación, la
+  **Gestión de Plantilla muestra la energía de TODO el plantel** ordenada del más cansado
+  al más entero (Sprint 3). Y la oportunidad rara **🛌 Plan de descanso a medida**
+  (`descanso_dirigido`) recupera **+25 a UN jugador que elige el DT**.
 
-  > **La víspera del partido también descansa** (Sprint 4, bug reportado por el PO). Hasta el
-  > Sprint 3, `advanceDay` cobraba el descanso pasivo **solo en días de preparación**: al llegar
-  > el día de partido se salía antes del `applyDailyRecovery`, así que se jugaba sin haber
-  > repuesto nada de la noche anterior. Ahora **todo día nuevo recupera**, pero la víspera lo
-  > hace a tasa reducida (`MATCHDAY_RECOVERY = 2` vs `DAILY_RECOVERY = 8`): viaje a la sede,
-  > charla técnica y nervios no son una jornada de recuperación.
+  > ⛔ **SE ELIMINÓ EL DESCANSO PASIVO DIARIO (decisión PO, 2-ago-2026).** Hasta acá,
+  > `applyDailyRecovery` (en `advanceDay`) devolvía **+8 energía por día de preparación y
+  > +2 el día de partido** a TODO el plantel, jugara o no — pasar un día ya recuperaba solo.
+  > Se retiró por completo: la **ÚNICA** fuente de energía que queda fuera del banco
+  > (`REST_RECOVERY`, arriba) es la acción **🧘 Recuperar**. El objetivo del PO: que
+  > gestionar energía sea una decisión real y no un colchón que corre solo.
   >
-  > **Ojo con este dial: es el más sensible del juego.** Medido en este sprint, `DAILY_RECOVERY`
-  > mueve **~5pp de campeón por punto** (BRA n=1500: con 6 → 25.9%, con 7 → 30.7%), porque
-  > rompe o restaura la espiral de fatiga en vez de sumar linealmente. Arreglar el bug con la
-  > tasa completa (+8 el día de partido) valía **+6pp** — por eso el arreglo entró por una
-  > constante propia y reducida, y no subiendo la recuperación de todos.
+  > **El impacto medido confirmó por qué este dial estaba marcado como el más sensible del
+  > juego** (ver el párrafo histórico más abajo: ~5pp de campeón por punto). Sin compensar
+  > nada más, BRA n=4000: piso **19.2% → 6.3%** · techo `--smart` **30.7% → 13.3%**. Se
+  > compensó subiendo `RECOVER_ENERGY` (la acción Recuperar) de **10 a 15** — el barrido
+  > viejo de esta constante (ver más abajo) la había declarado INERTE, pero esa medición es
+  > de cuando el pasivo todavía vivía: sin él, el botón pasó a ser la única palanca y
+  > respondió fuerte. Con 15, BRA n=4000: piso **8.3%** · techo **27.1%**.
+  >
+  > **✅ NUEVOS ANCLAJES (reemplazan al piso ~19% / techo ~30% de §10): piso ~8% · techo
+  > ~27%.** El techo casi no se movió (−3.6pp: el DT que ya gestionaba energía a propósito
+  > absorbe el golpe); **el piso sí, y a propósito**: el que decide al azar ahora paga caro
+  > por no gestionar. Efecto de método, para la escalera de estrategias (§La escalera de
+  > estrategias más abajo): con el botón en 15, **Siempre Recuperar (11.0%) le gana al piso
+  > mixto (8.3%)** por primera vez — hoy administrar energía a rajatabla vale más que jugar
+  > "normal", aunque sigue muy lejos de `--smart` (27.1%).
+
+  > **Lo que sigue histórico, sin cambios de código:** hasta el 2-ago-2026, "la víspera del
+  > partido también descansa" arreglaba un bug donde el día de partido salía de `advanceDay`
+  > antes de cobrar el pasivo — ya no aplica, porque el pasivo entero se retiró. Y el barrido
+  > de `DAILY_RECOVERY`/`RECOVER_ENERGY` de abajo describe la economía ANTES del cambio:
+  > queda como referencia del método, no como valores vigentes.
 - **Ritmo / Oxidación** (R1, 22-jul-2026): la contracara de descansar. Cada día de
   preparación sin **Entrenar / Sesión Táctica / cambio de identidad** suma a
   `run.diasSinEntrenar`; al 3º el plantel se **oxida** y rinde menos en el próximo
@@ -1782,82 +1792,79 @@ nadie tiene la copa asegurada, que es exactamente el espíritu roguelike.
 > favorito > aspirante > sorpresa > legendaria, que sí sigue vigente y se cumple (NZL 2.2%,
 > CPV 2.4%).
 
-> ✅ **EL ANCLA VIGENTE DEL TECHO (decisión PO 1-ago-2026): ~30% para un favorito.** Había
-> tres números contradictorios y ninguno mandaba — el 12-17 de la tabla de arriba, el **~42
-> del arco del Rebalance** y lo que medía el juego. **Se resuelve así:**
+> ✅ **EL ANCLA (decisión PO 1-ago-2026, RE-ANCLADA 2-ago-2026 tras retirar el descanso
+> pasivo): piso ~8% · techo ~27% para un favorito.** Había tres números contradictorios y
+> ninguno mandaba — el 12-17 de la tabla de arriba, el **~42 del arco del Rebalance** y lo
+> que medía el juego. **Se resuelve así:**
 >
-> | | ancla |
-> |---|---|
-> | **piso** (BRA, decisiones al azar) | **~19%** |
-> | **techo** (BRA, `--smart`) | **~30%** |
+> | | ancla (1-ago) | **ancla vigente (2-ago)** |
+> |---|---|---|
+> | **piso** (BRA, decisiones al azar) | ~19% | **~8%** |
+> | **techo** (BRA, `--smart`) | ~30% | **~27%** |
 >
 > El **~42 pasa a ser historia**: era una medición pre-Escalada, nunca un objetivo. Y el
 > 12-17 se jubila como ancla por lo dicho arriba (se fijó contra un techo, con otro juego).
 > El ancla es de **dos números, no uno**: declarar solo el techo fue justamente lo que dejó
-> quince sprints derivando sin gate (ver el trinquete en §La Escalada). Medido el 1-ago-2026:
-> piso 18.8 · techo 30.6 (n=4000 cada uno), que cuadra con el 19.0/31.4 del cierre de la
-> Escalada. **Un dial que mueva cualquiera de los dos más de ~2pp necesita ok del PO.**
+> quince sprints derivando sin gate (ver el trinquete en §La Escalada). **Un dial que mueva
+> cualquiera de los dos más de ~2pp necesita ok del PO.**
+>
+> **El re-anclaje del 2-ago**: eliminar el descanso pasivo diario (`applyDailyRecovery`, ver
+> §Energía) y compensar subiendo `RECOVER_ENERGY` 10→15 movió los dos números — el piso
+> **~2.4×** más que el techo (piso 19.2→8.3 = −11pp · techo 30.7→27.1 = −3.6pp), porque el DT
+> que ya gestionaba energía a propósito absorbe casi todo el golpe y el que decide al azar,
+> no. **Es el efecto buscado por el PO**, no una deuda: gestionar energía pasa a discriminar
+> de verdad entre jugar bien y jugar a ciegas.
 >
 > 🆕 **UN TERCER NÚMERO, Y NO ROMPE EL TRINQUETE** (sprint del Rival que Decide): `--counter`
-> mide **~34%** — el mismo DT greedy, pero que lee la identidad del rival en el informe y
-> declara el Plan que la caza. **No reemplaza al techo: lo acompaña.** El techo sigue siendo
-> `--smart` (~30-31%) porque es contra esa vara que se fijaron las anclas, y cambiar su
-> política habría re-basado el número en silencio. Lo que mide `--counter` es otra cosa y hace
-> falta: **cuánto paga jugar mejor con la información que el juego ya da gratis.** Antes del
-> sprint ese DT medía 30.4% (nada), ahora 33.8%. Si algún día esa distancia se achica a cero,
-> el ciclo de counters se murió y nadie se iba a enterar sin esta vara.
+> — el mismo DT greedy, pero que lee la identidad del rival en el informe y declara el Plan
+> que la caza. **No reemplaza al techo: lo acompaña.** Medía 33.8% antes de este re-anclaje;
+> re-medido tras retirar el pasivo, **30.5%** — el +3.4pp de ventaja sobre `--smart` (27.1%)
+> se mantiene casi intacto.
 
-### La escalera de estrategias, y el PISO PLANO (decisión PO 1-ago-2026)
+### La escalera de estrategias, y el PISO PLANO (decisión PO 1-ago-2026, RE-MEDIDA 2-ago-2026)
 
-Medición vigente sobre el árbol post-Escalada (BRA, n=4000 por peldaño, `RECOVER_ENERGY=10`).
-**Reemplaza a la escalera del 29-jul que declara §4** (R4), obsoleta desde la Escalada:
+Medición vigente sobre el árbol post-Escalada (BRA, n=4000 por peldaño). **La columna del
+1-ago se midió CON el descanso pasivo diario vivo; la del 2-ago es DESPUÉS de retirarlo y
+subir `RECOVER_ENERGY` 10→15** (ver §Energía) — el economía completa cambió, así que se
+re-corrió la escalera entera, no solo el número que se tocó:
 
-| estrategia fija | 29-jul (pre-Escalada) | **1-ago (vigente)** |
-|---|---|---|
-| siempre Recuperar | 16.0 | **10.0** |
-| siempre Entrenar | 18.1 | **10.7** |
-| mixto (azar) | 27.8 / 27.3 | **18.8** |
-| smart (techo) | 42.2 / 41.9 | **30.6** |
+| estrategia fija | 29-jul (pre-Escalada) | 1-ago (con pasivo) | **2-ago (sin pasivo, vigente)** |
+|---|---|---|---|
+| siempre Recuperar | 16.0 | 10.0 | **9.9** |
+| siempre Entrenar | 18.1 | 10.7 | **4.5** |
+| mixto (azar = "el piso") | 27.8 / 27.3 | 18.8 | **8.3** |
+| smart (techo) | 42.2 / 41.9 | 30.6 | **27.1** |
+| smart + contra-elección (`--counter`) | — | — | **30.5** |
 
-> ⚖️ **LA LEY DEL PISO PLANO.** Recuperar (10.0) y Entrenar (10.7) quedaron **empatados
-> dentro del ruido** (0.7pp con ±0.9pp a n=4000). Los arcos anteriores lo habrían leído como
-> una deuda —la escalera del Rebalance se apoyaba en que Entrenar le ganara a descansar— y
-> **el PO decidió lo contrario: el empate es el objetivo.** Ninguna estrategia de un solo
-> botón, repetida a ciegas los 30 días, debe acercarse a la copa: *si no jugás inteligente,
-> difícilmente deberías ganar*. El premio no vive en elegir la acción correcta **una vez**,
-> vive en elegirla **según el día** — y eso es exactamente lo que separa al mixto (18.8) y
-> sobre todo al smart (30.6) del piso.
+> ⚠️ **LA LEY DEL PISO PLANO SE ROMPIÓ, y es una consecuencia directa y esperada del cambio
+> del 2-ago, no una regresión escondida.** Recuperar (9.9) y Entrenar (4.5) ya NO están
+> empatados: **5.4pp de gap**, muy por fuera del ruido (±0.9pp a n=4000). La razón es
+> mecánica: sin el pasivo, Entrenar sigue pagando su costo de energía (`TRAIN_FATIGUE`) SIN
+> nada que lo repare — cada día de Entrenar puro es un día que solo gasta. Recuperar, en
+> cambio, ahora es la única fuente de energía que existe fuera del banco, así que una
+> estrategia que SOLO recupera deja de ser "el descuidado que no gestiona" y pasa a ser "el
+> único que no se funde". **El objetivo declarado el 1-ago —ninguna estrategia de un solo
+> botón debe acercarse a la copa— sigue vigente y se sigue cumpliendo** (9.9 y 4.5 están los
+> dos muy lejos del smart, 27.1): lo que cambió es que ya no son *iguales* entre sí. Se deja
+> como **deuda abierta** para el próximo pase de balance del arco de energía — no se
+> compensa acá porque tocar `TRAIN_FATIGUE` o `TRAIN_BUFF` para volver a emparejarlas es un
+> dial nuevo que hay que medir aparte, y el PO priorizó cerrar el re-anclaje del piso/techo
+> primero.
 >
-> **Qué se gatea de ahora en más:** no la brecha Recuperar↔Entrenar (que puede ser 0), sino
-> que **las dos se queden en ~10 y bien por debajo del mixto**. Si un dial futuro levanta a
-> cualquiera de las dos por encima de ~15, volvió a existir un botón que se puede apretar sin
-> pensar. La distancia que importa es **piso → smart (hoy ~20pp)**.
+> **Qué se gatea de ahora en más:** que Recuperar y Entrenar se queden **bien por debajo del
+> mixto** (hoy 8.3) y muy por debajo del smart (27.1) — eso sigue intacto. La distancia que
+> importa, **piso → smart, hoy ~19pp** (era ~12pp con el pasivo vivo): se ENSANCHÓ, que es la
+> dirección correcta de la LEY del Rebalance (R4): la brecha entre jugar mal y jugar bien
+> tiene que crecer, no achicarse.
 
-> ⛔ **`RECOVER_ENERGY` NO es el dial para nada de esto (barrido del 1-ago-2026).** Medido en
-> 10/15/20/25 con las cuatro estrategias (n=4000 cada una), el resultado ordena el futuro:
->
-> | `RECOVER_ENERGY` | recuperar | entrenar | mixto | smart | **smart − mixto** |
-> |---|---|---|---|---|---|
-> | **10** (vigente) | 10.0 | 10.7 | 18.8 | 30.6 | **11.8pp** |
-> | 15 | 10.9 | 11.0 | 19.4 | 33.0 | 13.6pp |
-> | 20 | 9.8 | 10.7 | 22.9 | 32.1 | 9.2pp |
-> | 25 | 10.4 | 11.3 | 23.2 | 31.4 | **8.2pp** |
->
-> **1. El dial está saturado por arriba igual que por abajo.** El recuperador no se mueve
-> (10.0/10.9/9.8/10.4, rango 1.1pp = ruido): ya vive con la energía al tope. Es la misma
-> conclusión que el diagnóstico de §La Acción del Día sacó recortando 10→6, ahora comprobada
-> en la dirección contraria. **La constante es casi inerte para quien la usa todos los días.**
->
-> **2. A quien SÍ le paga es al mixto (+4.4pp), y por eso se descarta.** Al DT que descansa al
-> azar, en días que no lo necesitaba: el dial **abarata el error**. La brecha smart−mixto se
-> comprime de 11.8pp a 8.2pp — **un 30% menos de premio por jugar bien**. Es la inversión
-> exacta de la LEY de R4: la palanca tiene que encenderse porque estoy fuerte, no porque soy
-> descuidado. Al techo no lo mueve (30.6/33.0/32.1/31.4: serrucho sin tendencia) porque al
-> greedy la energía no le ata las manos — descansa reactivo bajo `ENERGY_OK` y ya.
->
-> **3. Y rompe el gate de la Escalada.** La CURVA del mixto en la final sube a **65.3% (20) y
-> 66.9% (25)** contra el objetivo ≤~62% del sprint. Los dos valores altos quedan descalificados
-> por dos motivos independientes. Se **mantiene en 10**.
+> 🗑️ **El barrido de `RECOVER_ENERGY` del 1-ago (10/15/20/25, que declaraba la constante
+> "casi inerte" y la dejaba fija en 10) quedó OBSOLETO por completo.** Se midió con el
+> pasivo diario todavía vivo, así que "inerte" describía un mundo donde el pasivo ya
+> mantenía a todos cerca del tope y el botón sobraba. Sin el pasivo el botón es la única
+> palanca que queda, y por eso ahora **si** responde — de 10 a 15 el piso subió de 6.3% a
+> 8.3% y el techo de 13.3% a 27.1% (medido en el re-anclaje de §Energía). Cualquier barrido
+> futuro de este dial tiene que correrse contra la economía SIN pasivo: la vieja tabla no
+> sirve ni de referencia.
 
 > **Cómo re-medir.** `tests/smoke.js` simula runs completas sin UI. `node tests/smoke.js --all`
 > corre las 23 jugables; `--smart` mide el techo de un DT competente y `--focus` el del árbol

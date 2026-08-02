@@ -1,10 +1,11 @@
 /* ============================================================
-   Tests del cuerpo médico y la economía de energía (game/medical.js
-   + el descanso pasivo que dispara game/calendar.js):
+   Tests del cuerpo médico y la economía de energía (game/medical.js):
    - cruce Energía → Lesión del Sprint 4 (fatigueInjuryMult)
-   - descanso pasivo diario y el de la VÍSPERA del partido, que
-     antes no se cobraba (bug del PO, 21-jul-2026)
    - cansancio por minutos (matchFatigue) derivado de la constante
+   - EL DESCANSO PASIVO DIARIO SE ELIMINÓ (decisión PO, 2-ago-2026):
+     pasar un día ya NO recupera energía por sí solo. La única fuente
+     es la acción 🧘 Recuperar o el descanso del banco al no jugar
+     (REST_RECOVERY, que sigue vivo — ver el bloque de abajo).
    Uso: node tests/medical.test.js
    ============================================================ */
 import { loadEngine } from "./load-engine.js";
@@ -30,36 +31,27 @@ assert(E.fatigueInjuryMult(undefined) === 1, "sin campo energía (rival/duck-typ
 // El cruce no puede convertir un golpe en lesión segura: 0.45 base × tope debe seguir < 1.
 assert(0.45 * E.FATIGUE_INJURY_MAX < 1, "ni con las piernas vacías el golpe es lesión garantizada", 0.45 * E.FATIGUE_INJURY_MAX);
 
-// ---------- descanso pasivo: día de preparación vs víspera de partido ----------
+// ---------- EL DESCANSO PASIVO NO EXISTE (decisión PO, 2-ago-2026) ----------
 {
-  const squadDe = (energia) => Array.from({ length: 6 }, (_, i) => ({ name: `P${i}`, energia }));
-  const prep = { squad: squadDe(50) };
-  E.applyDailyRecovery(prep);
-  assert(prep.squad.every(p => p.energia === 50 + E.DAILY_RECOVERY), `un día de preparación recupera +${E.DAILY_RECOVERY}`, prep.squad[0].energia);
+  assert(E.applyDailyRecovery === undefined, "applyDailyRecovery se borró: no queda ni la función muerta");
+  assert(E.DAILY_RECOVERY === undefined && E.MATCHDAY_RECOVERY === undefined, "y tampoco sus constantes");
 
-  const visperaRun = { squad: squadDe(50) };
-  E.applyDailyRecovery(visperaRun, true);
-  assert(visperaRun.squad.every(p => p.energia === 50 + E.MATCHDAY_RECOVERY), `la víspera del partido recupera +${E.MATCHDAY_RECOVERY}`, visperaRun.squad[0].energia);
-
-  assert(E.MATCHDAY_RECOVERY > 0, "el día de partido SÍ recupera algo (bug del PO: antes era 0)");
-  assert(E.MATCHDAY_RECOVERY < E.DAILY_RECOVERY, "pero menos que un día de preparación: viaje, charla y nervios no son descanso");
-
-  const tope = { squad: squadDe(99) };
-  E.applyDailyRecovery(tope);
-  assert(tope.squad.every(p => p.energia === 100), "la recuperación pasiva no pasa de 100", tope.squad[0].energia);
-}
-
-// ---------- el día de partido cobra su descanso pasando el día de verdad ----------
-{
+  // Pasar un día de preparación, jugando o no, no mueve la energía de nadie.
   const run = E.newRun("BRA");
-  // Llevar la run hasta la víspera: pasar días hasta que el siguiente sea el del partido.
+  run.squad.forEach(p => { p.energia = 40; });
+  E.advanceDay(run);
+  assert(run.squad.every(p => p.energia === 40), "un día de preparación NO recupera energía por sí solo", run.squad[0].energia);
+
+  // Tampoco la víspera del partido (antes recuperaba +2 — ya no).
   while (run.day < run.nextMatchDay - 1) E.advanceDay(run);
   run.squad.forEach(p => { p.energia = 40; });
   const res = E.advanceDay(run);
   assert(res && res.type === "match", "el día siguiente es el de partido", JSON.stringify(res));
-  assert(run.squad.every(p => p.energia === 40 + E.MATCHDAY_RECOVERY),
-    `se llega al partido con +${E.MATCHDAY_RECOVERY} de energía, no con 0`, run.squad[0].energia);
+  assert(run.squad.every(p => p.energia === 40), "la víspera del partido tampoco recupera nada", run.squad[0].energia);
   assert(run.actionPending === false, "el día de partido sigue sin Acción del Día (los días de partido son sagrados)");
+
+  // La única fuente pasiva que sigue viva: el banco que no jugó (REST_RECOVERY).
+  assert(E.REST_RECOVERY > 0, "el que no juega un partido sigue recuperando por rotar");
 }
 
 // ---------- cansancio por minutos (derivado de la constante, no hardcodeado) ----------

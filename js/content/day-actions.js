@@ -34,7 +34,14 @@ export const TRAIN_BUFF = 1;
 export const TRAIN_FATIGUE = 5;
 // El foco de velocidad cansa MÁS: correr piques no es lo mismo que un rondo (Odisea).
 export const VELOCIDAD_FATIGUE_EXTRA = 3;
-const RECOVER_ENERGY = 10;
+// SUBIÓ de 10 a 15 (decisión PO, 2-ago-2026): desde que se eliminó el descanso pasivo
+// diario (medical.applyDailyRecovery, retirado — CORE §9), Recuperar pasó de ser un
+// colchón opcional a la ÚNICA fuente de energía fuera del banco. El barrido viejo de
+// este dial (10/15/20/25 → 10.0/10.9/9.8/10.4, 1-ago-2026) medía con el pasivo TODAVÍA
+// vivo y por eso la constante salía inerte — "siempre Recuperar" ya vivía con la energía
+// al tope gracias al pasivo, así que subir el botón no cambiaba nada. Ese resultado quedó
+// obsoleto el mismo día que se retiró el pasivo: re-medir es obligatorio (ver CORE §9).
+const RECOVER_ENERGY = 15;
 // Team Bonding (Sprint 3, decisión PO 20-jul-2026): sube la Moral del equipo pero CUESTA
 // energía — la integración es una jornada más, no un descanso. Es la palanca para gestionar
 // la moral a voluntad, que desde el Sprint 2 tiene efecto real (menos conflictos de
