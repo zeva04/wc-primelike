@@ -1,31 +1,12 @@
-/* ============================================================
-   content/philosophies — las 4 Filosofías y las 5 aristas
-   COMO DATOS (arco de Filosofía F1, decisiones PO 22-jul-2026).
-   Ley: Bible §5 — la filosofía es un GENERADOR de secuencias
-   (sesga qué fútbol sale), no un modificador escondido.
+/* Las 4 Filosofías y las 5 aristas como datos. La filosofía es un GENERADOR de
+   secuencias: sesga qué fútbol sale, nunca es un modificador escondido.
 
-   La filosofía se COMPONE de 2 aristas transversales (decisión
-   PO #2): se entrenan por separado (focos de la Sesión Táctica)
-   y PERSISTEN al cambiar de filosofía — la demolición es
-   orgánica: tu inversión no se borra, simplemente la nueva
-   identidad combina otras aristas (costo hundido real).
+   Cada filosofía se compone de 2 aristas, que se entrenan por separado y
+   persisten al cambiar de identidad. Las reglas (nivel, progresión, cambio)
+   viven en game/philosophy.js. */
 
-   Cada arista mapea a UN tipo de secuencia del catálogo (mismo
-   icono a propósito: la arista ES ese fútbol). El tipo firma de
-   una filosofía es el de su arista `firma` — siempre del lado
-   "mine" (la progresión por ejecución debe depender de MI
-   fútbol, no de cuánto ataque el rival; por eso la firma del
-   Bloque bajo es el pelotazo y no el repliegue, cuyo premio
-   llega como rasgo consolidado en F2/F3).
-
-   Las reglas (nivel, progresión, cambio) viven en
-   game/philosophy.js; aquí solo datos y las primitivas de
-   mutación que usa content/ (ARQUITECTURA §4).
-   ============================================================ */
-
-// Las 5 aristas transversales (decisión PO #5). `tipo` = el tipo de secuencia
-// del catálogo (content/sequences.js) que ese fútbol genera. `stat` = la stat
-// que ese fútbol trabaja (la usa el evento "Ensayo de la firma", F3).
+// `tipo` = el tipo de secuencia (content/match/sequences.js) que ese fútbol
+// genera. `stat` = la stat que ese fútbol trabaja.
 export const ARISTAS = [
   { id: "presion",      icon: "🦁", label: "Presión",      desc: "cazar arriba",          tipo: "recuperacion", stat: "defensa" },
   { id: "elaboracion",  icon: "🎼", label: "Elaboración",  desc: "tener y circular",      tipo: "circulacion",  stat: "pase_corto" },
@@ -36,32 +17,21 @@ export const ARISTAS = [
 
 export const aristaById = id => ARISTAS.find(a => a.id === id);
 
-/* Las ETAPAS de identidad (los 3 niveles originales de F1, valores EXACTOS —
-   mult ×1.35/×1.7/×2.1 calibrados en F1). Desde el arco de Rasgos (T1) son la
-   vista narrativa Y la escala técnica del RIVAL: rivalFiloLevel, la brecha R3
-   (identityGapMult), los gates de la avanzada y el scouting siguen operando
-   etapa vs etapa — CERO recalibración del Rebalance. */
+/* Las 3 etapas de identidad: vista narrativa Y escala técnica del rival (la
+   brecha, los gates de la avanzada y el scouting operan etapa vs etapa). */
 export const FILO_ETAPAS = [
   { id: "aprendiendo", label: "Aprendiendo",   min: 0, mult: 1.35 },
   { id: "desarrollo",  label: "En desarrollo", min: 4, mult: 1.7 },
   { id: "consolidada", label: "Consolidada",   min: 9, mult: 2.1 },
 ];
 
-/* ============================================================
-   LA ESCALERA DE 10 NIVELES, AHORA POR EXPERIENCIA (arco de
-   Progresión, 28-jul-2026). Las 4 filosofías progresan por
-   SEPARADO y solo con XP ganada EN LA CANCHA (y en eventos):
-   se aprende el fútbol que se juega, como las habilidades de
-   Skyrim. `min` es XP ACUMULADA; `mult` interpola ×1.35→×2.10
-   y sesga MI tipo firma; `etapa` indexa FILO_ETAPAS (Desarrollo
-   nivel 5, Consolidada nivel 10 — las anclas de F1 intactas).
+/* LA ESCALERA DE 10 NIVELES. Las 4 filosofías progresan por separado y solo con
+   XP ganada en la cancha: se aprende el fútbol que se juega. `min` es XP
+   ACUMULADA, `mult` interpola ×1.35→×2.10 y `etapa` indexa FILO_ETAPAS.
 
-   La curva: costos crecientes 250·300·360·430·510·600·700·810·930.
-   Está calibrada para que una run PERFECTA (8 partidos jugando
-   siempre la misma idea, con el Plan de Partido puesto y la
-   afinidad de la filosofía inicial) llegue al nivel 10 — y una
-   run promedio deje a la principal en 6-8. Es el dial declarado
-   del arco: si el techo se alcanza demasiado fácil, sube acá. */
+   DIAL: el costo de cada nivel. Calibrado para que una run perfecta (8 partidos
+   con la misma idea, Plan de Partido puesto y afinidad) llegue a 10 y una run
+   promedio deje la principal en 6-8. Si el techo se alcanza fácil, subir acá. */
 const FILO_XP_STEPS = [250, 300, 360, 430, 510, 600, 700, 810, 930];
 export const FILO_LEVELS = Array.from({ length: 10 }, (_, i) => ({
   min: FILO_XP_STEPS.slice(0, i).reduce((s, x) => s + x, 0),
@@ -69,17 +39,14 @@ export const FILO_LEVELS = Array.from({ length: 10 }, (_, i) => ({
   etapa: i >= 9 ? 2 : i >= 4 ? 1 : 0,
 }));
 
-/* La XP del partido (el 70/30 del GDD): la INTENCIÓN paga por cada jugada de ese
-   fútbol que el equipo propone; la EFECTIVIDAD paga por cada acto que sale bien
-   (y por el gol que la corona). Con ~10 jugadas y ~10 aciertos del tipo propio,
-   el reparto queda 140/60 = 70/30 exacto. Los dos son diales del arco. */
+/* DIALES de la XP del partido: la INTENCIÓN paga por cada jugada de ese fútbol
+   que el equipo propone, el ACIERTO por cada acto que sale bien. Calibrados para
+   un reparto 70/30 con ~10 jugadas y ~10 aciertos del tipo propio. */
 export const XP_INTENCION = 73;
 export const XP_ACIERTO = 32;
 
-/* Qué filosofía APRENDE cada tipo de secuencia del catálogo (content/sequences):
-   la arista ya mapeaba tipo↔fútbol, esto lo lleva a la filosofía dueña. Las
-   secuencias AVANZADAS traen su `advFor` y mandan sobre esta tabla. El balón
-   parado y la salida de fondo no enseñan nada: no son identidad de nadie. */
+/* Qué filosofía APRENDE cada tipo de secuencia. Las avanzadas traen su `advFor`
+   y mandan sobre esta tabla; el balón parado no enseña nada. */
 export const FILO_BY_TIPO = {
   recuperacion: "press",      // cazar arriba
   circulacion: "posesion",    // tener y circular
@@ -93,11 +60,10 @@ export const FILO_BY_TIPO = {
 };
 export const filoOfType = (type) => type?.advFor || FILO_BY_TIPO[type?.id] || null;
 
-/* LA AFINIDAD (GDD): la filosofía INICIAL de la run decide a qué velocidad se
-   aprenden las demás. Eje proactivo (Press · Posesión) vs reactivo (Contra ·
-   Bloque): tu vecina de eje te resulta natural, tu cruzada se te resiste.
-   Propia ×2 · cercana ×1.25 · neutral ×1 · opuesta ×0.6. Incentiva especializar
-   sin cerrar ninguna puerta: la opuesta progresa, solo que más lento. */
+/* LA AFINIDAD: la filosofía INICIAL decide a qué velocidad se aprenden las demás.
+   Eje proactivo (Press · Posesión) vs reactivo (Contra · Bloque): la vecina de eje
+   resulta natural, la cruzada se resiste. Ninguna puerta se cierra: la opuesta
+   progresa, solo que más lento. DIAL: los multiplicadores. */
 export const AFINIDAD = {
   press:    { press: 2, posesion: 1.25, contra: 1,    bloque: 0.6 },
   posesion: { posesion: 2, press: 1.25, contra: 1,    bloque: 0.6 },
@@ -107,28 +73,11 @@ export const AFINIDAD = {
 export const AFINIDAD_LABEL = { 2: "tu escuela", 1.25: "afín", 1: "neutral", 0.6: "opuesta" };
 export const afinidadMult = (inicial, target) => AFINIDAD[inicial]?.[target] ?? 1;
 
-/* ============================================================
-   EL CICLO DE COUNTERS (sprint del Rival que Decide, decisión
-   PO 1-ago-2026). El array ES el ciclo: cada identidad le gana
-   a la SIGUIENTE, y da la vuelta.
-
-     Press > Posesión > Bloque > Contra > Press
-
-   Los neutros caen solos —son los que quedan a distancia 2—:
-   Press↔Bloque y Posesión↔Contra. No hay que declararlos, y por
-   eso no pueden divergir del ciclo.
-
-   Se declara UNA vez y de acá lo derivan todos: la matriz de
-   pool (match/sequences), el reparto de pelota (filoShareShift,
-   que es donde MUERDE — ver ROADMAP-rival §2), el informe del
-   ojeador y el DT contra-elector del smoke.
-
-   Por qué este ciclo y no otro (diagnóstico medido): respeta 3
-   de las 4 aristas que F2 ya había implementado —Press>Posesión,
-   Bloque>Contra y Contra>Press— y solo da vuelta la que estaba
-   rota. El cruce Posesión↔Bloque era LOSE-LOSE (las dos
-   direcciones penalizadas) y su prosa se contradecía a sí misma.
-   ============================================================ */
+/* EL CICLO DE COUNTERS. El array ES el ciclo: cada identidad le gana a la
+   SIGUIENTE y da la vuelta — Press > Posesión > Bloque > Contra > Press. Los
+   neutros caen solos (los que quedan a distancia 2), así que no pueden divergir.
+   Se declara UNA vez: de acá lo derivan la matriz de pool, el reparto de pelota,
+   el informe del ojeador y el rival que reacciona. */
 export const COUNTER_CYCLE = ["press", "posesion", "bloque", "contra"];
 
 /** La PRESA de cada identidad: a quién le gana. Derivado del ciclo. */
@@ -153,12 +102,8 @@ export function counterEdge(myId, oppId) {
   return 0;
 }
 
-/* Las 4 filosofías (decisión PO #5): combinación de 2 aristas; `firma` es la
-   arista que define su fútbol (su `tipo` es el tipo firma del pool). `fuerte` y
-   `advertencia` anticipan la matriz de counters de F2 (regla 4 del Bible: toda
-   filosofía con fortalezas Y vulnerabilidades VISIBLES desde la elección).
-   `rasgo` es el premio de Consolidada — en F1 es promesa visible (dato y UI);
-   su efecto mecánico llega con la matriz en F2/F3. */
+/* Las 4 filosofías: combinación de 2 aristas; `firma` es la que define su fútbol.
+   `fuerte` y `advertencia` hacen VISIBLE el matchup desde la elección. */
 export const PHILOSOPHIES = [
   {
     id: "press", icon: "🦁", name: "High Press",

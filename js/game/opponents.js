@@ -5,7 +5,7 @@
 import { rnd } from "../core/rng.js";
 import { clamp } from "../core/math.js";
 import { STAT_KEYS, GK_STAT_KEYS, playerOverall, teamRating } from "./ratings.js";
-import { TEAM_PHILOSOPHIES, FILO_FORMATION } from "../content/team-philosophies.js";
+import { TEAM_PHILOSOPHIES, FILO_FORMATION } from "../content/identity/team-philosophies.js";
 import { getFormation } from "./lineup.js";
 
 // Desvíos por posición al derivar stats desde el rating del equipo

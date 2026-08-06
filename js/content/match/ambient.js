@@ -1,19 +1,13 @@
-/* ============================================================
-   content/ambient — el pool de relato ambiente del partido (A3).
-   Cada línea es DATOS: cuándo aplica (`when` sobre el ctx que arma
-   Match._ambientLine — nunca sobre la run), cuánto pesa frente a
-   las genéricas (`w`, las contextuales dominan cuando aplican) y
-   su texto. El ambiente LEE el partido: anticipa en el relato lo
-   que el contexto dinámico ya hace en el generador (perder tarde
-   vuelca al ataque, el cansancio pesa, la moral se nota).
+/* El pool de relato ambiente del partido. Cada línea declara cuándo aplica
+   (`when` sobre el ctx del partido, nunca sobre la run), cuánto pesa frente a las
+   genéricas (`w`) y su texto.
 
    ctx: { min, late (>=75'), diff (gMy−gOpp), myReds, oppReds,
           tired (energía media <55), band (banda de Moral),
           net (momentum últimos 15': mío − rival),
-          filo (id de mi filosofía o null), filoLvl (0..2) — F3 }
+          filo (id de mi filosofía o null), filoLvl (0..2) }
 
-   Agregar una línea = agregar una fila (cero lógica de sistema).
-   ============================================================ */
+   Agregar una línea = agregar una fila. */
 export const AMBIENT_LINES = [
   // --- genéricas (siempre aplican, peso base) ---
   { when: () => true, w: 1, text: () => "El partido se juega en el mediocampo." },

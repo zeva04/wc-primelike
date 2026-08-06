@@ -7,7 +7,7 @@
 import { getTeam } from "../../../data/teams-repo.js";
 import { playerOverall } from "../../../game/ratings.js";
 import { applyDayAction, dayOpportunity } from "../../../game/day-action.js";
-import { RARITIES } from "../../../content/rarities.js";
+import { RARITIES } from "../../../content/daily/rarities.js";
 import { buildOpponentReport } from "../../../game/scouting.js";
 import { S } from "../../session.js";
 import { flagImg, modal, closeModal, toast } from "../../components.js";

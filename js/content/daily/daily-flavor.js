@@ -1,12 +1,8 @@
-/* ============================================================
-   content/daily-flavor — titulares "de color" del World Cup
-   Daily (Bible §4.4, Prioridad 4): noticias de bajo impacto que
-   hacen sentir vivo el Mundial. Solo aparecen en días tranquilos
-   (máximo 1 por edición) — si todos los días son espectaculares,
-   ninguno lo es.
+/* Titulares "de color" del World Cup Daily: noticias de bajo impacto que hacen
+   sentir vivo el Mundial. Solo aparecen en días tranquilos (máximo 1 por
+   edición) — si todos los días son espectaculares, ninguno lo es.
 
-   Agregar una línea = agregar una fila {icon, text}. Nada más.
-   ============================================================ */
+   Agregar una línea = agregar una fila {icon, text}. */
 
 export const DAILY_FLAVOR = [
   { icon: "🎟️", text: "Récord histórico de asistencia: los estadios de las tres sedes rozan el lleno total." },

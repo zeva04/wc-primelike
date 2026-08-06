@@ -4,11 +4,11 @@ Documento de referencia del arco de Rasgos (T1–T3, cerrado 23-jul-2026). Lista
 rasgos vivos con su efecto mecánico ("buff"), su costo/tradeoff real, y el árbol de
 dependencias para desbloquear cada uno. Diseño narrativo completo en
 [ROADMAP-rasgos.md](ROADMAP-rasgos.md); datos fuente en
-[content/traits.js](../js/content/traits.js).
+[content/traits/](../js/content/traits/).
 
 > ✅ **Al día con el código al 1-ago-2026** (64 rasgos: Press 18 · Posesión 15 ·
 > Contragolpe 16 · Bloque bajo 15), regenerado desde
-> [content/traits.js](../js/content/traits.js), que es siempre la fuente de verdad.
+> [content/traits/](../js/content/traits/), que es siempre la fuente de verdad.
 > *Historia: las cuatro filosofías se rediseñaron DESPUÉS de cerrar el arco T1-T3, y este
 > documento quedó describiendo el árbol viejo de 9 nodos para Press y Posesión hasta que se
 > regeneró.*

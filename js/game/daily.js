@@ -28,9 +28,9 @@ import { teamRating, difficultyOf } from "./ratings.js";
 import { moraleBand } from "./morale.js";
 import { computeTable } from "./tournament/groups.js";
 import { nextOpponentId, STAGE_LABEL } from "./tournament/knockout.js";
-import { DAILY_FLAVOR } from "../content/daily-flavor.js";
-import { PREP_EVENTS } from "../content/prep-events.js";
-import { RANDOM_EVENTS } from "../content/conflicts.js";
+import { DAILY_FLAVOR } from "../content/daily/daily-flavor.js";
+import { PREP_EVENTS } from "../content/daily/prep-events.js";
+import { RANDOM_EVENTS } from "../content/daily/conflicts.js";
 import { buildOpponentReport } from "./scouting.js";
 
 // H6 (sprint Preparación con dientes): el framing de la previa cita UN dato del

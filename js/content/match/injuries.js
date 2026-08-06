@@ -1,12 +1,8 @@
-/* ============================================================
-   content/injuries — tabla de lesiones (FEAT-002).
-   Cada una tiene severidad, `partidos` de baja (recuperación) y
-   `peso` (probabilidad relativa de ocurrir). `partidos: 0` =
-   lesión menor: obliga a salir del partido actual pero el
-   jugador está disponible para el siguiente.
+/* Tabla de lesiones. Cada una tiene severidad, `partidos` de baja y `peso`
+   (probabilidad relativa de ocurrir). `partidos: 0` = lesión menor: obliga a
+   salir del partido actual pero el jugador llega al siguiente.
 
-   Agregar una lesión nueva = agregar una fila. Nada más.
-   ============================================================ */
+   Agregar una lesión = agregar una fila. */
 
 export const INJURY_TYPES = [
   { name: "Calambre",                     severidad: "Leve",     partidos: 0, peso: 22 },

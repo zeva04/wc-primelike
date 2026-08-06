@@ -11,7 +11,7 @@
 import { matchStats } from "../../../game/match/stats.js";
 import { momentumBars } from "../../../game/match/match-momentum.js";
 import { heatCells } from "../../../game/match/field.js";
-import { PHILOSOPHIES, FILO_LEVELS, xpLevelOf } from "../../../content/philosophies.js";
+import { PHILOSOPHIES, FILO_LEVELS, xpLevelOf } from "../../../content/identity/philosophies.js";
 import { S } from "../../session.js";
 import { $, heatPitch } from "../../components.js";
 

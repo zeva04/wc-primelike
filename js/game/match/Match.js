@@ -36,7 +36,7 @@ import { identityGapMult } from "../philosophy.js";
 import { canPlayAt } from "../lineup.js";
 import { playedPos } from "../ratings.js";
 import { moraleBand } from "../morale.js";
-import { AMBIENT_LINES } from "../../content/ambient.js";
+import { AMBIENT_LINES } from "../../content/match/ambient.js";
 import { teamPowers } from "./powers.js";
 import * as Chances from "./chances.js";
 import * as Sequences from "./sequences.js";
@@ -278,7 +278,7 @@ export class Match {
     if (this._roll(0.10)) return this._foulEvent();
     if (this._roll(0.028)) return this._injuryEvent();
 
-    // Relato ambiente contextual (A3): el pool vive en content/ambient.js y LEE el partido.
+    // Relato ambiente contextual (A3): el pool vive en content/match/ambient.js y LEE el partido.
     if (this._roll(AMBIENT_LINE)) this.log("plain", this._ambientLine());
     return false;
   }

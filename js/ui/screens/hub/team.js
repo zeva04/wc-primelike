@@ -6,8 +6,8 @@
    ============================================================ */
 import { getFormation } from "../../../game/lineup.js";
 import { canjeableBuffs, canjeBuff } from "../../../game/day-action.js";
-import { CANJE_THRESHOLD, CANJE_PERMANENT, STAT_LABELS } from "../../../content/day-actions.js";
-import { getPhilosophy, FILO_LEVELS, FILO_ETAPAS } from "../../../content/philosophies.js";
+import { CANJE_THRESHOLD, CANJE_PERMANENT, STAT_LABELS } from "../../../content/daily/day-actions.js";
+import { getPhilosophy, FILO_LEVELS, FILO_ETAPAS } from "../../../content/identity/philosophies.js";
 import { filoPoints, filoLevel, filoEtapa } from "../../../game/philosophy.js";
 import { dtProgress, DT_MAX } from "../../../game/coach.js";
 import { moraleBand } from "../../../game/morale.js";

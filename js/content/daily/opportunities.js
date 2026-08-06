@@ -1,42 +1,29 @@
-/* ============================================================
-   content/opportunities — Eventos de Oportunidad (Bible §4.5):
-   ofertas únicas que COMPITEN con la Acción del Día. Tomarla
-   consume la acción de hoy (day-action.js); dejarla pasar la
-   pierde para siempre, sin rastro (el silencio es el costo).
+/* Eventos de Oportunidad: ofertas únicas que COMPITEN con la Acción del Día.
+   Tomarla consume la acción de hoy; dejarla pasar la pierde para siempre.
 
-   Reglas del sistema (decisiones del PO, 16-jul-2026):
-   - Máx 1 por ventana entre partidos; ~20% de los días libres
-     la sortean (calendar.js, OPPORTUNITY_CHANCE).
-   - El modificador del día (run.dayMod) NO la escala ni la
-     bloquea: es un premio externo, no una acción del club.
-   - El calendario NO la anticipa (sin `tema`) y el Daily no la
-     pronostica (sin `teaser`): la sorpresa es parte del diseño.
+   - Máx 1 por ventana entre partidos; ~20% de los días libres la sortean.
+   - El modificador del día NO la escala ni la bloquea: es un premio externo.
+   - Sin `tema` ni `teaser`: no se anticipa, la sorpresa es parte del diseño.
 
-   La tentación es que rinde MÁS que una acción normal del mismo
-   corte — el trade-off no está en el efecto sino en el costo de
-   oportunidad: tomarla es renunciar a entrenar/recuperar/táctica.
-   A mayor rareza, mayor premio (misma escala que prep-events).
-   Pool de 20 elegido por el PO: 5 comunes · 7 infrecuentes ·
-   6 raras · 2 legendarias (la distribución es LEY en el validador).
+   Rinde MÁS que una acción normal: el trade-off no está en el efecto sino en el
+   costo de oportunidad. A mayor rareza, mayor premio. El pool es 5 comunes ·
+   7 infrecuentes · 6 raras · 2 legendarias, y esa distribución es LEY en el
+   validador (tests/events.validate.js).
 
-   `choose` (opcional) convierte la oportunidad en una DECISIÓN con
-   protagonista: el DT elige a qué jugador apunta el premio.
+   `choose` (opcional) la convierte en una DECISIÓN con protagonista:
      choose: { label: "pregunta para la UI", candidates: run => [jugadores] }
-   Su `effect(run, jugador)` recibe al elegido; day-action valida
-   que el objetivo esté entre los candidatos (por nombre, §3.1).
+   Su `effect(run, jugador)` recibe al elegido; day-action valida el objetivo.
 
-   `effect(run)` puede devolver un string para reemplazar `desc`
-   (oportunidades con protagonista). Solo sistemas existentes:
-   buffs, energía, lesiones, mejora permanente. Ni dinero ni moral.
+   `effect(run)` puede devolver un string que reemplaza `desc`. Solo sistemas
+   existentes: buffs, energía, lesiones, mejora permanente.
 
-   Agregar una oportunidad = agregar una fila con su `rareza`.
-   ============================================================ */
-import { clamp } from "../core/math.js";
-import { addFiloProgress } from "./philosophies.js";
+   Agregar una oportunidad = agregar una fila con su `rareza`. */
+import { clamp } from "../../core/math.js";
+import { addFiloProgress } from "../identity/philosophies.js";
 
-// Descanso dirigido (Sprint 3, decisión PO 20-jul-2026): el PO lo quiso como EVENTO RARO
-// con protagonista elegido, no como Acción del Día — así la rotación fina es un premio
-// ocasional y no una herramienta permanente (que habría inflado la ventaja de energía).
+// Descanso dirigido: es un EVENTO raro con protagonista elegido y no una Acción
+// del Día, para que la rotación fina sea un premio ocasional y no una herramienta
+// permanente (que inflaría la ventaja de energía).
 const DESCANSO_ENERGIA = 25;
 
 const buff = (r, k, v) => { r.buffs[k] = (r.buffs[k] || 0) + v; };

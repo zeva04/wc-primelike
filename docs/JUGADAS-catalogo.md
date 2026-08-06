@@ -4,7 +4,7 @@ Inventario de **todo lo que puede ocurrir dentro de un partido hoy**, con sus
 resoluciones. Sin números: qué se juega, qué decide el DT y en qué puede terminar.
 
 Documento de referencia para el sprint de **situaciones de juego**. Fuente:
-[content/sequences.js](../js/content/sequences.js) (los tipos),
+[content/match/sequences.js](../js/content/match/sequences.js) (los tipos),
 [sequence-acts.js](../js/game/match/sequence-acts.js) (los actos y sus desenlaces),
 [chances.js](../js/game/match/chances.js) (ocasiones sueltas y goles),
 [incidents.js](../js/game/match/incidents.js) (faltas y lesiones),

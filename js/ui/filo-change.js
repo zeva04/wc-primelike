@@ -14,7 +14,7 @@
    le sirve a la identidad nueva (el costo hundido, a la vista
    antes de firmar).
    ============================================================ */
-import { PHILOSOPHIES, aristaById, filoLevelOf } from "../content/philosophies.js";
+import { PHILOSOPHIES, aristaById, filoLevelOf } from "../content/identity/philosophies.js";
 import { changePhilosophy } from "../game/philosophy.js";
 import { S } from "./session.js";
 import { modal, closeModal, toast } from "./components.js";

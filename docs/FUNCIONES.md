@@ -239,7 +239,7 @@ con su resolución **intacta**; los remates no interactivos pasaron a `chances.a
 | `actOppShot(m,shooter,mine,{stat,bonus})` | Remate rival ante mi arquero. `stat` cabezazo (córner en contra), `bonus` el perfil. `ok` = gol rival. |
 | `actAerial(m,p,{handicap})` (A2) | Duelo aéreo: pesa el **Cabezazo** contra la zaga rival; `handicap` para la peinada al espacio. |
 
-**`game/match/sequences.js` — el GENERADOR** (+ `content/sequences.js` = los tipos como datos):
+**`game/match/sequences.js` — el GENERADOR** (+ `content/match/sequences.js` = los tipos como datos):
 | Función | Qué hace |
 |---|---|
 | `maybeStartSequence(m)` | ¿Arranca una secuencia este tick? Sobre la marcha, apuntando al objetivo del partido (5-9). Cada jugada tiene una **ventana** `abre`…`cierra` (sprint de la Densidad): sale en cuanto la pelota deja el mediocampo (`zonaViva`) y, si el partido sigue trabado, al vencer. El lado sale de `mineShare` (ventaja + mentalidad VIVA **+ contexto A3**: marcador tardío ±0.07/−0.05 desde el 75' y rojas ±0.06 por expulsado, leídos EN VIVO). |
@@ -279,7 +279,7 @@ Lo que sigue documenta los actos por dentro (dónde vive cada uno se lee en la t
 | `constructor(my, oppTeam, knockout, oppBanned)` | Inicializa el partido (`my` = {team, lineup, bench, mentalidad, buffs, **moral** (A3)}; `oppBanned` = suspendidos del rival por rojas del mundo vivo). |
 | `log(kind,text)` | Agrega una línea al relato (kind define el estilo visual). |
 | `flow()` (A3, decisión #11) | Posesión % mía y momentum (neto de los últimos 15') DERIVADOS de `m._flow` (todo lo generado: secuencia 3 · penal/mano a mano 2 · ambiente 1, con prior neutral). La UI pinta; acá solo se deriva. |
-| `_ambientLine()` (A3) | Arma el ctx del partido (marcador, rojas, fatiga, banda de Moral, momentum) y elige del pool `content/ambient.js` (contextuales pesan 2-3×). |
+| `_ambientLine()` (A3) | Arma el ctx del partido (marcador, rojas, fatiga, banda de Moral, momentum) y elige del pool `content/match/ambient.js` (contextuales pesan 2-3×). |
 | `activeMine()` | Mis jugadores en cancha (sin expulsados ni lesionados). |
 | `availableBench()` | Suplentes que aún pueden entrar. |
 | `eligibleFor(out)` | Suplentes elegibles para reemplazar a `out`. Regla **simétrica** vía `lineup.canPlayAt`: el arco solo lo cubre un arquero **y** un arquero no sale a la cancha. Antes solo se vigilaba una dirección y se podía mandar a un jugador de campo al arco: el equipo quedaba sin arquero y con 6 de campo. |
@@ -390,7 +390,7 @@ Forma y Ánimo mutando `p.momento`/`r.moral` con primitivas + clamp, sin importa
 `game/` — y `mod` opcional
 que modifica las Acciones del Día vía `run.dayMod`), `RANDOM_EVENTS` (6 conflictos con
 decisión, también con `tema`) y `DAY_ACTIONS` (6 Acciones del Día en
-`content/day-actions.js`: 3 focos de entrenamiento con `group:"entrenar"`, recuperación,
+`content/daily/day-actions.js`: 3 focos de entrenamiento con `group:"entrenar"`, recuperación,
 sesión táctica y **Team Bonding** (+Moral, −energía; muta `run.moral` con clamp sin importar
 `game/`); los `effect(run, mult)` escalan su recompensa — no el costo — por el
 modificador; exporta también `TRAIN_BUFF` (+1), `TRAIN_FATIGUE`, `BONDING_MORAL`,
@@ -399,7 +399,7 @@ constantes del canje `CANJE_THRESHOLD` (+4), `CANJE_PERMANENT` (+1), `CANJEABLE_
 `STAT_LABELS`).
 También `DAILY_FLAVOR` (12 titulares de color `{icon, text}` para el World Cup Daily,
 máximo 1 por edición y solo en días tranquilos) y `OPPORTUNITIES`
-(`content/opportunities.js`: 19 Eventos de Oportunidad — Bible §4.5 — que compiten con
+(`content/daily/opportunities.js`: 19 Eventos de Oportunidad — Bible §4.5 — que compiten con
 la Acción del Día, distribución 5/7/5/2 por rareza elegida por el PO; con `rareza` pero
 SIN `tema` ni `teaser` porque ni el calendario ni el Daily las anticipan; máx 1 por
 ventana, el modificador del día no las toca, y la que no se toma expira sin rastro.

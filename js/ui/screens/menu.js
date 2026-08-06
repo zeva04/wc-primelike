@@ -5,7 +5,7 @@
 import { allTeams } from "../../data/teams-repo.js";
 import { pick } from "../../core/rng.js";
 import { teamRating, teamStars, playerOverall, statLine, difficultyOf, teamFigure } from "../../game/ratings.js";
-import { teamDesc } from "../../content/team-flavor.js";
+import { teamDesc } from "../../content/identity/team-flavor.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenFull, fitScaleUp, $, flagImg, starsHtml, posBadge, numTag } from "../components.js";

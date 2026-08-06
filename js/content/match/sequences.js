@@ -1,45 +1,26 @@
-/* ============================================================
-   content/sequences — el catálogo de tipos de Key Sequence
-   (Bible §7). Cada tipo es DATOS: su identidad, quién tiende a
-   protagonizarla y su FORMA (el plan de actos y el flavor). La
-   máquina que los resuelve vive en game/match/sequences.js y la
-   matemática de cada gesto en game/match/actions.js — acá no hay
-   reglas, solo la caracterización (ARQUITECTURA §3: content =
-   datos + flavor, cero lógica de sistema).
+/* El catálogo de tipos de Key Sequence. Cada tipo es su identidad, quién tiende a
+   protagonizarlo y su FORMA (el plan de actos y el flavor). La máquina que los
+   resuelve vive en game/match/sequences.js: acá no hay reglas ni pesos.
 
-   `side`: "mine" (yo ataco) | "opp" (yo defiendo). El generador
-   reparte el partido entre ofensivas y defensivas según la
-   preparación (Bible: la mala preparación produce más defensivas).
+   `side`: "mine" (yo ataco) | "opp" (yo defiendo).
 
-   `plan`: la secuencia MÁXIMA de actos (Bible §7 "1 a 3 actos,
-   variable" — decisión PO). El último acto es el desenlace
-   (remate / atajada); los previos construyen. El fallo de un acto
-   cierra la secuencia... o ENCADENA (Sprint A2, regla 7 del Bible):
-   un remate atajado puede dar rebote y una pérdida arriesgada puede
-   abrir un contragolpe rival — eso lo maneja la máquina, acá solo
-   se declara la forma. Cada `kind` lo entiende la máquina:
-     mine → build (construir) · carry (conducir) · press (presionar
-            la salida rival) · duel (duelo aéreo) · setpiece (balón
-            parado a favor) · finish (rematar)
-     opp  → contain (contener) · clear (despejar el remate) ·
-            defend_sp (córner en contra) · playout (el rival me
-            presiona la salida: sobrevivirla CONVIERTE la secuencia
-            en una transición mía — def→of, decisión PO A2)
+   `plan`: la secuencia MÁXIMA de actos (1 a 3). El último es el desenlace
+   (remate / atajada); los previos construyen. El fallo de un acto cierra la
+   secuencia o ENCADENA — eso lo maneja la máquina. Cada `kind`:
+     mine → build (construir) · carry (conducir) · press (presionar la salida
+            rival) · duel (duelo aéreo) · setpiece (balón parado) · finish
+     opp  → contain (contener) · clear (despejar) · defend_sp (córner en contra) ·
+            playout (el rival me presiona la salida: sobrevivirla CONVIERTE la
+            secuencia en una transición mía)
 
-   `protWeight`: ponderación del protagonista por puesto JUGADO
-   (mismo criterio que _weightedPick de las ocasiones sueltas).
+   `protWeight`: ponderación del protagonista por puesto jugado.
 
-   El catálogo A2 completa los 6 tipos del roadmap: los 4 que mapean
-   a filosofías (recuperación→High Press · circulación→Posesión ·
-   transición→Contragolpe · pelotazo→Bloque bajo) + balón parado
-   (DOS caras: a favor y en contra) + salida desde el fondo, y el
-   repliegue de A1 sigue como defensiva base. La FRECUENCIA de cada
-   tipo la decide la máquina según la mentalidad y el perfil del
-   rival (sequences.seqPlan) — acá no hay pesos, solo identidad.
+   Los 4 tipos que mapean a filosofías (recuperación→Press · circulación→Posesión
+   · transición→Contra · pelotazo→Bloque) + balón parado (a favor y en contra) +
+   salida desde el fondo + repliegue.
 
-   Agregar un tipo nuevo = agregar una fila.
-   ============================================================ */
-import { pick } from "../core/rng.js";
+   Agregar un tipo = agregar una fila. */
+import { pick } from "../../core/rng.js";
 
 export const SEQUENCE_TYPES = [
   {

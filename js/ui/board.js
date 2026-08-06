@@ -27,7 +27,7 @@
    Módulo puro: recibe el árbol ya resuelto (game/traits.traitTree)
    y devuelve SVG. No lee estado ni toca el DOM.
    ============================================================ */
-import { PHILOSOPHIES, FILO_LEVELS, filoLevelOf, filoPointsOf } from "../content/philosophies.js";
+import { PHILOSOPHIES, FILO_LEVELS, filoLevelOf, filoPointsOf } from "../content/identity/philosophies.js";
 
 /* ---------- Geometría (viewBox 1200×700) ---------- */
 /* REDISEÑO DE ESPACIO (26-jul-2026, decisiones PO): con 19 rasgos el tablero se

@@ -13,7 +13,7 @@
    ============================================================ */
 import { rnd, pick } from "../../../core/rng.js";
 import { playedPos } from "../../ratings.js";
-import { sequenceType } from "../../../content/sequences.js";
+import { sequenceType } from "../../../content/match/sequences.js";
 import { protMomentum, protStatW, noteFiloHit, familyOf } from "../sequences.js";
 import { hookOf, hooksOf, traitMoment, hasTrait } from "../trait-hooks.js";
 import * as A from "../actions.js";

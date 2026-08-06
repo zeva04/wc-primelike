@@ -1,5 +1,5 @@
 /* ============================================================
-   Tests de la Filosofía (game/philosophy.js + content/philosophies.js) — F1:
+   Tests de la Filosofía (game/philosophy.js + content/identity/philosophies.js) — F1:
    - catálogo sano: 4 filosofías de 2 aristas, firma propia y del lado "mine"
    - nivel por umbrales (suma de las 2 aristas propias) y filoCtx
    - elección post-sorteo y cambio con costo (Acción del Día; aristas persisten)

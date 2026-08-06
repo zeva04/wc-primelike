@@ -3,10 +3,10 @@
    la unidad principal de planificación).
    ============================================================ */
 import { rnd, ri, shuffle } from "../core/rng.js";
-import { PREP_EVENTS } from "../content/prep-events.js";
-import { RANDOM_EVENTS } from "../content/conflicts.js";
-import { OPPORTUNITIES } from "../content/opportunities.js";
-import { RARITIES } from "../content/rarities.js";
+import { PREP_EVENTS } from "../content/daily/prep-events.js";
+import { RANDOM_EVENTS } from "../content/daily/conflicts.js";
+import { OPPORTUNITIES } from "../content/daily/opportunities.js";
+import { RARITIES } from "../content/daily/rarities.js";
 import { addJournal } from "./journal.js";
 import { moraleBand, MORAL_INICIAL } from "./morale.js";
 import { playWorldDay } from "./tournament/world.js";

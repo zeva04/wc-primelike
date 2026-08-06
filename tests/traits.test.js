@@ -1,5 +1,5 @@
 /* ============================================================
-   Tests del árbol de Rasgos (game/traits.js + content/traits.js) — T1:
+   Tests del árbol de Rasgos (game/traits.js + content/traits/index.js) — T1:
    - catálogo sano: 12 Basic, 3 por filosofía, uno por rama, tono sobrio
    - Puntos de Identidad: +1 al elegir (nivel 1), +1 por nivel de la ACTIVA
    - anti-farming: los niveles heredados al cambiar NO premian

@@ -1,11 +1,6 @@
-/* ============================================================
-   content/team-flavor — la breve descripción de cada selección
-   para el menú de selección (reemplaza al texto de dificultad).
-   Datos + flavor, cero reglas (ARQUITECTURA §3): vive acá y no en
-   data/teams.js para no chocar con las ediciones manuales del PO.
-
-   Agregar/editar una selección = una entrada `id: "texto"`.
-   ============================================================ */
+/* La descripción breve de cada selección para el menú. Vive acá y no en
+   data/teams.js para no chocar con las ediciones manuales de la base.
+   Agregar/editar una selección = una entrada `id: "texto"`. */
 export const TEAM_DESC = {
   // CONMEBOL
   ARG: "Los actuales campeones del mundo. Talento, mística y una obsesión: repetir.",

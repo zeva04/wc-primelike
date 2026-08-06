@@ -25,7 +25,7 @@ import { bestSix, expectedOpponentLineup } from "./opponents.js";
 import { teamPowers, gkQuality } from "./match/powers.js";
 import { rivalFilo, rivalFiloLevel, identityGapMult, filoEtapa, filoLevel } from "./philosophy.js";
 import { koRoundOf } from "./tournament/knockout.js";
-import { getPhilosophy, FILO_ETAPAS, counterEdge } from "../content/philosophies.js";
+import { getPhilosophy, FILO_ETAPAS, counterEdge } from "../content/identity/philosophies.js";
 import { baseHeight, heightOf } from "./match/field.js";
 
 // La lectura táctica de cada identidad rival (F2): qué te propone y por dónde

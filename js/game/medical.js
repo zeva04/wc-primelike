@@ -1,11 +1,11 @@
 /* ============================================================
    game/medical — reglas del cuerpo médico.
-   (La tabla de lesiones vive en content/injuries.js: contenido
+   (La tabla de lesiones vive en content/match/injuries.js: contenido
    y regla separados, como manda ARQUITECTURA §3.)
    ============================================================ */
 import { rnd } from "../core/rng.js";
 import { clamp } from "../core/math.js";
-import { INJURY_TYPES } from "../content/injuries.js";
+import { INJURY_TYPES } from "../content/match/injuries.js";
 import { addJournal } from "./journal.js";
 
 /** Sortea un tipo de lesión ponderado por su probabilidad (`peso`). */

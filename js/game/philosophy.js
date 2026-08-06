@@ -19,16 +19,16 @@
    {id, nivel} (se arma en screens/match.js Y tests/smoke.js);
    el Match no conoce la run (ARQUITECTURA §3.2).
    ============================================================ */
-import { getPhilosophy, PHILOSOPHIES, aristaById, filoPointsOf, filoLevelOf, filoEtapaOf, afinidadMult, FILO_LEVELS } from "../content/philosophies.js";
-import { ADVANCED_BY_FILO } from "../content/sequences.js";
-import { TEAM_PHILOSOPHIES } from "../content/team-philosophies.js";
+import { getPhilosophy, PHILOSOPHIES, aristaById, filoPointsOf, filoLevelOf, filoEtapaOf, afinidadMult, FILO_LEVELS } from "../content/identity/philosophies.js";
+import { ADVANCED_BY_FILO } from "../content/match/sequences.js";
+import { TEAM_PHILOSOPHIES } from "../content/identity/team-philosophies.js";
 import { teamRating } from "./ratings.js";
 import { clamp } from "../core/math.js";
 import { addJournal } from "./journal.js";
 import { trackOxidacion } from "./oxidation.js";
 import { activeTraitIds } from "./traits.js";
 import { addCoachXp, filoLevelReward } from "./coach.js";
-import { DEEP_TRAIT } from "../content/traits.js";
+import { DEEP_TRAIT } from "../content/traits/index.js";
 
 // EL PLAN DE PARTIDO (arco de Progresión, decisión PO 28-jul-2026): la vieja
 // Sesión Táctica ya no regala progreso desde el menú — declara QUÉ FÚTBOL vas a

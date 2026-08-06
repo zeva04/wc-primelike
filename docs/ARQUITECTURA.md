@@ -110,12 +110,25 @@ js/
       incidents.js             ← faltas, tarjetas, lesiones en juego (~120)
       shootout.js              ← tanda de penales (~90)
   content/                     ── tablas que el PO edita; datos + flavor, cero reglas ──
-    themes.js                  ← EVENT_THEMES (4 temáticas) (~15)
-    team-flavor.js             ← TEAM_DESC: la descripción de cada selección para el menú (~45)
-    sequences.js               ← SEQUENCE_TYPES: los tipos de Key Sequence como datos (~60)
-    prep-events.js             ← PREP_EVENTS (10 eventos inevitables) (~50)
-    conflicts.js               ← RANDOM_EVENTS (6 conflictos con decisión) (~85)
-    injuries.js                ← INJURY_TYPES (15 lesiones con pesos) (~30)
+    traits/                    ── el árbol de identidad, UN ARCHIVO POR FILOSOFÍA ──
+      index.js                 ← arma TRAITS + los DIALES de balance (TRAIT_COST, TRAIT_LEVEL) (~60)
+      press.js · posesion.js · contra.js · bloque.js   ← los 64 rasgos (~170 c/u)
+    identity/                  ── quién es cada uno y cómo juega ──
+      philosophies.js          ← las 4 escuelas, aristas, niveles, afinidad y el ciclo de counters (~225)
+      team-philosophies.js     ← la curación: qué filosofía juega cada uno de los 16 (~30)
+      team-flavor.js           ← TEAM_DESC: la descripción de cada selección para el menú (~40)
+    match/                     ── lo que consume el partido ──
+      sequences.js             ← SEQUENCE_TYPES: los tipos de Key Sequence como datos (~350)
+      ambient.js               ← AMBIENT_LINES: el relato ambiente (~45)
+      injuries.js              ← INJURY_TYPES (28 lesiones con pesos) (~45)
+    daily/                     ── el día a día de la Concentración ──
+      day-actions.js           ← DAY_ACTIONS + los diales de cada acción (~120)
+      prep-events.js           ← PREP_EVENTS (los eventos inevitables) (~210)
+      conflicts.js             ← RANDOM_EVENTS (conflictos con decisión) (~115)
+      opportunities.js         ← OPPORTUNITIES (las que compiten con la Acción del Día) (~150)
+      rarities.js              ← RARITIES: los 4 niveles y su peso de sorteo (~15)
+      themes.js                ← EVENT_THEMES (4 temáticas) (~10)
+      daily-flavor.js          ← DAILY_FLAVOR: los titulares de color (~20)
   ui/
     session.js                 ← estado de sesión: run, match, matchCtx, selectedLineup (~30)
     components.js              ← starsHtml, energyBar, posBadge, flagImg, numTag, toast, modal, screenShell (~100)
@@ -203,7 +216,7 @@ Formato: **propósito · contiene · NUNCA debe contener**.
 | `game/opponents.js` | Rivales efectivos | genOpponentLineup, POS_MODS | Datos de equipos (vienen del repo) |
 | `game/calendar.js` | El tiempo de la run | dayLabel, scheduleNextMatch, advanceDay | Efectos de eventos (viven en content), render |
 | `game/discipline.js` | Tarjetas y sanciones | acumulación, suspensiones, clearAmarillas | Faltas EN partido (eso es `match/incidents`) |
-| `game/medical.js` | Cuerpo y energía | rollInjury, recuperación post-partido | Tabla de lesiones (content/injuries) |
+| `game/medical.js` | Cuerpo y energía | rollInjury, recuperación post-partido | Tabla de lesiones (content/match/injuries) |
 | `game/coach.js` | El Director Técnico (nivel 1..20) | FILO_LEVEL_REWARD, DT_STEP/DT_LEVELS, dtLevelOf, dtProgress, addCoachXp (imprime PI) | Qué se compra con los PI (eso es game/traits), XP de filosofía (game/philosophy) |
 | `game/momentum.js` | El Momento del jugador (forma 1..7) | momentoPct/momentoMult, momentoLabel/MOMENTO_LABELS, applyMomentumPostMatch (devuelve el resumen anímico) | Render de chips/flechas (ui/components), reglas de moral |
 | `game/morale.js` | La Moral del equipo (1..100) | MORAL_BANDS, moraleBand, bumpMorale, applyMoralePostMatch | Efecto en partido (v1 no tiene; el hook vive comentado en Match.tick) |
@@ -252,21 +265,21 @@ Este mapa es ley: si un módulo escribe un campo que no le pertenece, es un bug 
 | `rivalBans` | `tournament/world` (limpia `flow` cuando cumplen ante mí) | daily, opponents, ui/match |
 | `day`, `nextMatchDay`, `dayPlan`, `actionPending`, `dayMod` | `calendar.js` (`actionPending` la baja day-action) | ui/hub, day-action |
 | `lastAction` | `day-action.js` | ui/hub |
-| `filoId`, `planFilo` | `philosophy.js` (elección/cambio) · `content/day-actions` (Plan de Partido) · `flow` (limpia `planFilo` al cerrar) | match (matchCtx.filo), ui/hub, ui/philosophy |
+| `filoId`, `planFilo` | `philosophy.js` (elección/cambio) · `content/daily/day-actions` (Plan de Partido) · `flow` (limpia `planFilo` al cerrar) | match (matchCtx.filo), ui/hub, ui/philosophy |
 | `filoInicial` | `philosophy.js` (`choosePhilosophy`, una sola vez) | philosophy (afinidad), ui |
-| `filoXp` | `philosophy.js` (`applyFiloXp`, post-partido) · `content/philosophies.addFiloProgress` (eventos) | philosophy (nivel), traits (gates), ui |
+| `filoXp` | `philosophy.js` (`applyFiloXp`, post-partido) · `content/identity/philosophies.addFiloProgress` (eventos) | philosophy (nivel), traits (gates), ui |
 | `dtXp`, `dtNivel` | `coach.js` (`addCoachXp`, solo desde subidas de filosofía) | ui/hub, ui/philosophy |
 | `identityPoints` | `coach.js` (+1 por nivel de DT) · `philosophy.js` (el PI inicial) · `traits.js` (los gasta) | ui/philosophy, ui/hub |
 | `rasgos` | `traits.js` (`buyTrait`, {filoId: [ids]} — todos activos a la vez) | match (vía matchCtx.filo.rasgos), ui |
 | `altura` | `ui/hub` (la orden permanente del DT, 1..5) | match (vía `matchCtx.altura`), ui |
 | `buffs` | efectos de `content/` (+), `flow` (reset) | match/powers, ui |
-| `peleaEntre`, `filtrador` | efectos de `content/conflicts` (NOMBRES, no referencias — regla de serialización) | el propio conflicto al aplicar la opción elegida |
+| `peleaEntre`, `filtrador` | efectos de `content/daily/conflicts` (NOMBRES, no referencias — regla de serialización) | el propio conflicto al aplicar la opción elegida |
 | `journal` | `journal.js` (todos anotan vía addJournal) | ui/journal |
 | `stats`, `champion` | `flow.js` | ui/end |
 
 Campos muertos a eliminar en la migración (F7): `lineup`, `extraPos`, `mentalidad`, `lastResults`, `eliminated`, `bracket`, `prepDone`. Y `koMatches`/`lastWinners` pasan a nacer en `newRun` (como `null`) para que la forma del estado sea estable.
 
-**Regla de serialización**: `run` contiene solo datos planos (JSON-izable). Prohibido guardar funciones, nodos DOM o referencias circulares. ✅ **DEUDA SALDADA (Sprint 4, 21-jul-2026)**: el hack `_peleaA/_peleaB` del conflicto "pelea" —que guardaba **referencias a objetos del squad** dentro de `run`— quedó reemplazado por `run.peleaEntre = [nombreA, nombreB]`, resuelto contra `run.squad` en el momento de aplicar el efecto (helper `peleadores(r)` en `content/conflicts.js`). El conflicto nuevo `fuga_vestuario` nace ya con el patrón correcto (`run.filtrador` = nombre). Verificado en navegador: `JSON.stringify(run)` no explota y los campos viejos ya no existen. Esto deja gratis el futuro "guardar run a medias". Excepción documentada: la instancia `Match` NO es serializable a mitad de partido — limitación aceptada.
+**Regla de serialización**: `run` contiene solo datos planos (JSON-izable). Prohibido guardar funciones, nodos DOM o referencias circulares. ✅ **DEUDA SALDADA (Sprint 4, 21-jul-2026)**: el hack `_peleaA/_peleaB` del conflicto "pelea" —que guardaba **referencias a objetos del squad** dentro de `run`— quedó reemplazado por `run.peleaEntre = [nombreA, nombreB]`, resuelto contra `run.squad` en el momento de aplicar el efecto (helper `peleadores(r)` en `content/daily/conflicts.js`). El conflicto nuevo `fuga_vestuario` nace ya con el patrón correcto (`run.filtrador` = nombre). Verificado en navegador: `JSON.stringify(run)` no explota y los campos viejos ya no existen. Esto deja gratis el futuro "guardar run a medias". Excepción documentada: la instancia `Match` NO es serializable a mitad de partido — limitación aceptada.
 
 ### 3.2 El contrato de decisiones Match ↔ UI
 
@@ -387,17 +400,17 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
 
 | Quiero... | Leer | Modificar | NO tocar |
 |---|---|---|---|
-| Nuevo evento inevitable | content/prep-events | content/prep-events (1 entrada) | calendar, hub |
-| Nuevo conflicto (aun multi-opción) | content/conflicts | content/conflicts | calendar, hub |
-| Nuevo tipo de lesión | content/injuries | content/injuries | medical, match |
+| Nuevo evento inevitable | content/daily/prep-events | content/daily/prep-events (1 entrada) | calendar, hub |
+| Nuevo conflicto (aun multi-opción) | content/daily/conflicts | content/daily/conflicts | calendar, hub |
+| Nuevo tipo de lesión | content/match/injuries | content/match/injuries | medical, match |
 | Cambiar regla de amarillas (p.ej. 3 en vez de 2) | game/discipline + CORE.md | game/discipline | match/incidents (solo detecta faltas), ui |
 | Nuevo tipo de secuencia | content/sequences (datos, **incluida su `zone.from`: desde qué alturas nace**) + sequences.js (su peso en el pool) + actions.js (si el gesto no existe) + **la familia de `match/acts/` que corresponda** (su constructor y su resolver, que debe MOVER la pelota) | esos archivos | Match.js (tick), `sequence-acts.js` salvo para sumar el acto a las tablas, powers, screens |
-| Que un rasgo dependa del territorio | match/field (el marco) + match/trait-hooks (`zoneOk`) | `content/traits`: `zone: [min,max]` o `minHeight: n` en el hook **y compensarle la frecuencia** | el motor (el gate ya existe: es un dato del rasgo) |
+| Que un rasgo dependa del territorio | match/field (el marco) + match/trait-hooks (`zoneOk`) | `content/traits/`: `zone: [min,max]` o `minHeight: n` en el hook **y compensarle la frecuencia** | el motor (el gate ya existe: es un dato del rasgo) |
 | Nuevo skill moment suelto (no secuencia) | match/chances + contrato §3.2 | match/chances (creador+resolver) + screens/match (ruteo) | Match.js (tick), powers |
 | Nueva pantalla | screens/ vecinas + components | screens/nueva.js + navegación en la pantalla origen | game/** |
-| **Sistema de Filosofía** | Bible §5 + sequences.js + flow | NUEVOS: game/philosophy.js, content/philosophies.js, screens/philosophy.js + hooks: **sequences.js (sesga el pool de secuencias — es un GENERADOR, no un modificador de powers)**, flow (progresión, la alimenta el PARTIDO vía applyFiloXp), game/coach.js (el DT y los PI), hub (card) | tournament, discipline, storage, powers (Filosofía NO es un modificador estadístico escondido) |
+| **Sistema de Filosofía** | Bible §5 + sequences.js + flow | NUEVOS: game/philosophy.js, content/identity/philosophies.js, screens/philosophy.js + hooks: **sequences.js (sesga el pool de secuencias — es un GENERADOR, no un modificador de powers)**, flow (progresión, la alimenta el PARTIDO vía applyFiloXp), game/coach.js (el DT y los PI), hub (card) | tournament, discipline, storage, powers (Filosofía NO es un modificador estadístico escondido) |
 | **Mundo vivo / noticias** | tournament/*, calendar | NUEVOS: game/news.js, content/headlines.js + hook en flow.postMatch + card en hub | match/**, discipline |
-| **Conflictos en cadena** | calendar, content/conflicts | calendar (dayPlan multi-acto), content/conflicts (formato cadena), run.js (estado de cadenas) | match/**, tournament |
+| **Conflictos en cadena** | calendar, content/daily/conflicts | calendar (dayPlan multi-acto), content/daily/conflicts (formato cadena), run.js (estado de cadenas) | match/**, tournament |
 | Logros | journal (ya es el log de momentos) | NUEVOS: game/achievements.js, content/achievements.js + hook en flow.endRun + sección en end.js | resto |
 | Sonido | screens que emiten momentos | NUEVO: ui/audio.js + llamadas desde screens | game/** (el motor no suena) |
 | Guardar run a mitad | storage/history, run.js (@typedef) | NUEVO: storage/save.js + botón en hub | game/** (run ya es serializable por la regla §3.1) |
@@ -415,7 +428,7 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
   - **F2–F5 (lado motor) ✓** engine.js (1.190 líneas) partido en 23 módulos: `core/`, `data/teams-repo`, `game/` (run, flow, ratings, opponents, calendar, discipline, medical, journal), `game/tournament/` (groups, knockout, sim), `game/match/` (Match + powers, chances, incidents, shootout) y `content/` (themes, prep-events, conflicts, injuries). `js/engine.js` quedó como **fachada** con la API idéntica — ui.js no se tocó salvo el import.
   - **Gates cumplidos**: batería completa verde · BRA campeón 35,0% → 34,5% (n=1500, sin deriva) · tabla de 18 jugables sin deriva sistemática (Δ dentro de ±2σ a n=150) · partido completo jugado en navegador (decisión de penal incluida) con consola limpia.
   - **Regla de datos fijada por el PO (15-jul)**: la distribución de posiciones de los planteles es **diseño libre** (mínimo 1 por posición); las huellas de sprite duplicadas son advertencia, no error; `data/teams.js` no se edita sin su OK. El validador es la ley ejecutable del esquema (la cabecera de teams.js quedó subordinada a él).
-  - `PREP_ACTIONS`/`applyPrep` (muertos desde v7) quedaron parqueados como LEGACY en `content/prep-events.js` y `game/flow.js` — borrarlos en F7 con OK del PO (no hay git para recuperarlos).
+  - `PREP_ACTIONS`/`applyPrep` (muertos desde v7) quedaron parqueados como LEGACY en `content/daily/prep-events.js` y `game/flow.js` — borrarlos en F7 con OK del PO (no hay git para recuperarlos).
 - **15-jul-2026 — F6 EJECUTADA** (orden del PO, con pase estético incluido):
   - ui.js (1.442 líneas) → `ui/` (nav, session, components, sprites, theme) + `ui/screens/` (11 pantallas, la mayor: hub 273 líneas) + `storage/history.js`. `js/main.js` compone; ui.js eliminado.
   - **Patrón de navegación**: las pantallas se registran en `ui/nav.js` y navegan con `go(nombre, ...args)` — cero imports circulares entre screens (cumple §4). Enmienda a §2: este registro reemplaza a los "imports directos entre pantallas" del diseño original, que habrían formado ciclos (hub↔squad, match↔post-match↔hub).
@@ -486,10 +499,7 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
     una mudanza de UI es abrirla, no que la batería esté verde.
 
   Con esto **ninguna PANTALLA pasa el presupuesto de §6** (la mayor es `screens/squad.js`, 463).
-  Quedan dos archivos sobre 500, los dos con su motivo:
-  - `content/traits.js` (1.127) es una **tabla de contenido**, no lógica: §6 solo le pide vivir
-    en `content/`, que es donde está. Si algún día molesta, el corte natural es por árbol
-    (un archivo por filosofía).
+  Queda un archivo sobre 500, con su motivo:
   - `game/match/sequences.js` (606) es el GENERADOR: pesos del pool, filosofía, altura,
     amplitud y XP de identidad. Su corte natural sería separar el sesgo del pool
     (`typeWeights` + las matrices) del arranque de secuencia (`startSequence`). No urge.

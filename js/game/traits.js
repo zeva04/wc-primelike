@@ -3,7 +3,7 @@
    (arco de Rasgos T1, decisiones PO 23-jul-2026).
 
    Posee `run.identityPoints` y `run.rasgos`. El catálogo vive en
-   content/traits.js (ARQUITECTURA §4).
+   content/traits/index.js (ARQUITECTURA §4).
 
    Reglas que viven acá (arco de Progresión, 28-jul-2026):
    - Los PI ya NO nacen del nivel de filosofía: los imprime el
@@ -17,8 +17,8 @@
      saber de qué árbol es cada uno, pero TODOS están activos a la
      vez — la build híbrida juega de verdad.
    ============================================================ */
-import { traitById, traitsOf } from "../content/traits.js";
-import { getPhilosophy, filoLevelOf, filoPointsOf, FILO_LEVELS } from "../content/philosophies.js";
+import { traitById, traitsOf, TRAIT_COST } from "../content/traits/index.js";
+import { getPhilosophy, filoLevelOf, filoPointsOf, FILO_LEVELS } from "../content/identity/philosophies.js";
 import { addJournal } from "./journal.js";
 
 /** Ids de TODOS los rasgos comprados, de cualquier filosofía (decisión PO
@@ -44,12 +44,9 @@ export function activeTraits(run) {
  *   alguno: [ids]         — al menos UNO (Master: cualquiera de los 2 Advanced)
  *   nivel: n              — nivel mínimo de LA FILOSOFÍA DEL RASGO (1·3·6·10)
  */
-/**
- * Lo que cuesta incorporar un rasgo, en Puntos de Identidad. Hoy todos valen 1,
- * pero el precio vive acá (y no repartido en literales) para que el catálogo
- * pueda declarar `costo: 2` en un rasgo caro sin tocar validación, cobro ni UI.
- */
-export const traitCost = (t) => t?.costo ?? 1;
+/** Lo que cuesta incorporar un rasgo, en Puntos de Identidad: sale del dial de su
+ *  tier (content/traits.TRAIT_COST), salvo que el rasgo declare un `costo` propio. */
+export const traitCost = (t) => t?.costo ?? TRAIT_COST[t?.tier] ?? 1;
 
 export function traitReqs(run, t) {
   const faltas = [];

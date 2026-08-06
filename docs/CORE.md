@@ -699,7 +699,7 @@ no conseguimos finalizar" — **nunca un número**, con un silencio mínimo de 1
 >
 > Medido: campeón 24.3% n=2000, sin cambio respecto de antes de la feature.
 
-### Key Sequences (`game/match/sequences.js` + `content/sequences.js` + `actions.js`)
+### Key Sequences (`game/match/sequences.js` + `content/match/sequences.js` + `actions.js`)
 
 Una secuencia es una **historia en miniatura de 1 a 3 actos** (decisión PO): cada acto es una
 decisión (`id: "sequence"`, contrato §3.2) que se resuelve con **Football Actions** — los bloques
@@ -1053,7 +1053,7 @@ conversión def→of. **Nunca toca una probabilidad de éxito** (el Momento ya e
 (arranca 50/50); momentum = neto de los últimos 15'. La UI los pinta bajo el marcador (barra +
 chip ▲▲/▲/·/▼/▼▼); el Match solo deriva.
 
-**Relato ambiente contextual** (`content/ambient.js`): ~19 líneas con predicado sobre un ctx que
+**Relato ambiente contextual** (`content/match/ambient.js`): ~19 líneas con predicado sobre un ctx que
 arma `Match._ambientLine` (marcador tardío, rojas, fatiga, momentum, bandas de Moral); las
 contextuales pesan 2-3× sobre las genéricas cuando aplican. El ambiente anticipa en el relato lo
 que el contexto ya hace en el motor.
@@ -1314,7 +1314,7 @@ Además del suceso que le toca, **cada día sin partido el DT elige exactamente 
 acción** (Core Gameplay Bible §4.7: un día = una inversión, con opportunity cost).
 El orden dentro del día es el del Bible: primero el evento cambia el contexto,
 después el DT decide. No se puede pasar el día sin elegir. Las acciones
-(`content/day-actions.js`):
+(`content/daily/day-actions.js`):
 
 | Acción | Efecto | Trade-off |
 |---|---|---|

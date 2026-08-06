@@ -20,9 +20,9 @@
    en el flujo de inicio (elegir filosofía trae acá con 1 PI para
    el 1-de-3 de rasgos básicos; el botón sigue al sorteo).
    ============================================================ */
-import { getPhilosophy, FILO_LEVELS, FILO_ETAPAS, AFINIDAD_LABEL, afinidadMult } from "../../content/philosophies.js";
-import { ADVANCED_BY_FILO } from "../../content/sequences.js";
-import { RAMA_LABELS, DEEP_TRAIT } from "../../content/traits.js";
+import { getPhilosophy, FILO_LEVELS, FILO_ETAPAS, AFINIDAD_LABEL, afinidadMult } from "../../content/identity/philosophies.js";
+import { ADVANCED_BY_FILO } from "../../content/match/sequences.js";
+import { RAMA_LABELS, DEEP_TRAIT } from "../../content/traits/index.js";
 import { filoPoints, filoLevel } from "../../game/philosophy.js";
 import { dtProgress, DT_MAX } from "../../game/coach.js";
 import { traitTree, buyTrait, traitCost } from "../../game/traits.js";

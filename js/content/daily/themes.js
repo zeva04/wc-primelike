@@ -1,8 +1,5 @@
-/* ============================================================
-   content/themes — las 4 temáticas de eventos y conflictos.
-   El calendario del hub muestra SOLO la temática del día
-   (caracterización fija); el detalle se descubre al vivirlo.
-   ============================================================ */
+/* Las 4 temáticas de eventos y conflictos. El calendario del hub muestra SOLO la
+   temática del día; el detalle se descubre al vivirlo. */
 
 export const EVENT_THEMES = {
   entrenamiento: { icon: "🏋️", name: "Entrenamiento", color: "text-amber-400" },

@@ -8,7 +8,7 @@
    ============================================================ */
 import { getTeam } from "../../data/teams-repo.js";
 import { newRun } from "../../game/run.js";
-import { PHILOSOPHIES, aristaById } from "../../content/philosophies.js";
+import { PHILOSOPHIES, aristaById } from "../../content/identity/philosophies.js";
 import { choosePhilosophy } from "../../game/philosophy.js";
 import { markerColor, PRINCIPLE_COLORS } from "../board.js";
 import { playBoard } from "../plays.js";

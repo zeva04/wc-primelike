@@ -1,6 +1,6 @@
 /* ============================================================
    Tests de la capa de secuencias (Sprint A1):
-   - catálogo content/sequences.js (3 tipos, esquema, sides)
+   - catálogo content/match/sequences.js (3 tipos, esquema, sides)
    - Football Actions game/match/actions.js (bien formadas y
      monótonas en la stat que las rige)
    - la máquina game/match/sequences.js: arranca, avanza multi-acto

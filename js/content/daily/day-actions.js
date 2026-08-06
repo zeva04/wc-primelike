@@ -1,51 +1,34 @@
-/* ============================================================
-   content/day-actions — las Acciones Principales del Día
-   (Core Gameplay Bible §4.7: cada día sin partido, el DT elige
-   exactamente UNA inversión estratégica; elegir es renunciar).
+/* Las Acciones Principales del Día: cada día sin partido el DT elige exactamente
+   UNA inversión. Elegir es renunciar.
 
-   Trade-offs deliberados:
-   - Entrenar sube una stat (+1 hasta el próximo partido) pero
-     CANSA (−5 de energía a todo el plantel).
-   - Recuperar devuelve energía pero no mejora a nadie.
-   - El PLAN DE PARTIDO elige QUÉ FÚTBOL va a jugar el equipo
-     (arco de Progresión): no compra nada — ni stats ni progreso
-     (el GDD prohíbe subir filosofías desde el menú) — pero fija
-     la identidad activa y multiplica la experiencia que esa idea
-     gane en el próximo partido. Se paga jugando, no eligiendo.
+   - Entrenar sube una stat hasta el próximo partido, pero CANSA.
+   - Recuperar devuelve energía y no mejora a nadie.
+   - El PLAN DE PARTIDO no compra nada: fija la identidad activa y multiplica la
+     XP que esa idea gane en el próximo partido. Se paga jugando, no eligiendo.
 
-   El CANJE (regla en game/day-action.js) cierra el círculo: un
-   boost de entrenamiento acumulado hasta +CANJE_THRESHOLD en una
-   stat puede convertirse en +CANJE_PERMANENT PERMANENTE a esa stat
-   para TODO el plantel — renuncias al boost del próximo partido a
-   cambio de crecimiento que dura el resto de la run (Bible cap.6
-   "Permanent Growth": nace del entrenamiento, es gradual, nunca
-   decrece y no se traslada a otras runs).
+   El CANJE (regla en game/day-action.js) cierra el círculo: un buff acumulado
+   hasta CANJE_THRESHOLD se convierte en crecimiento PERMANENTE para todo el
+   plantel — se renuncia al boost de hoy a cambio del resto de la run.
 
-   Agregar una acción nueva = agregar una fila con su `effect(run)`.
+   Agregar una acción = agregar una fila con su `effect(run)`.
    `group: "entrenar"` agrupa los focos de entrenamiento en la UI.
-   ============================================================ */
-import { clamp } from "../core/math.js";
-import { PHILOSOPHIES } from "./philosophies.js";
 
-// +1 y no +5: el entrenamiento es elegible (siempre apunta donde quieres),
-// los eventos de ±5 no. Elegible > aleatorio a igual magnitud. El PO lo bajó
-// de +4 a +1 (17-jul): con +4 el buff dominaba y el canje se conseguía en un día.
+   Los export const de arriba son los DIALES de cada acción. */
+import { clamp } from "../../core/math.js";
+import { PHILOSOPHIES } from "../identity/philosophies.js";
+
+// +1 y no +5: el entrenamiento es ELEGIBLE (siempre apunta donde uno quiere) y
+// los eventos de ±5 no. Elegible vale más que aleatorio a igual magnitud.
 export const TRAIN_BUFF = 1;
 export const TRAIN_FATIGUE = 5;
 // El foco de velocidad cansa MÁS: correr piques no es lo mismo que un rondo (Odisea).
 export const VELOCIDAD_FATIGUE_EXTRA = 3;
-// SUBIÓ de 10 a 15 (decisión PO, 2-ago-2026): desde que se eliminó el descanso pasivo
-// diario (medical.applyDailyRecovery, retirado — CORE §9), Recuperar pasó de ser un
-// colchón opcional a la ÚNICA fuente de energía fuera del banco. El barrido viejo de
-// este dial (10/15/20/25 → 10.0/10.9/9.8/10.4, 1-ago-2026) medía con el pasivo TODAVÍA
-// vivo y por eso la constante salía inerte — "siempre Recuperar" ya vivía con la energía
-// al tope gracias al pasivo, así que subir el botón no cambiaba nada. Ese resultado quedó
-// obsoleto el mismo día que se retiró el pasivo: re-medir es obligatorio (ver CORE §9).
+// No hay descanso pasivo diario: Recuperar es la ÚNICA fuente de energía fuera
+// del banco, así que este dial gobierna toda la economía física de la run.
 const RECOVER_ENERGY = 15;
-// Team Bonding (Sprint 3, decisión PO 20-jul-2026): sube la Moral del equipo pero CUESTA
-// energía — la integración es una jornada más, no un descanso. Es la palanca para gestionar
-// la moral a voluntad, que desde el Sprint 2 tiene efecto real (menos conflictos de
-// vestuario). Situacional a propósito: con la moral arriba conviene entrenar o recuperar.
+// Team Bonding: sube la Moral pero CUESTA energía — la integración es una jornada
+// más, no un descanso. Situacional a propósito: con la moral arriba conviene
+// entrenar o recuperar.
 export const BONDING_MORAL = 10;
 export const BONDING_FATIGUE = 5;
 
@@ -58,11 +41,9 @@ export const CANJE_PERMANENT = 1;
 export const CANJEABLE_STATS = ["tiro", "defensa", "cabezazo", "pase_corto", "pase_largo", "velocidad", "aura", "atajadas", "reflejos", "salidas"];
 // Etiquetas de stat para la UI y el diario (fuente única; la UI del hub las reusa).
 export const STAT_LABELS = { tiro: "Tiro", defensa: "Defensa", cabezazo: "Cabezazo", pase_corto: "Pase corto", pase_largo: "Pase largo", velocidad: "Velocidad", aura: "Aura", atajadas: "Atajadas", reflejos: "Reflejos", salidas: "Salidas" };
-// EL PLAN DE PARTIDO (arco de Progresión, decisión PO 28-jul-2026): la Sesión
-// Táctica ya no compra progreso desde el menú — el GDD lo prohíbe. Declara qué
-// fútbol va a intentar el equipo: pasa a ser la identidad activa (sesga qué
-// jugadas genera el partido) y multiplica ×PLAN_XP_MULT la XP que ese partido
-// deje para esa idea. Sin costo de energía: su costo es el día.
+// EL PLAN DE PARTIDO declara qué fútbol va a intentar el equipo: pasa a ser la
+// identidad activa (sesga qué jugadas genera el partido) y multiplica la XP que
+// ese partido deje para esa idea. Sin costo de energía: su costo es el día.
 export const PLAN_XP_MULT = 1.5;
 
 const tire = r => r.squad.forEach(p => p.energia = clamp(p.energia - TRAIN_FATIGUE, 5, 100));

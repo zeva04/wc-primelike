@@ -1,18 +1,12 @@
-/* ============================================================
-   content/conflicts — conflictos con decisión (Game Vision:
-   dilemas con 2 opciones y trade-offs sobre plantel o buffs).
-   Ocurren en días del calendario igual que los eventos; también
-   llevan temática. Los efectos de stat son ±5 por la misma razón
-   que en prep-events.
+/* Conflictos con decisión: dilemas con 2 opciones y trade-offs sobre el plantel o
+   los buffs. Ocurren en el calendario igual que los eventos y llevan temática.
 
-   Agregar un conflicto nuevo = agregar una fila con `tema`,
-   `teaser` (el pronóstico ambiguo que publica el World Cup
-   Daily esa mañana), `text` (string o función(run)) y 2+
-   `options` cuyo effect(run) devuelve el texto del resultado.
-   ============================================================ */
-import { rnd, shuffle } from "../core/rng.js";
-import { clamp } from "../core/math.js";
-import { addFiloProgress, addFirmaProgress, getPhilosophy } from "./philosophies.js";
+   Agregar un conflicto = agregar una fila con `tema`, `teaser` (el pronóstico
+   ambiguo del World Cup Daily), `text` (string o función(run)) y 2+ `options`
+   cuyo effect(run) devuelve el texto del resultado. */
+import { rnd, shuffle } from "../../core/rng.js";
+import { clamp } from "../../core/math.js";
+import { addFiloProgress, addFirmaProgress, getPhilosophy } from "../identity/philosophies.js";
 
 /** Los dos jugadores de la pelea, resueltos por nombre desde `run.peleaEntre` (§3.1). */
 const peleadores = r => (r.peleaEntre || []).map(n => r.squad.find(p => p.name === n)).filter(Boolean);

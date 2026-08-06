@@ -1,38 +1,25 @@
-/* ============================================================
-   content/prep-events — los 33 eventos inevitables del calendario
-   (Game Vision: "Eventos" = cambios del mundo que no se deciden).
-
-   Cada día sin partido trae uno (o un conflicto, ver calendar.js),
-   sorteado por RAREZA (content/rarities.js): a mayor rareza, menos
-   probable y MÁS impactante. Magnitudes por nivel:
-   - comun       ±5 de stat o ±10/20 de energía (los 10 originales)
+/* Los eventos inevitables del calendario: cambios del mundo que no se deciden.
+   Cada día sin partido trae uno (o un conflicto), sorteado por RAREZA. A mayor
+   rareza, menos probable y más impactante:
+   - comun       ±5 de stat o ±10/20 de energía
    - infrecuente ±8 de stat, ±12 de energía, o un MODIFICADOR del día
    - rara        ±10-12, combos de dos stats, o golpes al plantel
-   - legendaria  campaña-defining: todas las stats, crecimiento
-                 permanente, brotes… (~1 por run)
+   - legendaria  campaña-defining (~1 por run)
 
-   Los buffs de stat duran hasta el próximo partido y se ACUMULAN
-   entre días. El campo opcional `mod` convierte al evento en un
-   MODIFICADOR de la Acción del Día (Bible §4.5: los eventos
-   cambian el problema de hoy, no solo los números):
+   Los buffs duran hasta el próximo partido y se ACUMULAN entre días. El campo
+   opcional `mod` convierte al evento en un MODIFICADOR de la Acción del Día:
      mod: { mods: {entrenar|recuperar|tactica: mult}, desc }
    mult 0 bloquea la acción hoy; 0.5 la reduce; 2 la duplica.
-   Lo aplica game/day-action vía run.dayMod (escribe calendar).
 
-   `teaser` es el pronóstico que el World Cup Daily publica la
-   mañana del evento (Bible §4.4: el Daily anticipa, el evento
-   materializa). Debe insinuar el tema SIN revelar magnitud ni
-   rareza — la sorpresa se vive en el modal.
+   `teaser` es el pronóstico que el World Cup Daily publica esa mañana: insinúa el
+   tema SIN revelar magnitud ni rareza. `effect(run)` puede devolver un string que
+   reemplaza `desc` (eventos con protagonista).
 
-   `effect(run)` puede devolver un string para reemplazar `desc`
-   (eventos con protagonista, p.ej. una lesión en la práctica).
-
-   Agregar un evento nuevo = agregar una fila con su `tema`,
-   `tipo` (buff|debuff), `rareza`, `teaser` y `effect(run)`.
-   ============================================================ */
-import { clamp } from "../core/math.js";
-import { pick } from "../core/rng.js";
-import { addFiloProgress, addFirmaProgress, getPhilosophy, filoEtapaOf } from "./philosophies.js";
+   Agregar un evento = agregar una fila con su `tema`, `tipo` (buff|debuff),
+   `rareza`, `teaser` y `effect(run)`. */
+import { clamp } from "../../core/math.js";
+import { pick } from "../../core/rng.js";
+import { addFiloProgress, addFirmaProgress, getPhilosophy, filoEtapaOf } from "../identity/philosophies.js";
 import { STAT_LABELS } from "./day-actions.js";
 
 const buff = (r, k, v) => { r.buffs[k] = (r.buffs[k] || 0) + v; };

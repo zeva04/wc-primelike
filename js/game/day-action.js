@@ -3,7 +3,7 @@
    (Core Gameplay Bible §4.7). El estado `run.actionPending` lo
    levanta calendar al llegar a un día sin partido y lo baja
    este módulo al aplicar la acción elegida. La tabla de
-   acciones vive en content/day-actions.js.
+   acciones vive en content/daily/day-actions.js.
 
    Los eventos pueden MODIFICAR las acciones de hoy vía
    `run.dayMod` (Bible §4.5): `actionMult` resuelve el
@@ -16,8 +16,8 @@
    acción del club) y su rareza colorea el diario.
    ============================================================ */
 import { clamp } from "../core/math.js";
-import { DAY_ACTIONS, CANJE_THRESHOLD, CANJE_PERMANENT, CANJEABLE_STATS, STAT_LABELS } from "../content/day-actions.js";
-import { OPPORTUNITIES } from "../content/opportunities.js";
+import { DAY_ACTIONS, CANJE_THRESHOLD, CANJE_PERMANENT, CANJEABLE_STATS, STAT_LABELS } from "../content/daily/day-actions.js";
+import { OPPORTUNITIES } from "../content/daily/opportunities.js";
 import { addJournal } from "./journal.js";
 import { noteFiloMilestones } from "./philosophy.js";
 import { trackOxidacion } from "./oxidation.js";

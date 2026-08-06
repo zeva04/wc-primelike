@@ -27,8 +27,8 @@
      porque la jugada ES otra, no porque el equipo sea mejor.
    ============================================================ */
 import { rnd, pick } from "../../core/rng.js";
-import { traitById } from "../../content/traits.js";
-import { sequenceType } from "../../content/sequences.js";
+import { traitById } from "../../content/traits/index.js";
+import { sequenceType } from "../../content/match/sequences.js";
 import { playedPos } from "../ratings.js";
 import { protMomentum } from "./sequences.js"; // ciclo benigno: solo runtime (mismo patrón que sequence-acts)
 import { setBall, originOf, myHeight } from "./field.js";
