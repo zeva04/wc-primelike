@@ -12,6 +12,13 @@ export const S = {
   formation: null,      // id de la formación elegida (ej. "2-1-2"); define el puesto de cada slot
   timer: null,          // setInterval del relato del partido
   paused: false,        // pausa manual del usuario
+  // EL ENTRETIEMPO (bug fix, 2-ago-2026): también deja `timer` en null (stopTimer), y
+  // eso es indistinguible de una pausa manual para quien solo mira `!S.timer` — la
+  // pizarra de la altura (screens/match/tactics.js) lo hacía y reanudaba el partido
+  // solo al cerrar, dejando el botón "Continuar el partido" del entretiempo vivo pero
+  // mintiendo sobre el estado real. Esta bandera es la única fuente de "estamos en el
+  // entretiempo, y el ÚNICO botón que reanuda es el dedicado".
+  halftime: false,
   speed: 1,             // ritmo del relato: 1 = crucero (ráfaga entre secuencias) · 2 = más rápido
   feedRendered: 0,      // nº de líneas del relato ya pintadas
 };

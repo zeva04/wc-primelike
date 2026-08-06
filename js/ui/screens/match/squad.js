@@ -263,8 +263,12 @@ export function openSquadModal(caido = null) {
     reanudar();
   }
 
-  /** El reloj retoma al cerrar (el flujo de la lesión llega con el timer detenido). */
-  const reanudar = () => { if (!match.finished && !match.decision) startTimer(); };;
+  /** El reloj retoma al cerrar (el flujo de la lesión llega con el timer detenido).
+   *  Mismo cuidado que tactics.js (bug fix, 2-ago-2026): esta pantalla también se abre
+   *  desde `#btn-subs` en el ENTRETIEMPO (showHalftime invita a "hacer cambios" acá
+   *  mismo) — y ahí el ÚNICO botón que puede reanudar es el dedicado del entretiempo,
+   *  nunca el cierre de este modal. */
+  const reanudar = () => { if (!match.finished && !match.decision && !S.halftime) startTimer(); };
 
   /** Sale sin tocar el partido: deshace las reubicaciones y tira el plan. */
   const cancelar = () => {

@@ -42,6 +42,7 @@ function startMatch(oppId) {
   S.match = new Match(S.matchCtx, opp, S.run.stage !== "groups", S.run.rivalBans[oppId] || []);
   S.feedRendered = 0;
   S.paused = false;
+  S.halftime = false;
   resetCarousel();                // el carrusel arranca siempre en el momentum
   renderMatchScreen();
   S.match.log("info", `🏟️ ¡Comienza el partido! ${me.name} vs ${opp.name} — ${S.run.stage === "groups" ? "Grupo " + S.run.groups[S.run.myGroupIdx].name : STAGE_LABEL[S.run.stage]}`);
@@ -197,7 +198,7 @@ function step() {
   const r = S.match.tick();
   updateMatchUI();
   if (r === true && S.match.decision) { stopTimer(); S.timer = setTimeout(presentDecision, SEQ_INTRO_HOLD); return; }
-  if (r === "halftime") { stopTimer(); showHalftime(); return; }
+  if (r === "halftime") { stopTimer(); S.halftime = true; showHalftime(); return; }
   if (r === "pens") { stopTimer(); go("shootout"); return; }
   if (r === "end") { stopTimer(); go("finish-match"); return; }
   const scored = S.match.feed.slice(before).some(f => f.kind === "goal" || f.kind === "goal_opp");
@@ -347,7 +348,7 @@ function showHalftime() {
   const footer = $("#match-footer");
   footer.innerHTML = `<button id="btn-resume" class="btn-primary">▶️ Continuar el partido</button>
     <p class="text-xs text-slate-400 mt-2">Aprovecha para hacer cambios o ajustar la mentalidad.</p>`;
-  $("#btn-resume").onclick = () => { footer.innerHTML = ""; startTimer(); };
+  $("#btn-resume").onclick = () => { S.halftime = false; footer.innerHTML = ""; startTimer(); };
 }
 
 

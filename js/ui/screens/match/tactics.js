@@ -99,7 +99,14 @@ function openHeightModal() {
     closeModal();
     S.paused = wasPaused;
     updateMatchUI();
-    if (!match.finished && !match.decision && !S.timer) startTimer();
+    // BUG FIX (2-ago-2026): `!S.timer` no distingue "pausa manual" de "estamos en el
+    // entretiempo" — showHalftime también deja el timer en null, y ahí el ÚNICO botón
+    // que puede reanudar es el dedicado ("Continuar el partido"). Sin `!S.halftime`
+    // acá, cambiar la altura en el entretiempo reanudaba el partido solo mientras el
+    // botón de "Continuar" seguía en pantalla mintiendo sobre el estado real — y
+    // apretarlo después volvía a llamar a startTimer() sobre un partido que ya venía
+    // corriendo, dejando el relato colgado.
+    if (!match.finished && !match.decision && !S.timer && !S.halftime) startTimer();
   };
   w.querySelectorAll(".h-opt").forEach(b => b.onclick = () => {
     if (!setHeight(match, +b.dataset.h)) return;
