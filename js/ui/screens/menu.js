@@ -8,7 +8,7 @@ import { teamRating, teamStars, playerOverall, statLine, difficultyOf, teamFigur
 import { teamDesc } from "../../content/team-flavor.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $, flagImg, starsHtml, posBadge, numTag } from "../components.js";
+import { screenFull, fitScaleUp, $, flagImg, starsHtml, posBadge, numTag } from "../components.js";
 import { spriteSvg } from "../sprites.js";
 import { applyTeamColors, TROPHY_SVG, BALL_SVG } from "../theme.js";
 import { stopTimer } from "./match/index.js";
@@ -44,61 +44,104 @@ function renderMenu() {
   const c = sel.colors || {};
   const best = teamFigure(sel);
 
-  screenShell(`
-    <div class="text-center mb-6 mt-4">
-      <div class="flex items-end justify-center gap-8 mb-3">
-        <div class="w-12 h-12 md:w-16 md:h-16 animate-floaty">${BALL_SVG}</div>
-        <div class="w-16 h-[5.6rem] md:w-20 md:h-28">${TROPHY_SVG}</div>
-        <div class="w-12 h-12 md:w-16 md:h-16 animate-floaty" style="animation-delay:-2.5s">${BALL_SVG}</div>
+  // Pantalla fija (sprint de UX): cabecera / pestañas / carrusel elástico / banderas.
+  // El carrusel es el único bloque que crece (flex-1 min-h-0); todo lo demás mide fijo.
+  //
+  // ESCALA TIPOGRÁFICA del sprint (una sola familia; la manuscrita de tiza es la otra
+  // de las dos permitidas en todo el proyecto). Cada peldaño manda un nivel de lectura:
+  //   30px 900  título del juego        · 24px 900  nombre de la selección
+  //   17px 900  la acción (CTA)         · 16px 900  rating y estrellas
+  //   14px 600  descripción del equipo (mismo color que el nombre: son la misma voz)
+  //   14px 900  el overall del jugador (el dato que se compara de un vistazo)
+  //   12px      contexto: figura, continentes, nombre del jugador
+  //   10px      etiquetas duras: dorsal, posición, anfitriones
+  screenFull(`
+    <button id="btn-history" data-tip="Historial de Partidas"
+      class="tip absolute top-4 right-5 z-20 w-11 h-11 rounded-xl border border-slate-700 bg-slate-900/70 backdrop-blur text-xl leading-none
+             hover:border-[var(--wc-gold)] hover:bg-slate-800/80 cursor-pointer transition-all">📜</button>
+
+    <!-- Envoltorio de alto INTRÍNSECO para fitScaleUp (components.js): el zoom tiene
+         que aplicarse acá, nunca en el shell h-screen del padre — ver el porqué en
+         el comentario de fitScaleUp. El botón de historial queda AFUERA a propósito,
+         posicionado absoluto contra el shell: es chrome fijo de la pantalla, no
+         contenido del equipo, y no necesita moverse con el escalado. -->
+    <div id="menu-content" class="flex flex-col">
+    <header class="shrink-0 text-center">
+      <div class="flex items-center justify-center gap-3">
+        <h1 class="text-3xl font-black tracking-tighter gold-text leading-none">WC PRIME</h1>
+        <div class="w-9 h-[3.15rem]">${TROPHY_SVG}</div>
       </div>
-      <h1 class="text-4xl md:text-5xl font-black tracking-tighter gold-text">MUNDIAL 26</h1>
-      <p class="text-slate-300 mt-1.5 font-bold tracking-[0.35em] text-[11px] uppercase">
+      <p class="text-slate-300 mt-1 font-bold tracking-[0.35em] text-[10px] uppercase">
         <span style="color:var(--wc-blue)">Estados Unidos</span> · <span style="color:var(--wc-green)">México</span> · <span style="color:var(--wc-red)">Canadá</span>
       </p>
-      <div class="tricolor-bar max-w-md mx-auto mt-3"></div>
+      <div class="tricolor-bar w-72 mx-auto mt-2"></div>
+    </header>
+
+    <div class="shrink-0 flex justify-center items-center gap-2 flex-wrap mt-4">
+      ${confeds.map(cf => `<button data-confed="${cf}" class="confed-tab px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${cf === menuConfed ? "border-[var(--wc-gold)] text-amber-300 bg-amber-400/10" : "border-slate-700 text-slate-400 bg-slate-900/50 hover:border-slate-500"}">${CONFED_LABELS[cf] || cf} <span class="opacity-60">(${playables.filter(t => t.confed === cf).length})</span></button>`).join("")}
+      <button id="btn-random" title="Selección al azar" class="px-4 py-1.5 rounded-full border border-slate-600 text-xs font-bold uppercase tracking-wider text-slate-200 bg-slate-900/70 hover:border-[var(--wc-gold)] hover:text-amber-300 cursor-pointer transition-all">🎲 Aleatorio</button>
     </div>
-    <h2 class="text-center text-slate-300 font-bold mb-3 uppercase tracking-widest text-sm">Elige tu selección</h2>
-    <div class="flex justify-center gap-2 mb-4 flex-wrap">
-      ${confeds.map(cf => `<button data-confed="${cf}" class="confed-tab px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${cf === menuConfed ? "border-[var(--wc-gold)] text-amber-300 bg-amber-400/10" : "border-slate-700 text-slate-400 bg-slate-800/50 hover:border-slate-500"}">${CONFED_LABELS[cf] || cf} <span class="opacity-60">(${playables.filter(t => t.confed === cf).length})</span></button>`).join("")}
-      <button id="btn-random" title="Selección al azar" class="px-4 py-1.5 rounded-full border border-slate-600 text-xs font-bold uppercase tracking-wider text-slate-200 bg-slate-800/70 hover:border-[var(--wc-gold)] hover:text-amber-300 cursor-pointer transition-all">🎲 Aleatorio</button>
+
+    <!-- Orden deductivo (sprint de UX, 6-ago): primero ELEGÍS el continente (arriba),
+         después ELEGÍS el equipo dentro de él (esta fila de banderas) y recién ahí
+         aparece SU ficha. Por eso las banderas viven pegadas a las pestañas, no al
+         pie del carrusel — son el mismo paso de la decisión, no un resumen de ella. -->
+    <div class="shrink-0 flex justify-center gap-2 flex-wrap mt-2.5">
+      ${confTeams.map(t => `<button data-team="${t.id}" title="${t.name}" class="car-dot rounded-md overflow-hidden transition-all cursor-pointer ${t.id === menuSel ? "ring-2 ring-[var(--wc-gold)] scale-110" : "opacity-50 hover:opacity-90"}">${flagImg(t, "w-10 h-7")}</button>`).join("")}
     </div>
-    <div class="flex items-stretch gap-3 max-w-4xl mx-auto">
-      <button id="car-prev" title="Anterior" class="self-center shrink-0 w-11 h-11 rounded-full border border-slate-600 bg-slate-800/80 hover:border-[var(--wc-gold)] hover:text-amber-300 text-2xl font-black cursor-pointer transition-all">‹</button>
-      <div class="flex-1 w-full bg-slate-800/70 border border-slate-600 rounded-2xl overflow-hidden animate-pop" key="${sel.id}">
-        <div class="h-2" style="background:linear-gradient(90deg, ${c.primary}, ${c.secondary})"></div>
-        <div class="p-5">
-          <div class="flex items-center justify-between flex-wrap gap-3 mb-1">
-            <div class="flex items-center gap-3">
-              ${flagImg(sel, "w-16 h-11")}
-              <div>
-                <div class="text-2xl font-black">${sel.name}</div>
-                <div>${starsHtml(teamStars(sel))} <span class="text-amber-300 font-black ml-1">${teamRating(sel)}</span>
+
+    <!-- EL BLOQUE DEL EQUIPO (sprint de UX, 6-ago): deja de estirarse a lo alto de la
+         pantalla. Antes "flex-1" + "justify-center" lo obligaba a llenar el resto del
+         viewport, y esa plata se pagaba en dos huecos de aire —entre la descripción y
+         las fichas, y entre el botón y el borde de la tarjeta— que no eran margen de
+         diseño, eran sobrante sin dueño. Ahora el bloque mide EXACTO lo que su
+         contenido pide (shrink-0, items-start): descripción→fichas→botón quedan a
+         distancia fija de verdad. Si eso deja aire libre hasta el borde de la
+         pantalla, ESE es el lugar correcto para que viva — no hay problema en que la
+         pantalla no se llene del todo, lo que no puede pasar es que el aire quede
+         adentro de la tarjeta. fitScaleUp() decide, ya con el bloque medido en
+         serio, si ese sobrante alcanza para escalar todo un 5% en vez de dejarlo vacío. -->
+    <div id="menu-block" class="shrink-0 flex items-start justify-between gap-3 mt-3 py-1">
+      <div class="shrink-0 self-center w-20 h-20 animate-floaty">${BALL_SVG}</div>
+      <div class="flex-1 min-w-0 max-w-5xl mx-auto flex items-start gap-3">
+      <button id="car-prev" title="Anterior" class="self-center shrink-0 w-12 h-12 rounded-full border border-slate-600 bg-slate-900/80 hover:border-[var(--wc-gold)] hover:text-amber-300 text-2xl font-black cursor-pointer transition-all">‹</button>
+      <div class="flex-1 min-w-0 flex flex-col bg-slate-900/60 border border-slate-600 rounded-2xl overflow-hidden animate-pop backdrop-blur-sm" key="${sel.id}">
+        <div class="h-2 shrink-0" style="background:linear-gradient(90deg, ${c.primary}, ${c.secondary})"></div>
+        <div class="flex flex-col p-5">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex items-center gap-4 min-w-0">
+              ${flagImg(sel, "w-[4.5rem] h-[3.1rem]")}
+              <div class="min-w-0">
+                <div class="text-2xl font-black leading-tight truncate">${sel.name}</div>
+                <div class="leading-tight">${starsHtml(teamStars(sel))} <span class="text-amber-300 font-black ml-1">${teamRating(sel)}</span>
                   <span class="text-slate-400 text-xs ml-2">Figura: <b class="text-slate-200">${best.name}</b> ${playerOverall(best)}</span></div>
+                <p class="text-sm font-semibold text-slate-100 leading-snug mt-1">${teamDesc(sel.id)}</p>
               </div>
             </div>
-            <span class="px-3 py-1.5 rounded-full border text-xs font-bold ${DIFF_CHIP[diff.tier]}">${diff.label}</span>
+            <span class="shrink-0 px-3 py-1.5 rounded-full border text-xs font-bold ${DIFF_CHIP[diff.tier]}">${diff.label}</span>
           </div>
-          <p class="text-xs text-slate-400 mb-4">${teamDesc(sel.id)}</p>
-          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
+          <div class="grid grid-cols-5 grid-rows-2 gap-2.5 mt-4">
             ${sel.players.map(p => `
-              <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-2 text-center" title="${statLine(p)}">
-                <div class="flex justify-center">${spriteSvg(p, sel, "w-9 h-10")}</div>
-                <div class="text-[10px] font-semibold truncate mt-1">${p === best ? "⭐ " : ""}${p.name}</div>
-                <div class="flex items-center justify-center gap-1">${numTag(p)}${posBadge(p.pos)}<span class="text-amber-300 text-xs font-black">${playerOverall(p)}</span></div>
+              <div class="bg-slate-950/50 border border-slate-700 rounded-xl py-2.5 px-2 flex flex-col items-center gap-1.5" title="${statLine(p)}">
+                ${spriteSvg(p, sel, "h-10 w-auto")}
+                <div class="text-xs font-semibold truncate max-w-full">${p === best ? "⭐ " : ""}${p.name}</div>
+                <div class="flex items-center justify-center gap-1">${numTag(p)}${posBadge(p.pos)}<span class="text-amber-300 text-sm font-black">${playerOverall(p)}</span></div>
               </div>`).join("")}
           </div>
-          <button id="btn-start" class="w-full py-3 rounded-xl font-black text-lg cursor-pointer transition-all hover:brightness-110 hover:scale-[1.01]" style="background:linear-gradient(135deg, ${c.primary}, ${c.secondary});color:${c.text}">⚽ JUGAR CON ${sel.name.toUpperCase()}</button>
+          <button id="btn-start" class="w-full mt-4 py-3 rounded-xl font-black text-[17px] cursor-pointer transition-all hover:brightness-110 hover:scale-[1.005]" style="background:linear-gradient(135deg, ${c.primary}, ${c.secondary});color:${c.text}">⚽ JUGAR CON ${sel.name.toUpperCase()}</button>
         </div>
       </div>
-      <button id="car-next" title="Siguiente" class="self-center shrink-0 w-11 h-11 rounded-full border border-slate-600 bg-slate-800/80 hover:border-[var(--wc-gold)] hover:text-amber-300 text-2xl font-black cursor-pointer transition-all">›</button>
+      <button id="car-next" title="Siguiente" class="self-center shrink-0 w-12 h-12 rounded-full border border-slate-600 bg-slate-900/80 hover:border-[var(--wc-gold)] hover:text-amber-300 text-2xl font-black cursor-pointer transition-all">›</button>
+      </div>
+      <div class="shrink-0 self-center w-20 h-20 animate-floaty" style="animation-delay:-2.5s">${BALL_SVG}</div>
     </div>
-    <div class="flex justify-center gap-2 mt-4 flex-wrap">
-      ${confTeams.map(t => `<button data-team="${t.id}" title="${t.name}" class="car-dot rounded-md overflow-hidden transition-all cursor-pointer ${t.id === menuSel ? "ring-2 ring-[var(--wc-gold)] scale-110" : "opacity-50 hover:opacity-90"}">${flagImg(t, "w-9 h-6")}</button>`).join("")}
-    </div>
-    <div class="text-center mt-8">
-      <button id="btn-history" class="text-slate-400 hover:text-slate-200 text-sm underline underline-offset-4 cursor-pointer">📜 Historial de partidas</button>
     </div>
   `);
+  // Tailwind CDN aplica sus clases de forma asíncrona (JIT en runtime), así que medir
+  // en el mismo tick del innerHTML da un layout todavía sin estilizar. setTimeout (no
+  // requestAnimationFrame: rAF se pausa en pestañas en segundo plano/automatizadas y
+  // el escalado nunca llegaba a aplicarse) le da el respiro para asentarse de verdad.
+  setTimeout(() => fitScaleUp("menu-content"), 50);
   document.querySelectorAll(".confed-tab").forEach(b => b.onclick = () => {
     menuConfed = b.dataset.confed;
     // Al cambiar de continente se abre con su primer equipo en orden alfabético

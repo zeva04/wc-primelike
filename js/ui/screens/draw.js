@@ -19,7 +19,6 @@ function renderDraw() {
       <div class="w-12 h-12 mx-auto mb-2 animate-floaty">${BALL_SVG}</div>
       <h1 class="text-3xl font-black gold-text">SORTEO OFICIAL</h1>
       <div class="tricolor-bar max-w-xs mx-auto mt-2 mb-3"></div>
-      <p class="text-slate-400 mt-1">Juegas con ${teamChip(me, "font-bold text-slate-100")} — te tocó el <span class="tp-text font-bold">Grupo ${run.groups[run.myGroupIdx].name}</span></p>
     </div>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
       ${run.groups.map((g, gi) => `

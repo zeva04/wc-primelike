@@ -231,8 +231,12 @@ function pitchLines() {
    Se pierde la lectura fina del progreso (la barra pasó de 160px a 46) y se gana
    la cancha entera: con 19 rasgos, el espacio vale más que la precisión de una
    barra que igual se lee mejor en el número de al lado. */
-const CHIP_W = 150;          // paso entre fichas
-const CHIP_X = 26;           // dónde arranca la franja
+// Paso y arranque: la franja va CENTRADA en el pizarrón desde que los Puntos de
+// Identidad se mudaron al HUD (sprint de UX). Antes las cuatro fichas se apoyaban
+// en el borde izquierdo porque el saldo escrito en tiza equilibraba la derecha; sin
+// él, esa esquina quedaba vacía y la cabecera se leía descolgada.
+const CHIP_W = 190;          // paso entre fichas
+const CHIP_X = 230;          // dónde arranca la franja
 function principlesBand(run, f) {
   return `<g>${PHILOSOPHIES.map((p, i) => {
     const x = CHIP_X + i * CHIP_W;
@@ -258,19 +262,9 @@ function principlesBand(run, f) {
   }).join("")}</g>`;
 }
 
-/* ---------- LOS PUNTOS DE IDENTIDAD, escritos en la esquina ----------
-   Dejaron de ser un chip de interfaz arriba: el saldo se anota con tiza en la
-   esquina superior derecha del pizarrón, subrayado, espejo del título de la
-   regla de principios de la izquierda. Con puntos por gastar el número va en
-   el color del marcador; en cero, en tiza apagada. */
-function piNote(run, color) {
-  const pi = run.identityPoints || 0;
-  return `<g>
-    <text x="${RIGHT}" y="${HEAD_Y}" text-anchor="end" class="tb-hand" font-size="21" fill="${CHALK}" opacity=".62">Puntos de Identidad: <tspan
-      font-size="34" font-weight="700" fill="${pi > 0 ? color : CHALK}" opacity="${pi > 0 ? 1 : 0.5}">${pi}</tspan></text>
-    <line x1="${RIGHT - 258}" y1="${HEAD_Y + 8}" x2="${RIGHT}" y2="${HEAD_Y + 8}" stroke="${CHALK}" stroke-width="1.8" opacity=".26"/>
-  </g>`;
-}
+/* Los PUNTOS DE IDENTIDAD se anotaban acá con tiza, en la esquina superior derecha.
+   Salieron del pizarrón en el sprint de UX (5-ago): el saldo ya vive en la placa
+   dorada del HUD, y tenerlo en los dos lados era la misma cifra con dos fuentes. */
 
 /* ---------- EL POST-IT: las notas del DT ----------
    Ya no es una franja de texto al pie: es un papel pegado al pizarrón, al pie de
@@ -361,7 +355,9 @@ export function tacticBoard(run, f, tree, { adv, deep, deepOwned, etapa, selecte
       + (master ? node(master, MASTER.x, MASTER.y, MASTER.r, color, true, selected === master.id) : "");
   }
 
-  return `<svg id="tb-svg" viewBox="0 0 ${VB.w} ${VB.h}" class="w-full h-auto block select-none" xmlns="http://www.w3.org/2000/svg">
+  // El tablero manda por ALTO (sprint de UX): en una pantalla fija sin scroll, el
+  // alto es el recurso escaso — el SVG lo llena y deriva su ancho del viewBox.
+  return `<svg id="tb-svg" viewBox="0 0 ${VB.w} ${VB.h}" class="h-full w-auto max-w-full block select-none" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="tb-board" x1="0" y1="0" x2="0.4" y2="1">
         <stop offset="0" stop-color="#1a4a32"/><stop offset="55%" stop-color="#10331f"/><stop offset="100%" stop-color="#0a2417"/>
@@ -387,7 +383,6 @@ export function tacticBoard(run, f, tree, { adv, deep, deepOwned, etapa, selecte
       <g filter="url(#chalk)">${AMBIENT.map(ambient).join("")}</g>
       <path d="M${MIDX - 40} ${PITCH.y + 26} q 60 -14 118 0" fill="none" stroke="${CHALK}" stroke-width="1.6" opacity=".22" marker-end="url(#ah-off)"/>
       ${principlesBand(run, f)}
-      ${piNote(run, color)}
       ${arrows}
       ${nodes}
       ${postIt(selected === NOTES_ID)}

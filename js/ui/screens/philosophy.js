@@ -23,12 +23,12 @@
 import { getPhilosophy, FILO_LEVELS, FILO_ETAPAS, AFINIDAD_LABEL, afinidadMult } from "../../content/philosophies.js";
 import { ADVANCED_BY_FILO } from "../../content/sequences.js";
 import { RAMA_LABELS, DEEP_TRAIT } from "../../content/traits.js";
-import { filoPoints, filoLevel, filoEtapa } from "../../game/philosophy.js";
+import { filoPoints, filoLevel } from "../../game/philosophy.js";
 import { dtProgress, DT_MAX } from "../../game/coach.js";
 import { traitTree, buyTrait, traitCost } from "../../game/traits.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenShell, $ } from "../components.js";
+import { screenFull, $, hudGauge } from "../components.js";
 import { showFiloChange } from "../filo-change.js";
 import { tacticBoard, nodePos, camTransform, markerColor, TIER_LABEL, NOTES_ID, notesBlocks } from "../board.js";
 
@@ -150,77 +150,102 @@ function renderPhilosophy(opts = {}, selected = null) {
   // abre el modal compartido, donde la regla manda: changePhilosophy exige y
   // consume la Acción del Día — si ya la usaste hoy, el enlace lo dice y no miente.
   const cambioTxt = opts.onboarding
-    ? { label: "Elegir otra identidad", title: "Vuelve al selector — todavía no gastaste nada",
-        cls: "cursor-pointer border-slate-600 bg-slate-800/70 text-slate-300 hover:border-slate-400 hover:text-white hover:bg-slate-700/70" }
+    ? { label: "Elegir otra identidad", title: "Vuelve al selector — todavía no gastaste nada" }
     : run.actionPending
-      ? { label: "Cambiar identidad", title: "Cuesta la Acción del Día",
-          cls: "cursor-pointer border-slate-600 bg-slate-800/70 text-slate-300 hover:border-amber-400 hover:text-amber-300 hover:bg-slate-700/70" }
-      : { label: "Cambiar identidad", title: "Ya usaste la Acción del Día: mañana",
-          cls: "cursor-not-allowed border-slate-800 bg-slate-900/50 text-slate-600" };
+      ? { label: "Cambiar identidad", title: "Cuesta la Acción del Día" }
+      : { label: "Cambiar identidad", title: "Ya usaste la Acción del Día: mañana" };
 
-  screenShell(`
-    <!-- LA BANDA: quién eres y cuánto camino llevas. Una sola fila, sin cajas. -->
-    <div class="flex flex-wrap items-center gap-x-6 gap-y-3 mb-4">
-      <div class="flex items-center gap-2.5 min-w-0">
-        <span class="text-3xl leading-none">${f.icon}</span>
-        <div class="min-w-0">
-          <div class="flex items-baseline gap-2.5">
-            <h1 class="text-xl font-black leading-none tracking-tight">${f.name}</h1>
-            <span class="text-[9px] font-black uppercase tracking-[.18em] px-2 py-1 rounded-lg ${jugando ? "text-emerald-300 bg-emerald-500/10" : "text-slate-500 bg-slate-800/70"}">${jugando ? "la que juegas" : "solo mirando"}</span>
-            <!-- El cambio de identidad, en la misma línea del nombre: no cuesta
-                 un píxel de alto y queda donde el jugador mira su identidad. -->
-            <button id="btn-filo" class="text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all ${cambioTxt.cls}"
-              title="${cambioTxt.title}">↩ ${cambioTxt.label}</button>
-          </div>
-          <p class="chalk-hand text-[13px] text-slate-500 truncate mt-1">${f.lema}</p>
+  screenFull(`
+    <!-- EL HUD (sprint de UX, 5-ago). Antes esta franja eran dos filas rotas por el
+         flex-wrap con seis tamaños de letra, dos barras de distinto grosor separadas
+         de su propio número, y una frase corrida de cuatro datos a 9.5px. Ahora es
+         UNA fila de altura fija con tres piezas de gramática distinta:
+           · IDENTIDAD  (quién sos: icono, nombre, lema)
+           · MEDIDORES  (cuánto avanzaste: dos gauges idénticos, DT y filosofía)
+           · RECURSO    (qué podés gastar: los PI, en su placa dorada)
+         Los multiplicadores dejaron de ser prosa y son chips-buff con tooltip. El
+         nivel de la filosofía ya no se dice dos veces: el pie del gauge trae el XP
+         vivo (7/250) en vez de "nivel 2 a los 250", que obligaba a restar de cabeza. -->
+    <!-- El HUD y la pizarra comparten ANCHO (lo ajusta fitBoard(), abajo): sin eso la
+         barra sobresalía ~100px a cada lado del tablero y los dos bloques se leían
+         como dos pantallas distintas en vez de una. -->
+    <div id="filo-fit" class="flex flex-col h-full w-full mx-auto">
+    <div class="hud shrink-0">
+      <span class="text-[26px] leading-none">${f.icon}</span>
+      <!-- El bloque de identidad va ACOTADO: el lema es el texto más largo del HUD y
+           sin techo empujaba la barra a dos filas, que a su vez le comía alto a la
+           pizarra. Truncado con su tooltip: el lema se lee entero al pasar el mouse. -->
+      <div class="min-w-0 mr-1 max-w-[15rem]">
+        <div class="flex items-baseline gap-2">
+          <h1 class="text-2xl font-black leading-none tracking-tight truncate">${f.name}</h1>
+          <!-- El aviso existe SOLO en el caso anómalo: si estás mirando un árbol que
+               no es el que juegas. Un chip permanente que el 90% del tiempo dice lo
+               obvio es ruido (decisión PO 5-ago: fuera "la que juegas"). -->
+          ${jugando ? "" : `<span class="text-[10px] font-black uppercase tracking-[.16em] text-amber-400/80 shrink-0">solo mirando</span>`}
         </div>
+        <p class="tip tip-b text-xs text-slate-500 truncate mt-1" data-tip="${f.lema}">${f.lema}</p>
       </div>
 
-      <!-- El flex-wrap NO es decorativo: los cuatro bloques miden ~515px y a 375 de
-           pantalla el contenedor tiene 343. Sin envolver, la banda empujaba la página
-           a 567px de ancho y la pizarra se miraba con scroll horizontal (medido con
-           tools/mobile.html, 29-jul). Mismo bug —y mismo arreglo— que la cabecera de
-           Gestión de Plantilla: una fila de anchos fijos que no puede romper. -->
-      <div class="flex flex-wrap items-center justify-end gap-3 ml-auto">
-        <!-- EL DIRECTOR TÉCNICO: la segunda capa. Los PI que gasta el árbol salen de acá. -->
-        <div class="text-right leading-none">
-          <div class="text-[9px] font-black uppercase tracking-[.2em] mb-1 text-sky-400/70">Director técnico</div>
-          <div class="text-[15px] font-black">Nivel ${run.dtNivel || 1}<span class="text-slate-600 text-[12px] font-bold">/${DT_MAX}</span>
-            ${run.identityPoints > 0 ? `<span class="text-amber-300 text-[12px]"> · ${run.identityPoints} PI</span>` : ""}</div>
-          <div class="h-[4px] w-28 ml-auto rounded-full bg-black/60 overflow-hidden ring-1 ring-white/10 mt-1.5">
-            <div class="h-full rounded-full bg-sky-400" style="width:${dt.pct}%"></div>
-          </div>
-        </div>
-        <div class="text-right leading-none">
-          <div class="text-[9px] font-black uppercase tracking-[.2em] mb-1" style="color:${oro}b3">${FILO_ETAPAS[etapa].label}</div>
-          <div class="text-[15px] font-black">Nivel ${lvl + 1}<span class="text-slate-600 text-[12px] font-bold">/10</span></div>
-        </div>
-        <div class="w-56 max-w-full">
-          <div class="h-[6px] rounded-full bg-black/60 overflow-hidden ring-1 ring-white/10">
-            <div class="h-full rounded-full transition-all duration-500" style="width:${Math.min(100, nivelPct)}%;background:linear-gradient(90deg,${oro}88,${oro})"></div>
-          </div>
-          <div class="text-[9.5px] text-slate-500 mt-1.5">${pts} XP${next ? ` · nivel ${lvl + 2} a los ${next.min}` : " · la idea ya es ley"} · su firma sale ×${nivel.mult} · aprende ×${afin} <span class="opacity-70">(${AFINIDAD_LABEL[afin] || "neutral"})</span></div>
-        </div>
+      <!-- El DT no se muestra en el ONBOARDING: recién empieza (nivel 1, sin XP) y ahí
+           lo único que se decide es la identidad y el primer PI. Además su hueco es
+           justo el que necesita el CTA "Al sorteo" para que el HUD entre en una fila. -->
+      ${opts.onboarding ? "" : `<div class="hud-sep ml-auto"></div>
+      ${hudGauge({ label: "Director técnico", color: "#38bdf8", lvl: run.dtNivel || 1, max: DT_MAX,
+        pct: dt.pct, foot: dt.need ? `${dt.curr} / ${dt.need} XP` : "tope alcanzado" })}`}
+
+      <div class="hud-sep ${opts.onboarding ? "ml-auto" : ""}"></div>
+      ${hudGauge({ label: FILO_ETAPAS[etapa].label, color: oro, lvl: lvl + 1, max: 10, pct: nivelPct,
+        foot: next ? `${pts} / ${next.min} XP` : "la idea ya es ley", w: "11rem",
+        chips: [
+          { txt: `×${nivel.mult}`, tip: `Potencia de su jugada firma · nivel ${lvl + 1}` },
+          { txt: `×${afin}`, tip: `Aprende ${AFINIDAD_LABEL[afin] || "neutral"}` },
+        ] })}
+
+      <div class="hud-sep"></div>
+      <div class="hud-res tip tip-b" data-tip="Puntos de Identidad: se gastan en la pizarra">
+        <span class="text-[17px] font-black ${run.identityPoints > 0 ? "text-amber-300" : "text-slate-600"}">${run.identityPoints || 0}</span>
+        <span class="text-[10px] font-black uppercase tracking-[.14em] leading-tight text-amber-200/70">Puntos<br>Identidad</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btn-filo" class="hud-btn tip tip-b ${opts.onboarding || run.actionPending ? "" : "opacity-40 cursor-not-allowed"}"
+          data-tip="${cambioTxt.title}">↩ ${opts.onboarding ? "Otra" : "Cambiar"}</button>
         ${opts.onboarding
           ? `<button id="btn-continue" class="btn-primary text-sm ${run.identityPoints > 0 ? "opacity-40 cursor-not-allowed" : ""}"
               title="${run.identityPoints > 0 ? "Primero incorpora tu primera idea: elige uno de los tres rasgos básicos" : ""}">Al sorteo →</button>`
-          : `<button id="btn-back" class="text-sm text-slate-400 hover:text-slate-200 cursor-pointer px-3 py-2 rounded-xl border border-slate-700 hover:border-slate-500">← Volver</button>`}
+          : `<button id="btn-back" class="hud-btn tip tip-b" data-tip="Volver al hub">←</button>`}
       </div>
     </div>
 
     <!-- LA PIZARRA. Sin instrucciones escritas: el onboarding se resuelve solo con
-         los tres círculos que laten en campo propio y el contador de PI. El riel
-         de la derecha entra al enfocar un rasgo; la cámara encuadra el nodo al 29%
-         del ancho justamente para dejarle ese cuarto del tablero libre. -->
-    <div class="board-frame relative">
-      ${tacticBoard(run, f, tree, { adv, deep, deepOwned, etapa, selected })}
-      <div id="tb-rail" class="tb-rail"></div>
+         los tres círculos que laten en campo propio y el contador de PI del HUD. El
+         riel de la derecha entra al enfocar un rasgo; la cámara encuadra el nodo al
+         29% del ancho justamente para dejarle ese cuarto del tablero libre.
+         El tablero manda por ALTO (el SVG es h-full y deriva su ancho del viewBox):
+         así la pizarra llena lo que le sobra a la pantalla y nunca la desborda. -->
+    <div class="flex-1 min-h-0 flex justify-center mt-3">
+      <div class="board-frame relative h-full">
+        ${tacticBoard(run, f, tree, { adv, deep, deepOwned, etapa, selected })}
+        <div id="tb-rail" class="tb-rail"></div>
+      </div>
     </div>
-  `, "max-w-5xl");   // 6xl→5xl (26-jul): con 19 rasgos el tablero no entraba sin scroll
-                     // vertical en una notebook típica (1280×720): a 6xl sobraban 48px de
-                     // alto. El SVG escala uniforme (viewBox), así que achicar el ancho del
-                     // contenedor reduce TODO por igual — nodos, texto, huecos — sin riesgo
-                     // de reabrir los solapamientos que ya se verificaron sin él.
+    </div>
+  `);
+
+  /**
+   * Iguala el ancho del HUD al de la pizarra. El tablero manda por ALTO (llena lo que
+   * le sobra a la pantalla) y su ancho sale del aspecto del viewBox, 1200×700 = 12/7.
+   * El alto del HUD se MIDE en vez de constantear: si en una ventana angosta envuelve
+   * a dos filas, el cálculo sigue siendo exacto. Dos pases porque son mutuamente
+   * dependientes — al angostar el contenedor el HUD puede envolver y cambiar de alto.
+   */
+  function fitBoard() {
+    const wrap = $("#filo-fit"), hudEl = wrap.querySelector(".hud");
+    const libre = wrap.clientHeight - hudEl.offsetHeight - 12;   // 12 = el hueco (mt-3)
+    wrap.style.maxWidth = `${Math.min(1280, (libre * 12) / 7)}px`;
+  }
+  fitBoard();
+  requestAnimationFrame(fitBoard);
 
   const svg = $("#tb-svg"), cam = $("#tb-cam"), card = $("#tb-rail");
 

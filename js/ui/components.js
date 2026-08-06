@@ -151,7 +151,58 @@ export function closeModal() { const m = document.getElementById("modal"); if (m
 /** ¿Hay un modal abierto? Lo usa el hub para no avanzar el día dos veces (ver pasarDia). */
 export function modalOpen() { return !!document.getElementById("modal"); }
 
+/* ── EL HUD: medidores de progreso de las pantallas de gestión ────────────────
+   Un medidor = etiqueta + nivel + barra + pie, siempre en ese orden y siempre del
+   mismo tamaño. Dos medidores lado a lado se comparan sin leerlos porque son la
+   MISMA forma: lo único que los distingue es el color. Las clases viven en el CSS
+   global (.hud-*); acá solo se arma el HTML.
+   `chips` son multiplicadores/buffs cortos: [{txt:"×1.35", tip:"..."}]. */
+export function hudGauge({ label, color, lvl, max, pct, foot, chips = [], w = "9.5rem" }) {
+  const chipsHtml = chips.map(c => `<span class="hud-chip tip tip-b" data-tip="${c.tip}">${c.txt}</span>`).join("");
+  return `<div style="--g:${color};width:${w}">
+    <div class="hud-label">${label}</div>
+    <div class="flex items-center justify-between gap-2">
+      <div class="hud-lvl">${lvl}<small>/${max}</small></div>
+      ${chipsHtml ? `<div class="flex items-center gap-1">${chipsHtml}</div>` : ""}
+    </div>
+    <div class="hud-bar"><span style="width:${Math.max(0, Math.min(100, pct))}%"></span></div>
+    <div class="hud-foot">${foot}</div>
+  </div>`;
+}
+
 /** Reemplaza la pantalla completa con el contenido dado (contenedor centrado). */
 export function screenShell(inner, maxW = "max-w-5xl") {
   app().innerHTML = `<div class="${maxW} mx-auto px-4 py-6">${inner}</div>`;
+}
+
+/**
+ * Shell de PANTALLA FIJA (sprint de UX): ocupa exactamente el alto del viewport y
+ * NO hace scroll — todo tiene que entrar en una pantalla de PC. El contenido es un
+ * flex column: lo que debe adaptarse lleva `flex-1 min-h-0`, lo demás `shrink-0`.
+ */
+export function screenFull(inner, maxW = "max-w-7xl") {
+  app().style.zoom = "";  // limpia el escalado que haya dejado fitScaleUp() de la pantalla anterior
+  app().innerHTML = `<div class="h-screen overflow-hidden flex flex-col ${maxW} mx-auto px-5 py-4 relative">${inner}</div>`;
+}
+
+/**
+ * Aprovecha el aire libre de una pantalla FIJA (screenFull): si el contenido real
+ * queda muy por debajo del viewport, escala TODO ese contenido un poco con `zoom`
+ * en vez de dejar el sobrante como espacio muerto. `zoom` (no `transform`) porque
+ * reacomoda el layout de verdad, no solo lo agranda visualmente.
+ *
+ * OJO: el zoom va en `wrapId`, un contenedor de alto INTRÍNSECO (auto), nunca en el
+ * shell `h-screen` ni en un ancestro suyo — un `vh` adentro de algo zoomeado se mide
+ * contra el viewport real pero se DIBUJA ya multiplicado por el zoom, así que
+ * zoomear por encima de un `h-screen` lo desborda (100vh × 1.05 > 100vh: overflow
+ * garantizado). `wrapId` es a la vez lo que se mide y lo que se escala — por eso
+ * tiene que ser el envoltorio de TODO el contenido real de la pantalla, no el shell.
+ */
+export function fitScaleUp(wrapId, { max = 1.05, threshold = 40, pad = 16 } = {}) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  wrap.style.zoom = "";
+  const bottom = wrap.getBoundingClientRect().bottom;
+  const leftover = innerHeight - bottom - pad;
+  if (leftover > threshold && bottom * max < innerHeight - pad) wrap.style.zoom = String(max);
 }

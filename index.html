@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rumbo al Mundial 2026 — Roguelike</title>
+  <title>WC Prime</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
@@ -20,14 +20,77 @@
       --team-secondary: #8B6914;
       --team-text: #0f172a;
     }
-    body {
+    /* ---- EL FONDO DEL MUNDIAL (sprint de UX) ----
+       Negro de base con las tres manchas de los anfitriones (rojo/verde/azul)
+       difuminadas hasta mezclarse. Va en una capa fija propia: así el desenfoque
+       es UNA textura de pantalla y no se recalcula con cada render de una tab. */
+    body { background: var(--wc-black); min-height: 100vh; }
+    body::before {
+      content: ""; position: fixed; inset: -25%; z-index: -2; pointer-events: none;
       background:
-        radial-gradient(ellipse 60% 40% at 15% 0%, rgba(0, 87, 184, 0.14), transparent 60%),
-        radial-gradient(ellipse 60% 40% at 85% 0%, rgba(234, 0, 42, 0.12), transparent 60%),
-        radial-gradient(ellipse 70% 50% at 50% 100%, rgba(0, 122, 51, 0.10), transparent 65%),
-        linear-gradient(180deg, #131318 0%, var(--wc-black) 60%, #060608 100%);
-      min-height: 100vh;
+        radial-gradient(closest-side circle at 16% 22%, rgba(0, 87, 184, .95), transparent 100%),
+        radial-gradient(closest-side circle at 82% 18%, rgba(234, 0, 42, .85), transparent 100%),
+        radial-gradient(closest-side circle at 68% 82%, rgba(0, 122, 51, .95), transparent 100%),
+        radial-gradient(closest-side circle at 22% 86%, rgba(234, 0, 42, .55), transparent 100%),
+        radial-gradient(closest-side circle at 50% 48%, rgba(0, 87, 184, .45), transparent 100%);
+      filter: blur(90px) saturate(1.25);
+      opacity: .8;
     }
+    /* Viñeta: el color vive en el centro y los bordes vuelven al negro. */
+    body::after {
+      content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background: radial-gradient(ellipse 95% 85% at 50% 50%, transparent 45%, rgba(6, 6, 10, .72) 100%);
+    }
+    /* ---- EL HUD (sprint de UX): la barra de estado de las pantallas de gestión ----
+       UN solo componente de medidor repetido —etiqueta, número, barra, pie—; que sean
+       IDÉNTICOS en forma es lo que los vuelve comparables de un vistazo. Lo único que
+       cambia por medidor es el color, que entra por la variable --g. */
+    .hud {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
+      padding: 9px 14px; border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, .08);
+      background: rgba(9, 11, 16, .72); backdrop-filter: blur(6px);
+      box-shadow: 0 8px 26px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .05);
+    }
+    .hud-sep { width: 1px; align-self: stretch; background: rgba(255, 255, 255, .09); }
+    .hud-label { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .16em; color: var(--g); opacity: .85; }
+    .hud-lvl { font-size: 17px; font-weight: 900; line-height: 1.15; }
+    .hud-lvl small { font-size: 12px; font-weight: 800; color: #64748b; }
+    .hud-bar { height: 5px; border-radius: 3px; background: rgba(0, 0, 0, .6); overflow: hidden; margin-top: 4px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); }
+    .hud-bar > span { display: block; height: 100%; border-radius: 3px; transition: width .5s ease; background: linear-gradient(90deg, color-mix(in srgb, var(--g) 45%, transparent), var(--g)); }
+    .hud-foot { font-size: 10px; font-weight: 700; color: #64748b; margin-top: 3px; }
+    /* El multiplicador como BUFF: chip corto en el color del medidor, no prosa. */
+    .hud-chip {
+      font-size: 10px; font-weight: 900; letter-spacing: .04em; padding: 2px 6px; border-radius: 5px;
+      color: var(--g); background: color-mix(in srgb, var(--g) 15%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--g) 34%, transparent);
+    }
+    /* El recurso gastable: placa dorada propia. No es un dato más, es lo que se gasta. */
+    .hud-res {
+      display: flex; align-items: center; gap: 9px; padding: 7px 12px; border-radius: 11px;
+      border: 1px solid rgba(212, 175, 55, .34);
+      background: linear-gradient(160deg, rgba(212, 175, 55, .17), rgba(212, 175, 55, .04));
+    }
+    .hud-btn {
+      font-size: 11px; font-weight: 800; padding: 7px 11px; border-radius: 10px; cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .04); color: #cbd5e1;
+      transition: all .14s ease;
+    }
+    .hud-btn:hover { border-color: rgba(255, 255, 255, .28); color: #fff; background: rgba(255, 255, 255, .09); }
+    .hud-btn:disabled { cursor: not-allowed; opacity: .4; }
+    /* Tooltip propio (el `title` nativo tarda 1s y no combina): data-tip + .tip */
+    .tip { position: relative; }
+    .tip::after {
+      content: attr(data-tip);
+      position: absolute; top: 50%; right: calc(100% + 10px); transform: translateY(-50%);
+      white-space: nowrap; padding: 5px 9px; border-radius: 7px;
+      background: rgba(8, 8, 12, .96); border: 1px solid rgba(212, 175, 55, .38);
+      color: #e9e9f0; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+      opacity: 0; pointer-events: none; transition: opacity .14s ease;
+    }
+    .tip:hover::after { opacity: 1; }
+    /* Variante para tooltips en medio de una barra: cae abajo, no al costado. */
+    .tip-b::after { top: calc(100% + 8px); right: auto; left: 50%; transform: translateX(-50%); }
     .btn-primary {
       padding: 0.65rem 1.5rem;
       border-radius: 0.75rem;
