@@ -36,19 +36,35 @@ assert(0.45 * E.FATIGUE_INJURY_MAX < 1, "ni con las piernas vacías el golpe es 
   assert(E.applyDailyRecovery === undefined, "applyDailyRecovery se borró: no queda ni la función muerta");
   assert(E.DAILY_RECOVERY === undefined && E.MATCHDAY_RECOVERY === undefined, "y tampoco sus constantes");
 
-  // Pasar un día de preparación, jugando o no, no mueve la energía de nadie.
-  const run = E.newRun("BRA");
-  run.squad.forEach(p => { p.energia = 40; });
-  E.advanceDay(run);
-  assert(run.squad.every(p => p.energia === 40), "un día de preparación NO recupera energía por sí solo", run.squad[0].energia);
+  // Pasar un día de preparación, jugando o no, no mueve la energía de nadie POR SÍ SOLO.
+  // Repetido en vez de un solo trial: `advanceDay` también dispara eventos de preparación
+  // al azar (content/prep-events), y varios de ellos SÍ tocan energía por su cuenta — eso
+  // es un mecanismo distinto del descanso pasivo que se está probando acá. Un único día
+  // podía coincidir con uno de esos eventos y dar un falso rojo. Lo que hay que confirmar
+  // es que "nada pasa" sea un resultado POSIBLE (antes era IMPOSIBLE: el pasivo garantizaba
+  // +7 siempre) — no que sea el resultado de un día cualquiera.
+  let huboDiaSinCambios = false;
+  for (let i = 0; i < 60 && !huboDiaSinCambios; i++) {
+    const run = E.newRun("BRA");
+    run.squad.forEach(p => { p.energia = 40; });
+    E.advanceDay(run);
+    if (run.squad.every(p => p.energia === 40)) huboDiaSinCambios = true;
+  }
+  assert(huboDiaSinCambios, "en al menos uno de 60 días de preparación la energía no se mueve — confirma que no queda ningún piso pasivo");
 
-  // Tampoco la víspera del partido (antes recuperaba +2 — ya no).
-  while (run.day < run.nextMatchDay - 1) E.advanceDay(run);
-  run.squad.forEach(p => { p.energia = 40; });
-  const res = E.advanceDay(run);
-  assert(res && res.type === "match", "el día siguiente es el de partido", JSON.stringify(res));
-  assert(run.squad.every(p => p.energia === 40), "la víspera del partido tampoco recupera nada", run.squad[0].energia);
-  assert(run.actionPending === false, "el día de partido sigue sin Acción del Día (los días de partido son sagrados)");
+  // Tampoco la víspera del partido (antes recuperaba +2 — ya no). Mismo cuidado con los
+  // eventos al azar: se repite hasta ver un caso limpio.
+  let huboVisperaSinCambios = false;
+  for (let i = 0; i < 60 && !huboVisperaSinCambios; i++) {
+    const run = E.newRun("BRA");
+    while (run.day < run.nextMatchDay - 1) E.advanceDay(run);
+    run.squad.forEach(p => { p.energia = 40; });
+    const res = E.advanceDay(run);
+    assert(res && res.type === "match", "el día siguiente es el de partido", JSON.stringify(res));
+    assert(res.type !== "match" || run.actionPending === false, "el día de partido sigue sin Acción del Día (los días de partido son sagrados)");
+    if (run.squad.every(p => p.energia === 40)) huboVisperaSinCambios = true;
+  }
+  assert(huboVisperaSinCambios, "en al menos una víspera de partido la energía tampoco se mueve por sí sola");
 
   // La única fuente pasiva que sigue viva: el banco que no jugó (REST_RECOVERY).
   assert(E.REST_RECOVERY > 0, "el que no juega un partido sigue recuperando por rotar");

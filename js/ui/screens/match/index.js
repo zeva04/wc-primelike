@@ -318,6 +318,7 @@ function handleDecision(d, key) {
   else if (d.id === "last_man") match.resolveLastMan(key);
   else if (d.id === "forced_sub") { match.decision = null; match.makeSub(d.out, key); }
   else if (d.id === "gk_red") { match.decision = null; match.makeSub(match.my.lineup.find(p => p.name === key), d.gkIn, true); }
+  else if (d.id === "gk_emergency") match.resolveGkEmergency(key);
   else if (d.id === "protect") {
     match.decision = null;
     if (key === "sub") {

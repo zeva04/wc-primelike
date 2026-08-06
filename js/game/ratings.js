@@ -8,6 +8,17 @@ import { momentoMult } from "./momentum.js";
 export const STAT_KEYS = ["tiro", "defensa", "cabezazo", "pase_corto", "pase_largo", "velocidad", "aura"];        // jugadores de campo
 export const GK_STAT_KEYS = ["atajadas", "reflejos", "salidas", "pase_corto", "pase_largo", "velocidad", "aura"]; // arqueros
 
+/* ARQUERO DE EMERGENCIA (bug fix, 2-ago-2026): el equipo NUNCA puede jugar sin nadie en el
+   arco. Si los dos POR del plantel quedan fuera a la vez (lesión + expulsión + suspensión
+   acumulada — raro pero posible en 7 partidos de torneo), un jugador de campo tiene que
+   ponerse los guantes — y un jugador de campo no tiene `atajadas`/`reflejos`/`salidas` en
+   sus datos (son "otro juego", decisión de F2 en lineup.canPlayAt).
+   La línea es FIJA e IGUAL para cualquiera (decisión PO): no importa quién vaya al arco,
+   ninguno es arquero entrenado. Muy por debajo del peor arquero real del juego (medido:
+   el piso real es 61/63/57 — Márcio Rosa, CPV) para que la emergencia se sienta como
+   emergencia y no como una alternativa viable. */
+export const EMERGENCY_GK_STATS = { atajadas: 25, reflejos: 28, salidas: 22 };
+
 /* NO HAY "un número de pase". La costura de la Odisea (`PASE_MIX`, 60/40) murió el
    29-jul-2026: cada sitio del motor declara CUÁL de los dos pases mide y por qué —
    circulación y precisión del panel son `pase_corto`; el filtrado, el centro alto y el
@@ -42,10 +53,17 @@ export function outOfPosPenalty(p) { return penaltyAt(p, playedPos(p)); }
 // escala TODAS las stats — incluida el aura: la confianza es exactamente eso. Los rivales
 // no tienen `momento`, así que su multiplicador es 1 (poder asimétrico, ver momentum.js).
 // `conMomento: false` da la stat SIN la forma del día (naturalOverall la usa: talento puro).
+//
+// ARQUERO DE EMERGENCIA: si `pos` es "POR" y el jugador NO es arquero de verdad, las 3
+// stats exclusivas del arco (que no existen en sus datos) vienen de EMERGENCY_GK_STATS en
+// vez de `p.stats` — y sin el castigo por fuera de puesto (ya es una línea deliberadamente
+// mala, restarle más sería un doble castigo). El resto de sus stats (pase/velocidad/aura,
+// que SÍ tiene) sigue el camino normal, con el castigo de siempre.
 function statAt(p, key, pos, conMomento = true) {
-  const v = p.stats[key];
+  const emergencia = pos === "POR" && p.pos !== "POR" && key in EMERGENCY_GK_STATS;
+  const v = emergencia ? EMERGENCY_GK_STATS[key] : p.stats[key];
   if (v === undefined) return v;
-  const base = key === "aura" ? v : v - penaltyAt(p, pos);
+  const base = emergencia || key === "aura" ? v : v - penaltyAt(p, pos);
   return clamp(Math.round(base * (conMomento ? momentoMult(p) : 1)), 1, 99);
 }
 

@@ -8,7 +8,7 @@
    ============================================================ */
 import { rnd, pick } from "../../core/rng.js";
 import { noteMomentum, markMomentum } from "./match-momentum.js";
-import { statLine } from "../ratings.js";
+import { statLine, playedPos } from "../ratings.js";
 import { rollInjury, fatigueInjuryMult } from "../medical.js";
 
 /** Falta aleatoria: puede derivar en amarilla, roja, o la decisión de proteger a un amonestado. */
@@ -35,7 +35,12 @@ export function foulEvent(m) {
       // sin ser una jugada (el gráfico tiene que explicar el quiebre que viene después).
       noteMomentum(m, "roja", "opp"); markMomentum(m, "🟥");
       m.log("card", `min ${m.clock()}' — 🟥 ¡EXPULSADO ${p.name}! Roja directa. Juegan con ${m.activeMine().length}.`);
-      return p.pos === "POR" ? forceGkReplacement(m) : false;
+      // playedPos, NO p.pos (bug fix, 2-ago-2026): si el expulsado es el arquero de
+      // EMERGENCIA (un jugador de campo que ya estaba parado en el arco), su `p.pos`
+      // natural sigue siendo DEF/MED/DEL — chequear eso lo dejaba pasar como si fuera un
+      // jugador de campo cualquiera, y el arco se quedaba vacío por segunda vez sin que
+      // nada lo reparara.
+      return playedPos(p) === "POR" ? forceGkReplacement(m) : false;
     }
     p.amarillaPartido = (p.amarillaPartido || 0) + 1;
     m.stats.tarjetas++;
@@ -43,7 +48,12 @@ export function foulEvent(m) {
       p.expulsado = true;
       noteMomentum(m, "roja", "opp"); markMomentum(m, "🟥");
       m.log("card", `min ${m.clock()}' — 🟥 Segunda amarilla y EXPULSIÓN de ${p.name}.`);
-      return p.pos === "POR" ? forceGkReplacement(m) : false;
+      // playedPos, NO p.pos (bug fix, 2-ago-2026): si el expulsado es el arquero de
+      // EMERGENCIA (un jugador de campo que ya estaba parado en el arco), su `p.pos`
+      // natural sigue siendo DEF/MED/DEL — chequear eso lo dejaba pasar como si fuera un
+      // jugador de campo cualquiera, y el arco se quedaba vacío por segunda vez sin que
+      // nada lo reparara.
+      return playedPos(p) === "POR" ? forceGkReplacement(m) : false;
     }
     // La amarilla solo NARRA (PO 22-jul: el popup de "protegerlo" se eliminó — cambiar al
     // amonestado es una decisión que el DT toma solo, desde la Gestión de plantilla en vivo).
@@ -60,27 +70,49 @@ export function foulEvent(m) {
 }
 
 /**
- * Tras la roja al arquero: pausa y obliga a meter un arquero suplente por un jugador de campo.
- * Devuelve true (decisión pendiente) o, si no hay arquero suplente / cambios, false con aviso.
+ * El arco se quedó sin arquero (roja o lesión al que estaba parado ahí) y hay que
+ * resolverlo YA — el equipo NUNCA sale a jugar con el área vacía (bug fix, 2-ago-2026).
+ * Dos caminos, según lo que quede en la banca:
+ *   1. Hay un POR suplente Y cambios disponibles → sustitución normal (`gk_red`): entra
+ *      el arquero de la banca por un jugador de campo.
+ *   2. No hay arquero en la banca (o no quedan cambios) → alguien de los que YA están en
+ *      cancha se pone los guantes (`gk_emergency`): NO es una sustitución, es una
+ *      reposición — el DT elige a quién entre `Match.resolveGkEmergency`. Antes esto solo
+ *      lo NARRABA ("un jugador de campo se pone los guantes") sin que ocurriera de
+ *      verdad: el arco quedaba vacío igual y el partido seguía como si nada.
+ * Devuelve true si queda una decisión pendiente (pausa el partido hasta resolverla).
  */
 export function forceGkReplacement(m) {
   const gkIn = m.availableBench().find(b => b.pos === "POR");
   const fieldOnPitch = m.activeMine().filter(p => p.pos !== "POR");
-  if (m.subsLeft <= 0 || !gkIn || !fieldOnPitch.length) {
-    m.log("event", `Sin arquero en la banca: un jugador de campo se pone los guantes. 🧤`);
+  if (m.subsLeft > 0 && gkIn) {
+    m.decision = {
+      id: "gk_red", gkIn: gkIn.name,
+      title: `🧤 ¡Te quedaste sin arquero!`,
+      text: `Entra #${gkIn.num || "?"} ${gkIn.name} (POR). Elige qué jugador de campo sale:`,
+      options: fieldOnPitch.map(p => ({ label: `#${p.num} ${p.name} (${p.pos})`, hint: statLine(p), key: p.name })),
+    };
+    m.stats.decisiones++;
+    return true;
+  }
+  if (!fieldOnPitch.length) {
+    // Caso extremo: ni un solo jugador de campo activo (equipo ya reducido a nada).
+    // No hay a quién mandar al arco — el motor no puede fabricar un jugador de la nada.
+    m.log("event", `No queda nadie en cancha para ponerse los guantes.`);
     return false;
   }
   m.decision = {
-    id: "gk_red", gkIn: gkIn.name,
-    title: `🧤 ¡Te quedaste sin arquero!`,
-    text: `Entra #${gkIn.num || "?"} ${gkIn.name} (POR). Elige qué jugador de campo sale:`,
+    id: "gk_emergency",
+    title: `🧤 ¡Sin arquero en la banca!`,
+    text: `Nadie puede entrar de la banca a cubrir el arco: un jugador de campo tiene que ponerse los guantes. Elige quién:`,
     options: fieldOnPitch.map(p => ({ label: `#${p.num} ${p.name} (${p.pos})`, hint: statLine(p), key: p.name })),
   };
   m.stats.decisiones++;
   return true;
 }
 
-/** Lesión aleatoria: golpe leve (−energía) o lesión que fuerza un cambio (decisión "forced_sub"). */
+/** Lesión aleatoria: golpe leve (−energía) o lesión que fuerza un cambio (decisión "injury_sub",
+ *  o "gk_red"/"gk_emergency" si la lesionada es la arquera y no hay suplente elegible). */
 export function injuryEvent(m) {
   const mineInjured = rnd() < 0.5;
   if (!mineInjured) {
@@ -108,6 +140,21 @@ export function injuryEvent(m) {
     : `${inj.partidos} partido${inj.partidos > 1 ? "s" : ""} de baja`;
   markMomentum(m, "🚑");
   m.log("event", `min ${m.clock()}' — 🚑 ¡${p.name} sufre ${inj.name} (${inj.severidad})! No puede continuar — ${baja}.`);
+  // EL ARQUERO LESIONADO es un caso aparte (bug fix, 2-ago-2026): si no hay un POR
+  // suplente elegible (`m.eligibleFor(p)` ya filtra por `canPlayAt`, así que da vacío sin
+  // arquero en la banca), el arco NO puede quedar sin nadie — se resuelve con la misma
+  // ruta que la roja al arquero (`forceGkReplacement`), que ahora sabe fabricar un
+  // arquero de emergencia si hace falta. Antes esto caía derecho al mensaje genérico de
+  // abajo y el partido seguía sin que nadie ocupara el arco.
+  //
+  // playedPos, NO p.pos: si el lesionado es el arquero de EMERGENCIA (un jugador de campo
+  // que ya estaba parado en el arco), su `p.pos` natural sigue siendo DEF/MED/DEL —
+  // chequear eso lo mandaba por el camino de "jugador de campo lesionado" y el arco se
+  // quedaba vacío por segunda vez, sin que nada lo reparara. Es el mismo bug que en la
+  // roja (`foulEvent`, arriba) y el que cazó el barrido de balance de este fix.
+  if (playedPos(p) === "POR" && !(m.subsLeft > 0 && m.eligibleFor(p).length > 0)) {
+    return forceGkReplacement(m);
+  }
   if (m.subsLeft > 0 && m.eligibleFor(p).length > 0) {
     // El reemplazo es MANUAL (PO 22-jul): nada de lista de recomendados — la UI abre la
     // Gestión de plantilla en vivo con el caído marcado y el DT arma el cambio a mano.

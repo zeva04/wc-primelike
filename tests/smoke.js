@@ -147,7 +147,12 @@ function playMatch(run, oppId) {
   const val = E.validateLineup(available, lineup);
   assert(val.ok, "autoLineup debe producir alineación válida",
     `[${val.msg}] once: ${lineup.map(p => `${p.pos}:${p.name}`).join(", ")} · fuera: ${run.squad.filter(p => p.suspendido || p.lesionadoPartidos > 0).map(p => `${p.name}(${p.pos}${p.suspendido ? " susp" : " les" + p.lesionadoPartidos})`).join(", ") || "nadie"}`);
-  assert(lineup.every(p => E.outOfPosPenalty(p) === 0), "el once automático no debe castigar a nadie");
+  // Única excepción admitida (bug fix, 2-ago-2026): el arquero de EMERGENCIA, cuando el
+  // plantel se quedó sin ningún POR disponible. Fuera de ese caso, el once automático
+  // sigue sin poder castigar a nadie.
+  assert(lineup.every(p => E.outOfPosPenalty(p) === 0 || (p.pos !== "POR" && E.playedPos(p) === "POR")),
+    "el once automático no castiga a nadie salvo al arquero de emergencia (si hace falta uno)",
+    lineup.filter(p => E.outOfPosPenalty(p) > 0).map(p => `${p.name}:${p.pos}->${p.posJugada}`).join(", "));
   const bench = available.filter(p => !lineup.includes(p));
   // matchCtx homólogo al de screens/match.js (la moral entra al generador por acá — A3;
   // la filosofía viaja igual desde F1: {id, nivel}, el Match no conoce la run)
@@ -165,6 +170,9 @@ function playMatch(run, oppId) {
   for (const name of banned) assert(!match.oppLineup.some(p => p.name === name), "suspendido fuera del once rival", name);
   assert(match.oppLineup.length === 6, "el rival siempre forma 6 (los genéricos cubren al suspendido)");
   assert(match.oppLineup.some(p => p.pos === "POR"), "el rival nunca se queda sin arquero");
+  // Bug fix 2-ago-2026: MI arco tampoco puede arrancar vacío (playedPos, no p.pos: admite
+  // al arquero de emergencia cuando ningún POR real está disponible en el plantel).
+  assert(ctx.lineup.some(p => E.playedPos(p) === "POR"), "mi arco nunca arranca vacío", ctx.lineup.map(p => `${p.name}:${p.pos}->${p.posJugada}`).join(", "));
   // El Momento es poder asimétrico POR DATOS: ningún rival debe llevar el campo
   assert(match.oppLineup.every(p => p.momento === undefined), "los rivales no tienen Momento");
   let guard = 0;
@@ -185,6 +193,7 @@ function playMatch(run, oppId) {
         if (elig.length) match.makeSub(d.player, elig[Math.floor(Math.random() * elig.length)].name);
       }
       else if (d.id === "gk_red") { match.decision = null; match.makeSub(match.my.lineup.find(p => p.name === opt.key), d.gkIn, true); }
+      else if (d.id === "gk_emergency") match.resolveGkEmergency(opt.key);
       else match.decision = null;
     } else if (r === "pens") {
       match.startShootout();
@@ -203,6 +212,14 @@ function playMatch(run, oppId) {
     }
   }
   assert(guard < 500, "partido no terminó (loop guard)");
+  // EL EQUIPO NUNCA JUEGA SIN ARQUERO (bug fix, 2-ago-2026): al cerrar el partido, si
+  // queda alguien activo en cancha, uno de ellos tiene que estar jugando de arquero —
+  // sea el titular, un suplente, o el arquero de emergencia (playedPos, no p.pos: el
+  // de emergencia nunca es un POR de verdad).
+  const activos = match.activeMine();
+  if (activos.length) {
+    assert(activos.some(p => E.playedPos(p) === "POR"), "el arco nunca queda vacío al cierre del partido", activos.map(p => `${p.name}:${p.pos}->${p.posJugada}`).join(", "));
+  }
   return match;
 }
 

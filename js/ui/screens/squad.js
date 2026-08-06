@@ -247,7 +247,11 @@ function renderPlayerCard() {
   const p = S.run.squad.find(x => x.name === selName);
   if (!p) return;
   const me = getTeam(S.run.teamId);
-  const keys = p.pos === "POR" ? GK_STAT_KEYS : STAT_KEYS;
+  // El arquero de EMERGENCIA (bug fix, 2-ago-2026) se lee por `playedPos`, no por `p.pos`:
+  // si está parado en el arco, lo que importa mostrarle al DT es su línea de arco (fija,
+  // ratings.EMERGENCY_GK_STATS), no sus stats de campo que ahora no cuentan para nada.
+  const emergencia = p.pos !== "POR" && playedPos(p) === "POR";
+  const keys = playedPos(p) === "POR" ? GK_STAT_KEYS : STAT_KEYS;
   const st = stateOf(p);
   const fuera = outOfPosPenalty(p) > 0;
   const bajas = statPenalties(p);
@@ -269,7 +273,7 @@ function renderPlayerCard() {
         ${starsHtml(playerStars(p), "text-xs")}
       </div>
     </div>
-    ${fuera ? outOfPosNote(p, bajas) : ""}
+    ${emergencia ? emergencyGkNote(p) : (fuera ? outOfPosNote(p, bajas) : "")}
 
     <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">Estadísticas</div>
     <div class="space-y-1 mb-3">${keys.map(k => statRow(p, k)).join("")}</div>
@@ -296,6 +300,19 @@ function renderPlayerCard() {
 
   const btn = $("#btn-swap");
   if (btn) btn.onclick = () => openSwapModal(p);
+}
+
+/**
+ * Nota del arquero de EMERGENCIA (bug fix, 2-ago-2026): no es un fuera-de-puesto normal
+ * (el desglose de `outOfPosNote` compara stats técnicas que ni siquiera pesan en el arco),
+ * es que nadie más puede cubrirlo — sus atajadas/reflejos/salidas son una línea fija y
+ * floja (`ratings.EMERGENCY_GK_STATS`), igual sin importar a quién se lo pida el DT.
+ */
+function emergencyGkNote(p) {
+  return `<div class="mb-3 p-2 rounded-lg border border-red-500/60 bg-red-500/10">
+    <div class="text-[11px] font-black text-red-300 mb-1">🧤 Arquero de emergencia</div>
+    <p class="text-[10px] text-slate-300 leading-snug">No queda ningún arquero disponible: ${p.name} se pone los guantes por necesidad. No tiene entrenamiento de arco — sus atajadas, reflejos y salidas salen de una línea fija muy floja, sin importar quién sea. Si preferís que vaya otro, cambialo con "⇄ Sustituir jugador".</p>
+  </div>`;
 }
 
 /** Explica el castigo por jugar fuera de puesto: cuánto pierde y por qué. */
@@ -382,25 +399,31 @@ const slotPos = (i) => formationSlots(S.formation)[i] || S.selectedLineup[i].pos
 /**
  * Con quién puede intercambiarse este jugador. Cualquier puesto vale (el castigo por
  * jugar fuera de él ya lo cobra el motor); el único límite es el arco, que solo pueden
- * ocupar los arqueros porque sus stats son otro juego (game/lineup.canPlayAt).
+ * ocupar los arqueros porque sus stats son otro juego (game/lineup.canPlayAt) — EXCEPTO
+ * si no queda ningún arquero disponible (bug fix, 2-ago-2026): ahí el arco pasa a ser un
+ * slot más, y cualquier jugador de campo puede ocuparlo como arquero de emergencia. El DT
+ * puede reasignar a quien quiera; `currentLineup` ya eligió a alguien por defecto (el peor
+ * de campo libre), pero esto es una elección real, no una imposición.
  */
 function swapCandidates(p) {
   const i = idxOf(p);
+  const sinArquero = !availables().some(q => q.pos === "POR");
+  const cp = (a, pos) => canPlayAt(a, pos, { emergency: sinArquero });
   // El titular DE BAJA (🚑/🟥) no juega ni se mueve, pero SÍ se reemplaza: puede entrar en
   // su slot cualquier disponible del banco (PO 22-jul: el reemplazo es manual, acá).
   if (!isAvailable(p)) {
     if (i < 0) return [];
-    return S.run.squad.filter(q => q !== p && idxOf(q) < 0 && isAvailable(q) && canPlayAt(q, slotPos(i)));
+    return S.run.squad.filter(q => q !== p && idxOf(q) < 0 && isAvailable(q) && cp(q, slotPos(i)));
   }
   if (i >= 0) {
     return S.run.squad.filter(q => {
       if (q === p || !isAvailable(q)) return false;
       const j = idxOf(q);
-      return j >= 0 ? canPlayAt(p, slotPos(j)) && canPlayAt(q, slotPos(i))
-                    : canPlayAt(q, slotPos(i));
+      return j >= 0 ? cp(p, slotPos(j)) && cp(q, slotPos(i))
+                    : cp(q, slotPos(i));
     });
   }
-  return S.selectedLineup.filter(q => canPlayAt(p, slotPos(idxOf(q))));
+  return S.selectedLineup.filter(q => cp(p, slotPos(idxOf(q))));
 }
 
 /**

@@ -17,6 +17,7 @@
    | last_man     | chances.js    | resolveLastMan                       |
    | injury_sub   | incidents.js  | UI: abre la Gestión en vivo → makeSub |
    | gk_red       | incidents.js  | ruteo UI → makeSub                   |
+   | gk_emergency | incidents.js  | resolveGkEmergency                   |
    (protect y forced_sub se retiraron el 22-jul: la amarilla solo narra
    y el reemplazo del lesionado es manual en la Gestión de plantilla.)
    (`sequence` es multi-acto: resolver un acto puede dejar OTRA
@@ -413,6 +414,26 @@ export class Match {
     this.subsLeft--;
     markMomentum(this, "🔄");
     this.log("info", `min ${this.clock()}' — 🔄 Cambio: entra #${inP.num || "?"} ${inP.name} por #${outPlayer.num || "?"} ${outPlayer.name}.`);
+    return true;
+  }
+
+  /**
+   * Resuelve la decisión `gk_emergency` (bug fix, 2-ago-2026): el equipo se quedó sin
+   * arquero real (el suyo salió por lesión/roja y no hay suplente POR en la banca) y el
+   * DT elige a qué jugador de campo mandar al arco. NO es una sustitución — no gasta
+   * cambio, es una reposición dentro del mismo once (como swapAssignments): el elegido
+   * sigue en cancha, solo que ahora juega de arquero (`posJugada`). Sus stats de arco
+   * salen de `ratings.EMERGENCY_GK_STATS`, no de las suyas (no existen — `statAt` ya lo
+   * resuelve solo). Devuelve false si no hay decisión pendiente o el nombre no es válido.
+   */
+  resolveGkEmergency(playerName) {
+    if (!this.decision || this.decision.id !== "gk_emergency") return false;
+    const p = this.activeMine().find(x => x.name === playerName && x.pos !== "POR");
+    if (!p) return false;
+    p.posJugada = "POR";
+    this.decision = null;
+    markMomentum(this, "🧤");
+    this.log("event", `min ${this.clock()}' — 🧤 ${p.name} se pone los guantes: no queda otra.`);
     return true;
   }
 

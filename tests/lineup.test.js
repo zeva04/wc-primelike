@@ -206,17 +206,13 @@ const clon = p => ({ ...p, stats: { ...p.stats }, posJugada: null });
   t(Number.isFinite(E.teamPowers(lineup, "normal", {}).def), "el equipo sigue calculando tras las reubicaciones");
 }
 
-// ---------- 6f. Plantel SIN ARQUERO: jugar corto se paga UNA vez ----------
-// REGRESIÓN (1-ago-2026, lo cazó un barrido de balance a n=4000). §6b prueba lo mismo pero
-// con el plantel entero — y el agujero estaba exactamente en el plantel diezmado.
-//
-// La cadena: sin ningún POR disponible el once se arma con 5 de campo; `formationLabel`
-// cuenta solo DEF/MED/DEL y DA POR SENTADO el arquero, así que devuelve etiquetas que suman
-// 5 ("1-1-3") y COINCIDEN con las de una formación real de 6. currentLineup la adoptaba y
-// orderBySlots pedía 6 slots para un pool de 5: sin nadie de pos POR su findIndex fallaba,
-// metía al primero de la fila en el arco y CORRÍA A TODOS una línea (DEF→POR, MED→DEF,
-// DEL→MED). Tres castigos de −6 ENCIMA de la inferioridad numérica — que es el único
-// castigo que corresponde (§Plantel diezmado: perder por diezmado es una historia).
+// ---------- 6f. Plantel SIN ARQUERO: exactamente UN arquero de emergencia ----------
+// Reescrita el 2-ago-2026 (bug fix "el equipo nunca puede jugar sin arquero"). La versión
+// vieja de este test (1-ago-2026) fijaba como "correcto" el bug que este sprint arregla:
+// afirmaba que sin ningún POR disponible NADIE debía terminar jugando de arquero — o sea,
+// el equipo salía a la cancha con el área vacía, y eso pasaba la validación igual. Ahora
+// el once diezmado (5 de campo, 0 arqueros) tiene que resolver con EXACTAMENTE uno de
+// esos 5 puesto de arquero de emergencia (assignPositions es la última red: game/lineup.js).
 //
 // Se barre exhaustivo: todos los quintetos de campo posibles de cada jugable, o sea todas
 // las formas que puede tomar un plantel sin arquero. Derivado, no hardcodeado.
@@ -228,7 +224,7 @@ const clon = p => ({ ...p, stats: { ...p.stats }, posJugada: null });
     return [...combinaciones(resto, k - 1).map(c => [x, ...c]), ...combinaciones(resto, k)];
   };
 
-  let casos = 0, conCastigo = null, conFormacion = null, noCorto = null, tamañoMal = null;
+  let casos = 0, sinUno = null, conFormacion = null, noCorto = null, tamañoMal = null, castigoRaro = null;
   for (const equipo of E.allTeams().filter(t => t.players)) {
     const base = E.newRun(equipo.id);
     const campo = base.squad.filter(p => p.pos !== "POR");
@@ -242,21 +238,28 @@ const clon = p => ({ ...p, stats: { ...p.stats }, posJugada: null });
       casos++;
 
       const forma = `${equipo.id} [${available.map(p => p.pos).sort().join(",")}]`;
-      const castigados = lineup.filter(p => E.outOfPosPenalty(p) > 0);
-      if (castigados.length && !conCastigo) conCastigo = `${forma} → ${castigados.map(p => `${p.pos}→${E.playedPos(p)}`).join(" ")}`;
-      // Sin arquero NINGUNA formación aplica: sus slots piden 6 cabezas y hay 5.
+      const enArco = lineup.filter(p => E.playedPos(p) === "POR");
+      if (enArco.length !== 1 && !sinUno) sinUno = `${forma} → ${enArco.length} en el arco (esperaba 1)`;
+      // Ninguna de las 6 formaciones de la tabla llega a cerrar: piden 5 de campo + 1 arco,
+      // y con 5 jugadores en total, reservar el arco solo deja 4. Sigue siendo así.
       if (E.getFormation(formationId) && !conFormacion) conFormacion = `${forma} → adoptó ${formationId}`;
       if (lineup.length !== 5 && !tamañoMal) tamañoMal = `${forma} → once de ${lineup.length}`;
-      // El castigo que SÍ corresponde tiene que seguir ahí
+      // El castigo por diezmado sigue siendo el único que corresponde: modo corto válido.
       if (!(val.ok && val.short) && !noCorto) noCorto = `${forma} → ok=${val.ok} short=${val.short}`;
+      // El ÚNICO castigado por fuera de puesto tiene que ser el arquero de emergencia — no
+      // el cascadeo de 3 posiciones que causaba el bug viejo (DEF→POR, MED→DEF, DEL→MED).
+      const castigados = lineup.filter(p => E.outOfPosPenalty(p) > 0);
+      const soloElArquero = castigados.length === 1 && castigados[0].posJugada === "POR";
+      if (!soloElArquero && !castigoRaro) castigoRaro = `${forma} → castigados: ${castigados.map(p => `${p.pos}→${E.playedPos(p)}`).join(", ") || "ninguno"}`;
     }
   }
 
   t(casos > 0, `el barrido montó planteles sin arquero (${casos} casos)`);
-  t(!conCastigo, `sin arquero NADIE juega fuera de puesto: el diezmado se paga una sola vez (${conCastigo})`);
-  t(!conFormacion, `sin arquero no se adopta ninguna formación: la etiqueta de 5 es ambigua (${conFormacion})`);
+  t(!sinUno, `sin arquero disponible, EXACTAMENTE uno de los 5 juega de arquero de emergencia (${sinUno})`);
+  t(!conFormacion, `sin arquero no se adopta ninguna formación: ninguna de las 6 alcanza con solo 4 de campo tras reservar el arco (${conFormacion})`);
   t(!tamañoMal, `el once diezmado presenta a los 5 que quedan en pie (${tamañoMal})`);
   t(!noCorto, `y sigue siendo válido en modo corto — la inferioridad numérica no se perdona (${noCorto})`);
+  t(!castigoRaro, `el único castigado por fuera de puesto es el arquero de emergencia, no un cascadeo (${castigoRaro})`);
 }
 
 // ---------- 6g. Con arquero, el diezmado tampoco improvisa puestos ----------

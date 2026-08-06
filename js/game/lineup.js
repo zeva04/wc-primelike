@@ -3,7 +3,7 @@
    Hasta F7 vivían en la UI y el smoke test debía duplicarlas
    (P2 del diagnóstico); ahora hay una sola fuente.
    ============================================================ */
-import { naturalOverall } from "./ratings.js";
+import { naturalOverall, playedPos } from "./ratings.js";
 
 // Las 6 formaciones del formato 6v6: 1 arquero fijo + 5 de campo repartidos
 // DEF-MED-DEL con mínimo 1 por línea (son todas las combinaciones posibles).
@@ -40,8 +40,16 @@ export function formationSlots(id) {
  * los arqueros no salen de él (decisión del PO 15-jul): sus stats son otro juego —
  * un delantero no tiene `atajadas` ni un arquero tiene `defensa`, así que cruzarlos
  * no sería un castigo sino una división por la nada. Entre DEF/MED/DEL, todo vale.
+ *
+ * `{ emergency: true }` es la ÚNICA excepción (bug fix, 2-ago-2026): el equipo nunca
+ * puede jugar sin nadie en el arco, y si los dos arqueros del plantel quedan fuera a la
+ * vez, alguien de campo tiene que ponerse los guantes. Sus stats de arco no salen de
+ * `p.stats` (no existen) sino de `ratings.EMERGENCY_GK_STATS` — `statAt` ya lo resuelve
+ * solo por tener `posJugada === "POR"`. Quien llama decide CUÁNDO ofrecer la excepción
+ * (solo si de verdad no queda un arquero real disponible); acá no se adivina el contexto.
  */
-export function canPlayAt(player, slotPos) {
+export function canPlayAt(player, slotPos, { emergency = false } = {}) {
+  if (emergency && slotPos === "POR" && player.pos !== "POR") return true;
   return (player.pos === "POR") === (slotPos === "POR");
 }
 
@@ -96,11 +104,26 @@ export function assignToFormation(lineup, formationId) {
  * al resto del plantel. Es la única pluma de ese campo (ARQUITECTURA §3.1) y hay que
  * llamarla cada vez que el once cambia: de ahí salen el castigo por jugar fuera de
  * puesto y la nota que ve el DT.
+ *
+ * EL ARCO NUNCA QUEDA VACÍO (bug fix, 2-ago-2026): es la última red, así que corre
+ * DESPUÉS de la asignación normal por slots. Si nadie terminó jugando de POR —ni por
+ * slot de formación ni por posición natural— y hay al menos un jugador de campo en el
+ * once, el PEOR de campo (naturalOverall) se pone los guantes. Cubre TODOS los caminos
+ * que llegan hasta acá sin arquero: el plantel sano sin formación resuelta (`currentLineup`
+ * ya intenta algo mejor antes de llegar hasta acá) y, sobre todo, el plantel DIEZMADO sin
+ * ningún POR disponible — ahí ninguna de las 6 formaciones de la tabla llega a cerrar
+ * (piden 5 de campo + 1 arco; con 5 jugadores en total, reservar el arco solo deja 4), así
+ * que es la ÚNICA red que le queda. Si esto no corriera, el equipo saldría a jugar con el
+ * área vacía — que es exactamente el bug que esto arregla.
  */
 export function assignPositions(squad, lineup, formationId) {
   const slots = formationSlots(formationId);
   for (const p of squad) p.posJugada = null;
   lineup.forEach((p, i) => { p.posJugada = slots[i] || p.pos; });
+  if (lineup.length && !lineup.some(p => p.posJugada === "POR")) {
+    const emergencyGk = [...lineup].sort((a, b) => naturalOverall(a) - naturalOverall(b))[0];
+    emergencyGk.posJugada = "POR";
+  }
 }
 
 /**
@@ -145,6 +168,22 @@ export function currentLineup(squad, prev, formationId) {
     if (!canUseFormation(available, id)) {
       const label = formationLabel(lineup);
       id = lineup.length === 6 && getFormation(label) ? label : null;
+      // SIN NINGÚN ARQUERO DISPONIBLE (bug fix, 2-ago-2026): `bestLineup` no reserva el
+      // arco de emergencia (no sabe de formaciones), así que sus 6 de campo suman 6 en
+      // `formationLabel` — y NINGUNA de las 6 formaciones de la tabla suma 6 (todas suman
+      // 5: 5 de campo + 1 arquero). El fallback de arriba SIEMPRE daba `null` en este caso
+      // y el arco se perdía en el camino: nadie terminaba jugando ahí y el equipo salía a
+      // la cancha sin nadie en el área. Acá se busca la PRIMERA formación de la tabla que
+      // SÍ se pueda armar reservando el arco de emergencia (fillFormation ya sabe hacerlo)
+      // y se usa SU resultado — bestLineup no sirve porque no reserva ese cupo.
+      if (!id && lineup.length === 6 && !available.some(p => p.pos === "POR")) {
+        const f = FORMATIONS.find(fm => canUseFormation(available, fm.id));
+        if (f) { id = f.id; lineup = fillFormation(available, id); }
+        // Si NINGUNA formación alcanza ni reservando el arco de emergencia (plantel
+        // brutalmente diezmado, además de sin arquero), `id` queda en null y
+        // validateLineup lo va a reportar: no hay forma automática de resolverlo, y es
+        // correcto que el DT quede bloqueado — no hay con qué armar un once legal.
+      }
     }
     lineup = orderBySlots(lineup, id);
   }
@@ -156,15 +195,25 @@ export function currentLineup(squad, prev, formationId) {
  * Mejor once posible para una formación, o null si el plantel disponible no la cubre
  * (p.ej. pedir 3 DEF con 2 sanos). Los jugadores de `keep` mandan por sobre la nota:
  * así cambiar de formación no borra las elecciones manuales del DT.
+ *
+ * ARQUERO DE EMERGENCIA (bug fix, 2-ago-2026): si NINGÚN POR está disponible (los dos
+ * lesionados/suspendidos a la vez), el equipo NUNCA sale a jugar sin nadie en el arco —
+ * el puesto se cubre con el PEOR jugador de campo libre (su calidad de arco es la misma
+ * línea fija sin importar quién sea — ratings.EMERGENCY_GK_STATS —, así que no tiene
+ * sentido sacrificar a la figura de su línea). Se procesa PRIMERO (LINES arranca en POR)
+ * para que DEF/MED/DEL, más abajo, ya lo encuentren descartado.
  */
 export function fillFormation(available, id, keep = []) {
   const f = getFormation(id);
   if (!f) return null;
   const need = needsOf(f);
+  const sinArquero = !available.some(p => p.pos === "POR");
   const picks = [];
   for (const pos of LINES) {
-    const pool = available.filter(p => p.pos === pos).sort((a, b) =>
-      (Number(keep.includes(b)) - Number(keep.includes(a))) || (naturalOverall(b) - naturalOverall(a)));
+    const pool = (pos === "POR" && sinArquero
+      ? available.filter(p => p.pos !== "POR").sort((a, b) => naturalOverall(a) - naturalOverall(b))
+      : available.filter(p => p.pos === pos && !picks.includes(p)).sort((a, b) =>
+          (Number(keep.includes(b)) - Number(keep.includes(a))) || (naturalOverall(b) - naturalOverall(a))));
     if (pool.length < need[pos]) return null;
     picks.push(...pool.slice(0, need[pos]));
   }
@@ -228,7 +277,21 @@ export function validateLineup(available, selected) {
   }
   const count = pos => selected.filter(p => p.pos === pos).length;
   const avail = pos => available.some(p => p.pos === pos);
-  if (avail("POR") && count("POR") !== 1) return { ok: false, msg: "Necesitas exactamente 1 arquero." };
+  // EL ARCO NUNCA PUEDE QUEDAR VACÍO (bug fix, 2-ago-2026). Antes esta regla se saltaba
+  // entera cuando ningún POR estaba disponible (los dos lesionados/suspendidos a la vez) y
+  // el equipo salía a jugar con seis de campo y nadie en el arco. Ahora cuenta por PUESTO
+  // JUGADO (`playedPos`), no por posición natural — eso admite al arquero de emergencia
+  // (`canPlayAt(..., {emergency:true})` solo lo habilita cuando `avail("POR")` es false, en
+  // la pantalla de Gestión de Plantilla), y sigue exigiendo exactamente 1 arquero real
+  // cuando sí hay uno disponible.
+  if (selected.filter(p => playedPos(p) === "POR").length !== 1) {
+    return {
+      ok: false,
+      msg: avail("POR")
+        ? "Necesitas exactamente 1 arquero."
+        : "Sin arquero disponible: designa a un jugador de campo para el arco (Gestión de Plantilla).",
+    };
+  }
   for (const pos of ["DEF", "MED", "DEL"]) {
     if (avail(pos) && count(pos) < 1) return { ok: false, msg: `Necesitas al menos 1 ${pos}.` };
   }
