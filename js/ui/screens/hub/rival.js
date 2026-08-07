@@ -6,7 +6,7 @@
    ============================================================ */
 import { getTeam } from "../../../data/teams-repo.js";
 import { playerOverall } from "../../../game/ratings.js";
-import { applyDayAction, dayOpportunity } from "../../../game/day-action.js";
+import { applyDayAction } from "../../../game/day-action.js";
 import { RARITIES } from "../../../content/daily/rarities.js";
 import { buildOpponentReport } from "../../../game/scouting.js";
 import { S } from "../../session.js";
@@ -145,36 +145,6 @@ export function showScoutReport(oppId) {
     </div>
   `, "max-w-lg").querySelector("#scout-close").onclick = closeModal;
   wireAlturaPicker();
-}
-
-
-/**
- * Card de la Oportunidad del día: la oferta única que compite con
- * las acciones normales. Borde y badge de su rareza; el calendario nunca la
- * anticipó y mañana no va a estar — la card lo dice. "" si hoy no hay.
- * `state`: "active" (elegible) · "chosen" (fue la acción de hoy) · "muted"
- * (elegiste otra). La card se queda visible en los tres casos para que el
- * panel no cambie de tamaño (evita huecos al elegir).
- */
-export function oppCard(state = "active") {
-  const o = dayOpportunity(S.run);
-  if (!o) return "";
-  const rar = RARITIES[o.rareza];
-  const chosen = state === "chosen", muted = state === "muted";
-  const box = chosen ? `${rar.border} ring-2 ring-emerald-400/50 bg-slate-900/70`
-    : muted ? "border-slate-700 bg-slate-900/40 opacity-40 cursor-not-allowed"
-    : `${rar.border} bg-slate-900/60 hover:scale-[1.01] hover:brightness-110 cursor-pointer`;
-  const foot = chosen ? `<div class="text-[9px] text-emerald-400 font-bold mt-1">✓ Aprovechada hoy — ocupó tu Acción del Día</div>`
-    : muted ? `<div class="text-[9px] text-slate-500 mt-1">Hoy elegiste otra acción</div>`
-    : `<div class="text-[9px] ${rar.color} font-bold mt-1">⏳ Solo por hoy — ocupa tu Acción del Día${o.choose ? " · tú eliges al protagonista" : ""}</div>`;
-  return `<button id="da-opp" ${state === "active" ? "" : "disabled"} class="w-full text-left rounded-xl border-2 ${box} p-3 mb-2 transition-all">
-    <div class="flex items-center justify-between gap-2 flex-wrap">
-      <span class="font-semibold text-sm">${o.icon} ${o.title}</span>
-      <span class="px-2 py-0.5 rounded-full border ${rar.border} ${rar.color} text-[9px] font-black uppercase tracking-widest">Oportunidad · ${rar.label}</span>
-    </div>
-    <div class="text-[10px] text-slate-400 mt-0.5">${o.desc}</div>
-    ${foot}
-  </button>`;
 }
 
 

@@ -28,8 +28,15 @@ Toda la batería tiene que quedar verde, incluido el `smoke` de 300 runs.
 http://localhost:8347/?dev=philosophy&team=BRA&filo=contra&nivel=10&pi=12&node=el_anzuelo
 ```
 
-Los parámetros están documentados en [js/dev/deeplink.js](js/dev/deeplink.js). Solo funciona
-servido en local; en cualquier otro origen el módulo ni se descarga.
+```
+http://localhost:8347/?dev=hub&team=ARG&filo=press&nivel=4&node=campo
+```
+
+Los parámetros están documentados en [js/dev/deeplink.js](js/dev/deeplink.js): `dev` `team`
+`filo` `view` `nivel` `pi` `traits` `node` `onb` `anim` `dia`. `node` abre lo que esa
+pantalla pueda abrir — la ficha de un rasgo en la pizarra, un edificio en el hub. `dia=partido`
+salta al día del partido. Solo funciona servido en local; en cualquier otro origen el módulo
+ni se descarga.
 
 El deep-link **congela las animaciones** por defecto: el riel del pizarrón se desliza en
 420ms y la cámara del tablero hace zoom en 500ms, así que una captura disparada a destiempo
@@ -77,10 +84,32 @@ automatización de navegador de una forma que **no se recupera sola**:
 
 ---
 
+---
+
+## El hub es una pantalla aparte
+
+La Concentración Mundialista (`js/ui/screens/hub/`) no sigue las reglas del resto de la UI, y
+es a propósito (rediseño del 6-ago-2026, adaptado de un diseño de Claude Design):
+
+- **Lienzo FIJO de 1440×900**, escalado entero con `transform` (`screenStage` en
+  `ui/components.js`). No reflowea: es pixel art y un layout elástico obligaría a escalar en
+  fracciones. En ventanas angostas quedan bandas negras; el móvil pediría un layout propio,
+  que hoy **no existe**.
+- **Kit propio**, todas las clases `px-*` en `index.html`: bordes duros de 2px, sombras
+  sólidas sin blur, grilla de 8px, Silkscreen solo en mayúsculas. No mezclar con las cards
+  redondeadas de Tailwind que usa el resto del juego.
+- **Todo el arte se dibuja**, no se carga: los seis edificios isométricos
+  (`hub/complex.js`) y los iconos de 16×16 (`ui/pixicons.js`) son SVG generados. El repo
+  sigue sin assets binarios más allá de la fuente.
+- **Geometría con presupuesto**: el complejo tiene su propio sistema de coordenadas de
+  1440×`PLANO_H` anclado abajo, y la columna del HUD arranca en x=1056. `tests/hub.test.js`
+  verifica que ninguna parcela se salga ni se solape — es lo que una captura no chequea.
+
 ## Deuda técnica que conviene tener presente
 
 `index.html` carga **Tailwind desde `cdn.tailwindcss.com`**. El README dice "sin
 dependencias" y hay un comentario en el CSS que dice que el juego funciona offline: las dos
 cosas son falsas hoy para los estilos. Sin red, la UI queda sin maquetar. Cambiarlo pide un
 paso de build, que es justo lo que el proyecto decidió no tener — está declarado acá para que
-la decisión sea consciente y no una sorpresa.
+la decisión sea consciente y no una sorpresa. (La fuente Silkscreen del hub **sí** va
+auto-hospedada en `assets/fonts/`, así que esa parte no depende de la red.)

@@ -1,86 +1,169 @@
 /* ============================================================
-   ui/screens/hub — Concentración Mundialista (Game Vision):
-   pantalla central entre partidos. Rival, calendario por días,
-   estado del torneo, plantilla, efectos y el botón del día.
-   También muestra los modales de evento/conflicto del día.
+   ui/screens/hub — CONCENTRACIÓN MUNDIALISTA: la pantalla central entre partidos.
 
-   ── LA CARPETA `hub/` ────────────────────────────
-   Este archivo llegó a 889 líneas (presupuesto §6: 500) y se partió
-   por responsabilidad, sin tocar una sola regla:
-     hub/rival.js  el rival: su card, el Informe y la Oportunidad
-     hub/team.js   mi equipo: estado, identidad, efectos y la altura
-     hub/day.js    el día: calendario, Acción del Día y sus modales
-   Acá quedan la COMPOSICIÓN de la pantalla y el paso del día.
+   ── EL REDISEÑO DEL 6-AGO-2026 ───────────────────────────────────────────────
+   El hub dejó de ser un tablero de tarjetas y pasó a ser un LUGAR: una ciudad
+   deportiva isométrica en pixel art donde cada edificio es una acción del día.
+   Adaptado del diseño "Hub Mundial 2026" (Claude Design). Lo que cambió es la
+   piel y la gramática espacial; ni una regla de juego se movió — las acciones,
+   sus multiplicadores y lo que cuesta el día siguen viniendo de game/day-action.
+
+   La idea de fondo: antes el DT leía una lista y elegía una fila. Ahora MIRA UN
+   SITIO y decide a dónde lleva al plantel. La distinción entre lo que gasta el
+   día y lo que es gratis, que era una etiqueta en una card, ahora es geografía —
+   cuatro edificios se apagan cuando ya decidiste y dos siguen encendidos.
+
+   ── LA CARPETA `hub/` ────────────────────────────────────────────────────────
+     hub/complex.js  el complejo: los 6 edificios isométricos y el plano
+     hub/hud.js      las franjas de arriba, la columna derecha y la barra de acción
+     hub/panels.js   lo que abre un edificio que pide una elección más
+     hub/day.js      calendario, Acción del Día y los modales de pasar de día
+     hub/team.js     estado del equipo, altura de bloque, canjes
+     hub/rival.js    informe del rival y la Oportunidad
+   Acá quedan la COMPOSICIÓN, el cableado y el paso del día.
    ============================================================ */
 import { getTeam } from "../../../data/teams-repo.js";
-import { teamRating, teamStars, outOfPosPenalty } from "../../../game/ratings.js";
+import { outOfPosPenalty } from "../../../game/ratings.js";
 import { currentLineup, validateLineup, assignPositions, maxLineupSize } from "../../../game/lineup.js";
-import { dayLabel, advanceDay } from "../../../game/calendar.js";
+import { advanceDay, dayLabel } from "../../../game/calendar.js";
 import { buildDaily } from "../../../game/daily.js";
-import { applyDayAction, multLabel, dayOpportunity } from "../../../game/day-action.js";
+import { applyDayAction, multLabel, actionMult, dayOpportunity } from "../../../game/day-action.js";
+import { DAY_ACTIONS } from "../../../content/daily/day-actions.js";
+import { computeTable } from "../../../game/tournament/groups.js";
 import { nextOpponentId, STAGE_LABEL } from "../../../game/tournament/knockout.js";
+import { oxidState } from "../../../game/oxidation.js";
 import { S } from "../../session.js";
 import { register, go } from "../../nav.js";
-import { screenShell, $, flagImg, starsHtml, modal, closeModal, modalOpen, toast, momentoChip } from "../../components.js";
-import { spriteSvg } from "../../sprites.js";
+import { screenStage, $, closeModal, modalOpen, toast, momentoChip } from "../../components.js";
 import { mountPitch } from "../../pitch.js";
-import { renderGroupTableCard, renderKoInfoCard } from "../worldcup.js";
-import { renderScorersCard, wireScorersCard } from "../scorers.js";
-import { showScoutReport, showOppChooser, keyPlayers } from "./rival.js";
-import { teamStateCard, alturaPicker, wireAlturaPicker, showCanje } from "./team.js";
-import { actionCard, renderCalendarCard, showDaily, showDayEvent, showRandomEvent, bajasDelOnce } from "./day.js";
+import { showScoutReport, showOppChooser } from "./rival.js";
+import { alturaPicker, wireAlturaPicker, showCanje } from "./team.js";
+import { showDaily, showDayEvent, showRandomEvent, bajasDelOnce } from "./day.js";
+import { PLOTS, PLANO_H, complexGround, plotHtml } from "./complex.js";
+import { barraOportunidad, cabecera, franjaAnfitriones, lineaDias, columnaDerecha, barraAccion } from "./hud.js";
+import { panelFocos, panelPlan } from "./panels.js";
 
-/**
- * Concentración Mundialista: pantalla central entre partidos. Calca el layout de
- * referencia del PO: banda VS a lo ancho; cuerpo en 3 columnas (IZQ estado del
- * equipo con la cancha · CENTRO "¿Qué harás hoy?" + efectos · DER grupo + goleadores);
- * y a lo ancho abajo el calendario y el botón del día. El Diario y el Estado del
- * Mundial viven como iconos en la cabecera.
- */
+/** Qué edificio ejecuta qué. `accion` resuelve en el clic; `panel` pide otra elección. */
+const EDIFICIOS = {
+  campo: { titulo: "Campo de entrenamiento", grupo: "entrenar", panel: "focos",
+    tip: "Sesión con foco: sube una stat del plantel hasta el próximo partido, a costa de energía." },
+  video: { titulo: "Sala de video", grupo: "tactica", panel: "plan",
+    tip: "Declará el plan: esa idea sale más seguido y rinde más experiencia en el partido." },
+  residencia: { titulo: "Residencia", accion: "recuperar",
+    tip: "Jornada de recuperación: el plantel entero recupera energía." },
+  asado: { titulo: "Patio · asado", accion: "bonding",
+    tip: "Jornada de integración: sube la moral del grupo, cansa un poco las piernas." },
+  scouting: { titulo: "Sala de scouting", libre: true,
+    tip: "Leé el informe del rival. Mirar nunca gasta el día." },
+  enfermeria: { titulo: "Enfermería", libre: true,
+    tip: "Parte médico, sanciones y el estado real de la plantilla." },
+};
+
+// Qué panel hay abierto (null = ninguno). Vive fuera del render porque un re-pintado
+// tras comprar/canjear no debe cerrar el panel que el DT tenía abierto.
+let panelAbierto = null;
+let desengancharResize = null;
+
 /**
  * Pasa al día siguiente: lo resuelve el motor (advanceDay), re-pinta el hub y abre la
  * portada del Daily; al cerrarla llega el evento/conflicto (o el toast de día de partido).
- * Lo usan el botón "Pasar al día" y la vuelta del partido (el partido consume su día, así
- * que al volver al hub arranca el día siguiente — no el del partido).
+ * Lo usan el botón del hub y la vuelta del partido (el partido consume su día, así que al
+ * volver arranca el día siguiente — no el del partido).
  */
 function pasarDia() {
-  // Guarda anti doble-día (bug del PO, "a veces doble evento"). Todo camino
-  // legítimo hasta acá deja la pantalla SIN modal (el botón del hub, o el post-partido que
-  // cierra el suyo antes de navegar); si hay uno abierto es porque la cadena Daily→evento
-  // de este día ya está en curso y el disparo es repetido (doble clic).
+  // Guarda anti doble-día (bug del PO, "a veces doble evento"). Todo camino legítimo hasta
+  // acá deja la pantalla SIN modal; si hay uno abierto es porque la cadena Daily→evento de
+  // este día ya está en curso y el disparo es repetido (doble clic).
   if (modalOpen()) return;
-  const bajasPre = bajasDelOnce().length; // para detectar si el evento de HOY tumba a un titular
+  const bajasPre = bajasDelOnce().length;
   const res = advanceDay(S.run);
   if (!res) { renderHub(); return; }
-  renderHub(); // el hub del día nuevo queda detrás de la portada
+  panelAbierto = null;
+  renderHub();
   // Bible §4.4: el día arranca con el Daily (informa); el evento llega después (transforma)
+  // showDaily NO cierra su propio modal: el que encadena decide. Los dos modales que
+  // siguen abren el suyo (y `modal()` cierra el anterior); los otros dos caminos —día de
+  // partido y día tranquilo— tienen que cerrarlo a mano o el diario se queda pegado.
   showDaily(buildDaily(S.run), () => {
-    if (res.type === "match") { closeModal(); toast(`⚽ ${dayLabel(S.run.day)} — ¡Día de partido!`); }
-    else if (res.type === "evento") showDayEvent(res, bajasPre);
+    if (res.type === "evento") showDayEvent(res, bajasPre);
     else if (res.type === "conflicto") showRandomEvent(res);
-    else closeModal(); // día tranquilo (el de la Oportunidad): sin evento — la oferta espera en el hub
+    else {
+      closeModal();
+      if (res.type === "match") toast(`⚽ ${dayLabel(S.run.day)} — ¡Día de partido!`);
+    }
   });
 }
 
+/** Los avisos de la columna derecha, del más bloqueante al más ambiental. */
+function construirAvisos(v, discipline, fueraDePuesto, forma, bajasOnce) {
+  const run = S.run;
+  const a = [];
+  const rojo = { col: "var(--px-bad)", bg: "#2a0f13", txtCol: "#f0d5d5" };
+  const ambar = { col: "var(--px-warn)", bg: "#221a08", txtCol: "#f5dfa8" };
+  const verde = { col: "var(--px-ok)", bg: "#0d2019", txtCol: "#c9efdd" };
+
+  if (bajasOnce.length) a.push({ ...rojo, fuerte: true, ico: "lesion", titulo: "Baja en el once",
+    txt: `${bajasOnce.map(p => p.name).join(", ")} — elegí su reemplazo` });
+  if (!v.ok) a.push({ ...ambar, ico: "amarilla", txt: v.msg });
+  else if (v.short) a.push({ ...ambar, ico: "lesion", txt: `Plantel diezmado: presentás ${S.selectedLineup.length}` });
+  if (fueraDePuesto.length) a.push({ ...ambar, ico: "ritmo", txt: `Fuera de puesto: ${fueraDePuesto.map(p => p.name).join(", ")}` });
+  if (discipline.susp.length) a.push({ ...rojo, ico: "roja", txt: `Suspendido${discipline.susp.length > 1 ? "s" : ""}: ${discipline.susp.map(p => p.name).join(", ")}` });
+  if (discipline.aperc.length) a.push({ ...ambar, ico: "amarilla", txt: `${discipline.aperc.length} apercibido${discipline.aperc.length > 1 ? "s" : ""} — con otra amarilla se lo pierden` });
+  const ox = oxidState(run);
+  if (ox.oxidado) a.push({ ...ambar, ico: "ritmo", txt: `Plantel oxidado: ${ox.racha} días sin entrenar` });
+  if (forma.racha.length) a.push({ ...verde, ico: "racha", txt: `En racha: ${forma.racha.map(p => p.name).join(", ")}` });
+  if (forma.frios.length) a.push({ col: "var(--px-free)", bg: "#0d1b24", txtCol: "#cfe4f5", ico: "frio", txt: `Fríos: ${forma.frios.map(p => p.name).join(", ")}` });
+  return a;
+}
+
+/** El estado de cada parcela, derivado del run — nunca de la UI. */
+function estadoDeParcelas(isMatchDay) {
+  const run = S.run;
+  const elegidoHoy = !run.actionPending && run.lastAction?.day === run.day;
+  const grupoElegido = elegidoHoy ? run.lastAction.group : null;
+  const idElegido = elegidoHoy ? run.lastAction.id : null;
+
+  return PLOTS.map(def => {
+    const e = EDIFICIOS[def.id];
+    // Una acción de referencia del edificio, para leerle el multiplicador del día.
+    const ref = e.accion ? DAY_ACTIONS.find(x => x.id === e.accion) : DAY_ACTIONS.find(x => x.group === e.grupo);
+    const mult = e.libre || !ref ? 1 : actionMult(run, ref);
+    const mine = !e.libre && (e.grupo ? grupoElegido === e.grupo : idElegido === e.accion);
+    return {
+      def,
+      st: {
+        titulo: e.titulo,
+        // El tooltip DICE el multiplicador cuando lo hay: es la información que
+        // convierte el mapa en una decisión y no en una lista de puertas.
+        tip: mult === 0 ? "Hoy no se puede: el día lo impide." : e.tip + (mult !== 1 ? ` · <b style="color:#F0D97D">${multLabel(mult)} hoy</b>` : ""),
+        free: !!e.libre,
+        boost: mult > 1,
+        // El día del partido lo que gasta el día ya no se puede: no hay decisión que tomar.
+        locked: !e.libre && (mult === 0 || isMatchDay),
+        off: !e.libre && elegidoHoy && !mine,
+        mine,
+      },
+    };
+  });
+}
 
 export function renderHub(opts = {}) {
-  // Al volver de un partido (opts.autoAdvance) el día ya se jugó: se avanza al siguiente
-  // en vez de quedarse en el hub del día del partido (evita re-mostrar ese día).
+  // Al volver de un partido el día ya se jugó: se avanza al siguiente en vez de
+  // quedarse en el hub del día del partido (evita re-mostrar ese día).
   if (opts.autoAdvance) { pasarDia(); return; }
   const run = S.run;
   const me = getTeam(run.teamId);
   const oppId = nextOpponentId(run);
   const opp = getTeam(oppId);
   const isMatchDay = run.day >= run.nextMatchDay;
-  const stageTxt = (run.stage === "groups"
-    ? `Fase de grupos · Fecha ${run.matchday + 1} de 3 · Grupo ${run.groups[run.myGroupIdx].name}`
-    : STAGE_LABEL[run.stage]) + ` · ${dayLabel(run.day)}`;
+  const grupo = run.groups[run.myGroupIdx];
+  const stageTxt = run.stage === "groups"
+    ? `Fase de grupos · Fecha ${run.matchday + 1} de 3 · Grupo ${grupo.name}`
+    : STAGE_LABEL[run.stage];
 
   const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
-  // Las BAJAS del once NO se auto-reemplazan (PO): el caído queda a la vista (🚑/🟥)
-  // y el DT arma el reemplazo a mano en Gestión de Plantilla — la formación tampoco cambia
-  // sola. La válvula automática queda SOLO para el plantel diezmado (no llega a 6 en pie:
-  // ahí no hay decisión que tomar y sin ella la run moría en softlock).
+  // Las BAJAS del once NO se auto-reemplazan (PO): el caído queda a la vista y el DT arma
+  // el reemplazo a mano. La válvula automática queda SOLO para el plantel diezmado.
   const conBaja = (S.selectedLineup || []).some(p => p.suspendido || p.lesionadoPartidos > 0);
   if (conBaja && maxLineupSize(available) >= 6) assignPositions(run.squad, S.selectedLineup, S.formation);
   else ({ lineup: S.selectedLineup, formationId: S.formation } = currentLineup(run.squad, S.selectedLineup, S.formation));
@@ -89,155 +172,131 @@ export function renderHub(opts = {}) {
   const discipline = { susp: run.squad.filter(p => p.suspendido), aperc: run.squad.filter(p => p.amarillas > 0 && !p.suspendido) };
   const fueraDePuesto = S.selectedLineup.filter(p => outOfPosPenalty(p) > 0);
   const forma = { racha: run.squad.filter(p => (p.momento ?? 4) >= 6), frios: run.squad.filter(p => (p.momento ?? 4) <= 2) };
+  const avisos = construirAvisos(v, discipline, fueraDePuesto, forma, bajasOnce);
+  const tabla = computeTable(grupo).map(r => ({
+    name: getTeam(r.id).name, pj: r.pj, dg: r.gf - r.gc, pts: r.pts, mine: r.id === run.teamId,
+  }));
 
-  screenShell(`
-    <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
-      <div>
-        <div class="text-xs uppercase tracking-widest tp-text font-bold">${stageTxt}</div>
-        <h1 class="text-2xl font-black mt-1 flex items-center gap-2">${flagImg(me, "w-8 h-[1.4rem]")} Concentración Mundialista</h1>
+  const parcelas = estadoDeParcelas(isMatchDay);
+  const elegidoHoy = !run.actionPending && run.lastAction?.day === run.day;
+  const listoParaJugar = v.ok && !bajasOnce.length;
+  const cta = isMatchDay
+    ? { id: "btn-play", ico: "balon", label: "Jugar partido →" }
+    : { id: "btn-nextday", ico: "luna", label: "Pasar al día siguiente →" };
+  const ayuda = isMatchDay
+    ? (listoParaJugar ? "El once está listo — a la cancha" : "Resolvé las bajas del once antes de jugar")
+    : (elegidoHoy ? `Acción tomada: ${EDIFICIOS[Object.keys(EDIFICIOS).find(k => (EDIFICIOS[k].grupo && EDIFICIOS[k].grupo === run.lastAction.group) || EDIFICIOS[k].accion === run.lastAction.id) || "campo"].titulo}` : "Primero elegí la acción del día");
+
+  desengancharResize = screenStage(`
+    ${barraOportunidad()}
+    ${cabecera(me, stageTxt)}
+    ${franjaAnfitriones()}
+    ${lineaDias(opp)}
+
+    <!-- EL COMPLEJO. El mapa es el fondo REAL de esta franja (no una card): los
+         edificios se posicionan en absoluto sobre él y la columna del HUD flota
+         encima, a la derecha, sin llegar a pisarlos. -->
+    <div class="relative flex-1" style="min-height:0;overflow:hidden">
+      ${complexGround()}
+      <div class="px absolute flex items-center gap-2.5" style="left:16px;top:12px;z-index:35;font-size:11px;letter-spacing:.12em;color:var(--wc-gold-light);background:rgba(11,11,14,.7);border:2px solid rgba(11,11,14,.9);padding:4px 8px">
+        El complejo
+        <span class="px-body" style="font-size:13px;letter-spacing:.08em;color:var(--px-dim);text-transform:uppercase">${isMatchDay
+          ? "Hoy se juega · el complejo cierra"
+          : elegidoHoy ? "Ya decidiste: el resto queda para otro día" : "¿A dónde llevás al plantel hoy?"}</span>
       </div>
-      <div class="flex items-center gap-2">
-        <button id="btn-journal" title="Diario de Campaña (${run.journal.length})" class="relative w-11 h-11 flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 text-xl hover:border-[var(--team-primary)] cursor-pointer transition-all">📖</button>
-        <button id="btn-standings" title="Estado del Mundial" class="w-11 h-11 flex items-center justify-center rounded-xl border border-slate-600 bg-slate-800/80 text-xl hover:border-[var(--team-primary)] cursor-pointer transition-all">🏆</button>
-        <button id="btn-abandon" class="text-xs text-slate-500 hover:text-red-400 cursor-pointer ml-1 px-3 py-2 rounded-xl border border-slate-700 hover:border-red-400/50">Abandonar torneo</button>
+      <!-- EL PLANO: las parcelas comparten con las calles un sistema de coordenadas
+           propio de 1440×PLANO_H anclado ABAJO. Sin esta caja, las posiciones se
+           medirían contra un alto que cambia según haya Oportunidad o no, y la fila
+           de abajo se saldría de la pantalla. -->
+      <div class="absolute" style="left:0;right:0;bottom:0;height:${PLANO_H}px">
+        ${parcelas.map(p => plotHtml(p.def, p.st)).join("")}
       </div>
+      ${panelAbierto === "focos" ? panelFocos() : panelAbierto === "plan" ? panelPlan() : ""}
+      ${isMatchDay ? `<div class="px-panel absolute" style="left:24px;bottom:16px;width:420px;z-index:35;padding:10px 12px">
+        <div class="px" style="font-size:10px;letter-spacing:.1em;color:var(--wc-gold-light)">Altura del bloque</div>
+        <div class="mt-2">${alturaPicker()}</div>
+      </div>` : ""}
+      ${columnaDerecha(opp, avisos, tabla, `Grupo ${grupo.name}`)}
     </div>
 
-    <div id="btn-scout" title="Ver el informe del cuerpo técnico" class="bg-slate-800/80 border border-slate-600 tp-topbar rounded-2xl p-5 mb-5 cursor-pointer transition-all hover:scale-[1.005] hover:border-[var(--team-primary)]">
-      <div class="flex items-center justify-between flex-wrap gap-4">
-        <div class="flex items-center gap-4">
-          ${flagImg(me, "w-16 h-11", true)}
-          <span class="text-xl font-black text-slate-400">VS</span>
-          ${flagImg(opp, "w-16 h-11", true)}
-          <div>
-            <div class="text-2xl font-bold">${opp.name}</div>
-            <div>${starsHtml(teamStars(opp))} <span class="text-amber-300 font-bold text-sm ml-1">Media ${teamRating(opp)}</span></div>
-          </div>
-        </div>
-        <div class="text-right">
-          <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Figuras</div>
-          <div class="flex gap-1.5 justify-end">
-            ${keyPlayers(opp).map(f => `
-              <div class="text-center w-14 shrink-0" title="${f.name}">
-                <div class="flex justify-center">${spriteSvg(f, opp, "w-7 h-8")}</div>
-                <div class="text-[9px] text-slate-400 truncate">${f.name}</div>
-              </div>`).join("")}
-          </div>
-        </div>
-      </div>
-      <p class="text-[10px] tp-text font-semibold text-right mt-2">📋 Informe del rival →</p>
-    </div>
+    ${barraAccion({
+      listo: isMatchDay ? listoParaJugar : !run.actionPending,
+      ayuda, ayudaOk: isMatchDay ? listoParaJugar : elegidoHoy, cta,
+    })}
 
-    <!-- Cuerpo en 3 columnas de IGUAL alto (items-stretch): en cada columna un bloque
-         crece (flex-1) para llenar y no dejar hueco — la cancha (izq), la acción del
-         día (centro) y la tabla de goleadores (der). -->
-    <div class="grid lg:grid-cols-[20rem_minmax(0,1fr)_20rem] gap-5 items-stretch">
-      <!-- IZQUIERDA: estado del equipo (la card ya llena su columna) -->
-      ${teamStateCard(v, discipline, fueraDePuesto, forma)}
+    <div class="px-scan"></div>
+    <div class="px-vig"></div>
+  `);
+  window.onresize = desengancharResize;
 
-      <!-- CENTRO: la acción del día llena la columna -->
-      <div class="flex flex-col min-w-0">
-        ${isMatchDay
-          ? `<div class="bg-slate-800/60 border tp-border rounded-2xl p-5 text-center flex-1 flex flex-col justify-center">
-              <div class="text-4xl mb-2">⚽</div>
-              <h3 class="text-xl font-black">¡Hoy se juega!</h3>
-              <p class="text-sm text-slate-400 mt-1">${me.name} enfrenta a ${opp.name}. Revisa tu plantilla y cuando estés listo, salta a la cancha.</p>
-              <div class="mt-4 pt-4 border-t border-slate-700/70">${alturaPicker()}</div>
-            </div>`
-          : actionCard()}
-      </div>
-
-      <!-- DERECHA: grupo (fijo) + goleadores (llena el resto) -->
-      <div class="flex flex-col gap-5 min-w-0">
-        <div id="btn-standings2" class="cursor-pointer transition-transform hover:scale-[1.01] shrink-0" title="Ver el estado de todos los grupos">
-          ${run.stage === "groups" ? renderGroupTableCard() : renderKoInfoCard()}
-        </div>
-        <div id="btn-scorers" class="cursor-pointer transition-transform hover:scale-[1.01] flex-1 flex flex-col" title="Ver la tabla completa de goleadores">
-          ${renderScorersCard()}
-        </div>
-      </div>
-    </div>
-
-    <div class="mt-5">${renderCalendarCard(opp)}</div>
-
-    <div class="mt-5">
-      ${isMatchDay
-        ? `<button id="btn-play" class="tp-gradient w-full text-lg font-black py-3.5 rounded-xl shadow-lg cursor-pointer transition-all hover:scale-[1.005] hover:brightness-110">⚽ JUGAR PARTIDO</button>`
-        : run.actionPending
-          ? `<button id="btn-nextday" disabled class="w-full text-lg font-black py-3.5 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-500 shadow-lg cursor-not-allowed" title="Primero elige la Acción del día">🌙 Pasar al día siguiente →</button>`
-          : `<button id="btn-nextday" class="w-full text-lg font-black py-3.5 rounded-xl border border-slate-500 bg-slate-700/70 hover:bg-slate-600 shadow-lg cursor-pointer transition-all hover:scale-[1.005]">🌙 Pasar al día siguiente →</button>`}
-    </div>
-  `, "max-w-7xl");
-
-  // La cancha del "Estado del equipo": solo lectura, clic (ficha o césped) → Gestión de Plantilla.
+  // La cancha del panel "Mi equipo": solo lectura, clic → Gestión de Plantilla.
   mountPitch({
-    pitchEl: $("#hub-pitch"),
-    team: me,
-    lineup: S.selectedLineup,
-    bench: [],
-    selected: null,
-    sizes: { sprite: "w-7 h-9", bench: "w-7 h-9" },
-    draggable: () => false,
-    canSwap: () => null,
-    onSelect: () => {}, // el clic lo captura el contenedor (abajo): toda la cancha lleva a plantilla
+    pitchEl: $("#hub-pitch"), team: me, lineup: S.selectedLineup, bench: [], selected: null,
+    sizes: { sprite: "w-5 h-6", bench: "w-5 h-6" },
+    draggable: () => false, canSwap: () => null, onSelect: () => {},
     badge: p => momentoChip(p) + (p.suspendido ? "🟥" : p.lesionadoPartidos > 0 ? "🚑" : p.amarillas > 0 ? "🟨" : ""),
     muted: p => p.suspendido || p.lesionadoPartidos > 0,
   });
-  $("#hub-pitch").onclick = () => go("squad");
 
-  $("#btn-abandon").onclick = () => { if (confirm("¿Abandonar el torneo? La partida terminará.")) go("end-run", false, true); };
-  $("#btn-scout").onclick = () => showScoutReport(oppId);
-  $("#btn-standings").onclick = () => go("worldcup");
-  $("#btn-standings2").onclick = () => go("worldcup");
-  $("#btn-scorers").onclick = () => go("scorers");
-  wireScorersCard($("#btn-scorers")); // carrusel Goleadores↔Asistidores (corta la navegación al togglear)
-  $("#btn-journal").onclick = () => go("journal", "hub");
-  $("#btn-squad").onclick = () => go("squad");
-  const filoBtn2 = $("#btn-filo");
-  if (filoBtn2) filoBtn2.onclick = () => go("philosophy");
-  // El canje está disponible siempre que un buff llegue al umbral (también el día de
-  // partido: renunciar al boost de hoy por crecimiento permanente es una decisión válida).
+  /* ── Cableado ────────────────────────────────────────────────────────────── */
+  const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
+
+  on("#hub-pitch", () => go("squad"));
+  on("#btn-squad", () => go("squad"));
+  on("#px-mas", () => go("squad"));
+  on("#btn-scout", () => showScoutReport(oppId));
+  on("#px-journal", () => go("journal", "hub"));
+  on("#px-world", () => go("worldcup"));
+  on("#btn-scorers", () => go("scorers"));
+  on("#btn-filo", () => go("philosophy"));
+  on("#px-abandon", () => { if (confirm("¿Abandonar el torneo? La partida terminará.")) go("end-run", false, true); });
+  on("#px-opp", () => {
+    const o = dayOpportunity(S.run);
+    if (!o) return;
+    if (o.choose) { showOppChooser(o); return; }
+    const res = applyDayAction(S.run, o.id);
+    if (!res) return;
+    toast(`${res.icon} ${res.title}: ${res.desc}`);
+    panelAbierto = null;
+    renderHub();
+  });
+
+  // LOS EDIFICIOS. Uno solo de los tres caminos: abrir panel, ejecutar la acción, o
+  // navegar (los gratis). El bloqueado no hace nada — su tooltip ya dijo por qué.
+  document.querySelectorAll("[data-plot]").forEach(el => el.onclick = () => {
+    const id = el.dataset.plot;
+    const e = EDIFICIOS[id];
+    if (el.hasAttribute("data-locked")) return;
+    if (id === "scouting") { showScoutReport(oppId); return; }
+    if (id === "enfermeria") { go("squad"); return; }
+    if (el.hasAttribute("data-off")) return;            // ya decidiste: gastar el día otra vez, no
+    if (e.panel) { panelAbierto = el.hasAttribute("data-mine") ? null : e.panel; renderHub(); return; }
+    aplicar(e.accion);
+  });
+
+  // Las opciones DENTRO de un panel (los 5 focos, las 4 filosofías).
+  document.querySelectorAll(".da-opt").forEach(b => b.onclick = () => aplicar(b.dataset.action));
+  on("#px-sheet-x", () => { panelAbierto = null; renderHub(); });
+
   document.querySelectorAll(".canje-opt").forEach(b => b.onclick = () => showCanje(b.dataset.key));
+
   if (isMatchDay) {
     wireAlturaPicker();
-    const play = $("#btn-play");
-    // validateLineup no mira disponibilidad (eso lo hacía el auto-reemplazo retirado):
-    // con una baja en el once no se juega — el DT la resuelve en Gestión de Plantilla.
-    const listo = v.ok && !bajasOnce.length;
-    play.disabled = !listo;
-    play.classList.toggle("opacity-40", !listo);
-    play.classList.toggle("cursor-not-allowed", !listo);
-    play.onclick = () => {
+    on("#btn-play", () => {
       if (validateLineup(available, S.selectedLineup).ok && !S.selectedLineup.some(p => p.suspendido || p.lesionadoPartidos > 0)) go("start-match", oppId);
-    };
-  } else {
-    document.querySelectorAll(".da-opt").forEach(b => b.onclick = () => {
-      const a = applyDayAction(S.run, b.dataset.action);
-      if (!a) return;
-      toast(`${a.icon} ${a.title}${a.mult !== 1 ? ` (${multLabel(a.mult)} hoy)` : ""}: ${a.desc}.`);
-      renderHub();
     });
-    // Payoff de la Sesión Táctica: al pasar por un foco, la línea muestra qué acerca;
-    // al salir de la grilla, vuelve a la consigna por defecto. Solo lectura — no decide.
-    const payoutEl = $("#tac-payoff");
-    if (payoutEl) document.querySelectorAll(".tac-mark[data-payoff]").forEach(b => {
-      b.addEventListener("mouseenter", () => { payoutEl.innerHTML = decodeURIComponent(b.dataset.payoff); });
-      b.addEventListener("focus", () => { payoutEl.innerHTML = decodeURIComponent(b.dataset.payoff); });
-      b.addEventListener("mouseleave", () => { payoutEl.innerHTML = payoutEl.dataset.default; });
-    });
-    const oppBtn = $("#da-opp");
-    if (oppBtn) oppBtn.onclick = () => {
-      const o = dayOpportunity(S.run);
-      if (!o) return;
-      if (o.choose) { showOppChooser(o); return; }
-      const res = applyDayAction(S.run, o.id);
-      if (!res) return;
-      toast(`${res.icon} ${res.title}: ${res.desc}`);
-      renderHub();
-    };
-    if (!S.run.actionPending) $("#btn-nextday").onclick = pasarDia;
+  } else if (!run.actionPending) {
+    on("#btn-nextday", pasarDia);
+  }
+
+  /** Ejecuta una acción del día y re-pinta. La validación la hace el motor. */
+  function aplicar(actionId) {
+    const a = applyDayAction(S.run, actionId);
+    if (!a) return;
+    toast(`${a.icon} ${a.title}${a.mult !== 1 ? ` (${multLabel(a.mult)} hoy)` : ""}: ${a.desc}.`);
+    panelAbierto = null;
+    renderHub();
   }
 }
-
 
 register("hub", renderHub);

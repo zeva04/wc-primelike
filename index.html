@@ -253,6 +253,184 @@
        seleccionar — que es justo la lectura buscada, "la tarjeta se agranda". */
     .filo-annot { display: none; }
     .filo-board.is-sel .filo-annot { display: block; animation: fadein .3s ease; }
+    /* ═══════════════════════════════════════════════════════════════════════════
+       EL SISTEMA PIXEL · la Concentración Mundialista (ui/screens/hub)
+       ═══════════════════════════════════════════════════════════════════════════
+       Adaptación del diseño "Hub Mundial 2026" de Claude Design. Reglas del kit,
+       que valen para TODO lo que lleve una clase px-:
+         · bordes DUROS de 2px, nunca redondeados
+         · sombras SÓLIDAS de 2-4px, jamás blur (una sombra difusa rompe el pixel)
+         · todo a la grilla de 8px
+         · Silkscreen SOLO en mayúsculas con tracking, y nunca para texto corrido:
+           el cuerpo va en la tipografía del sistema (ver .px-body)
+
+       La fuente va AUTO-HOSPEDADA (assets/fonts): Silkscreen es OFL y pesa 16 KB
+       las dos variantes. Enlazarla a Google Fonts habría sumado una segunda
+       dependencia de red en runtime — decisión PO del 6-ago-2026. */
+    @font-face {
+      font-family: "Silkscreen"; font-style: normal; font-weight: 400; font-display: block;
+      src: url("assets/fonts/silkscreen-400.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Silkscreen"; font-style: normal; font-weight: 700; font-display: block;
+      src: url("assets/fonts/silkscreen-700.woff2") format("woff2");
+    }
+
+    :root {
+      /* Los grises MORADOS del kit. No son los slate de Tailwind: el hub vive en una
+         familia propia, más cálida y más oscura, para que se lea como otra cosa. */
+      --px-bg: #221f28;
+      --px-panel: rgba(38, 34, 48, .86);
+      --px-panel-hi: rgba(52, 46, 66, .88);
+      --px-panel-lo: rgba(28, 25, 36, .86);
+      --px-line: #46405a;          /* borde de panel vivo */
+      --px-line-off: #332e42;      /* borde apagado / bloqueado */
+      --px-ink: #f4f4f0;
+      --px-dim: #a9a2b8;
+      --px-faint: #5a5a66;
+      --px-shadow: #05050a;
+      --px-shadow-soft: #14111c;
+      --px-free: #38bdf8;          /* lo que NO gasta el día */
+      --px-ok: #34d399;
+      --px-warn: #fbbf24;
+      --px-bad: #f87171;
+    }
+
+    /* ── El LIENZO. 1440×900 exactos, escalados por JS (fitHubScreen) para llenar la
+       ventana sin deformar ni hacer scroll. El pixel art solo se ve nítido si el
+       lienzo tiene un tamaño real y el escalado es uniforme. ── */
+    .px-stage {
+      position: fixed; inset: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      background: #14111c;
+    }
+    .px-screen {
+      position: relative; width: 1440px; height: 900px; flex-shrink: 0;
+      display: flex; flex-direction: column; overflow: hidden;
+      color: var(--px-ink); image-rendering: pixelated;
+      transform-origin: center center;
+      background:
+        radial-gradient(55% 50% at 8% 6%, rgba(234, 0, 42, .40), transparent 70%),
+        radial-gradient(50% 45% at 94% 10%, rgba(0, 87, 184, .42), transparent 72%),
+        radial-gradient(60% 50% at 50% 98%, rgba(0, 122, 51, .36), transparent 70%),
+        var(--px-bg);
+    }
+    /* El CRT: barrido y viñeta. Van arriba de todo y no reciben clics. */
+    .px-scan, .px-vig { position: absolute; inset: 0; pointer-events: none; }
+    .px-scan { z-index: 80; background: repeating-linear-gradient(0deg, rgba(0,0,0,.10) 0 1px, transparent 1px 3px); }
+    .px-vig { z-index: 81; background: radial-gradient(ellipse 82% 74% at 50% 45%, transparent 62%, rgba(0,0,0,.32) 100%); }
+
+    /* ── Tipografía ── */
+    .px { font-family: Silkscreen, "Courier New", monospace; text-transform: uppercase; letter-spacing: .08em; line-height: 1.35; }
+    .px-body { font-family: ui-sans-serif, system-ui, sans-serif; letter-spacing: .01em; }
+
+    /* ── Superficies ── */
+    .px-panel { background: var(--px-panel); border: 2px solid var(--px-line); box-shadow: 3px 3px 0 var(--px-shadow); }
+    .px-head { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--px-panel-hi); border-bottom: 2px solid var(--wc-black); }
+
+    /* ── El BOTÓN principal, con sus 4 estados. El relieve son dos sombras internas
+       (clara arriba-izquierda, oscura abajo-derecha): así se ve tallado sin un solo
+       píxel difuso. Al presionar BAJA 3px y su sombra se achica — el botón se hunde. ── */
+    .px-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: var(--wc-gold); color: var(--wc-black); border: 2px solid var(--wc-black);
+      box-shadow: inset 2px 2px 0 var(--wc-gold-light), inset -2px -2px 0 var(--wc-gold-dark), 4px 4px 0 var(--px-shadow);
+      cursor: pointer; transition: none;
+    }
+    .px-btn:hover { background: var(--wc-gold-light); box-shadow: inset 2px 2px 0 #fff3c4, inset -2px -2px 0 var(--wc-gold), 4px 4px 0 var(--px-shadow); }
+    .px-btn:active { background: var(--wc-gold-dark); transform: translate(3px, 3px); box-shadow: inset 2px 2px 0 var(--wc-gold), inset -2px -2px 0 #5a4409, 1px 1px 0 var(--px-shadow); }
+    .px-btn:disabled, .px-btn[disabled] {
+      background: #312c40; color: #79728a; border-color: var(--px-line); cursor: not-allowed; transform: none;
+      box-shadow: inset 2px 2px 0 #3b3550, inset -2px -2px 0 #241f30;
+    }
+    /* Botón secundario: mismo relieve, sin oro — para "ver informe", "gestión de plantilla". */
+    .px-btn2 {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      background: var(--px-panel-hi); border: 2px solid var(--px-line); box-shadow: 2px 2px 0 var(--px-shadow);
+      color: var(--px-dim); cursor: pointer;
+    }
+    .px-btn2:hover { border-color: var(--wc-gold); color: var(--wc-gold-light); }
+
+    /* ── Badges. El orden de fuerza es: oro (te conviene) › celeste (es gratis) ›
+       rojo (no podés) › color del equipo (ya lo elegiste). ── */
+    .px-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; border: 2px solid var(--wc-black); font-family: Silkscreen, monospace; font-size: 8px; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+    .px-tag-gold { background: var(--wc-gold); color: var(--wc-black); box-shadow: 2px 2px 0 var(--px-shadow); }
+    .px-tag-free { background: #0d1b24; color: var(--px-free); border-color: var(--px-free); }
+    .px-tag-off { background: var(--wc-black); color: var(--px-bad); border-color: var(--px-line); }
+    .px-tag-mine { background: var(--team-primary); color: var(--team-text); box-shadow: 2px 2px 0 var(--px-shadow); }
+
+    /* ── EL COMPLEJO. Cada edificio es una PARCELA en rombo (el plano isométrico) con
+       su sprite encima y su cartel colgando debajo. Los estados se pintan en el borde
+       del rombo y en el cartel, nunca en el sprite: el arte no cambia, cambia el sitio. ── */
+    .px-plot { position: absolute; cursor: pointer; }
+    .px-plot[data-locked] { cursor: not-allowed; }
+    .px-rhomb { position: relative; width: 100%; height: 100%; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); filter: drop-shadow(3px 3px 0 var(--px-shadow-soft)); }
+    .px-rhomb-in { position: absolute; inset: 3px; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+    .px-sprite { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    .px-sign {
+      position: absolute; left: 50%; transform: translateX(-50%); width: max-content; max-width: 210px; text-align: center;
+      background: rgba(18, 15, 26, .94); border: 2px solid #3a2a12; box-shadow: 2px 2px 0 var(--px-shadow);
+      padding: 4px 8px; font-family: Silkscreen, monospace; font-size: 8px; letter-spacing: .06em; color: #d8d8de;
+    }
+    /* Hover: el edificio FLOTA y su cartel se enciende en oro. Es el único movimiento
+       de la pantalla, y por eso alcanza para decir "esto se puede tocar". */
+    .px-plot:not([data-locked]):not([data-off]):hover { z-index: 30; }
+    .px-plot:not([data-locked]):not([data-off]):hover .px-rhomb { filter: drop-shadow(3px 3px 0 var(--px-shadow-soft)) drop-shadow(0 0 0 2px var(--wc-gold)); }
+    .px-plot:not([data-locked]):not([data-off]):hover .px-sprite { animation: pxFloat 2.4s ease-in-out infinite; }
+    .px-plot:not([data-locked]):not([data-off]):hover .px-sign { border-color: var(--wc-gold); color: var(--wc-gold-light); }
+    @keyframes pxFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+    /* Ya decidiste: lo que gasta el día se apaga. Lo gratis sigue encendido. */
+    .px-plot[data-off] { opacity: .38; cursor: default; }
+    /* Bloqueado ≠ apagado. Apagado es "ya elegiste otra cosa" y solo baja la opacidad;
+       bloqueado es "hoy acá no se puede" y apaga el COLOR del edificio, para que el
+       candado del centro se lea sobre un sitio que ya parece cerrado. */
+    .px-plot[data-locked] .px-rhomb, .px-plot[data-locked] .px-sprite { filter: grayscale(.75) brightness(.45); }
+    .px-plot[data-locked] .px-sign { opacity: .5; }
+    .px-plot[data-mine] .px-sign { border-color: var(--team-primary); color: var(--px-ink); }
+
+    /* El TOOLTIP del edificio: sale del cartel hacia arriba, con su pico. */
+    .px-tip {
+      position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); margin-bottom: 12px; width: 250px;
+      background: var(--px-panel-hi); border: 2px solid var(--wc-gold); box-shadow: 3px 3px 0 var(--px-shadow);
+      padding: 7px 9px; z-index: 40; opacity: 0; pointer-events: none;
+    }
+    .px-plot:not([data-locked]):hover .px-tip, .px-plot[data-locked]:hover .px-tip { opacity: 1; }
+    .px-plot[data-locked]:hover .px-tip { border-color: var(--px-bad); }
+    .px-tip::after { content: ""; position: absolute; left: 50%; top: 100%; margin-left: -4px; width: 8px; height: 8px; background: var(--wc-gold); }
+    .px-plot[data-locked]:hover .px-tip::after { background: var(--px-bad); }
+
+    /* ── La LÍNEA DE DÍAS. El de hoy es más alto y parpadea en oro: la pantalla
+       entera existe para resolver ESE día. ── */
+    .px-day { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid; padding: 8px 6px; }
+    .px-day-past { height: 60px; background: rgba(24, 21, 32, .8); border-color: var(--px-line-off); opacity: .55; }
+    .px-day-next { height: 64px; background: rgba(40, 36, 52, .88); border-color: var(--px-line); box-shadow: 2px 2px 0 var(--px-shadow-soft); }
+    .px-day-now { height: 80px; background: #2e2415; border-color: var(--wc-gold); box-shadow: 3px 3px 0 var(--px-shadow-soft), inset 0 0 0 2px var(--wc-gold-dark); animation: pxBlink 1.1s steps(2, end) infinite; }
+    .px-day-match { height: 70px; background: #33270f; border-color: var(--px-warn); box-shadow: 3px 3px 0 var(--px-shadow-soft); }
+    @keyframes pxBlink { 0%, 100% { border-color: var(--wc-gold); } 50% { border-color: var(--wc-gold-dark); } }
+
+    /* ── El PANEL que abre un edificio (focos, pizarra). Entra sobre el mapa, no
+       navega: la decisión del día se toma sin salir del complejo. ── */
+    /* El panel ocupa el ANCHO DEL MAPA, no el de la pantalla: `right:396px` lo corta
+       justo antes de la columna del HUD (que arranca en 1056). Tapar el estado del
+       equipo mientras se elige la sesión sería esconder la mitad del criterio. */
+    .px-sheet { position: absolute; left: 24px; right: 396px; top: 64px; z-index: 50; background: var(--px-panel); border: 2px solid var(--wc-gold); box-shadow: 4px 4px 0 var(--px-shadow); }
+    .px-sheet-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--px-panel-hi); border-bottom: 2px solid var(--wc-black); }
+    .px-x { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: var(--wc-black); border: 2px solid var(--px-line); font-family: Silkscreen, monospace; font-size: 10px; color: var(--px-dim); cursor: pointer; flex-shrink: 0; }
+    .px-x:hover { border-color: var(--wc-gold); color: var(--wc-gold-light); }
+    .px-opt { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 8px; background: var(--px-panel-hi); border: 2px solid var(--px-line); box-shadow: 2px 2px 0 var(--px-shadow); cursor: pointer; }
+    .px-opt:hover { border-color: var(--wc-gold); background: #2e2415; }
+
+    /* ── Medidores segmentados: 16 casillas, no una barra continua. Un valor que se
+       cuenta en bloques se compara de un vistazo. ── */
+    .px-seg { flex: 1; height: 10px; border: 1px solid var(--px-shadow-soft); }
+
+    /* ── La cancha MINIATURA del panel "Mi equipo". Es un croquis de la formación,
+       no la pantalla de plantilla: a 180px de alto las placas con nombre y nota se
+       solapan y no se lee ninguna. Se ocultan y quedan el sprite y el dorsal —
+       el detalle está a un clic, en Gestión de Plantilla. ── */
+    .pitch-mini [data-name] > span:last-child { display: none; }
+    .pitch-mini [data-name] { z-index: 10; }
+
     /* ---- Sesión Táctica: los 5 principios como marcadores de tiza (hub) ----
        Trae el idioma del pizarrón a la acción que construye identidad, SIN filtros
        SVG (el hub ya renderiza mucho): tinte verde + fuente manuscrita + color por

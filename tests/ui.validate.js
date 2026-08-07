@@ -21,7 +21,7 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const DIRS = ["js/ui", "js/content", "js/core", "js/data", "js/game", "js/storage"];
+const DIRS = ["js/ui", "js/content", "js/core", "js/data", "js/game", "js/storage", "js/dev"];
 
 let fails = 0, n = 0;
 

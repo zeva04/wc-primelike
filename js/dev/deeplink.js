@@ -37,6 +37,7 @@
    | `node`    | en `philosophy`, abre la ficha de ese rasgo en el riel.          |
    | `onb`     | `1` para el modo ONBOARDING de la pizarra.                       |
    | `anim`    | `1` para NO congelar las animaciones (por defecto se congelan).   |
+   | `dia`     | `partido` salta al día del partido (el hub cambia de cara ahí).   |
 
    ── La señal de listo ────────────────────────────────────────────────────────
    Al terminar marca `<html data-dev-ready="philosophy">` y `window.__devReady`.
@@ -45,6 +46,8 @@
    marca `data-dev-error` con el motivo, y el motivo se ve en pantalla.
    ============================================================ */
 import { newRun } from "../game/run.js";
+import { getTeam } from "../data/teams-repo.js";
+import { applyTeamColors } from "../ui/theme.js";
 import { choosePhilosophy } from "../game/philosophy.js";
 import { FILO_LEVELS } from "../content/identity/philosophies.js";
 import { traitById } from "../content/traits/index.js";
@@ -83,6 +86,10 @@ export function bootDeepLink() {
   try {
     if (q.get("anim") !== "1") freezeAnimations();
     const run = (S.run = newRun((q.get("team") || "BRA").toUpperCase()));
+    // Los colores del equipo son variables CSS que setea el flujo de inicio. Sin esto
+    // el deep-link pinta TODO con el oro por defecto y la captura miente sobre el color
+    // real de la pantalla (`--team-primary` es lo que marca "esto lo elegiste vos").
+    applyTeamColors(getTeam(run.teamId));
 
     const filo = q.get("filo");
     if (filo) {
@@ -103,15 +110,24 @@ export function bootDeepLink() {
       run.rasgos = { ...run.rasgos, [t.filo]: [...(run.rasgos?.[t.filo] || []), id] };
     }
 
+    // Saltar al día del partido: se mueve el CALENDARIO, no un flag de UI, para que la
+    // pantalla derive su estado igual que en una partida real (isMatchDay sale de ahí).
+    if (q.get("dia") === "partido") run.day = run.nextMatchDay;
+
     const opts = {};
     if (q.get("view")) opts.view = q.get("view");
     if (q.get("onb") === "1") opts.onboarding = true;
-    go(screen, opts, q.get("node") || null);
+    const node = q.get("node");
+    go(screen, opts, node || null);
 
-    // El nodo se abre en el mismo render (philosophy lo hace con `selected`), pero si
-    // la pantalla no lo soporta lo decimos en vez de fingir que salió.
-    if (q.get("node") && !document.querySelector(".tb-rail.open")) {
-      throw new Error(`la pantalla "${screen}" no abrió el nodo "${q.get("node")}"`);
+    // `node` abre "lo que se pueda abrir" en esa pantalla, y cada una lo hace a su
+    // manera: la pizarra lo recibe como argumento del render, y el hub abre su
+    // edificio con un clic real (así se ejerce el mismo camino que el jugador). Si
+    // ninguna de las dos enganchó, lo decimos en vez de fingir que salió.
+    if (node && !document.querySelector(".tb-rail.open")) {
+      const plot = document.querySelector(`[data-plot="${node}"]`);
+      if (plot) plot.click();
+      else throw new Error(`la pantalla "${screen}" no abrió "${node}"`);
     }
     signal(true, screen);
   } catch (e) {

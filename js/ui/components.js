@@ -186,6 +186,28 @@ export function screenFull(inner, maxW = "max-w-7xl") {
 }
 
 /**
+ * Shell de LIENZO FIJO: la pantalla es una imagen de 1440×900 exactos que se ESCALA
+ * entera para llenar la ventana, en vez de reacomodarse. Lo usa la Concentración
+ * Mundialista, que es pixel art: un layout elástico obligaría a escalar en
+ * fracciones y el pixel dejaría de caer entero.
+ *
+ * Devuelve la función que reajusta la escala — el llamador la engancha a `resize`
+ * y la suelta al cambiar de pantalla.
+ */
+export function screenStage(inner) {
+  app().style.zoom = "";
+  app().innerHTML = `<div class="px-stage"><div class="px-screen" id="px-screen">${inner}</div></div>`;
+  const el = document.getElementById("px-screen");
+  const fit = () => {
+    // `contain`: la escala la manda el lado que primero se queda sin sitio, así el
+    // lienzo entra completo y nunca hay scroll. El sobrante queda como marco negro.
+    el.style.transform = `scale(${Math.min(window.innerWidth / 1440, window.innerHeight / 900)})`;
+  };
+  fit();
+  return fit;
+}
+
+/**
  * Aprovecha el aire libre de una pantalla FIJA (screenFull): si el contenido real
  * queda muy por debajo del viewport, escala TODO ese contenido un poco con `zoom`
  * en vez de dejar el sobrante como espacio muerto. `zoom` (no `transform`) porque
