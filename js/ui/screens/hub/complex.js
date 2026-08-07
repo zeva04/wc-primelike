@@ -197,36 +197,189 @@ export const PLOTS = [
   { id: "campo", cx: 225, cy: 190, w: 330, h: 188, acento: "#fbbf24", piso: CESPED },
   { id: "residencia", cx: 562, cy: 162, w: 300, h: 172, acento: "#38bdf8", piso: CESPED },
   { id: "video", cx: 868, cy: 200, w: 300, h: 172, acento: "#D4AF37", piso: ASFALTO },
-  { id: "asado", cx: 178, cy: 478, w: 300, h: 172, acento: "#fb923c", piso: TIERRA },
-  { id: "enfermeria", cx: 518, cy: 462, w: 300, h: 172, acento: "#34d399", piso: CESPED },
-  { id: "scouting", cx: 852, cy: 500, w: 300, h: 172, acento: "#0057B8", piso: ASFALTO },
+  { id: "asado", cx: 178, cy: 458, w: 300, h: 172, acento: "#fb923c", piso: TIERRA },
+  { id: "enfermeria", cx: 518, cy: 442, w: 300, h: 172, acento: "#34d399", piso: CESPED },
+  { id: "scouting", cx: 852, cy: 480, w: 300, h: 172, acento: "#0057B8", piso: ASFALTO },
 ];
 
+/* ── LA RED DE CALLES ────────────────────────────────────────────────────────
+   La versión anterior heredaba cinco trazos sueltos del mockup: pasaban CERCA de
+   los edificios pero no los tocaban, y el predio se leía como seis islas con
+   rayas de asfalto por encima. Ahora la red se DERIVA de las parcelas.
+
+   El frente de un edificio es el vértice de abajo de su rombo — en isométrica,
+   la puerta. Cada avenida se traza uniendo los frentes de su fila, así que si
+   una parcela se mueve la calle la sigue sola y no hay dos verdades.
+
+   La jerarquía es la de un campus de verdad:
+     avenidas    unen los tres edificios de cada fila
+     conectores  cruzan de una fila a otra, cada uno con su rotonda
+     accesos     el ramal corto de la avenida a la puerta (lo que faltaba)
+   ── */
+
+/** El frente de una parcela: dónde está la puerta. */
+const frente = p => ({ x: p.cx, y: p.cy + p.h / 2 });
+
+/* Cuánto por DEBAJO del frente pasa la avenida de cada fila. No es el mismo
+   número arriba y abajo: la fila de abajo tiene que dejar pasar el cartel del
+   nombre Y la chapa de "no gasta el día", que cuelgan 42px por debajo del rombo.
+   Con menos de 74 la calle se comería la chapa. */
+const OFF_NORTE = 44, OFF_SUR = 74;
+
+/** Une los frentes de una fila y prolonga la calzada hasta salirse del cuadro. */
+function avenida(fila, off) {
+  const pts = fila.map(p => { const f = frente(p); return [f.x, f.y + off]; });
+  return `M 14 ${pts[0][1]} L ${pts.map(p => p.join(" ")).join(" L ")} L 1038 ${pts.at(-1)[1]}`;
+}
+
+/** Y de una avenida en un x dado (para colgarle un conector sin descuadrarlo). */
+function yEnAvenida(fila, off, x) {
+  const pts = fila.map(p => { const f = frente(p); return [f.x, f.y + off]; });
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+    if (x >= x0 && x <= x1) return Math.round(y0 + ((x - x0) / (x1 - x0)) * (y1 - y0));
+  }
+  return x < pts[0][0] ? pts[0][1] : pts.at(-1)[1];
+}
+
+const FILA_N = PLOTS.slice(0, 3), FILA_S = PLOTS.slice(3);
+const AVE_N = avenida(FILA_N, OFF_NORTE);
+const AVE_S = avenida(FILA_S, OFF_SUR);
+
+/* Los dos conectores caen en los huecos entre edificios, y cada uno lleva su
+   rotonda a media altura. Con dos (y no una) el centro del predio queda ENCERRADO
+   por la calzada: la Enfermería pasa a estar en una isla, que es exactamente cómo
+   se siente un campus. */
+const ROT_O = { x: 348, y: 462 }, ROT_E = { x: 694, y: 466 };
+const conector = (rot) => {
+  const arriba = yEnAvenida(FILA_N, OFF_NORTE, rot.x);
+  const abajo = yEnAvenida(FILA_S, OFF_SUR, rot.x);
+  return `M ${rot.x} ${arriba} C ${rot.x + 12} ${arriba + 55}, ${rot.x + 8} ${rot.y - 47}, ${rot.x} ${rot.y}`
+    + ` C ${rot.x - 8} ${rot.y + 48}, ${rot.x - 4} ${abajo - 52}, ${rot.x} ${abajo}`;
+};
+
 /**
- * Las CALLES que unen las parcelas. Tres trazos por camino, en este orden: el
- * contorno negro (34px), el asfalto (24px) y la línea discontinua del centro. Es
- * la receta del diseño y es lo que hace que se lean como calles y no como cintas.
+ * El RAMAL DE ACCESO: de la avenida a la puerta. Es lo que "conecta" de verdad —
+ * sin esto las avenidas pasan cerca y el predio se lee como seis islas. Se exporta
+ * para que el test pueda comprobar que cada edificio tiene el suyo y que muere
+ * exactamente en su frente: si alguien mueve una parcela y el ramal se despega,
+ * eso en una captura no se ve.
  */
-const RUTAS = [
-  "M20 336 L430 262 L1030 344",
-  "M40 618 Q380 664 700 626 Q880 600 1030 644",
-  "M300 348 Q560 420 830 348",
-  "M430 262 L430 206",
-  "M700 626 L700 672",
+export const ACCESOS = [
+  ...FILA_N.map(p => { const f = frente(p); return `M ${f.x} ${f.y + OFF_NORTE} L ${f.x} ${f.y - 4}`; }),
+  ...FILA_S.map(p => { const f = frente(p); return `M ${f.x} ${f.y + OFF_SUR} L ${f.x} ${f.y - 4}`; }),
 ];
 
+/** La entrada al predio: sube desde el borde de abajo hasta la avenida sur. */
+const ENTRADA_X = 430;
+const ENTRADA = `M ${ENTRADA_X} ${PLANO_H} L ${ENTRADA_X} ${yEnAvenida(FILA_S, OFF_SUR, ENTRADA_X)}`;
+
+const CALZADAS = [AVE_N, AVE_S, conector(ROT_O), conector(ROT_E), ENTRADA];
+
+/* ── El mobiliario del predio ────────────────────────────────────────────────
+   Un complejo deportivo no es seis edificios y unas calles: es lo que hay ENTRE
+   ellos. Todo esto se dibuja en el espacio de pantalla del plano (no en el iso
+   local de los sprites) porque va pegado al suelo. ── */
+
+/** Árbol isométrico: dos copas en rombo, tronco y su sombra en el pasto. */
+const arbol = (x, y, s = 1) => `<g transform="translate(${x},${y}) scale(${s})">
+  <ellipse cx="0" cy="2" rx="17" ry="7" fill="#0a3318" opacity=".45"/>
+  <rect x="-3" y="-17" width="6" height="19" fill="#5c4b3a" stroke="#14111c" stroke-width="1"/>
+  <polygon points="0,-34 21,-22 0,-10 -21,-22" fill="#25733a" stroke="#14111c" stroke-width="1"/>
+  <polygon points="0,-28 21,-22 0,-16 -21,-22" fill="#35934a"/>
+  <polygon points="0,-48 16,-36 0,-24 -16,-36" fill="#2b8442" stroke="#14111c" stroke-width="1"/>
+  <polygon points="0,-42 16,-36 0,-30 -16,-36" fill="#3fa855"/>
+</g>`;
+
+/** Farola: el poste y su luz encendida — el predio se ve de noche. */
+const farola = (x, y) => `<g transform="translate(${x},${y})">
+  <ellipse cx="0" cy="1" rx="8" ry="3" fill="#0a3318" opacity=".45"/>
+  <rect x="-2" y="-40" width="4" height="41" fill="#8f889f" stroke="#14111c" stroke-width="1"/>
+  <rect x="-2" y="-44" width="15" height="5" fill="#8f889f" stroke="#14111c" stroke-width="1"/>
+  <rect x="8" y="-39" width="8" height="5" fill="#F0D97D" stroke="#14111c" stroke-width="1"/>
+  <ellipse cx="12" cy="-28" rx="13" ry="16" fill="#F0D97D" opacity=".10"/>
+</g>`;
+
+/** Tramo de reja perimetral: dos travesaños y sus postes. */
+function reja(x0, x1, y) {
+  let postes = "";
+  for (let x = x0; x <= x1; x += 30) postes += `<rect x="${x - 2}" y="${y - 26}" width="4" height="28" fill="#4a4458" stroke="#14111c" stroke-width="1"/>`;
+  return `<g><rect x="${x0}" y="${y - 22}" width="${x1 - x0}" height="3" fill="#3a3548"/>
+    <rect x="${x0}" y="${y - 11}" width="${x1 - x0}" height="3" fill="#3a3548"/>${postes}</g>`;
+}
+
+/** Playa de estacionamiento: asfalto, líneas de las plazas y algún auto. */
+function playa(x, y, w, h, autos) {
+  const paso = w / 6;
+  let lineas = "";
+  for (let k = 1; k < 6; k++) lineas += `<rect x="${x + k * paso - 1}" y="${y + 4}" width="2" height="${h - 8}" fill="#e8e4d8" opacity=".65"/>`;
+  const coches = autos.map(([k, col]) => `<g transform="translate(${x + k * paso + paso / 2},${y + h / 2})">
+    <rect x="-14" y="-10" width="28" height="20" fill="${col}" stroke="#14111c" stroke-width="1"/>
+    <rect x="-10" y="-7" width="20" height="8" fill="#bfe2f5"/>
+    <rect x="-14" y="4" width="28" height="3" fill="#14111c" opacity=".5"/></g>`).join("");
+  return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#3a3548" stroke="#14111c" stroke-width="2"/>${lineas}${coches}</g>`;
+}
+
 /**
- * EL SUELO: el césped de fondo, el rombo del predio y la red de calles con su
- * rotonda. Va en dos partes porque no comparten caja:
+ * La CANCHA AUXILIAR: el rectángulo de entrenamiento chico del fondo del predio.
+ * Ocupa el hueco de arriba a la izquierda, que era el único trozo de pasto grande
+ * sin usar, y dice "esto es un complejo deportivo" mejor que otro estacionamiento
+ * — que además no entraba en ningún lado sin pisar una calle o un cartel.
+ */
+function canchaAux(cx, cy, w, h) {
+  const rombo = (dx, dy) => `${cx},${cy - dy} ${cx + dx},${cy} ${cx},${cy + dy} ${cx - dx},${cy}`;
+  return `<g>
+    <polygon points="${rombo(w / 2, h / 2)}" fill="#1b7035" stroke="#0d3d1e" stroke-width="2"/>
+    <polygon points="${rombo(w / 2 - 12, h / 2 - 7)}" fill="none" stroke="#eaf3ec" stroke-width="2" opacity=".7"/>
+    <line x1="${cx - w / 2 + 12}" y1="${cy}" x2="${cx + w / 2 - 12}" y2="${cy}" stroke="#eaf3ec" stroke-width="2" opacity=".7"/>
+    <ellipse cx="${cx}" cy="${cy}" rx="15" ry="8" fill="none" stroke="#eaf3ec" stroke-width="2" opacity=".7"/>
+    <rect x="${cx - w / 2 + 2}" y="${cy - 9}" width="5" height="18" fill="#f4f4f0" stroke="#14111c" stroke-width="1"/>
+    <rect x="${cx + w / 2 - 7}" y="${cy - 9}" width="5" height="18" fill="#f4f4f0" stroke="#14111c" stroke-width="1"/>
+  </g>`;
+}
+
+/** Rotonda: la calzada anular, su isleta de pasto y el mástil del predio. */
+const rotonda = ({ x, y }) => `<g>
+  <ellipse cx="${x}" cy="${y}" rx="52" ry="30" fill="none" stroke="#0f0d16" stroke-width="34"/>
+  <ellipse cx="${x}" cy="${y}" rx="52" ry="30" fill="none" stroke="#3a3548" stroke-width="24"/>
+  <ellipse cx="${x}" cy="${y}" rx="52" ry="30" fill="none" stroke="#F0D97D" stroke-width="2" stroke-dasharray="10 12" opacity=".40"/>
+  <ellipse cx="${x}" cy="${y}" rx="34" ry="19" fill="#1e7a3a" stroke="#114d25" stroke-width="2"/>
+  <rect x="${x - 4}" y="${y - 26}" width="8" height="24" fill="#8f889f" stroke="#14111c" stroke-width="1"/>
+  <polygon points="${x},${y - 38} ${x + 10},${y - 31} ${x},${y - 24} ${x - 10},${y - 31}" fill="#D4AF37" stroke="#14111c" stroke-width="1"/>
+</g>`;
+
+/** La EXPLANADA de entrada: el pavimento donde el ramal muere contra la puerta. */
+const explanada = p => {
+  const f = frente(p);
+  return `<polygon points="${f.x},${f.y - 26} ${f.x + 58},${f.y} ${f.x},${f.y + 26} ${f.x - 58},${f.y}"
+    fill="#4a4558" stroke="#14111c" stroke-width="2"/>`;
+};
+
+/**
+ * EL SUELO: el césped, el rombo del predio, la red de calles y el mobiliario.
+ * Va en dos partes porque no comparten caja:
  *   · el CÉSPED llena toda la franja (`inset:0`), sea cual sea su alto — el fondo
  *     nunca puede quedar corto;
- *   · las CALLES viven en el plano de 1440×672 anclado ABAJO, el mismo sistema de
- *     coordenadas que las parcelas, para que calle y edificio no se despeguen.
+ *   · el PLANO (calles, rotondas, mobiliario) vive en 1440×PLANO_H anclado ABAJO,
+ *     el mismo sistema de coordenadas que las parcelas.
  * Cuando no hay Oportunidad el día regala 28px arriba: se los queda el césped.
+ *
+ * El orden de pintado ES la profundidad: pavimento → calzada → señalización →
+ * rotondas → mobiliario. Los árboles y las farolas van al final para que asomen
+ * por delante de la calle, como asoman en el mundo.
  */
 export function complexGround() {
-  const capa = (stroke, w, extra = "") =>
-    RUTAS.map(p => `<path d="${p}" ${extra} stroke="${stroke}" stroke-width="${w}"/>`).join("");
+  const capa = (vias, stroke, w, extra = "") =>
+    vias.map(p => `<path d="${p}" ${extra} stroke="${stroke}" stroke-width="${w}"/>`).join("");
+
+  const arboles = [
+    [92, 302], [140, 372], [400, 256], [468, 344], [700, 258], [762, 348], [980, 300], [1022, 372],
+    [70, 556], [360, 552], [660, 562], [1004, 596], [232, 62, 0.85], [408, 44, 0.85], [624, 52, 0.85], [1000, 62, 0.85],
+  ].map(t => arbol(t[0], t[1], t[2])).join("");
+
+  const farolas = [[300, 348], [640, 306], [1000, 348], [268, 600], [612, 590], [962, 628]]
+    .map(f => farola(f[0], f[1])).join("");
+
   return `
     <div class="absolute inset-0" style="background:repeating-linear-gradient(90deg,#0f4423 0 32px,#0d3d1e 32px 64px)"></div>
     <div class="absolute" style="left:-140px;top:-60px;width:1520px;height:820px;background:#114d25;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)">
@@ -234,14 +387,23 @@ export function complexGround() {
     </div>
     <svg viewBox="0 0 1440 ${PLANO_H}" width="1440" height="${PLANO_H}" shape-rendering="crispEdges"
       class="absolute" style="left:0;bottom:0;image-rendering:pixelated">
-      <g fill="none">${capa("#0f0d16", 34)}</g>
-      <g fill="none">${capa("#3a3548", 24)}</g>
-      <g fill="none" opacity="0.45">${capa("#F0D97D", 2, 'stroke-dasharray="12 14"')}</g>
-      <g fill="none">
-        <ellipse cx="560" cy="384" rx="54" ry="30" stroke="#0f0d16" stroke-width="34"/>
-        <ellipse cx="560" cy="384" rx="54" ry="30" stroke="#3a3548" stroke-width="24"/>
-        <ellipse cx="560" cy="384" rx="35" ry="19" fill="#1e7a3a" stroke="#114d25" stroke-width="2"/>
+      ${reja(14, 1038, 40)}
+      ${canchaAux(104, 98, 156, 76)}
+      ${PLOTS.map(explanada).join("")}
+      ${playa(392, 268, 140, 44, [[0, "#EA002A"], [3, "#cfd8e4"]])}
+      <g fill="none">${capa(ACCESOS, "#0f0d16", 26)}</g>
+      <g fill="none">${capa(ACCESOS, "#4a4558", 18)}</g>
+      <g fill="none">${capa(CALZADAS, "#0f0d16", 34)}</g>
+      <g fill="none">${capa(CALZADAS, "#3a3548", 24)}</g>
+      <g fill="none" opacity="0.45">${capa(CALZADAS, "#F0D97D", 2, 'stroke-dasharray="12 14"')}</g>
+      ${rotonda(ROT_O)}${rotonda(ROT_E)}
+      <g transform="translate(${ENTRADA_X},${PLANO_H - 34})">
+        <rect x="-46" y="-16" width="26" height="22" fill="#e2d6c3" stroke="#14111c" stroke-width="2"/>
+        <rect x="-42" y="-12" width="18" height="8" fill="#bfe2f5"/>
+        <rect x="-20" y="-6" width="42" height="5" fill="#EA002A" stroke="#14111c" stroke-width="1"/>
       </g>
+      ${farolas}
+      ${arboles}
     </svg>`;
 }
 

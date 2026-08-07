@@ -12,7 +12,7 @@
 
    Uso: node tests/hub.test.js
    ============================================================ */
-import { PLOTS, PLANO_H, plotHtml, complexGround } from "../js/ui/screens/hub/complex.js";
+import { PLOTS, PLANO_H, ACCESOS, plotHtml, complexGround } from "../js/ui/screens/hub/complex.js";
 import { pxIcon, PX_ICON_NAMES } from "../js/ui/pixicons.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -88,11 +88,30 @@ for (const f of ["js/ui/screens/hub/hud.js", "js/ui/screens/hub/panels.js", "js/
 for (const name of usados) assert(PX_ICON_NAMES.includes(name), "el icono que pide el hub existe", name);
 assert(usados.size >= 12, "se detectaron los iconos del hub", `solo ${usados.size}`);
 
+/* ── La red vial ────────────────────────────────────────────────────────────── */
+
+// LO QUE PIDIÓ EL PO: que las calles conecten los edificios, no que pasen cerca.
+// Cada parcela tiene que tener su ramal, y ese ramal tiene que MORIR en su puerta
+// (el vértice de abajo del rombo). Es un invariante geométrico: si alguien mueve
+// una parcela y el ramal se despega, en una captura no se nota — parece que la
+// calle "casi" llega. Acá sí se nota.
+assert(ACCESOS.length === PLOTS.length, "cada edificio tiene su ramal de acceso", `${ACCESOS.length} de ${PLOTS.length}`);
+
+// Un ramal es siempre `M x yAvenida L x yPuerta`: cuatro números y nada más.
+const tramos = ACCESOS.map(d => d.match(/-?\d+(?:\.\d+)?/g).map(Number));
+for (const p of PLOTS) {
+  const puertaX = p.cx, puertaY = p.cy + p.h / 2;
+  const ramal = tramos.find(([x0, , x1, y1]) => x0 === puertaX && x1 === puertaX && Math.abs(y1 - puertaY) <= 8);
+  assert(ramal, "el ramal muere en la puerta del edificio", p.id);
+  if (ramal) assert(ramal[1] > ramal[3], "el ramal baja de la puerta hacia la avenida", `${p.id}: ${ramal.join(",")}`);
+}
+
 /* ── El suelo ───────────────────────────────────────────────────────────────── */
 
 const suelo = complexGround();
 assert(suelo.includes(`viewBox="0 0 1440 ${PLANO_H}"`), "las calles usan el MISMO sistema de coordenadas que las parcelas");
 assert(/stroke-width="34"/.test(suelo) && /stroke-width="24"/.test(suelo), "cada calle lleva su contorno y su asfalto");
+assert(/stroke-width="18"/.test(suelo), "los ramales de acceso se pintan más finos que la avenida");
 
 console.log(`hub.test: ${n} checks · fallos: ${fails}`);
 if (fails) process.exit(1);
