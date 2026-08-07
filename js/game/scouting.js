@@ -1,6 +1,5 @@
 /* ============================================================
-   game/scouting — el Informe del Rival (Bible §4.6, sprint
-   "Preparación con dientes"): lo que el cuerpo técnico sabe del
+   game/scouting — el Informe del Rival: lo que el cuerpo técnico sabe del
    próximo cruce, para que la Acción del Día se decida mirando
    al rival y no en el vacío.
 
@@ -12,7 +11,7 @@
    - Solo datos que el motor YA tiene: poderes esperados (stats
      sin ruido, opponents.expectedOpponentLineup), resultados
      jugados por el mundo vivo, bajas de run.rivalBans, la figura
-     del rival, su identidad (F2) y —desde el sprint del
+     del rival, su identidad y —desde el sprint del
      Territorio— la ALTURA DE BLOQUE con la que va a jugar: es la
      información que le faltaba a la decisión más nueva del DT,
      que hasta ahora se tomaba a ciegas.
@@ -28,12 +27,11 @@ import { koRoundOf } from "./tournament/knockout.js";
 import { getPhilosophy, FILO_ETAPAS, counterEdge } from "../content/identity/philosophies.js";
 import { baseHeight, heightOf } from "./match/field.js";
 
-// La lectura táctica de cada identidad rival (F2): qué te propone y por dónde
+// La lectura táctica de cada identidad rival: qué te propone y por dónde
 // se le entra — el "España quiere la pelota: presiónala o enciérrate" del roadmap.
 // El CONSEJO de cada línea nombra al cazador de esa identidad en el ciclo (Press >
-// Posesión > Bloque > Contra > Press): lo que el ojeador te dice que hagas es
-// exactamente lo que el motor premia. Antes no cuadraban — la línea de `posesion`
-// recomendaba "enciérrate", que bajo el ciclo nuevo es justo el cruce que se pierde.
+// Posesión > Bloque > Contra > Press): lo que el ojeador te dice que hagas tiene que ser
+// exactamente lo que el motor premia. Al editar una línea, verificarlo contra el ciclo.
 const FILO_SCOUT = {
   posesion: "Quiere la pelota y te va a hacer correr detrás de ella: la única forma de quitársela es ir a buscarla arriba — encerrarse solo les da la tarde entera para pensar.",
   press: "Te va a asfixiar la salida desde el minuto uno: salir jugando contra ellos es jugar con fuego, pero si aguantas el primer salto la espalda que dejan es enorme.",
@@ -41,10 +39,9 @@ const FILO_SCOUT = {
   bloque: "Se encierra y revienta la pelota: derribar la muralla exige paciencia y mover el balón hasta que se parta, y ojo con sus balones parados, que son su gol de vestuario.",
 };
 
-/* CÓMO SE VA A PARAR (sprint del Territorio): la altura de bloque que va a jugar el rival y,
-   sobre todo, QUÉ CAMINO DEJA ABIERTO. Es la información que le faltaba a la decisión más
-   nueva del DT —su propia altura—, que se toma en la pizarra y antes se tomaba a ciegas.
-   Dicho como lo diría un ojeador: dónde te esperan y por dónde se les entra. */
+/* CÓMO SE VA A PARAR: la altura de bloque del rival y, sobre todo, QUÉ CAMINO DEJA
+   ABIERTO. Es lo que le da información a la decisión de altura propia, que el DT toma en
+   la pizarra. Dicho como lo diría un ojeador: dónde te esperan y por dónde se les entra. */
 const BLOQUE_SCOUT = {
   1: "Se meten todos en su área y no te van a dejar un metro a la espalda: hay que tener paciencia, mover la pelota de lado a lado y confiar en el balón parado.",
   2: "Bloque replegado que espera tu error para salir de contra: cuidado con perderla adelantado, porque cada regalo vuelve convertido en carrera.",
@@ -53,7 +50,7 @@ const BLOQUE_SCOUT = {
   5: "Juegan con los centrales cerca del círculo central: te van a asfixiar la salida desde el minuto uno… y toda su espalda queda descubierta para el que se anime a atacarla.",
 };
 
-/* EL MODO MUNDIAL, EN PALABRAS (sprint de la Escalada, decisión PO 31-jul-2026).
+/* EL MODO MUNDIAL, EN PALABRAS.
 
    El informe decía "🔥 Modo Mundial: llega un +18% encendido". Era el ÚNICO porcentaje
    del módulo y contradecía su propia regla declarada acá arriba ("CUALITATIVO, nunca
@@ -82,13 +79,11 @@ const BRECHA_SCOUT = {
   behind: "Encima llegan con más idea que nosotros: a la final no se llega improvisando — consolidar nuestra identidad es la vacuna.",
 };
 
-/* EL CRUCE, ANTICIPADO (sprint del Rival que Decide, gate del PO: *"que el informe lo
-   anticipe SIEMPRE: si no lo veo venir es un impuesto, no una decisión"*).
+/* EL CRUCE, ANTICIPADO.
 
    Es el dato más accionable del informe, porque es el único que el DT puede CAMBIAR con
    un día: declarar el Plan de Partido que caza a esa idea. Y se puede decir sin mentir
-   porque la identidad del rival es su ESENCIA y no una elección de último momento
-   (decisión PO: el rival reacciona durante el partido, no contra-elige antes).
+   porque la identidad del rival es su ESENCIA y no una elección de último momento.
 
    Cualitativo como todo el módulo: ni el multiplicador ni los puntos porcentuales. Lo
    que se nombra es de quién va a ser la pelota, que es exactamente donde muerde el ciclo
@@ -175,10 +170,10 @@ export function buildOpponentReport(run, oppId) {
   const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0).map(shadow);
   const myP = teamPowers(bestSix(available), "normal", {});
 
-  // La identidad del rival (F2): curada para los 16, derivada para el resto. El nivel
+  // La identidad del rival: curada para los 16, derivada para el resto. El nivel
   // sale de su jerarquía (los grandes llegan Consolidados) — el informe la NOMBRA
   // porque es accionable: la matriz de counters premia elegir bien contra qué juegas.
-  // R2: el nivel que muestra es el MADURADO por la ronda (el que vas a enfrentar), y
+  // el nivel que muestra es el MADURADO por la ronda (el que vas a enfrentar), y
   // `modoMundial` narra la escalada (forma de torneo) cuando hay eliminatoria.
   const koRound = koRoundOf(run.stage);
   const rf = rivalFilo(opp, koRound);
@@ -206,7 +201,7 @@ export function buildOpponentReport(run, oppId) {
       ...MODO_MUNDIAL[koRound],
       madura: rivalFiloLevel(opp, koRound) > rivalFiloLevel(opp),
       // La identidad, en los dos sentidos: si su idea supera a la mía se nombra el
-      // castigo (R3, accionable: consolidar ANTES de KO es la vacuna); si la mía lo
+      // castigo; si la mía lo
       // supera, se nombra la vara alta (al favorito le juegan la final). El informe
       // tiene que nombrar el multiplicador COMPLETO que va a llevar el rival — callar
       // una de las dos mitades sería mentirle al DT sobre el partido que le espera.

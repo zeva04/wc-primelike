@@ -59,7 +59,7 @@ export const BUILDERS = {
       { label: "🎯 Circular por dentro", hint: "Llega siempre… pero el rival se corre a tiempo y el centro sale contra la defensa acomodada", key: "dentro" },
     ],
   }),
-  // ═══ LAS DOS JUGADAS DEL TERRITORIO (T4) ═══
+  // ═══ LAS DOS JUGADAS DEL TERRITORIO ═══
   // La salida desde el área propia: la primera decisión del partido que solo existe
   // porque el motor sabe DÓNDE está la pelota. Tres fútbols distintos para el mismo
   // problema — y el del medio ni siquiera sigue siendo esta jugada.
@@ -72,7 +72,7 @@ export const BUILDERS = {
     ],
   }),
   press: (m, s) => ({
-    // El 2º acto de la Cacería total (M2) es la TRAMPA sobre el reseteo rival — mismo
+    // El 2º acto de la Cacería total es la TRAMPA sobre el reseteo rival — mismo
     // gesto (Football Action de presión), otro momento del fútbol.
     title: s.type.id === "caceria" && s.actIdx === 1
       ? `🦁 min ${m.clock()}' — ¡El rival intenta resetear y la trampa se cierra! ${s.prot.name} otra vez encima`
@@ -111,10 +111,10 @@ export function resolveBuild(m, s, key, f) {
   if (key === "filtrado") {
     const r = A.actPass(m, s.prot, { hard: true });
     if (!r.ok) {
-      // T1 — Buscar al Hombre Libre: el filtrado interceptado puede RECICLARSE (una
+      // Buscar al Hombre Libre: el filtrado interceptado puede RECICLARSE (una
       // vez por secuencia): la posesión no muere — aparece el desmarcado, la pelota
       // cambia de pies y el MISMO momento se juega de nuevo (el bonus se perdió).
-      // T3 — Juego Posicional lo vuelve ESTRUCTURA: más seguido y hasta dos veces.
+      // Juego Posicional lo vuelve ESTRUCTURA: más seguido y hasta dos veces.
       const up = hookOf(m, "recycleUpgrade");
       const h = up || hookOf(m, "recycleBuild");
       if (h && (s.recycles || 0) < (up?.max ?? 1) && rnd() < h.p) {
@@ -128,8 +128,8 @@ export function resolveBuild(m, s, key, f) {
     }
     s.bonus += 0.07;
   }
-  s.buildOks = (s.buildOks || 0) + 1; // la sinfonía (M2) cuenta la desesperación rival
-  // T3 — La Invitación: contra el rival que ESPERA (contra/bloque), la circulación
+  s.buildOks = (s.buildOks || 0) + 1; // la sinfonía cuenta la desesperación rival
+  // La Invitación: contra el rival que ESPERA (contra/bloque), la circulación
   // es un cebo — el compás acertado puede convertir en transición cuando el rival
   // da un paso al frente. La respuesta comprable al partido muerto.
   const bait = hookOf(m, "baitConvert");
@@ -151,7 +151,7 @@ export function resolveBuild(m, s, key, f) {
 }
 
 
-// ═══ SALIDA DESDE EL ÁREA (T4) ═══
+// ═══ SALIDA DESDE EL ÁREA ═══
 export function resolveBuildout(m, s, key, f) {
   if (key === "seguro") {
     // Cederla no es gratis ni es un desastre: el equipo respira y sale del embudo.
@@ -240,11 +240,11 @@ export function resolveCarry(m, s, key, f) {
     if (tiredBonus && rnd() < 0.3) traitMoment(m, legs.traitId, [legs.texto]);
     if (r.foul && sk && foulPlus && rnd() < 0.4) traitMoment(m, sk.traitId, [sk.texto]);
     if (r.foul) {
-      // GEOGRAFÍA de la falta en el Contragolpe letal (M2): en el primer tramo (lejos
+      // GEOGRAFÍA de la falta en el Contragolpe letal: en el primer tramo (lejos
       // del área) es la falta desesperada — amarilla + tiro libre encadenado; en el
       // segundo (zona letal) es PENAL, como la conducción de siempre.
       if (s.type.advFor === "contra" && s.actIdx === 0) return advFoulSetPiece(m, f.foulText, s.type.adv.freekickBonus);
-      // LA GEOGRAFÍA GENERAL (T4): la falta se cobra DONDE LO BAJARON, y bajarlo es
+      // LA GEOGRAFÍA GENERAL: la falta se cobra DONDE LO BAJARON, y bajarlo es
       // justamente impedir que avance — así que la pelota NO progresa antes de juzgar
       // (medido: adelantarla primero metía media conducción de más dentro del área y
       // los penales SUBÍAN, que es lo contrario de lo que este arreglo busca). Dentro
@@ -254,8 +254,8 @@ export function resolveCarry(m, s, key, f) {
       return foulGeography(m, s.prot);
     }
     if (!r.ok) {
-      // 2º tramo del letal (M2): el rival YA está partido, replegando a la desesperada.
-      // Un % de los "fallos" son en realidad FALTA DESESPERADA (decisión PO): ROJA por
+      // 2º tramo del letal: el rival YA está partido, replegando a la desesperada.
+      // Un % de los "fallos" son en realidad FALTA DESESPERADA: ROJA por
       // último hombre + tiro libre al borde (despRed), o amarilla + PENAL (el resto) —
       // devuelve el EV del penal que la geografía le quitó al 1º tramo. Y perderla ahí
       // limpio no abre contra-contra (nadie quedó parado para lanzarla): muere y punto.
@@ -289,7 +289,7 @@ export function resolveCarry(m, s, key, f) {
     m.log("plain", `min ${m.clock()}' — ${f.carryOk(s.prot)}`);
     dtOk(m);
   } else {
-    // Pase al pie: seguro, siempre progresa. En el Contragolpe letal (M2) TAMBIÉN gana
+    // Pase al pie: seguro, siempre progresa. En el Contragolpe letal TAMBIÉN gana
     // metros de verdad (adv.passBonus): con el rival partido, el pase al pie es progreso.
     s.bonus += (s.type.advFor === "contra" ? s.type.adv.passBonus[Math.min(s.actIdx, 1)] : 0.02) + tiredBonus;
     if (tiredBonus && rnd() < 0.3) traitMoment(m, legs.traitId, [legs.texto]);
@@ -323,7 +323,7 @@ export function resolvePress(m, s, key, f) {
   // El +0.10 es MI iniciativa: presionar una salida roba más que contener a un rival lanzado.
   const { mine } = m.powers();
   const total = key === "total";
-  const caza = s.type.id === "caceria"; // la avanzada del Press (M2)
+  const caza = s.type.id === "caceria"; // la avanzada del Press
   const r = A.actContain(m, mine, { press: total, bonus: 0.10 });
   if (!r.ok) {
     // Cacería total: el rival que la rompe, un % de las veces la rompe CON FALTA —
@@ -338,7 +338,7 @@ export function resolvePress(m, s, key, f) {
   s.bonus += (total ? 0.15 : 0.05) + (caza && s.actIdx === 1 ? s.type.adv.trapBonus + (hasTrait(m, "gegenpressing") ? s.type.adv.deepBonus : 0) : 0);
   m.log("event", `min ${m.clock()}' — ${caza && s.actIdx === 1 ? f.press2Ok : f.pressOk}`);
   if (total) dtOk(m);
-  // T1 — Trampa en la Banda: el robo de la recuperación puede CONVERTIRSE en ataque
+  // Trampa en la Banda: el robo de la recuperación puede CONVERTIRSE en ataque
   // inmediato (transición con el bonus a cuestas) en vez de escalar a su desenlace.
   // Por FAMILIA pero SOLO en el primer acto (gate T1): el robo en banda de la
   // cacería también convierte, pero jamás aborta su trampa final en zona letal.

@@ -1,7 +1,6 @@
 /* ============================================================
    storage/history — persistencia del historial de runs en
-   localStorage. Único módulo que toca localStorage
-   (ARQUITECTURA §4: prohibido fuera de storage/).
+   localStorage. Único módulo que toca localStorage.
    ============================================================ */
 
 /** Lee el historial de runs guardadas (array; vacío si no hay o está corrupto). */

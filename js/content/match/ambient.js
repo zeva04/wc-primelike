@@ -34,7 +34,7 @@ export const AMBIENT_LINES = [
   // --- moral (los extremos se notan hasta en el trote) ---
   { when: c => c.band === "nubes", w: 2, text: () => "Se nota la confianza: la pelota corre sola." },
   { when: c => c.band === "suelo", w: 2, text: () => "Hay nervios en tu equipo: los pases no llegan al pie." },
-  // --- filosofía (F3): el ambiente lee la identidad — ctx.filo/filoLvl vía matchCtx ---
+  // --- filosofía: el ambiente lee la identidad — ctx.filo/filoLvl vía matchCtx ---
   { when: c => c.filo === "press", w: 2, text: () => "Tu equipo achica en bloque: el rival no puede armar dos pases seguidos." },
   { when: c => c.filo === "press" && c.tired, w: 3, text: () => "La presión pide piernas que ya no están: el bloque achica cada vez más abajo." },
   { when: c => c.filo === "posesion", w: 2, text: () => "La pelota es tuya y el rival lo sabe: corre detrás de tu sombra." },

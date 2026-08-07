@@ -2,15 +2,14 @@
    game/match/sequence-acts — los ACTOS de las Key Sequences:
    constructores de decisión, resolución, escalada y el fallo que
    encadena (rebote / contra / mano a mano). Extraído de
-   sequences.js en A2 por presupuesto de líneas (ARQUITECTURA §6:
-   el archivo pasó de 300 con el catálogo completo) — mudanza
+   sequences.js en A2 por presupuesto de líneas — mudanza
    pura, cero cambios de lógica.
 
    La GENERACIÓN (qué secuencia sale y cuándo) vive en
    sequences.js; acá vive CÓMO se juega una vez que arrancó.
    Contrato §3.2: la decisión `sequence` se crea acá
    (buildActDecision) y se resuelve acá (resolveSequenceAct).
-   ── LA CARPETA `acts/` (30-jul-2026) ───────────────────────────
+   ── LA CARPETA `acts/` ───────────────────────────
    Este archivo llegó a 1.283 líneas (presupuesto §6: 500) y se
    partió por FAMILIAS DE ACTO, sin tocar una sola regla:
      acts/build.js     construir: circular, salir del área, cambiar

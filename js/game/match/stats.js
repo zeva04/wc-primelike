@@ -1,10 +1,10 @@
 /* ============================================================
    game/match/stats — LAS ESTADÍSTICAS DE TRANSMISIÓN
-   (pedido del PO 28-jul-2026: el panel del partido pasó de las
+   (pedido del PO el panel del partido pasó de las
    alineaciones a Posesión · Tiros · % Pases · Córners).
 
    Dos de las cuatro ya vivían en el motor y NO se tocan:
-     · Posesión → `Match.flow()` la deriva de lo GENERADO (A3, #11)
+     · Posesión → `Match.flow` la deriva de lo GENERADO
      · Tiros    → `m.stats.misTiros/oppTiros` (punto único en
                   actions.actShot/actOppShot + chances)
 
@@ -17,7 +17,7 @@
    nace de una jugada real (el balón parado en contra, el córner
    que gana la Fortaleza).
 
-   POR QUÉ EL VOLUMEN SIMULADO ES DETERMINISTA: no consume `rnd()`.
+   POR QUÉ EL VOLUMEN SIMULADO ES DETERMINISTA: no consume `rnd`.
    El % de pase de un equipo es genuinamente estable partido a
    partido (lo que varía es de quién es la pelota, y eso ya lo
    modula la posesión), y así el panel no le mueve NI UN dial al

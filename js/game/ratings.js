@@ -8,19 +8,19 @@ import { momentoMult } from "./momentum.js";
 export const STAT_KEYS = ["tiro", "defensa", "cabezazo", "pase_corto", "pase_largo", "velocidad", "aura"];        // jugadores de campo
 export const GK_STAT_KEYS = ["atajadas", "reflejos", "salidas", "pase_corto", "pase_largo", "velocidad", "aura"]; // arqueros
 
-/* ARQUERO DE EMERGENCIA (bug fix, 2-ago-2026): el equipo NUNCA puede jugar sin nadie en el
+/* ARQUERO DE EMERGENCIA (bug fix,): el equipo NUNCA puede jugar sin nadie en el
    arco. Si los dos POR del plantel quedan fuera a la vez (lesión + expulsión + suspensión
    acumulada — raro pero posible en 7 partidos de torneo), un jugador de campo tiene que
    ponerse los guantes — y un jugador de campo no tiene `atajadas`/`reflejos`/`salidas` en
    sus datos (son "otro juego", decisión de F2 en lineup.canPlayAt).
-   La línea es FIJA e IGUAL para cualquiera (decisión PO): no importa quién vaya al arco,
+   La línea es FIJA e IGUAL para cualquiera: no importa quién vaya al arco,
    ninguno es arquero entrenado. Muy por debajo del peor arquero real del juego (medido:
    el piso real es 61/63/57 — Márcio Rosa, CPV) para que la emergencia se sienta como
    emergencia y no como una alternativa viable. */
 export const EMERGENCY_GK_STATS = { atajadas: 25, reflejos: 28, salidas: 22 };
 
 /* NO HAY "un número de pase". La costura de la Odisea (`PASE_MIX`, 60/40) murió el
-   29-jul-2026: cada sitio del motor declara CUÁL de los dos pases mide y por qué —
+ cada sitio del motor declara CUÁL de los dos pases mide y por qué —
    circulación y precisión del panel son `pase_corto`; el filtrado, el centro alto y el
    pelotazo son `pase_largo`. Si aparece un caso nuevo, elige uno; no vuelvas a mezclar. */
 
@@ -28,7 +28,7 @@ export const EMERGENCY_GK_STATS = { atajadas: 25, reflejos: 28, salidas: 22 };
 // La línea del fútbol: de atrás hacia adelante. La distancia entre dos posiciones
 // son los pasos que las separan aquí (DEF→MED = 1, DEF→DEL = 2).
 const POS_LINE = ["POR", "DEF", "MED", "DEL"];
-// Castigo por paso de distancia, en escala 1-99 (decisión del PO 15-jul: "suave").
+// Castigo por paso de distancia, en escala 1-99.
 export const OUT_OF_POS_STEP = 6;
 
 /**
@@ -96,7 +96,7 @@ export function statPenalties(p) {
 
 // Nota 1-99 ponderada por posición: a un DEL le pesa el tiro, a un POR las atajadas.
 // (Un promedio plano haría que Haaland con defensa 40 pareciera mediocre.)
-// LOS PESOS DE LA ODISEA (sprint 1, decisiones PO 29-jul-2026): el `pase` se partió en
+// LOS PESOS DE LA ODISEA: el `pase` se partió en
 // corto y largo, entró la `velocidad` como dimensión de primer orden (DEL 22% · MED 18% ·
 // DEF 12% · POR 5%) y el AURA bajó a un 10% PAREJO en los cuatro puestos. Los datos de
 // data/teams.js se recalcularon para que la media de cada jugador NO cambiara con estos
@@ -127,7 +127,7 @@ export function playerOverall(p) { return overallAt(p, playedPos(p)); }
 /**
  * La FIGURA de un equipo: el jugador de mayor media (`playerOverall`), **incluido el arquero**
  * (Cabo Verde, p. ej., tiene su mejor media en el arco — antes el menú excluía a los POR y
- * mostraba a otro). Desempate por **mayor aura** (decisión PO 21-jul-2026): a igual media,
+ * mostraba a otro). Desempate por **mayor aura**: a igual media,
  * manda la personalidad. Devuelve la referencia al jugador; `team.players` debe existir.
  */
 export function teamFigure(team) {
@@ -139,7 +139,7 @@ export function teamFigure(team) {
 /**
  * Nota del jugador EN SU PUESTO, ignorando dónde lo hayan parado hoy Y su momento: es su
  * talento, no su circunstancia (el Momento es circunstancia, así que tampoco entra — y de
- * paso el once automático no persigue al que está en racha: recorte de balance 17-jul).
+ * paso el once automático no persigue al que está en racha: recorte de balance).
  * Ordena el plantel (`autoLineup`) y sirve de referencia en la ficha.
  * Sin esto, el once automático manda al banco al crack que venías usando fuera de puesto:
  * lo compara castigado contra suplentes intactos.

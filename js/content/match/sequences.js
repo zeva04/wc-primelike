@@ -59,7 +59,7 @@ export const SEQUENCE_TYPES = [
     },
   },
   {
-    // LA JUGADA NUEVA DE LA ODISEA (2ª mitad, decisión PO 29-jul-2026): el fútbol por
+    // LA JUGADA NUEVA DE LA ODISEA (2ª mitad): el fútbol por
     // afuera, que el motor no tenía. Tres actos con decisión propia — correr la banda,
     // llegar (o no) a la línea de fondo, y el centro — y por fin una jugada cuya primera
     // pregunta es "¿tenés piernas?" en vez de "¿tenés pase?". Enseña Contragolpe: desbordar
@@ -112,7 +112,7 @@ export const SEQUENCE_TYPES = [
   },
   {
     id: "balon_parado", side: "mine", icon: "🎯", name: "Balón parado a favor",
-    // SIN carril forzado (sprint del Eje Horizontal): el balón parado nace DONDE quedó la
+    // SIN carril forzado: el balón parado nace DONDE quedó la
     // pelota, y eso decide qué jugada es — desde la banda es un CÓRNER (centro o corto);
     // por el centro es un TIRO LIBRE FRONTAL, y ahí aparece el disparo directo al arco.
     zone: { from: [4, 5] },
@@ -163,7 +163,7 @@ export const SEQUENCE_TYPES = [
       containFail: opp => `${opp.name} progresa y encara el área.`,
     },
   },
-  /* ---------- Las 2 jugadas del TERRITORIO (T4, decisión PO 30-jul-2026) ----------
+  /* ---------- Las 2 jugadas del TERRITORIO ----------
      No son tipos más: son los dos fútbols que ANTES NO PODÍAN EXISTIR porque el motor
      no sabía dónde estaba la pelota. Uno solo aparece con el balón en el área propia
      (¿la sacamos jugando o la reventamos?) y el otro solo tiene sentido contra un
@@ -190,7 +190,7 @@ export const SEQUENCE_TYPES = [
     },
   },
   {
-    // LA JUGADA DEL EJE HORIZONTAL (decisión PO 30-jul-2026): el ancho como arma. Nace con
+    // LA JUGADA DEL EJE HORIZONTAL: el ancho como arma. Nace con
     // la pelota atascada en una banda y busca el otro carril, donde la defensa ya no está.
     // Solo la juega de verdad un equipo con AMPLITUD (una línea de tres): sin alguien
     // esperando del otro lado, cambiar de frente es regalar la pelota.
@@ -231,9 +231,9 @@ export const SEQUENCE_TYPES = [
       finishStat: "tiro", finishBonus: 0.10,
     },
   },
-  /* ---------- Las 4 SECUENCIAS AVANZADAS (arco del Meta M2, diseños PO 22-jul) ----------
+  /* ---------- Las 4 SECUENCIAS AVANZADAS ----------
      El fútbol superior de cada filosofía: entran al pool desde EN DESARROLLO (nivel 1)
-     y Consolidada las PROFUNDIZA (el rasgo de F2 se FUSIONÓ acá — decisión PO M2: la
+     y Consolidada las PROFUNDIZA (el rasgo de F2 se FUSIONÓ acá M2: la
      avanzada ES el rasgo cumplido jugando). `advFor` es la filosofía dueña: la máquina
      las gatea por `filo.nivel` (applyFiloWeights) y cuentan como ejecución de la firma
      (noteFiloHit). Los números finos del castigo/desenlace viven en `adv` — datos, no
@@ -294,7 +294,7 @@ export const SEQUENCE_TYPES = [
     // carryBonus por tramo: con el rival partido, cada conducción ganada vale MÁS que la
     // de la transición simple (+0.05) — el doble riesgo de conducir dos veces debe pagar.
     // freekickBonus: la falta desesperada del 1º tramo te corta lejos — tiro libre
-    // peligroso pero no letal. En el 2º TRAMO la desesperación escala (decisión PO M2):
+    // peligroso pero no letal. En el 2º TRAMO la desesperación escala:
     // despFoul = % de los fallos del conducir que son FALTA del rival desesperado;
     // despRed = de esas, cuántas son ROJA por último hombre (+ tiro libre al borde,
     // despFreekickBonus); el resto es amarilla + PENAL. Devuelve el EV del penal que la

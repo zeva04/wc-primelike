@@ -2,14 +2,13 @@
    ui/filo-change — el modal de CAMBIO DE IDENTIDAD, compartido.
 
    Vivía dentro de hub.js; se extrajo cuando la pantalla de
-   Identidad pasó a ofrecer el cambio también (sprint de UI de
-   Identidad): la regla se muestra en un solo lugar y no hay dos
+   Identidad pasó a ofrecer el cambio también: la regla se muestra en un solo lugar y no hay dos
    copias del texto del costo que puedan divergir.
 
    La REGLA no vive acá: `changePhilosophy` (game/philosophy)
    exige `run.actionPending` y lo consume — desde donde se llame,
    el cambio siempre cuesta la Acción del Día. Este módulo solo
-   pinta la elección informada (F1, decisión PO #1): la demolición
+   pinta la elección informada: la demolición
    es ORGÁNICA, así que cada card muestra cuánto de lo entrenado
    le sirve a la identidad nueva (el costo hundido, a la vista
    antes de firmar).

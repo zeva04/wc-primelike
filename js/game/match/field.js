@@ -1,12 +1,12 @@
 /* ============================================================
-   game/match/field — EL TERRITORIO (sprint del Territorio, T1).
+   game/match/field — EL TERRITORIO.
 
    El partido pasa a saber DÓNDE se juega. Hasta acá el motor
    sabía qué jugada salía y qué tan buena quedaba (el canal
    `bonus`), pero no existía el concepto de posición: un penal y
    una circulación nacían del mismo sitio, que era ninguno.
 
-   ── EL MARCO (decisión PO) ─────────────────────────────────────
+   ── EL MARCO ─────────────────────────────────────
    ABSOLUTO y anclado a MI arco. Siempre, sin importar de quién
    sea la pelota:
        v1 = mi área · v2 = mi salida · v3 = mediocampo
@@ -19,7 +19,7 @@
 
    ── LA LEY DEL AZAR (la misma de stats.js y match-momentum.js) ──
    La DERIVA AMBIENTE —los ~90 minutos en los que no hay una Key
-   Sequence— NO consume `rnd()`. Ni una tirada. Con 5-9 secuencias
+   Sequence— NO consume `rnd`. Ni una tirada. Con 5-9 secuencias
    por partido, un mapa de calor alimentado solo por jugadas
    tendría 5 muestras; el relleno sale DETERMINISTA de la posesión
    ya derivada del juego (`Match.flow`), los poderes y las dos
@@ -118,7 +118,7 @@ export const ballZone = m => (m.field ? { h: m.field.h, v: m.field.v, side: m.fi
  *  no en el estado del simulador — por eso se lee EN VIVO en cada consulta. */
 export const myHeight = m => clamp(m.my?.altura ?? HEIGHT_DEFAULT, 1, 5);
 
-/* EL RIVAL QUE REACCIONA (sprint del Rival que Decide, decisión PO 1-ago-2026).
+/* EL RIVAL QUE REACCIONA.
 
    El PO fijó el alcance: *"el rival mantiene su formación de esencia y su filosofía de
    esencia; puede cambiar durante un partido si el partido se le empieza a escapar, pero
@@ -136,8 +136,8 @@ export const myHeight = m => clamp(m.my?.altura ?? HEIGHT_DEFAULT, 1, 5);
    es salir a buscar la pelota; (2) es lo único VISIBLE — el informe anuncia la altura de
    esencia antes del partido, así que cuando el bloque se mueve el DT lo reconoce.
 
-   Lo que había antes era un escalón de ±1 desde el minuto 70 mirando solo el marcador.
-   Un equipo no espera al minuto 70 para darse cuenta de que se le está escapando. */
+   Es gradual y mira más que el marcador a propósito: un equipo no espera al minuto 70
+   para darse cuenta de que se le está escapando. */
 const REACCION_DOMINIO = 20;   // tendencia de match-momentum que ya es "me están comiendo"
                                // (el asistente técnico usa 22 para decir lo mismo)
 
@@ -147,8 +147,7 @@ const REACCION_DOMINIO = 20;   // tendencia de match-momentum que ya es "me est�
  */
 export function oppReaction(m) {
   // Las ROJAS mandan sobre todo lo demás y son inmediatas: con uno menos te metés atrás
-  // aunque vayas perdiendo, y con uno más salís a buscarlo aunque vayas ganando. Hasta
-  // hoy una roja solo restaba poder — el rival no se reordenaba nunca.
+  // aunque vayas perdiendo, y con uno más salís a buscarlo aunque vayas ganando.
   const rojas = m.my.lineup.filter(p => p.expulsado).length - m.oppLineup.filter(p => p.expulsado).length;
   if (rojas !== 0) return clamp(rojas, -1, 1);
   // El marcador pesa cada vez más con el reloj: a los 20' un 0-1 se remonta caminando,
@@ -273,7 +272,7 @@ export function startHalfField(m, nominal) {
   f._pos = 0.5;
 }
 
-/* ── LA AMPLITUD: quién ocupa los carriles (sprint del Eje Horizontal) ────────
+/* ── LA AMPLITUD: quién ocupa los carriles ────────
    Una línea de TRES ocupa los tres carriles. Una de UNO, solo el centro. Es la
    lectura que le faltaba al dibujo: un 3-1-1 no es "defensivo" a secas — es un
    equipo que cubre las dos bandas atrás y que arriba no tiene a NADIE por afuera;
@@ -328,7 +327,7 @@ export function widthHint(def, med, del) {
   return { atk: a, def: d, txt: partes.join(" · ") };
 }
 
-/* ── LA GEOGRAFÍA DE LAS JUGADAS (T4) ─────────────────────────────────────────
+/* ── LA GEOGRAFÍA DE LAS JUGADAS ─────────────────────────────────────────
    Cada tipo de Key Sequence declara DESDE QUÉ ALTURAS puede nacer (`zone.from` en
    content/sequences). Un penal casi solo puede originarse en el área rival; una
    circulación larga no arranca dentro de esa misma área; una recuperación alta
@@ -379,7 +378,7 @@ export function originOf(m, type) {
 }
 
 /* Cuánto AVANZA la pelota cada gesto, en alturas. El fútbol del sprint, en una tabla
-   (decisión PO: "cada acto ahora deberá modificar la ubicación del balón"). Los
+. Los
    resolvers de sequence-acts la leen; nadie más tiene permitido inventar números. */
 export const ADVANCE = {
   paseSeguro: 1,      // la circulación progresa un tramo
@@ -404,7 +403,7 @@ export const inOppBox = m => (m.field?.v ?? 3) >= BOX_OPP;
 /* ── LA ALTURA COMO PALANCA DEL DT ─────────────────────────────────────────────
    Mover el bloque antes del partido y en el entretiempo es GRATIS: ahí el equipo
    está parado y el DT habla. Moverlo CON EL PARTIDO EN JUEGO cuesta una VENTANA
-   TÁCTICA (decisión PO): reorganizar veinte metros de líneas en caliente es una
+   TÁCTICA: reorganizar veinte metros de líneas en caliente es una
    orden real, no un dial que se toquetea. Las ventanas son un recurso NUEVO y
    propio — no gastan los 3 cambios, y la mentalidad (que es actitud, no
    estructura) sigue siendo gratis e ilimitada.

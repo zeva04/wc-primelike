@@ -14,7 +14,7 @@ import { heatCells, heatHalves } from "../../game/match/field.js";
 import { renderGroupTableCard } from "./worldcup.js";
 import { stopTimer } from "./match/index.js";
 
-// Guardas de UN SOLO DISPARO para el cierre del partido (bug del PO, 21-jul-2026: "los días
+// Guardas de UN SOLO DISPARO para el cierre del partido (bug del PO, "los días
 // posteriores al juego a veces tenían doble evento"). Tanto `finishMatch` como `routeAdvance`
 // son alcanzables por más de un camino —el reloj del partido, el fin de la tanda, el botón
 // Continuar, el modal de clasificados— y un doble disparo avanzaba DOS días de una: se
@@ -42,7 +42,7 @@ function finishMatch() {
  * Momento de cada jugador que se movió — su nivel antes → después (cualitativo) y las
  * razones que lo explican (`reasons`, las narra el motor).
  *
- * ANTI-SPAM (Sprint 4, decisión PO 21-jul-2026): se listan en detalle solo los MOVIMIENTOS
+ * ANTI-SPAM: se listan en detalle solo los MOVIMIENTOS
  * REALES — los que cambiaron por una acción del partido (gol, asistencia, corte, penal,
  * lesión). Los enfriamientos por no sumar minutos se colapsan en UNA línea desplegable:
  * antes ocupaban una fila por jugador y enterraban lo que de verdad importaba.
@@ -52,7 +52,7 @@ function finishMatch() {
 const esDecaimiento = m => m.reasons.length > 0 && m.reasons.every(r => r.text.startsWith("No sumó minutos"));
 
 /**
- * El bloque de IDENTIDAD del análisis (F3): la progresión por ejecución que reportó el
+ * El bloque de IDENTIDAD del análisis: la progresión por ejecución que reportó el
  * cierre (jugar tu fútbol y que salga te consolida — Bible §5) y el costo físico del
  * Press si lo hubo. Nada que reportar → "" (sin ruido: el bloque solo habla si pasó algo).
  */
@@ -145,7 +145,7 @@ function friosBlock(frios) {
 }
 
 /**
- * DÓNDE SE JUGÓ EL PARTIDO (sprint del Territorio): los mapas de calor del encuentro,
+ * DÓNDE SE JUGÓ EL PARTIDO: los mapas de calor del encuentro,
  * uno por tiempo — el motor los guarda separados porque cada tiempo tiene el suyo, y
  * puestos lado a lado cuentan la historia táctica del partido (el equipo que empujó en
  * el primero y se replegó en el segundo se VE, sin un solo número).

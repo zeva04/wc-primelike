@@ -52,7 +52,7 @@ export function paintStats(match) {
 
 
 /**
- * LA XP DE IDENTIDAD EN VIVO (arco de Progresión, "skill-up a la Skyrim"): una fila por
+ * LA XP DE IDENTIDAD EN VIVO: una fila por
  * filosofía que este partido ejercitó, con lo ganado y la barra hacia su próximo nivel.
  * Los números salen del Match (`filoXp`, ya multiplicados) y de la foto que trajo el
  * matchCtx (`filo.xp`): la pantalla no calcula reglas, solo suma foto + partido.

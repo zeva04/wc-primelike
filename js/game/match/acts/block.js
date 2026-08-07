@@ -31,7 +31,7 @@ export function noteOppDead(m) {
   if (fr && frustMalus(m) <= -0.05 && rnd() < 0.25) traitMoment(m, fr.traitId, [fr.texto]);
 }
 
-/* ---------- LO QUE EL BLOQUE LE HACE AL REMATE RIVAL (rediseño 30-jul-2026) ----------
+/* ---------- LO QUE EL BLOQUE LE HACE AL REMATE RIVAL ----------
    Cuatro nodos del árbol nuevo empeoran la SITUACIÓN del remate rival (jamás mejoran a
    mis jugadores: la ley del arco). Se suman por el mismo canal —el bonus de actOppShot—
    y se piden juntos en los tres sitios donde el rival remata contra mi bloque: el

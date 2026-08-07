@@ -29,20 +29,19 @@ export function wingChaser(m) {
 
 /**
  * ¿Se puede congelar? Fríos es un rasgo de ESTADO: pide el tramo final (desde el 70')
- * y NO ir perdiendo — con ventaja o empate (decisión PO: el empate también sirve, y
- * en fase de grupos a veces es justo lo que hace falta).
+ * y NO ir perdiendo — con ventaja o empate.
  */
 export const FREEZE_FROM_MIN = 70;
 export const canFreeze = m => !!hookOf(m, "iceGame") && m.min >= FREEZE_FROM_MIN && m.gMy >= m.gOpp;
 
-// Feedback del DT (PO 22-jul): solo las decisiones con RIESGO real generan comentario —
+// Feedback del DT (PO): solo las decisiones con RIESGO real generan comentario —
 // el relato celebra el acierto de la arriesgada y cobra su fallo. La opción segura no
 // opina: no hay mérito en lo seguro.
 export const dtOk = m => m.log("info", `min ${m.clock()}' — 🎯 ${pick(["La decisión del DT fue la correcta.", "La apuesta del banco sale perfecta.", "El riesgo del DT paga."])}`);
 export const dtFail = m => m.log("info", `min ${m.clock()}' — 💢 ${pick(["La apuesta del DT salió cara.", "El riesgo no pagó esta vez.", "Decisión valiente, castigo inmediato."])}`);
 
 /**
- * El que pasa SE DESPRENDE de la pelota (bug PO 22-jul): la recibe un compañero, que pasa a
+ * El que pasa SE DESPRENDE de la pelota (bug PO): la recibe un compañero, que pasa a
  * ser el protagonista del acto siguiente (ponderado por el puesto que pide el tipo y su
  * Momento, como en el arranque). El pasador queda como asistidor si el receptor convierte.
  * Devuelve false si no hay a quién pasársela (equipo diezmado): el prot no cambia.

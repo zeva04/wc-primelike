@@ -1,5 +1,5 @@
 /* ============================================================
-   game/match/press — EL BOTÓN DE PRESIÓN (decisión PO 25-jul-2026).
+   game/match/press — EL BOTÓN DE PRESIÓN.
 
    La primera palanca del DT que se acciona DURANTE el juego y no
    entre secuencias: apretar arriba a voluntad, a cambio de piernas.

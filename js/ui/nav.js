@@ -2,9 +2,9 @@
    ui/nav — registro de navegación entre pantallas.
 
    Las pantallas se navegan unas a otras (menú→hub→partido→...)
-   y eso formaría ciclos de import prohibidos (ARQUITECTURA §4).
+   y eso formaría ciclos de import prohibidos.
    Solución: cada pantalla se REGISTRA aquí al importarse y las
-   demás la invocan por nombre con go(). Nadie importa pantallas.
+   demás la invocan por nombre con go. Nadie importa pantallas.
 
    Nombres registrados hoy: menu · history · start-run · draw ·
    hub · squad · worldcup · journal · start-match · shootout ·

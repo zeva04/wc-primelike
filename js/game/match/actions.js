@@ -1,5 +1,5 @@
 /* ============================================================
-   game/match/actions — Football Actions (Bible §7, regla 6): los
+   game/match/actions — Football Actions: los
    bloques de juego reutilizables con los que se arman las
    secuencias. Cada uno resuelve UN gesto (pase, regate, remate,
    presión, corte, atajada) sobre `effStat` y devuelve un
@@ -30,7 +30,7 @@ function oppR(m) { return teamRating(m.oppTeam) / 20; }
  * una secuencia habilita un remate mejor). Espejo de la rama "pass" de resolveChance
  * (0.35 + pase·0.11), con el filtrado un poco más exigente.
  *
- * ODISEA (sprint 1): el pase filtrado es el que ROMPE LÍNEAS — lo mide `pase_largo`; el
+ * ODISEA: el pase filtrado es el que ROMPE LÍNEAS — lo mide `pase_largo`; el
  * pase de circulación lo mide `pase_corto`. Es el primer sitio del motor donde el split
  * ya significa algo, y el patrón que va a seguir el resto en la segunda mitad del sprint.
  */
@@ -49,7 +49,7 @@ export function actPass(m, from, { hard = false } = {}) {
 /**
  * Regate/individual de un mío. Puede salir (ok), terminar en falta a favor → penal
  * (foul), o perderse. Espejo de la rama "solo" de resolveChance (aura·0.075 + 12% penal).
- * `bonus` (M2): conducir con la cancha ROTA es más fácil — el 2º tramo del Contragolpe
+ * `bonus`: conducir con la cancha ROTA es más fácil — el 2º tramo del Contragolpe
  * letal lo usa (adv.carryEase): el rival partido y de espaldas no es una defensa plantada.
  */
 /** `foulPlus` (Skiller, Contra): a ese no lo frenan limpio — la ventana de FALTA a favor
@@ -73,7 +73,7 @@ export function actDribble(m, p, { bonus = 0, foulPlus = 0 } = {}) {
  * myChance (0.12 + q·0.085 − oppR·0.035), que es el que fija el ritmo de gol del juego.
  * Devuelve solo si fue gol; anotar es cosa de sequences.js (goalMine con su asistidor).
  * Cuenta el tiro en m.stats — EL punto único de conteo de los remates de secuencia
- * (excepción documentada al "no muta": stats no es marcador. Antes solo contaban los
+ * (excepción documentada al "no muta": stats no es marcador; cuentan también los
  * remates ambiente y el panel post-partido sub-reportaba desde A1 — bug T3).
  */
 export function actShot(m, p, { stat = "tiro", bonus = 0 } = {}) {

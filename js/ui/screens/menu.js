@@ -44,7 +44,7 @@ function renderMenu() {
   const c = sel.colors || {};
   const best = teamFigure(sel);
 
-  // Pantalla fija (sprint de UX): cabecera / pestañas / carrusel elástico / banderas.
+  // Pantalla fija: cabecera / pestañas / carrusel elástico / banderas.
   // El carrusel es el único bloque que crece (flex-1 min-h-0); todo lo demás mide fijo.
   //
   // ESCALA TIPOGRÁFICA del sprint (una sola familia; la manuscrita de tiza es la otra
@@ -90,17 +90,12 @@ function renderMenu() {
       ${confTeams.map(t => `<button data-team="${t.id}" title="${t.name}" class="car-dot rounded-md overflow-hidden transition-all cursor-pointer ${t.id === menuSel ? "ring-2 ring-[var(--wc-gold)] scale-110" : "opacity-50 hover:opacity-90"}">${flagImg(t, "w-10 h-7")}</button>`).join("")}
     </div>
 
-    <!-- EL BLOQUE DEL EQUIPO (sprint de UX, 6-ago): deja de estirarse a lo alto de la
-         pantalla. Antes "flex-1" + "justify-center" lo obligaba a llenar el resto del
-         viewport, y esa plata se pagaba en dos huecos de aire —entre la descripción y
-         las fichas, y entre el botón y el borde de la tarjeta— que no eran margen de
-         diseño, eran sobrante sin dueño. Ahora el bloque mide EXACTO lo que su
-         contenido pide (shrink-0, items-start): descripción→fichas→botón quedan a
-         distancia fija de verdad. Si eso deja aire libre hasta el borde de la
-         pantalla, ESE es el lugar correcto para que viva — no hay problema en que la
-         pantalla no se llene del todo, lo que no puede pasar es que el aire quede
-         adentro de la tarjeta. fitScaleUp() decide, ya con el bloque medido en
-         serio, si ese sobrante alcanza para escalar todo un 5% en vez de dejarlo vacío. -->
+    <!-- EL BLOQUE DEL EQUIPO no se estira a lo alto de la pantalla: mide EXACTO lo que
+         su contenido pide (shrink-0, items-start), así descripción→fichas→botón quedan a
+         distancia fija. Estirarlo con flex-1 paga el relleno en huecos de aire adentro de
+         la tarjeta, que no son margen de diseño sino sobrante sin dueño. El aire que
+         sobra vive AFUERA, entre la tarjeta y el borde de la pantalla; fitScaleUp()
+         decide si alcanza para escalar todo un 5% en vez de dejarlo vacío. -->
     <div id="menu-block" class="shrink-0 flex items-start justify-between gap-3 mt-3 py-1">
       <div class="shrink-0 self-center w-20 h-20 animate-floaty">${BALL_SVG}</div>
       <div class="flex-1 min-w-0 max-w-5xl mx-auto flex items-start gap-3">

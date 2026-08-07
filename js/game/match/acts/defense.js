@@ -65,7 +65,7 @@ export function resolvePlayout(m, s, key, f) {
   }
   const r = A.actPass(m, s.prot, { hard: true });
   if (!r.ok) {
-    // T2 — El Tercer Hombre: la salida rota puede RESCATARSE — el desmarcado aparece
+    // El Tercer Hombre: la salida rota puede RESCATARSE — el desmarcado aparece
     // a tiempo y el regalo letal no existe (la posesión se pierde sin sangre). La
     // vacuna comprable contra el festín del Press rival.
     const th = hookOf(m, "playoutRescue");
@@ -110,7 +110,7 @@ export function resolveContain(m, s, key, f) {
     return closeSeq(m, "event", `min ${m.clock()}' — 🚀 La revientan lejos del área: ${m.oppTeam.name} tiene que armar todo otra vez desde atrás.`);
   }
   const { mine } = m.powers();
-  const fortaleza = s.type.advFor === "bloque"; // la avanzada del Bloque (M2)
+  const fortaleza = s.type.advFor === "bloque"; // la avanzada del Bloque
   // La contención profunda de la fortaleza era el rasgo F2 de Consolidada — desde T2
   // la compra Dueños del Área (migración al árbol); el repliegue base sigue original.
   // ODISEA: replegar es LLEGAR — la velocidad media de mi línea de fondo entra al corte.
@@ -118,7 +118,7 @@ export function resolveContain(m, s, key, f) {
   const chase = zaga.length ? zaga.reduce((a, p) => a + effStat(p, "velocidad", m.my.buffs), 0) / zaga.length : null;
   // ESTÓICOS (Contra, básica): replegado, el equipo aguanta lo que le tiren — la
   // contención del bloque corta más ("en Bloque Bajo" = cuando el equipo se repliega,
-  // decisión PO 30-jul: no la filosofía homónima ni la mentalidad).
+  // decisión PO no la filosofía homónima ni la mentalidad).
   const est = hookOf(m, "containBonus");
   // LA AMPLITUD DEFENSIVA (Eje Horizontal): cortar un ataque POR AFUERA depende de que
   // alguien esté parado ahí. Una zaga de tres cubre las dos bandas; una de uno vive de
@@ -129,7 +129,7 @@ export function resolveContain(m, s, key, f) {
   if (est && r.ok && rnd() < 0.2) traitMoment(m, est.traitId, [est.texto]);
   if (r.ok) {
     setBall(m, { side: "mine" });   // cortar es recuperar: la pelota pasa a ser mía
-    // La fortaleza CASTIGA (M2): la contención exitosa convierte — pelotazo inmediato
+    // La fortaleza CASTIGA: la contención exitosa convierte — pelotazo inmediato
     // con el rival desarmado (def→of, el patrón de la salida bajo presión). El convert
     // profundo era el rasgo F2 de Consolidada — desde T2 lo compra Dueños del Área.
     if (fortaleza && rnd() < (hasTrait(m, "area_blindada") ? s.type.adv.convertDeep : s.type.adv.convert)) {
@@ -142,7 +142,7 @@ export function resolveContain(m, s, key, f) {
       buildActDecision(m);
       return false;
     }
-    // T1 — Tender la Trampa: el repliegue contenido puede CONVERTIR en contra
+    // Tender la Trampa: el repliegue contenido puede CONVERTIR en contra
     // (el rival quedó estirado a propósito) — el patrón def→of, ahora comprable.
     const tt = s.type.id === "repliegue" ? rollChain(m, "chainOnContain") : null;
     if (tt) {
@@ -156,7 +156,7 @@ export function resolveContain(m, s, key, f) {
   moveBall(m, ADVANCE.avanceRival);   // el rival progresa HACIA mi arco
   m.log("chance", `min ${m.clock()}' — ${f.containFail(m.oppTeam)}`);
   if (r.press) dtFail(m);
-  // T1 — Oficio de Trinchera: el avance rival puede morir CORTADO (falta táctica,
+  // Oficio de Trinchera: el avance rival puede morir CORTADO (falta táctica,
   // ritmo roto) antes de llegar al remate — el partido se corta, la jugada muere.
   const of = hookOf(m, "oppLoseActs");
   if (of && rnd() < of.p) {
@@ -166,7 +166,7 @@ export function resolveContain(m, s, key, f) {
   // FORTALEZA INEXPUGNABLE (Bloque, Master): la OCASIÓN CLARA que no ocurre. Antes de
   // que la contención rota se vuelva mano a mano, apareció el que tenía que aparecer.
   if (clearChanceGuarded(m)) return closeSilent(m);
-  // ABSORCIÓN DEL ÚLTIMO HOMBRE (Sprint A2, decisión PO #7): buena parte de las
+  // ABSORCIÓN DEL ÚLTIMO HOMBRE: buena parte de las
   // contenciones rotas terminan en el mano a mano con MI central — la decisión
   // `last_man` del Sprint 1, con su calibración INTACTA (lastManChance/resolveLastMan
   // no se tocan). La secuencia cierra y el último hombre toma el control.
@@ -181,7 +181,7 @@ export function resolveContain(m, s, key, f) {
 export function resolveClear(m, s, key, f) {
   // el rival remata, mi arquero responde (desenlace defensivo automático)
   const { mine } = m.powers();
-  // T1 — Jaula Central: el remate del repliegue llega INCÓMODO (la jaula lo empujó
+  // Jaula Central: el remate del repliegue llega INCÓMODO (la jaula lo empujó
   // a la banda: la situación es peor, no mi arquero mejor — el canal finishBonus).
   // Por FAMILIA: la fortaleza también encierra (gate T1).
   const jl = hookOf(m, "oppShotMalus", familyOf(s.type));

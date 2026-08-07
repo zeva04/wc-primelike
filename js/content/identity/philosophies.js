@@ -112,11 +112,11 @@ export const PHILOSOPHIES = [
     fuerte: "Brilla contra los que quieren la pelota: más robos en salida rival.",
     advertencia: "Correr arriba los 90' pasa factura física, y el que te espera agazapado te deja cazando sombras.",
     rasgo: "La cacería roba aún más letal, y al rival solo le queda la falta: más amarillas, más tiros libres tuyos.",
-    // Mi fila del CICLO en cualitativo (F3, pantalla de identidad — regla 4: visible).
+    // Mi fila del CICLO en cualitativo.
     // Press > Posesión > Bloque > Contra > Press: cazo a uno, me caza otro, y con el
     // tercero (Bloque) el cruce es parejo.
     counters: { brilla: "contra los que quieren la pelota (Posesión): su salida es tu festín", sufre: "contra el Contragolpe: presionar al que no quiere la pelota es correr al vacío, y su espalda queda a tiro. Encima el costo es físico: −6 de energía cada partido" },
-    // El relato de MI firma cuando la identidad es mía (F3): el pressing tiene nombre
+    // El relato de MI firma cuando la identidad es mía: el pressing tiene nombre
     firmaIntros: [
       p => `¡El pressing que entrenamos toda la semana! ${p.name} salta a cazar la salida rival.`,
       p => `La jauría otra vez arriba: ${p.name} lidera la presión como pide la idea.`,
@@ -190,7 +190,7 @@ export function filoLevelOf(r, filoId = r.filoId) {
   return filoId ? xpLevelOf(r.filoXp?.[filoId] || 0) : 0;
 }
 /** Etapa (0 Aprendiendo · 1 En desarrollo · 2 Consolidada) del nivel actual —
- *  la vista 0-2 que consumen el rival, la brecha R3 y los gates (T1). */
+ *  la vista 0-2 que consumen el rival, la brecha R3 y los gates. */
 export function filoEtapaOf(r, filoId = r.filoId) {
   return FILO_LEVELS[filoLevelOf(r, filoId)].etapa;
 }
@@ -209,7 +209,7 @@ export const EVENT_XP = 80;
  * Progreso de identidad desde CONTENIDO (eventos/oportunidades/conflictos):
  * `pts` puntos de evento se vuelven XP de la filosofía ACTIVA, con la afinidad
  * de tu escuela aplicada igual que en la cancha. Mutación con primitivas, sin
- * importar game/ (ARQUITECTURA §4, mismo patrón que la moral). Devuelve
+ * importar game/. Devuelve
  * {id, label, icon, xp} para el desc del evento, o null sin filosofía.
  */
 export function addFiloProgress(r, pts) {
@@ -221,5 +221,5 @@ export function addFiloProgress(r, pts) {
   return { id: f.id, label: f.name, icon: f.icon, xp, stat: aristaById(f.firma).stat };
 }
 
-/** Alias histórico (F3): los eventos de "la firma" trabajan la misma identidad. */
+/** Alias histórico: los eventos de "la firma" trabajan la misma identidad. */
 export const addFirmaProgress = addFiloProgress;

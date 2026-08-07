@@ -118,7 +118,7 @@ export function resolvePenaltyMine(m, name) {
   const p = m.my.lineup.find(x => x.name === name);
   m.decision = null;
   m.stats.misTiros++; // el penal ES un tiro — contado en la resolución (único punto, bug T3)
-  // RECORTE DE BALANCE (17-jul-2026): la definición de penales NO lleva el % del Momento
+  // RECORTE DE BALANCE: la definición de penales NO lleva el % del Momento
   // (÷ momentoMult lo neutraliza). Fue la "primera línea de recorte" pactada al aprobar
   // la feature: con el efecto pleno, BRA derivaba ~+2pp en el smoke (precedente FEAT-003).
   const q = (effStat(p, "tiro", m.my.buffs) + effStat(p, "aura", m.my.buffs)) / 2 / momentoMult(p);
@@ -186,7 +186,7 @@ function lastManStop(m, def, text) {
 
 /**
  * Resuelve la decisión "último hombre" de MI central (d.prot) ante el escapado (d.shooter).
- * Perfiles (decisión PO 20-jul-2026):
+ * Perfiles:
  *  - anticipar: alto riesgo/recompensa. Corte limpio (+Momento) o el delantero queda de
  *    cara al arco → gol muy probable (sin tarjeta).
  *  - barrerse: puede cortar (+Momento), pero el mal timing es falta → PENAL si es en el
@@ -295,7 +295,7 @@ export function goalMine(m, p, flavor, assist, varOffside = true) {
   if (assistP) { assistP.asistencias = (assistP.asistencias || 0) + 1; m.assists.push({ name: assistP.name, min: m.min }); }
   const assistTxt = assistP ? ` Asistencia de ${assistP.name}.` : "";
   // VAR. `varOffside = false` para los goles de PENAL: un penal convertido no puede
-  // anularse por posición adelantada (bug reportado por el PO, 21-jul-2026) — el
+  // anularse por posición adelantada (bug reportado por el PO,) — el
   // pateador sale del punto blanco con todos detrás de la pelota.
   if (varOffside && rnd() < 0.12) {
     m.log("event", `min ${m.clock()}' — ⚽ Gol de ${p.name}... ¡pero el VAR lo está revisando! 😬`);
@@ -306,7 +306,7 @@ export function goalMine(m, p, flavor, assist, varOffside = true) {
       return;
     }
     m.log("goal", `✅ ¡GOL CONFIRMADO! ${flavor} ${p.name}.${assistTxt} (${m.gMy}-${m.gOpp})`);
-    noteFiloHit(m); // el gol que corona una secuencia firma también es ejecución (F1)
+    noteFiloHit(m); // el gol que corona una secuencia firma también es ejecución
     golAlMomentum(m, "mine");
     return;
   }

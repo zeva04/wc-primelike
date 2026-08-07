@@ -40,7 +40,7 @@ export function openSquadModal(caido = null) {
   let banco = match.my.bench.slice();
   const pendientes = [];                    // [{ sale, entra }] cambios por confirmar
 
-  // EL DIBUJO (PO 28-jul): la formación no se guarda en ningún lado durante el partido —
+  // EL DIBUJO (PO): la formación no se guarda en ningún lado durante el partido —
   // se DERIVA de dónde está parado cada uno (`playedPos`), que es la única verdad acá.
   // Así sigue siendo correcta tras un cambio, una reubicación a mano o una expulsión,
   // sin un campo más que mantener sincronizado.
@@ -57,7 +57,7 @@ export function openSquadModal(caido = null) {
   const enOnce = p => once.includes(p);
   /** En el once previsualizado y en condiciones de jugar: un expulsado o lesionado no se mueve. */
   const activo = p => enOnce(p) && !p.expulsado && !p.lesionado;
-  /** Puede SALIR en un cambio: los activos y el lesionado aún en cancha (PO 22-jul: el
+  /** Puede SALIR en un cambio: los activos y el lesionado aún en cancha (PO el
    *  caído se reemplaza acá, arrastrando un suplente sobre su ficha — no se reubica). */
   const puedeSalir = p => activo(p) || (enOnce(p) && p.lesionado && !p.sustituido);
   const restantes = () => match.subsLeft - pendientes.length;
@@ -264,7 +264,7 @@ export function openSquadModal(caido = null) {
   }
 
   /** El reloj retoma al cerrar (el flujo de la lesión llega con el timer detenido).
-   *  Mismo cuidado que tactics.js (bug fix, 2-ago-2026): esta pantalla también se abre
+   *  Mismo cuidado que tactics.js (bug fix,): esta pantalla también se abre
    *  desde `#btn-subs` en el ENTRETIEMPO (showHalftime invita a "hacer cambios" acá
    *  mismo) — y ahí el ÚNICO botón que puede reanudar es el dedicado del entretiempo,
    *  nunca el cierre de este modal. */

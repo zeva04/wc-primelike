@@ -1,6 +1,5 @@
 /* ============================================================
-   game/coach — EL DIRECTOR TÉCNICO: la segunda capa de progresión
-   (arco de Progresión, decisiones PO 28-jul-2026).
+   game/coach — EL DIRECTOR TÉCNICO: la segunda capa de progresión.
 
    Posee `run.dtXp` y `run.dtNivel` (1..20). El DT NO gana
    experiencia directa: toda su XP viene de que las Filosofías

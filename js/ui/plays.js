@@ -1,6 +1,5 @@
 /* ============================================================
-   ui/plays — LAS CUATRO JUGADAS FIRMA dibujadas en mini-pizarra
-   (sprint de UI del selector de identidad, decisiones PO).
+   ui/plays — LAS CUATRO JUGADAS FIRMA dibujadas en mini-pizarra.
 
    La tesis de la pantalla: el jugador elige entre cuatro FÚTBOLS
    distintos, así que tiene que VERLOS, no leerlos. Cada filosofía

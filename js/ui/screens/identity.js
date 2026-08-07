@@ -1,10 +1,7 @@
 /* ============================================================
    ui/screens/identity — inicio de run y ELECCIÓN DE IDENTIDAD
-   (arco de Filosofía F1, decisión PO #1: se elige apenas
-   confirmado el equipo, antes de ver el sorteo — el grupo no
-   influye en quién decides ser). Las 4 cards muestran fortaleza
-   Y vulnerabilidad (Bible §5 regla 4: se elige informado, no hay
-   build sin costo).
+. Las 4 cards muestran fortaleza
+   Y vulnerabilidad.
    ============================================================ */
 import { getTeam } from "../../data/teams-repo.js";
 import { newRun } from "../../game/run.js";
@@ -39,7 +36,7 @@ function startRun(teamId) {
  * que se los dibujamos (ui/plays) en vez de describírselos. La cancha de cada
  * filosofía con su jugada firma ES la información — se compara de un vistazo.
  *
- * Reglas del sprint (decisiones PO):
+ * Reglas del sprint:
  *  · Fortaleza y advertencia SOLO en la elegida — Bible §5 regla 4 se cumple
  *    igual (ves el precio antes de confirmar) sin el muro de 8 líneas en paralelo.
  *  · Fuera la línea del fútbol superior / árbol de rasgos: habla de un desbloqueo
@@ -109,7 +106,7 @@ function renderChooseIdentity() {
   $("#btn-continue").onclick = () => {
     if (!elegida) return;
     choosePhilosophy(S.run, elegida);
-    // Arco de Rasgos (T1, decisión PO): elegir filosofía acredita el PI del nivel 1
+    // Arco de Rasgos: elegir filosofía acredita el PI del nivel 1
     // y lleva DIRECTO al árbol — el 1-de-3 de rasgos básicos es la segunda decisión
     // de identidad de la run. De ahí, al sorteo.
     go("philosophy", { onboarding: true });

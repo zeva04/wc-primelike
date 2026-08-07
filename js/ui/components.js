@@ -65,7 +65,7 @@ export function numTag(p, extra = "") {
 }
 
 /**
- * Icono del Momento sobre la ficha (game/momentum), por nivel 1..7 (decisión PO 18-jul):
+ * Icono del Momento sobre la ficha (game/momentum), por nivel 1..7:
  * arriba el color sube con la distancia al neutro (amarillo = 1 paso, verde = 2); abajo
  * el amarillo avisa (3) y el celeste marca la caída (2); los extremos son 🔥 (7,
  * inspirado) y ❄️ (1, paupérrimo). La forma codifica la dirección (▲/▼). Neutro (4): nada.
@@ -85,7 +85,7 @@ export function momentoChip(p) {
   }
 }
 
-/* ── EL MAPA DE CALOR (sprint del Territorio) ─────────────────────────────────
+/* ── EL MAPA DE CALOR ─────────────────────────────────
    La cancha vertical con sus zonas pintadas por intensidad, como los mapas de
    calor de las transmisiones. Recibe las celdas YA normalizadas por el motor
    (match/field.heatCells): la vista no conoce zonas, alturas ni reglas — solo
@@ -176,12 +176,12 @@ export function screenShell(inner, maxW = "max-w-5xl") {
 }
 
 /**
- * Shell de PANTALLA FIJA (sprint de UX): ocupa exactamente el alto del viewport y
+ * Shell de PANTALLA FIJA: ocupa exactamente el alto del viewport y
  * NO hace scroll — todo tiene que entrar en una pantalla de PC. El contenido es un
  * flex column: lo que debe adaptarse lleva `flex-1 min-h-0`, lo demás `shrink-0`.
  */
 export function screenFull(inner, maxW = "max-w-7xl") {
-  app().style.zoom = "";  // limpia el escalado que haya dejado fitScaleUp() de la pantalla anterior
+  app().style.zoom = "";  // limpia el escalado que haya dejado fitScaleUp de la pantalla anterior
   app().innerHTML = `<div class="h-screen overflow-hidden flex flex-col ${maxW} mx-auto px-5 py-4 relative">${inner}</div>`;
 }
 

@@ -4,11 +4,11 @@
    sobre esta instancia: chances.js (ocasiones, penales, goles),
    incidents.js (faltas, tarjetas, lesiones), shootout.js (tanda).
 
-   CONTRATO DE DECISIONES (ARQUITECTURA §3.2) — agregar una
+   CONTRATO DE DECISIONES — agregar una
    decisión nueva son SIEMPRE 3 pasos:
      1. creador en chances.js/incidents.js (setea m.decision)
      2. resolver aquí o en el módulo hermano
-     3. ruteo en ui.js handleDecision()
+     3. ruteo en ui.js handleDecision
    | id           | la crea       | la resuelve                          |
    |--------------|---------------|--------------------------------------|
    | sequence     | sequences.js  | resolveSequenceAct                   |
@@ -18,17 +18,17 @@
    | injury_sub   | incidents.js  | UI: abre la Gestión en vivo → makeSub |
    | gk_red       | incidents.js  | ruteo UI → makeSub                   |
    | gk_emergency | incidents.js  | resolveGkEmergency                   |
-   (protect y forced_sub se retiraron el 22-jul: la amarilla solo narra
+   (protect y forced_sub se retiraron el la amarilla solo narra
    y el reemplazo del lesionado es manual en la Gestión de plantilla.)
    (`sequence` es multi-acto: resolver un acto puede dejar OTRA
    decisión `sequence` —el acto siguiente—; los loops de UI y smoke
-   la reprocesan solos porque tick() corta con decisión pendiente.)
+   la reprocesan solos porque tick corta con decisión pendiente.)
 
    La UI lo maneja así:
-     1. `tick()` cada ~2s → avanza 1 min y devuelve false | true (hay decisión) | "halftime" | "pens" | "end"
+     1. `tick` cada ~2s → avanza 1 min y devuelve false | true (hay decisión) | "halftime" | "pens" | "end"
      2. Si hay `decision`, la UI muestra el modal y llama al resolve* correspondiente según decision.id
-     3. En "pens": startShootout() + shootMyPen()/shootOppPen() hasta shootoutStatus().done
-     4. Al final: result()
+     3. En "pens": startShootout + shootMyPen/shootOppPen hasta shootoutStatus.done
+     4. Al final: result
    ============================================================ */
 import { rnd } from "../../core/rng.js";
 import { genOpponentLineup } from "../opponents.js";
@@ -50,7 +50,7 @@ import { newField, tickField, startHalfField, backlineRisk } from "./field.js";
 import { newMomentum, closeMinute, assistantLine, noteMomentum, markMomentum } from "./match-momentum.js";
 import { drainOppEnergy } from "../medical.js";
 
-// Frecuencias por tick de los eventos INDEPENDIENTES de las secuencias (Sprint A1). Penal y
+// Frecuencias por tick de los eventos INDEPENDIENTES de las secuencias. Penal y
 // último hombre se calibraron antes y quedan intactos; acá solo se fija cada cuánto asoman
 // como evento suelto (antes vivían dentro de myChance/oppChance). Los remates AMBIENTE (la
 // parte simulada del Bible §7) se escalan por AMBIENT_* para dejarle sitio al gol interactivo
@@ -73,14 +73,13 @@ const AMBIENT_OPP = 0.40;
 // segundos, y con la frecuencia vieja el relato quedaba muerto entre jugada y jugada.
 const AMBIENT_LINE = 0.55;
 
-// EL RELOJ CONTINUO (decisión PO 27-jul-2026). Antes cada tick avanzaba 5 minutos de
-// golpe; ahora avanza 1 y el minuto CORRE a la vista. TODA la calibración del juego
-// (penales, breakaway, faltas, remates ambiente) está expresada por CADA 5 MINUTOS —la
-// unidad histórica— y se reescala en un solo lugar, `_roll`: los diales de arriba no se
-// tocan y siguen significando lo mismo por partido.
+// EL RELOJ CONTINUO: el tick avanza 1 minuto y el reloj CORRE a la vista. Toda la
+// calibración del juego (penales, breakaway, faltas, remates ambiente) está expresada
+// POR CADA 5 MINUTOS y se reescala en un solo lugar, `_roll`: los diales de arriba se
+// leen por partido y no hay que tocarlos si cambia el tamaño del tick.
 const MIN_PER_TICK = 1;
 
-// EL DESCUENTO (misma decisión): tope duro de minutos agregados al final de cada tiempo.
+// EL DESCUENTO: tope duro de minutos agregados al final de cada tiempo.
 const ADDED_MAX = 6;
 
 export class Match {
@@ -93,7 +92,7 @@ export class Match {
   constructor(my, oppTeam, knockout, oppBanned = []) {
     this.my = my;
     this.oppTeam = oppTeam;
-    // ESCALADA (R2): la profundidad KO viaja en matchCtx (como moral/filo — el Match no
+    // ESCALADA: la profundidad KO viaja en matchCtx (como moral/filo — el Match no
     // conoce la run) y enciende la forma de torneo del once rival (0 en grupos = ×1).
     this.koRound = my.koRound || 0;
     this.oppLineup = genOpponentLineup(oppTeam, oppBanned, this.koRound);
@@ -106,7 +105,7 @@ export class Match {
     this.min = 0;
     // EL RELOJ: `min` es el minuto que corre; `nominal` el minuto en que termina el tiempo
     // EN CURSO (45 · 90 · 105 · 120) y `added` su descuento (null = todavía no se calculó).
-    // Mientras min > nominal se juega el descuento y el reloj se canta 45+2 (ver clock()).
+    // Mientras min > nominal se juega el descuento y el reloj se canta 45+2 (ver clock).
     this.halfStart = 0;        // minuto en que arrancó el tiempo en curso (para medir sus momentos)
     this.nominal = 45;
     this.added = null;
@@ -119,7 +118,7 @@ export class Match {
     this.pens = null;
     this.stats = { misTiros: 0, oppTiros: 0, decisiones: 0, penalesAtajados: 0 };
     // Panel de estadísticas del partido (match/stats.js): pases y córners, que el motor
-    // no llevaba. Los tiros siguen en `stats` y la posesión la deriva `flow()`.
+    // no llevaba. Los tiros siguen en `stats` y la posesión la deriva `flow`.
     this.tally = newTally();
     // MATCH MOMENTUM (match/match-momentum.js): el gráfico de barras de la transmisión.
     // Es una SALIDA del simulador — nada de lo que hay acá abajo lo lee.
@@ -138,7 +137,7 @@ export class Match {
     this.lastManStops = [];    // MIS centrales que cortaron un gol como último hombre (+Momento)
     this.lastManFouls = [];    // MIS centrales que se ganaron tarjeta/penal como último hombre (−Momento)
     this.seq = null;           // secuencia en curso {type, prot/shooter, actIdx, bonus} o null (sequences.js)
-    this._flow = [];           // todo lo GENERADO {min, side, w}: secuencia 3 · penal/mano a mano 2 · ambiente 1 (A3, #11)
+    this._flow = [];           // todo lo GENERADO {min, side, w}: secuencia 3 · penal/mano a mano 2 · ambiente 1
     // Minutos jugados por jugador (para el cansancio post-partido, medical): los titulares
     // entran al minuto 0; un cambio cierra los del que sale y arranca los del que entra.
     this._minutes = new Map();                              // jugador → minutos ya acumulados (los que salieron)
@@ -155,11 +154,11 @@ export class Match {
 
   /** Agrega una línea al relato del partido (kind define el estilo visual en la UI).
    *  `min` es el minuto CRUDO (91, 92…): lo lee el cálculo del descuento. Lo que se
-   *  muestra al jugador lo canta clock() dentro del texto. */
+   *  muestra al jugador lo canta clock dentro del texto. */
   log(kind, text) { this.feed.push({ min: this.min, kind, text }); }
 
   /** El minuto como lo canta la tele: "45+2" durante el descuento, "63" en juego corrido.
-   *  TODO el relato lo usa (`min ${m.clock()}'`); `m.min` sigue siendo el número crudo. */
+   *  TODO el relato lo usa (`min ${m.clock}'`); `m.min` sigue siendo el número crudo. */
   clock() { return this.min > this.nominal ? `${this.nominal}+${this.min - this.nominal}` : `${this.min}`; }
 
   /** Mis jugadores actualmente en cancha (sin expulsados ni lesionados). */
@@ -173,8 +172,8 @@ export class Match {
   /**
    * Suplentes elegibles para reemplazar a `outPlayer`. Regla simétrica: el arco solo lo
    * cubre un arquero, y un arquero no sale a la cancha (lineup.canPlayAt) — sus stats son
-   * otro juego. Antes solo se vigilaba una dirección y se podía mandar a un jugador de
-   * campo al arco: el equipo quedaba sin arquero y con 6 de campo (bug reportado por el PO).
+   * otro juego. La regla se vigila en LAS DOS direcciones: vigilar una sola deja mandar a
+   * un jugador de campo al arco, y el equipo termina sin arquero y con 6 de campo.
    */
   eligibleFor(outPlayer) {
     return this.availableBench().filter(b => canPlayAt(b, playedPos(outPlayer)));
@@ -236,7 +235,7 @@ export class Match {
     tickPress(this);
     // El rival se cansa mientras juega (medical.drainOppEnergy): llega al 90' cerca de
     // 58 de energía. El Rondo (Posesión) acelera el drenaje — el rondo son ELLOS
-    // corriendo. Va ANTES de powers() para que el tick ya lo cobre en sus duelos.
+    // corriendo. Va ANTES de powers para que el tick ya lo cobre en sus duelos.
     drainOppEnergy(this.oppLineup, MIN_PER_TICK, hookOf(this, "oppStamina")?.factor || 1);
 
     const { mine, opp } = this.powers();
@@ -247,18 +246,18 @@ export class Match {
     // arriba a propósito — las jugadas que nacen más abajo LEEN la zona resultante.
     tickField(this, mine, opp);
 
-    // Key Sequences (Bible §7): la columna interactiva del partido. Reemplazan a las
+    // Key Sequences: la columna interactiva del partido. Reemplazan a las
     // ocasiones sueltas de myChance/oppChance; 5-9 por partido moduladas por la preparación.
     if (Sequences.maybeStartSequence(this)) return true;
 
     // Eventos interactivos INDEPENDIENTES de las secuencias (penal y último hombre, intactos
     // del calibrado previo; A1 no toca su matemática, solo cada cuánto asoman como evento suelto).
     if (this._roll(PEN_MINE_TICK)) { this._flow.push({ min: this.min, side: "mine", w: 2 }); return Chances.myPenaltyChance(this); }
-    // EL ESPACIO A LA ESPALDA (sprint del Territorio): el pelotazo que salta mi línea
+    // EL ESPACIO A LA ESPALDA: el pelotazo que salta mi línea
     // vale lo que mi bloque le regala. Neutro con el bloque medio; el que juega muy
     // alto multiplica este riesgo — es el precio honesto de robar arriba.
     if (this._roll(BREAKAWAY_TICK * backlineRisk(this))) {
-      // T2 — Anticipar la Espalda: el central que LEYÓ el pelotazo lo corta antes del
+      // Anticipar la Espalda: el central que LEYÓ el pelotazo lo corta antes del
       // mano a mano (el canal ambiente del breakaway — exactamente el fútbol que este
       // rasgo compra: la vacuna contra el balón largo que salta la presión). La
       // calibración del último hombre queda intacta: se corta ANTES de nacer.
@@ -278,7 +277,7 @@ export class Match {
     if (this._roll(0.10)) return this._foulEvent();
     if (this._roll(0.028)) return this._injuryEvent();
 
-    // Relato ambiente contextual (A3): el pool vive en content/match/ambient.js y LEE el partido.
+    // Relato ambiente contextual: el pool vive en content/match/ambient.js y LEE el partido.
     if (this._roll(AMBIENT_LINE)) this.log("plain", this._ambientLine());
     return false;
   }
@@ -332,7 +331,7 @@ export class Match {
   }
 
   /**
-   * Posesión y momentum DERIVADOS de lo generado (A3, decisión #11): quién generó qué, no
+   * Posesión y momentum DERIVADOS de lo generado: quién generó qué, no
    * números inventados. `pos` = % mío sobre el peso acumulado (con prior neutral: arranca
    * 50/50 y una sola jugada no lo dispara); `net` = mi peso − el suyo en los últimos 15'
    * (el momentum visible). La UI lo pinta; acá solo se deriva.
@@ -357,7 +356,7 @@ export class Match {
       tired: act.reduce((s, p) => s + p.energia, 0) / Math.max(1, act.length) < 55,
       band: moraleBand(this.my.moral ?? 50).id,
       net: this.flow().net,
-      // El ambiente lee la FILOSOFÍA (F3): id y ETAPA de matchCtx.filo (0..2 — sus
+      // El ambiente lee la FILOSOFÍA: id y ETAPA de matchCtx.filo (0..2 — sus
       // líneas comparan contra la escala original de F1), null sin identidad
       filo: this.my.filo?.id ?? null,
       filoLvl: this.my.filo?.etapa ?? 0,
@@ -418,7 +417,7 @@ export class Match {
   }
 
   /**
-   * Resuelve la decisión `gk_emergency` (bug fix, 2-ago-2026): el equipo se quedó sin
+   * Resuelve la decisión `gk_emergency` (bug fix,): el equipo se quedó sin
    * arquero real (el suyo salió por lesión/roja y no hay suplente POR en la banca) y el
    * DT elige a qué jugador de campo mandar al arco. NO es una sustitución — no gasta
    * cambio, es una reposición dentro del mismo once (como swapAssignments): el elegido

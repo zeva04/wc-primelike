@@ -32,8 +32,7 @@ export function applyDisciplinePostMatch(run, p) {
 }
 
 /**
- * Borra las amarillas ACUMULADAS de todo el plantel (regla FIFA adaptada: al terminar
- * la fase de grupos y al terminar los cuartos de final). Las suspensiones ya ganadas
+ * Borra las amarillas ACUMULADAS de todo el plantel. Las suspensiones ya ganadas
  * NO se perdonan: la tarjeta se limpia, el castigo pendiente se cumple igual.
  * Devuelve cuántos jugadores limpiaron tarjeta.
  */

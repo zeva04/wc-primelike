@@ -2,7 +2,7 @@
    game/flow — orquestador de transiciones de la run.
    Coordina sistemas y escribe SOLO los campos que posee
    (stage, matchday, koMatches, lastWinners, stats, buffs);
-   las reglas viven en cada sistema (ARQUITECTURA §3).
+   las reglas viven en cada sistema.
 
    Tres transiciones:
    - closeMatch(run, match)      cierra un partido del usuario
@@ -91,7 +91,7 @@ export function postMatchUpdate(run, match) {
   const presRaw = match.pressMinutesByName ? match.pressMinutesByName() : {};
   const presionados = {};
   for (const [name, min] of Object.entries(presRaw)) presionados[name] = pressExtraMinutes(match, min);
-  // Y el sobrecosto del BLOQUE ADELANTADO (sprint del Territorio) se cobra por el mismo
+  // Y el sobrecosto del BLOQUE ADELANTADO se cobra por el mismo
   // caño, pero SIN el descuento de los rasgos de fuelle: esos abaratan el acto de
   // presionar, no la decisión estructural de vivir veinte metros más arriba.
   const altoRaw = match.heightMinutesByName ? match.heightMinutesByName() : {};
@@ -114,14 +114,14 @@ export function postMatchUpdate(run, match) {
     p.enCancha = false;
   }
   const morale = applyMoralePostMatch(run, match);
-  // LA PROGRESIÓN (arco de Progresión): la XP que el Match repartió por filosofía se
+  // LA PROGRESIÓN: la XP que el Match repartió por filosofía se
   // acredita, sube niveles, paga XP al DT y este imprime PI. `filoExec` viaja en el
   // retorno para que el post-partido lo narre.
   const filoExec = applyFiloXp(run, match);
-  noteFiloMilestones(run); // la cancha pudo consolidar el umbral: la conquista se narra (M2)
+  noteFiloMilestones(run); // la cancha pudo consolidar el umbral: la conquista se narra
   run.planFilo = null;     // el Plan de Partido se consume con el partido
   run.buffs = {};
-  // Oxidación (R1): JUGAR devuelve el ritmo ("jugar es ritmo", decisión PO). El reset va
+  // Oxidación: JUGAR devuelve el ritmo ("jugar es ritmo", decisión PO). El reset va
   // acá, en el cierre físico — el partido ya se jugó con la racha que traía el plantel.
   resetOxidacion(run);
   // El partido consumió el día: se agenda el siguiente a 5-6 días con sus eventos diarios

@@ -1,5 +1,5 @@
 /* ============================================================
-   game/match/match-momentum — EL MATCH MOMENTUM (PO 28-jul-2026).
+   game/match/match-momentum — EL MATCH MOMENTUM (PO).
 
    El gráfico de barras de las transmisiones: quién está ejerciendo
    más peligro AHORA. No es posesión, no son tiros, no es xG.
@@ -11,7 +11,7 @@
    ── LA REGLA DE ORO ────────────────────────────────────────────
    El Match Momentum **refleja** el partido, no lo genera. Es una
    SALIDA del simulador:
-     · no consume `rnd()` — ni una sola tirada, a propósito: si
+     · no consume `rnd` — ni una sola tirada, a propósito: si
        consumiera azar correría el flujo del RNG y le movería los
        diales al balance calibrado (la lección de A1/A2/A3);
      · no escribe nada que el simulador lea (vive entero en
@@ -164,7 +164,7 @@ export function momentumTrend(m, n = 5) {
    pasando, que es lo que diría el ayudante desde el banco. Las condiciones
    miran también el marcador porque "dominamos" significa cosas distintas
    ganando 2-0 que perdiendo 0-1.
-   Elegir la frase NO usa `rnd()` (ver la regla de oro): rota por minuto. */
+   Elegir la frase NO usa `rnd` (ver la regla de oro): rota por minuto. */
 const TALK = [
   {
     when: (t, m) => t > 22 && m.gMy <= m.gOpp,

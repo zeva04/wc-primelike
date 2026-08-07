@@ -12,7 +12,7 @@ import { teamRating } from "../ratings.js";
    subía solo de 76.1 a 80.3 en cinco rondas, y **el 6% de las finales se jugaban contra un
    rival de rating ≤69**. La dificultad del torneo crecía sin que se VIERA crecer.
 
-   SPRINT DE LA ESCALADA (decisión PO): el mundo se vuelve implacable SOLO en eliminatorias.
+   SPRINT DE LA ESCALADA: el mundo se vuelve implacable SOLO en eliminatorias.
    Los grupos conservan su caos a propósito — la cenicienta y el batacazo son el combustible
    del World Cup Daily, y es la única fase donde una sorpresa no le arruina el bracket a
    nadie. En KO, en cambio, el que llega a la final tiene que ser un grande: la dificultad

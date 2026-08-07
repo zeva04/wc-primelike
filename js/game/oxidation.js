@@ -1,6 +1,5 @@
 /* ============================================================
-   game/oxidation — la regla de la OXIDACIÓN (arco del Rebalance
-   R1, decisión PO 22-jul-2026): el espejo de la banda verde.
+   game/oxidation — la regla de la OXIDACIÓN: el espejo de la banda verde.
    Un plantel que pasa días de preparación sin Entrenar ni
    Sesión Táctica se oxida — rinde menos en el próximo partido.
 
@@ -9,7 +8,7 @@
    plantel: así entra a effStat por el mismo caño que la energía,
    y el rival —que nunca tiene el campo— queda en ×1.
 
-   Qué RESETEA (decisión PO, R1): Entrenar, Sesión Táctica, el
+   Qué RESETEA: Entrenar, Sesión Táctica, el
    cambio de identidad (el día se va en reinstalar ideas: es
    trabajo táctico) y JUGAR ("jugar es ritmo" — flow la resetea
    al cierre del partido, DESPUÉS de que el partido se jugó con

@@ -1,25 +1,16 @@
-/* ============================================================
-   ui/screens/philosophy — la pantalla de IDENTIDAD: LA PIZARRA
-   DEL DT (sprint de UI de Identidad, decisiones PO 23-jul-2026).
+/* La pantalla de IDENTIDAD: LA PIZARRA DEL DT.
 
-   Antes esta pantalla apilaba 19 bloques rectangulares y dejaba
-   el árbol —lo único accionable— al fondo del scroll. Ahora hay
-   DOS cosas: una banda superior con el nivel de filosofía, y la
-   pizarra táctica (ui/board.js) donde el árbol se dibuja sobre
-   una cancha. Nada se borró: los 5 principios viven en la franja
-   de cabecera de la pizarra y los counters + el fútbol superior
-   en las notas del DT, que se leen en el riel al tocar la
-   chincheta (rediseño de espacio del 26-jul-2026).
+   Dos cosas y nada más: el HUD de estado arriba y la pizarra táctica (ui/board.js), donde
+   el árbol de rasgos se dibuja sobre una cancha. Los 5 principios viven en la franja de
+   cabecera de la pizarra, y los counters y el fútbol superior en las notas del DT, que se
+   leen en el riel al tocar la chincheta.
 
-   El detalle de cada rasgo NO se muestra en reposo (el nodo es
-   ícono + nombre): se abre al tocarlo, la cámara hace zoom sobre
-   él y la ficha aparece a la derecha con desc, momento, faltas y
-   la compra. Esa es la única profundidad de la pantalla.
+   El detalle de cada rasgo NO se muestra en reposo (el nodo es ícono + nombre): se abre al
+   tocarlo, la cámara hace zoom sobre él y la ficha entra por el riel de la derecha con
+   desc, momento, faltas y la compra. Esa es la única profundidad de la pantalla.
 
-   Doble modo (T1.5): pantalla normal desde el hub, y ONBOARDING
-   en el flujo de inicio (elegir filosofía trae acá con 1 PI para
-   el 1-de-3 de rasgos básicos; el botón sigue al sorteo).
-   ============================================================ */
+   Doble modo: pantalla normal desde el hub, y ONBOARDING en el flujo de inicio (elegir
+   filosofía trae acá con 1 PI para el 1-de-3 de rasgos básicos; el botón sigue al sorteo). */
 import { getPhilosophy, FILO_LEVELS, FILO_ETAPAS, AFINIDAD_LABEL, afinidadMult } from "../../content/identity/philosophies.js";
 import { ADVANCED_BY_FILO } from "../../content/match/sequences.js";
 import { RAMA_LABELS, DEEP_TRAIT } from "../../content/traits/index.js";
@@ -35,7 +26,7 @@ import { tacticBoard, nodePos, camTransform, markerColor, TIER_LABEL, NOTES_ID, 
 const MAGNETS = `<span class="tb-magnet" style="left:9px"></span><span class="tb-magnet" style="right:9px"></span>`;
 
 /**
- * La ficha del rasgo, escrita en EL RIEL DEL PIZARRÓN (decisión PO: opción D).
+ * La ficha del rasgo, escrita en EL RIEL DEL PIZARRÓN.
  * Lo narrativo (nombre, descripción, su momento) va en tiza sobre la misma
  * superficie del tablero; lo funcional (requisitos y compra) va en una ETIQUETA
  * IMANTADA — el único objeto que puede permitirse alto contraste, porque es lo
@@ -98,10 +89,9 @@ function traitCard(t, f, run, color) {
 }
 
 /**
- * Las NOTAS DEL DT en el riel. Desde el rediseño de espacio (26-jul) el post-it
- * dejó de ser un papel de 164×174 en la cancha: es una chincheta, y su contenido
- * se lee acá — el mismo panel donde ya se leen las fichas de rasgos, con la misma
- * tipografía de tiza. Un solo lugar en la pantalla donde vive el texto largo.
+ * Las NOTAS DEL DT en el riel. En la cancha son solo una chincheta; su contenido se lee
+ * acá, el mismo panel donde se leen las fichas de rasgos y con la misma tipografía de
+ * tiza. Un solo lugar en la pantalla donde vive el texto largo.
  */
 function notesCard(f, adv, deep, deepOwned, etapa, color) {
   const TONE = { ok: ["✓", "#86efac"], warn: ["⚠", "#fdba74"], info: ["🎯", "#fde68a"] };
@@ -122,7 +112,7 @@ function notesCard(f, adv, deep, deepOwned, etapa, color) {
 
 function renderPhilosophy(opts = {}, selected = null) {
   const run = S.run;
-  // ARBOLES NAVEGABLES (arco de Progresión): las 4 filosofías progresan a la vez, así
+  // ARBOLES NAVEGABLES: las 4 filosofías progresan a la vez, así
   // que la pizarra muestra la que estés MIRANDO (`opts.view`), no solo la que juegas.
   // La franja de cabecera del tablero es el selector.
   const viewId = opts.view && getPhilosophy(opts.view) ? opts.view : run.filoId;
@@ -135,7 +125,7 @@ function renderPhilosophy(opts = {}, selected = null) {
   const etapa = FILO_LEVELS[lvl].etapa;       // etapa 0..2 (los hitos de siempre)
   const nivel = FILO_LEVELS[lvl];
   const next = FILO_LEVELS[lvl + 1] || null;
-  const adv = ADVANCED_BY_FILO[f.id];         // la secuencia avanzada de esa identidad (M2)
+  const adv = ADVANCED_BY_FILO[f.id];         // la secuencia avanzada de esa identidad
   const deep = DEEP_TRAIT[f.id];              // el rasgo que la profundiza (migración F2, T2)
   const deepOwned = (run.rasgos?.[f.id] || []).includes(deep.id);
   const dt = dtProgress(run);
@@ -156,16 +146,12 @@ function renderPhilosophy(opts = {}, selected = null) {
       : { label: "Cambiar identidad", title: "Ya usaste la Acción del Día: mañana" };
 
   screenFull(`
-    <!-- EL HUD (sprint de UX, 5-ago). Antes esta franja eran dos filas rotas por el
-         flex-wrap con seis tamaños de letra, dos barras de distinto grosor separadas
-         de su propio número, y una frase corrida de cuatro datos a 9.5px. Ahora es
-         UNA fila de altura fija con tres piezas de gramática distinta:
+    <!-- EL HUD: UNA fila de altura fija con tres piezas de gramática distinta.
            · IDENTIDAD  (quién sos: icono, nombre, lema)
            · MEDIDORES  (cuánto avanzaste: dos gauges idénticos, DT y filosofía)
            · RECURSO    (qué podés gastar: los PI, en su placa dorada)
-         Los multiplicadores dejaron de ser prosa y son chips-buff con tooltip. El
-         nivel de la filosofía ya no se dice dos veces: el pie del gauge trae el XP
-         vivo (7/250) en vez de "nivel 2 a los 250", que obligaba a restar de cabeza. -->
+         Los multiplicadores son chips-buff con tooltip, no prosa. El pie del gauge trae
+         el XP vivo (7/250) y no "nivel 2 a los 250", que obliga a restar de cabeza. -->
     <!-- El HUD y la pizarra comparten ANCHO (lo ajusta fitBoard(), abajo): sin eso la
          barra sobresalía ~100px a cada lado del tablero y los dos bloques se leían
          como dos pantallas distintas en vez de una. -->
@@ -298,7 +284,7 @@ function renderPhilosophy(opts = {}, selected = null) {
     // La franja de cabecera es el SELECTOR de árbol: tocar otra filosofía cambia de pizarra.
     const tab = e.target.closest("[data-filo]");
     // En ONBOARDING no se navega: el PI inicial se gasta SÍ o SÍ en un básico de la
-    // escuela elegida (GDD). Después, la pizarra entera queda abierta.
+    // escuela elegida. Después, la pizarra entera queda abierta.
     if (tab) { if (!opts.onboarding) renderPhilosophy({ ...opts, view: tab.dataset.filo }); return; }
     const g = e.target.closest("[data-node]");
     if (g) open(g.dataset.node); else close();

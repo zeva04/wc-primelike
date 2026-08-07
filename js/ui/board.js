@@ -1,7 +1,7 @@
 /* ============================================================
    ui/board — LA PIZARRA TÁCTICA: el árbol de rasgos dibujado
    sobre una cancha, como el DT que raya el pizarrón del
-   vestuario (sprint de UI de Identidad, decisiones PO 23-jul).
+   vestuario.
 
    Reglas del lenguaje visual (las 4 decisiones del sprint):
    1. COLOR = el del principio FIRMA de la filosofía (press rojo ·
@@ -16,9 +16,7 @@
       nombres de rasgos y requisitos siempre en sans.
    4. Nada se borra: los 5 principios viven en la franja de
       cabecera y los counters + el fútbol superior en las notas
-      del DT, que se abren desde la chincheta (rediseño de espacio
-      del 26-jul: con 19 rasgos, la columna lateral de 196px y el
-      post-it de 164×174 le estaban comiendo el tablero al árbol).
+      del DT, que se abren desde la chincheta.
 
    El ataque va de IZQUIERDA a DERECHA: los básicos nacen en
    campo propio, los avanzados cruzan la mitad y el Master se
@@ -30,13 +28,11 @@
 import { PHILOSOPHIES, FILO_LEVELS, filoLevelOf, filoPointsOf } from "../content/identity/philosophies.js";
 
 /* ---------- Geometría (viewBox 1200×700) ---------- */
-/* REDISEÑO DE ESPACIO (26-jul-2026, decisiones PO): con 19 rasgos el tablero se
-   saturó. Los 5 principios pasaron de una COLUMNA lateral de 196px a una FRANJA
-   horizontal en la cabecera, y el post-it de 164×174 se redujo a una chincheta que
-   abre sus notas en el riel. Entre las dos cosas la cancha recuperó ~170px de ancho,
-   y el viewBox creció de 640 a 700 de alto. Todo ese aire se invirtió en SEPARAR los
-   nodos (decisión PO), no en agrandarlos: lo que satura no es el tamaño de cada
-   rasgo, es la cercanía entre ramas. */
+/* Con 19 rasgos el tablero se satura, así que el espacio está peleado: los 5 principios
+   viven en una FRANJA horizontal de cabecera (no en una columna lateral) y las notas del
+   DT en una chincheta que las abre en el riel. El aire que eso libera se invierte en
+   SEPARAR los nodos, nunca en agrandarlos — lo que satura no es el tamaño de cada rasgo,
+   es la cercanía entre ramas. */
 const VB = { w: 1200, h: 700 };
 const PITCH = { x: 40, y: 78, w: 1120, h: 588 };
 const RIGHT = PITCH.x + PITCH.w;         // línea de fondo rival
@@ -102,7 +98,7 @@ function arrow(a, b, bend, color, on) {
     marker-end="url(#${on ? "ah-on" : "ah-off"})"/>`;
 }
 
-/* LA FORMA DICE LA RAMA (decisión PO): se eliminaron las etiquetas "Firma /
+/* LA FORMA DICE LA RAMA: se eliminaron las etiquetas "Firma /
    Respuesta / Expansión" de la cancha — la silueta del nodo lo revela, y el
    nombre de la rama solo aparece en el riel al enfocarlo.
      ○ círculo   Firma      — el jugador, tu marca propia
@@ -225,16 +221,13 @@ function pitchLines() {
 }
 
 /* ---------- LOS 5 PRINCIPIOS, en franja de cabecera ----------
-   Antes eran una columna lateral de 196px de ancho por casi todo el alto del
-   tablero: el 16% del pizarrón gastado en cinco filas. Ahora son cinco fichas
-   apaisadas sobre la línea de cal, cada una con icono + valor + una barra corta.
-   Se pierde la lectura fina del progreso (la barra pasó de 160px a 46) y se gana
-   la cancha entera: con 19 rasgos, el espacio vale más que la precisión de una
-   barra que igual se lee mejor en el número de al lado. */
+   Cinco fichas apaisadas sobre la línea de cal, cada una con icono + valor + una barra
+   corta. La barra es chica (46px) y se pierde lectura fina del progreso: con 19 rasgos el
+   espacio de cancha vale más que la precisión de una barra que igual se lee mejor en el
+   número de al lado. */
 // Paso y arranque: la franja va CENTRADA en el pizarrón desde que los Puntos de
-// Identidad se mudaron al HUD (sprint de UX). Antes las cuatro fichas se apoyaban
-// en el borde izquierdo porque el saldo escrito en tiza equilibraba la derecha; sin
-// él, esa esquina quedaba vacía y la cabecera se leía descolgada.
+// Identidad viven en el HUD: sin ese saldo escrito en tiza a la derecha, apoyar las
+// cuatro fichas en el borde izquierdo dejaba la esquina vacía y la cabecera descolgada.
 const CHIP_W = 190;          // paso entre fichas
 const CHIP_X = 230;          // dónde arranca la franja
 function principlesBand(run, f) {
@@ -263,7 +256,7 @@ function principlesBand(run, f) {
 }
 
 /* Los PUNTOS DE IDENTIDAD se anotaban acá con tiza, en la esquina superior derecha.
-   Salieron del pizarrón en el sprint de UX (5-ago): el saldo ya vive en la placa
+   Salieron del pizarrón en el sprint de UX: el saldo ya vive en la placa
    dorada del HUD, y tenerlo en los dos lados era la misma cifra con dos fuentes. */
 
 /* ---------- EL POST-IT: las notas del DT ----------
@@ -276,8 +269,7 @@ function principlesBand(run, f) {
    Era un papel de 164×174 clavado al pie de la columna izquierda — bonito, pero
    con 19 rasgos ese cuarto de tablero hace falta para el árbol. Ahora es una
    chincheta de 34px en la esquina, y lo que decía se lee en EL RIEL, el mismo
-   panel donde ya se leen las fichas de rasgos (decisión PO: cero mecanismo nuevo,
-   un solo lugar donde se lee texto largo). El papel sigue estando: es el gesto de
+   panel donde ya se leen las fichas de rasgos. El papel sigue estando: es el gesto de
    "hay una nota acá", no el texto desplegado permanentemente. */
 const NOTES = { x: 74, y: 604, r: 21 };
 export const NOTES_ID = "__notes";
@@ -355,7 +347,7 @@ export function tacticBoard(run, f, tree, { adv, deep, deepOwned, etapa, selecte
       + (master ? node(master, MASTER.x, MASTER.y, MASTER.r, color, true, selected === master.id) : "");
   }
 
-  // El tablero manda por ALTO (sprint de UX): en una pantalla fija sin scroll, el
+  // El tablero manda por ALTO: en una pantalla fija sin scroll, el
   // alto es el recurso escaso — el SVG lo llena y deriva su ancho del viewBox.
   return `<svg id="tb-svg" viewBox="0 0 ${VB.w} ${VB.h}" class="h-full w-auto max-w-full block select-none" xmlns="http://www.w3.org/2000/svg">
     <defs>

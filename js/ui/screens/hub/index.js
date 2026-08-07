@@ -4,7 +4,7 @@
    estado del torneo, plantilla, efectos y el botón del día.
    También muestra los modales de evento/conflicto del día.
 
-   ── LA CARPETA `hub/` (30-jul-2026) ────────────────────────────
+   ── LA CARPETA `hub/` ────────────────────────────
    Este archivo llegó a 889 líneas (presupuesto §6: 500) y se partió
    por responsabilidad, sin tocar una sola regla:
      hub/rival.js  el rival: su card, el Informe y la Oportunidad
@@ -44,7 +44,7 @@ import { actionCard, renderCalendarCard, showDaily, showDayEvent, showRandomEven
  * que al volver al hub arranca el día siguiente — no el del partido).
  */
 function pasarDia() {
-  // Guarda anti doble-día (bug del PO, 21-jul-2026: "a veces doble evento"). Todo camino
+  // Guarda anti doble-día (bug del PO, "a veces doble evento"). Todo camino
   // legítimo hasta acá deja la pantalla SIN modal (el botón del hub, o el post-partido que
   // cierra el suyo antes de navegar); si hay uno abierto es porque la cadena Daily→evento
   // de este día ya está en curso y el disparo es repetido (doble clic).
@@ -77,7 +77,7 @@ export function renderHub(opts = {}) {
     : STAGE_LABEL[run.stage]) + ` · ${dayLabel(run.day)}`;
 
   const available = run.squad.filter(p => !p.suspendido && p.lesionadoPartidos === 0);
-  // Las BAJAS del once NO se auto-reemplazan (PO 22-jul): el caído queda a la vista (🚑/🟥)
+  // Las BAJAS del once NO se auto-reemplazan (PO): el caído queda a la vista (🚑/🟥)
   // y el DT arma el reemplazo a mano en Gestión de Plantilla — la formación tampoco cambia
   // sola. La válvula automática queda SOLO para el plantel diezmado (no llega a 6 en pie:
   // ahí no hay decisión que tomar y sin ella la run moría en softlock).

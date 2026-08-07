@@ -6,14 +6,13 @@
    acciones vive en content/daily/day-actions.js.
 
    Los eventos pueden MODIFICAR las acciones de hoy vía
-   `run.dayMod` (Bible §4.5): `actionMult` resuelve el
+   `run.dayMod`: `actionMult` resuelve el
    multiplicador de cada acción (0 = bloqueada hoy).
 
    La Oportunidad del día (run.dayOpp, escribe calendar) se
    consume por esta MISMA puerta: es una acción más que compite
    con las de siempre, con dos diferencias — el modificador del
-   día no la toca (decisión PO: es un premio externo, no una
-   acción del club) y su rareza colorea el diario.
+   día no la toca y su rareza colorea el diario.
    ============================================================ */
 import { clamp } from "../core/math.js";
 import { DAY_ACTIONS, CANJE_THRESHOLD, CANJE_PERMANENT, CANJEABLE_STATS, STAT_LABELS } from "../content/daily/day-actions.js";
@@ -47,7 +46,7 @@ export function canjeableBuffs(run) {
  * campo no tienen atajadas/reflejos/salidas: no los toca). El crecimiento nunca decrece y
  * respeta el techo de 99. Es GRATIS: no consume la Acción del Día (ya se pagó con los días
  * de Entrenar). Escribe squad[].stats — mismo caño que usan medical y los efectos de
- * content/ (ARQUITECTURA §3.1); si la progresión crece (equipo, cuerpo técnico), se muda a
+ * content/; si la progresión crece (equipo, cuerpo técnico), se muda a
  * game/progression.js. Devuelve {key, label, permanent, alcance, jugadores} para el toast y
  * el diario, o null si esa stat no llegaba al umbral (la UI no debería ofrecerlo).
  */
@@ -108,9 +107,9 @@ export function applyDayAction(run, actionId, targetName) {
   addJournal(run, isOpp
     ? { icon: a.icon, tone: a.rareza === "legendaria" ? "gold" : "good", title: a.title, desc: `Oportunidad única: ${desc}` }
     : { icon: a.icon, tone: "neutral", title: a.title, desc: `Acción del día: ${desc}${mult !== 1 ? ` (${multLabel(mult)} por "${run.dayMod.title}")` : ""}.` });
-  noteFiloMilestones(run); // un evento pudo cruzar un umbral de identidad: la conquista se narra (M2)
-  // Oxidación (R1): solo el trabajo de cancha resetea la racha — Entrenar y Táctica.
-  // Todo lo demás (Recuperar, Bonding, Oportunidades) es un día sin entrenar (decisión PO).
+  noteFiloMilestones(run); // un evento pudo cruzar un umbral de identidad: la conquista se narra
+  // Oxidación: solo el trabajo de cancha resetea la racha — Entrenar y Táctica.
+  // Todo lo demás (Recuperar, Bonding, Oportunidades) es un día sin entrenar.
   trackOxidacion(run, a.group === "entrenar" || a.group === "tactica");
   return { ...a, mult, desc };
 }

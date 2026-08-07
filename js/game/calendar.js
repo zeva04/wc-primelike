@@ -27,7 +27,7 @@ export function dayLabel(day) {
 // inevitable). Es el valor de la banda anímica "estable"; la Moral la modula (ver abajo).
 export const CONFLICT_CHANCE = 0.25;
 
-// SPRINT 2 — Moral con mordida (decisión PO 20-jul-2026): la Moral del equipo modula la
+// SPRINT 2 — Moral con mordida: la Moral del equipo modula la
 // FRECUENCIA de conflictos de vestuario de la ventana, simétrica alrededor del 0.25 base —
 // un vestuario feliz vive semanas tranquilas (menos incendios), uno hundido se llena de
 // dilemas. Es el efecto AUTO-CORRECTIVO elegido por el PO: muerde cuando ya vas mal, no
@@ -36,9 +36,9 @@ export const CONFLICT_CHANCE = 0.25;
 // ocurre en postMatchUpdate, cuando la moral ya trae el resultado del último partido.
 export const CONFLICT_CHANCE_BY_BAND = { nubes: 0.12, alta: 0.18, estable: 0.25, baja: 0.34, suelo: 0.42 };
 
-/** Probabilidad de conflicto de un día según la banda de moral del equipo (Sprint 2). */
+/** Probabilidad de conflicto de un día según la banda de moral del equipo. */
 export function conflictChanceFor(moral) { return CONFLICT_CHANCE_BY_BAND[moraleBand(moral ?? MORAL_INICIAL).id]; }
-// Probabilidad de que un día libre traiga además una Oportunidad (Bible §4.5);
+// Probabilidad de que un día libre traiga además una Oportunidad;
 // el tope de 1 por ventana lo aplica scheduleNextMatch cortando en el primer acierto.
 const OPPORTUNITY_CHANCE = 0.20;
 
@@ -46,7 +46,7 @@ const OPPORTUNITY_CHANCE = 0.20;
  * Sortea del pool por RAREZA: primero el nivel (ponderado por RARITIES.weight,
  * renormalizado entre los niveles que aún tienen entradas sin usar en la
  * ventana) y después una entrada de ese nivel. Los pools llegan ya barajados,
- * así que `pop()` es una entrada al azar del nivel. Lo usan los eventos
+ * así que `pop` es una entrada al azar del nivel. Lo usan los eventos
  * inevitables y las oportunidades.
  */
 function drawByRarity(pools) {
@@ -64,7 +64,7 @@ function drawByRarity(pools) {
  * TEMÁTICA: el detalle (y su rareza) se descubre al vivir el día.
  * Además, a lo sumo UN día libre de la ventana esconde una Oportunidad (`opp`):
  * cada día tira OPPORTUNITY_CHANCE y el primero que acierta se la lleva. El
- * calendario no la muestra — se descubre al llegar el día (decisión del PO).
+ * calendario no la muestra — se descubre al llegar el día.
  */
 export function scheduleNextMatch(run) {
   // Primer día de esta ventana de preparación: hoy en el arranque (aún no hubo partido),
@@ -76,7 +76,7 @@ export function scheduleNextMatch(run) {
   const eventPools = {};
   for (const t of Object.keys(RARITIES)) eventPools[t] = shuffle(PREP_EVENTS.filter(e => e.rareza === t));
   const conflictPool = shuffle(RANDOM_EVENTS);
-  // La Moral del equipo (post-partido) fija la turbulencia de TODA la ventana (Sprint 2).
+  // La Moral del equipo (post-partido) fija la turbulencia de TODA la ventana.
   const conflictChance = conflictChanceFor(run.moral);
   for (let d = run.day + 1; d < run.nextMatchDay; d++) {
     const kind = rnd() < conflictChance && conflictPool.length ? "conflicto" : "evento";
@@ -88,7 +88,7 @@ export function scheduleNextMatch(run) {
   for (let d = run.day + 1; d < run.nextMatchDay; d++) {
     if (rnd() >= OPPORTUNITY_CHANCE) continue;
     const opp = drawByRarity(oppPools);
-    // La Oportunidad MANDA su día (PO 22-jul, "cada día trae UNA sola cosa"): reemplaza al
+    // La Oportunidad MANDA su día (PO, "cada día trae UNA sola cosa"): reemplaza al
     // evento planificado. El día amanece 🧘 tranquilo en el calendario — la temática ya no
     // delata nada y la oferta sorprende sola (refuerza el "sin aviso previo").
     if (opp) run.dayPlan[d] = { opp: opp.id };
@@ -101,10 +101,9 @@ export function scheduleNextMatch(run) {
  *  - {type:"match"}      llegó el día de partido (sin evento ni acción: los días de partido son sagrados)
  *  - {type:"evento", …}  evento inevitable YA APLICADO, con sus datos para mostrarlo
  *  - {type:"conflicto", …} dilema pendiente: la UI muestra las opciones y aplica el effect elegido
- * Todo día sin partido deja además una Acción del Día pendiente (Bible §4.7): el evento
+ * Todo día sin partido deja además una Acción del Día pendiente: el evento
  * cambia el contexto, DESPUÉS el DT decide su inversión del día (game/day-action.js).
- * Si el evento trae `mod`, queda en `run.dayMod` y modifica las acciones SOLO hoy
- * (Bible §4.5: los eventos cambian el problema del día, no solo los números).
+ * Si el evento trae `mod`, queda en `run.dayMod` y modifica las acciones SOLO hoy.
  * Si el plan del día esconde una Oportunidad, queda viva en `run.dayOpp` — la de
  * ayer expira SIN rastro (rechazo silencioso: el silencio es el costo).
  * Devuelve null si ya es día de partido (no se puede pasar el día sin jugarlo).
@@ -116,7 +115,7 @@ export function advanceDay(run) {
   run.dayOpp = null; // la oportunidad no tomada ayer se perdió para siempre
   playWorldDay(run); // "anoche" el resto del Mundial jugó lo suyo (run.lastNight → Daily)
   const esDiaDePartido = run.day >= run.nextMatchDay;
-  // EL DESCANSO PASIVO SE ELIMINÓ (decisión PO, 2-ago-2026): pasar un día ya no
+  // EL DESCANSO PASIVO SE ELIMINÓ: pasar un día ya no
   // recupera energía por sí solo — la ÚNICA fuente es la acción 🧘 Recuperar
   // (`RECOVER_ENERGY`, day-action.js) o el descanso del banco al no jugar un partido
   // (`REST_RECOVERY`, medical.applyMedicalPostMatch, que sigue vivo: rotar sigue

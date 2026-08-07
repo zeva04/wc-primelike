@@ -1,34 +1,19 @@
-/* ============================================================
-   game/match/sequences — la máquina de Key Sequences (Bible §7).
-   Opera sobre una instancia de Match, como chances/incidents.
+/* La máquina de Key Sequences. Opera sobre una instancia de Match.
 
-   Una secuencia es una historia en miniatura de 1 a 3 actos
-   (decisión PO): cada acto es una DECISIÓN del DT que se resuelve
-   con Football Actions (actions.js). Al acertar, la jugada ESCALA
-   al acto siguiente; al fallar, CIERRA (en A1 el fallo cierra; el
-   fallo que encadena —rebote, pelota suelta— es A2). El último
-   acto del plan es el desenlace (remate / atajada).
+   Una secuencia es una historia en miniatura de 1 a 3 actos: cada acto es una
+   DECISIÓN del DT que se resuelve con Football Actions (actions.js). Al acertar la
+   jugada ESCALA al acto siguiente; al fallar CIERRA, o ENCADENA (rebote, pelota
+   suelta). El último acto del plan es el desenlace: remate o atajada.
 
-   Contrato §3.2 — la decisión `sequence`:
+   Contrato de la decisión `sequence`:
      - la crea startSequence/buildActDecision (setea m.decision)
-     - la resuelve resolveSequenceAct (acá)
+     - la resuelve resolveSequenceAct
      - la rutea screens/match.js → match.resolveSequenceAct(key)
-   Como cada acto es una decisión y tick() corta con decisión
-   pendiente, la escalera multi-acto funciona sola en la UI y en
-   el smoke sin tocar sus loops: resolver un acto puede dejar
-   OTRA decisión (el acto siguiente) y ambos loops la reprocesan.
+   Como cada acto es una decisión y tick corta con decisión pendiente, la escalera
+   multi-acto funciona sola en la UI y en el smoke sin tocar sus loops.
 
-   Los ACTOS (constructores de decisión, resolución, escalada y
-   el fallo que encadena) viven en sequence-acts.js desde A2
-   (presupuesto de líneas §6). Acá vive la GENERACIÓN: qué
-   secuencia sale, cuándo y con qué protagonista.
-
-   GENERACIÓN (decisión PO): sobre la marcha, apuntando a un
-   objetivo de 5-9 por partido modulado por la preparación (Bible:
-   la preparación determina cuántas oportunidades recibes). Se
-   decide por tick para que A3 pueda meter contexto (marcador,
-   minuto, fatiga) sin reescribir esto.
-   ============================================================ */
+   Los ACTOS viven en sequence-acts.js. Acá vive la GENERACIÓN: qué secuencia sale,
+   cuándo y con qué protagonista. */
 import { rnd, ri, pick } from "../../core/rng.js";
 import { clamp } from "../../core/math.js";
 import { playedPos } from "../ratings.js";
@@ -43,27 +28,23 @@ import { noteCorner as noteCornerStat } from "./stats.js";
 import { setBall, myHeight, oppHeight, HEIGHT_DEFAULT, zoneWeight, originOf, attackWidth, defenseWidth } from "./field.js";
 import { noteMomentum } from "./match-momentum.js";
 
-/* Rango objetivo de secuencias por partido. El Bible §7 decía "aproximadamente 2 a 6", y
-   con ticks de 5' eso alcanzaba: el partido entero duraba ~15 segundos de reloj de pared.
-   EL RELOJ CONTINUO lo rompió — con 1 minuto cada 2 s, cuatro jugadas en 90' dejan huecos
-   de 16 a 21 minutos de mediana (34-42 s mirando correr el minutero) y el PO lo reportó
-   como bug. `seqSlots` arregló la COLA repartiendo los momentos; la MEDIA solo la arregla
-   subir el número. Sprint de la Densidad (31-jul-2026, decisión PO): 5-9. */
+/* DIAL: cuántas jugadas por partido. Con el reloj continuo (1 minuto cada 2 s) este
+   número gobierna el ritmo de lo que el jugador VE: por debajo de 5 quedan huecos
+   largos mirando correr el minutero. `seqSlots` reparte la cola; la media es esto. */
 export const SEQ_MIN = 5, SEQ_MAX = 9;
 
 /**
- * Factor de presencia por Momento (A3, decisión #15): el encendido (7) pide la pelota
- * (~1.36×), el apagado (1) se esconde (~0.64×). Pondera QUIÉN protagoniza — nunca toca una
- * probabilidad de éxito: el Momento ya escala stats por statAt (sería contarlo dos veces).
- * Lo usan startSequence y la conversión def→of de sequence-acts (el mismo pick).
+ * Factor de presencia por Momento: el encendido (7) pide la pelota (~1.36×), el
+ * apagado (1) se esconde (~0.64×). Pondera QUIÉN protagoniza — nunca una probabilidad
+ * de éxito: el Momento ya escala stats por statAt, y sería contarlo dos veces.
  */
 export function protMomentum(p) { return 1 + 0.12 * ((p.momento ?? 4) - 4); }
 
 /**
- * Peso por la STAT que la jugada pide (Odisea, 2ª mitad). Un tipo puede declarar
- * `protStat`: el desborde por la banda lo corre el RÁPIDO, no un central que quedó
- * suelto. Cuadrático sobre 70 (la media del plantel): vel 95 pesa ×1.8, vel 55 ×0.6 —
- * inclina fuerte sin volverlo determinista (el segundo más rápido también juega).
+ * Peso por la STAT que la jugada pide. Un tipo puede declarar `protStat`: el desborde
+ * por la banda lo corre el RÁPIDO, no un central que quedó suelto. Cuadrático sobre 70
+ * (la media del plantel): vel 95 pesa ×1.8, vel 55 ×0.6 — inclina fuerte sin volverlo
+ * determinista, el segundo más rápido también juega.
  */
 export function protStatW(type, p) {
   if (!type.protStat) return 1;
@@ -72,46 +53,35 @@ export function protStatW(type, p) {
 }
 
 /**
- * Perfil del rival DERIVADO de sus stats (decisión PO A2, #14): sin datos nuevos, cada
- * dimensión se normaliza a 0..1 desde el promedio de sus jugadores de campo. Define qué
- * fútbol te genera (y contra qué fútbol atacas tú): atk = su peligro directo · def = su
- * solidez/intensidad (proxy de cuánto te presiona) · pase = su vocación de tener la pelota ·
- * cab = su juego aéreo. Cuando llegue Filosofía, su filosofía real reemplaza este proxy.
+ * Perfil del rival DERIVADO de sus stats: cada dimensión se normaliza a 0..1 desde el
+ * promedio de sus jugadores de campo. Define qué fútbol te genera y contra qué fútbol
+ * atacás: atk = su peligro directo · def = su solidez (proxy de cuánto te presiona) ·
+ * pase = su vocación de tener la pelota · cab = su juego aéreo. Es la BASE sobre la que
+ * multiplica su filosofía real, no un reemplazo de ella.
  */
 function rivalProfile(m) {
   const field = m.oppLineup.filter(p => p.pos !== "POR");
   const st = k => field.reduce((s, p) => s + (p.stats[k] || 50), 0) / Math.max(1, field.length);
   const N = x => clamp((x - 58) / 28, 0, 1); // ~58 (genéricos débiles) → 0 · ~86 (élite) → 1
-  // ODISEA (costura cerrada): "vocación de tener la pelota" es `pase_corto`. Un equipo que
-  // quiere la pelota es el que sabe tocarla, no el que sabe lanzarla — de hecho el que
-  // vive del pase largo es justo el que NO la quiere. Su capacidad de envío largo no entra
-  // acá: sería otra dimensión, y no se agrega un dial que nadie lee (la lección de `vel`).
+  // "Vocación de tener la pelota" es `pase_corto`: quiere la pelota el que sabe tocarla,
+  // no el que sabe lanzarla — el que vive del pase largo es justo el que NO la quiere.
   return { atk: N(st("tiro")), def: N(st("defensa")), pase: N(st("pase_corto")), cab: N(st("cabezazo")), vel: N(st("velocidad")) };
 }
 
 /**
- * LOS MOMENTOS DEL PARTIDO (fix del PO 28-jul-2026): CUÁNDO sale cada secuencia, repartido.
+ * LOS MOMENTOS DEL PARTIDO: cuándo sale cada secuencia, REPARTIDO.
  *
- * Antes se sorteaba tick a tick con una probabilidad sin memoria (`faltan / ticksQuedan`).
- * El NÚMERO por partido salía perfecto, pero los huecos eran exponenciales: medido en 300
- * partidos KOR vs ESP, mediana de **15 minutos** sin una sola jugada y p90 de **42**. Con
- * ticks de 5' eso no se veía (17 minutos eran ~2 segundos de reloj de pared); con el reloj
- * continuo son 34 segundos mirando correr el minutero, y el PO lo reportó como bug.
+ * Los minutos se sortean una vez por fase, una VENTANA por secuencia (`abre` … `cierra`).
+ * Sortear tick a tick con una probabilidad sin memoria da el número correcto por partido
+ * pero huecos exponenciales — medido: mediana de 15 minutos sin una sola jugada, p90 de
+ * 42. Con el reloj continuo eso son 30+ segundos mirando el minutero.
  *
- * Ahora los minutos se sortean UNA vez por fase: una VENTANA por secuencia y un minuto al
- * azar dentro de su ventana (con margen en los bordes para que no se peguen entre sí).
- * Misma cuenta por partido —el objetivo no se toca, el balance no se mueve—, sin sequías.
- * TODO lo que decide QUÉ secuencia sale (lado, tipo, protagonista, contexto A3/F2/T1/presión)
- * sigue pasando al DISPARARLA, no acá: esto solo reemplaza el "¿ahora?" del sorteo.
+ * Dentro de su ventana la jugada espera a que haya fútbol (`zonaViva`) y sale ahí; si el
+ * partido se queda trabado en el medio, sale igual al vencer `cierra`. La geografía elige
+ * CUÁL minuto de la ventana se usa, nunca CUÁNTAS jugadas hay: esa es ley del Territorio.
  *
- * SPRINT DE LA DENSIDAD (decisión PO): cada secuencia deja de tener un MINUTO y pasa a
- * tener una VENTANA de verdad — `abre` … `cierra`. Dentro de la ventana la jugada espera
- * a que haya fútbol (la pelota fuera del mediocampo, ver `zonaViva`) y sale ahí; si el
- * partido se queda trabado en el medio toda la ventana, sale igual al vencer `cierra`.
- * El NÚMERO de jugadas del partido no cambia por territorio —esa sigue siendo la ley del
- * sprint del Territorio (la zona decide QUÉ jugada, nunca CUÁNTAS)—: lo único que decide
- * la geografía es CUÁL de los minutos de la ventana se usa. Una jugada que nace con la
- * pelota ya movida es una jugada que el jugador entiende.
+ * Lo que decide QUÉ secuencia sale (lado, tipo, protagonista, contexto) pasa al
+ * DISPARARLA, no acá: esto solo responde "¿ahora?".
  */
 const ANTICIPO = 0.40;   // cuánto se abre la ventana antes de su vencimiento, en fracción de L
 
@@ -126,89 +96,76 @@ function seqSlots(count, desde, hasta) {
   });
 }
 
-/** ¿Hay fútbol AHORA? La pelota fuera del mediocampo: alguien está atacando o defendiendo
- *  de verdad. Medido: pasa el 35% de los minutos, así que es una puerta real —ni un
- *  pase-libre ni un cuello de botella—. No gasta azar (lee el territorio, que es
- *  determinista: la ley de la deriva). */
+/** ¿Hay fútbol AHORA? La pelota fuera del mediocampo: alguien ataca o defiende de
+ *  verdad. Pasa el ~35% de los minutos, así que es una puerta real y no un pase libre.
+ *  No gasta azar: lee el territorio, que es determinista. */
 const zonaViva = m => (m.field?.v ?? 3) !== 3;
 
 /**
  * Objetivo de secuencias del partido, ventaja y perfil rival. Se calcula UNA vez por partido
  * (cacheado en m._seqPlan). El favorito bien preparado recibe más secuencias y más ofensivas;
- * el superado, menos y más defensivas — es el pago visible de prepararse (Bible §7).
+ * el superado, menos y más defensivas — es el pago visible de prepararse.
  */
 function seqPlan(m) {
   if (m._seqPlan) return m._seqPlan;
   const { mine, opp } = m.powers();
   const edge = (mine.atk - opp.atk) + (mine.def - opp.def); // ~[-6, 6]
-  // La BASE sube (4 → 7) y la pendiente del edge NO se toca (decisión PO): el aumento de
-  // densidad es PAREJO. Es deliberado y se midió por separado — la prueba vieja que dio
-  // +8pp al favorito movía las dos cosas a la vez (base 4→6.5 Y pendiente 0.32→0.52), o
-  // sea que una parte de ese desvío no era "más jugadas" sino "más jugadas EXTRA para el
-  // que ya era favorito". Con la pendiente quieta, el débil gana en términos relativos:
-  // recibe las mismas +3 jugadas sobre una base menor.
+  // La BASE y la PENDIENTE del edge son diales separados: subir la base da más jugadas a
+  // los dos por igual, subir la pendiente se las da al favorito. Moverlos juntos fue el
+  // error medido una vez (+8pp al favorito) — si se toca la densidad, tocar solo la base.
   const target = clamp(Math.round(7 + edge * 0.32 + ri(-1, 1) * 0.5), SEQ_MIN, SEQ_MAX);
-  // La identidad del RIVAL (F2, decisión PO #4): curada o derivada, es fija por
-  // partido — se cachea con el plan. El proxy de stats (prof) queda como BASE:
-  // la filosofía multiplica encima, no lo reemplaza (un bloque de élite sigue
-  // siendo más sólido que un bloque débil).
-  // R2: la identidad rival MADURA con la profundidad del torneo (desde cuartos +1 nivel)
+  // La identidad del rival es fija por partido y madura con la profundidad del torneo.
   m._seqPlan = { target, edge, prof: rivalProfile(m), oppFilo: rivalFilo(m.oppTeam, m.koRound), slots: seqSlots(target, 0, 90) };
   return m._seqPlan;
 }
 
 /**
- * Pesos de cada tipo dentro de su lado, desde el perfil rival y la MENTALIDAD (que es una
- * palanca viva: se leen en el momento de generar, no al inicio — cambiarla a mitad de
- * partido cambia el fútbol que sale, decisión PO A2 "sesgo perceptible").
- * Lado mine (mi ataque, contra SU perfil): un rival que ataca deja espacio a la contra; un
+ * Pesos de cada tipo dentro de su lado, desde el perfil rival y la MENTALIDAD. Todo se lee
+ * EN VIVO al generar: cambiar la mentalidad a mitad de partido cambia el fútbol que sale.
+ *
+ * Lado mine (mi ataque contra SU perfil): un rival que ataca deja espacio a la contra; un
  * bloque sólido invita al juego directo y al balón parado; uno que quiere la pelota, a
- * presionarle la salida. Lado opp (su iniciativa): su ataque genera repliegues, su intensidad
- * te presiona la salida, su juego aéreo vive del córner.
+ * presionarle la salida. Lado opp (su iniciativa): su ataque genera repliegues, su
+ * intensidad te presiona la salida, su juego aéreo vive del córner.
  */
 function typeWeights(m, side, plan) {
   const prof = plan.prof;
   const ment = m.my.mentalidad;
-  // Contexto dinámico (A3, decisión #9): TODO se lee EN VIVO al generar, nunca se cachea
-  // (seqPlan cachea target/edge/perfil; el partido —marcador, minuto, fatiga— cambia).
+  // Contexto dinámico: nunca se cachea. seqPlan cachea target/edge/perfil; el partido
+  // —marcador, minuto, fatiga— cambia y se lee al momento de generar.
   const losingLate = m.min >= 75 && m.gMy < m.gOpp;   // perder tarde → fútbol directo
   const winningLate = m.min >= 75 && m.gMy > m.gOpp;  // ganar tarde → el rival te empuja
   const act = m.activeMine();
   const tired = act.reduce((s, p) => s + p.energia, 0) / Math.max(1, act.length) < 55;
-  // [MORAL → OCASIONES] (A3, decisión #10): la Moral sesga el TIPO, nunca el número. Llega
-  // por matchCtx (el Match no conoce la run). Extremos fuertes + leves: en las nubes el
-  // equipo se anima (presiona y corre); por el suelo, se asusta (revienta, no presiona).
+  // [MORAL → OCASIONES]: la Moral sesga el TIPO, nunca el número. En las nubes el equipo
+  // se anima (presiona y corre); por el suelo se asusta (revienta y no presiona).
   const band = moraleBand(m.my.moral ?? 50).id;
   const brave = band === "nubes" ? 1.5 : band === "alta" ? 1.2 : 1;
   const scared = band === "suelo" ? 1.5 : band === "baja" ? 1.2 : 1;
   const noPress = band === "suelo" ? 0.6 : band === "baja" ? 0.8 : 1;
-  // Las AVANZADAS (M2) arrancan en 0: el pool las contiene para todos, pero solo
-  // applyFiloWeights les da peso — al dueño de la filosofía, desde nivel 1. Un 0
-  // explícito, porque el pick usa `w[t.id] ?? 1`: sin esto jugarían gratis.
+  // Las AVANZADAS arrancan en 0: el pool las contiene para todos, pero solo
+  // applyFiloWeights les da peso, al dueño de la filosofía. El 0 es explícito porque el
+  // pick usa `w[t.id] ?? 1`: sin esto jugarían gratis.
   const w = side === "mine" ? {
     circulacion: 3,
     transicion: (2.5 + 2 * prof.atk) * (losingLate ? 1.5 : 1) * brave,
     recuperacion: (2 + 1.5 * prof.pase) * (ment === "ofensiva" ? 1.6 : 1) * (tired ? 0.6 : 1) * brave * noPress,
     pelotazo: (1.3 + 1.8 * prof.def) * (ment === "defensiva" ? 1.5 : 1) * (losingLate ? 1.5 : 1) * (tired ? 1.4 : 1) * scared,
-    // El desborde (Odisea): la respuesta clásica al rival que se encierra — cuanto más
-    // sólido y junto está el bloque rival, más sentido tiene ir por afuera. Cansado no
-    // sale (el sprint es lo primero que se pierde) y perdiendo tarde se busca más.
-    // Y se va a buscar la ESPALDA LENTA (`prof.vel`, el dial que se calculaba sin usar):
-    // contra una zaga que no corre, la banda es el camino; contra laterales rápidos, no.
-    // El término está CENTRADO —1.0 fijo + 1.0·(1−vel), que promedia los 1.5 de antes—
-    // así el desborde discrimina por el rival sin aparecer más seguido en promedio.
+    // El desborde: la respuesta clásica al que se encierra — cuanto más sólido y junto
+    // el bloque rival, más sentido tiene ir por afuera. Cansado no sale (el sprint es lo
+    // primero que se pierde) y perdiendo tarde se busca más. Busca la ESPALDA LENTA: el
+    // término va CENTRADO en 1.0 para que discrimine por rival sin salir más seguido.
     banda: (1.0 + 1.5 * prof.def + 1.0 * (1 - prof.vel)) * (losingLate ? 1.4 : 1) * (tired ? 0.7 : 1) * brave,
     balon_parado: 1.5,
-    // LAS DOS JUGADAS DEL TERRITORIO (T4). La salida desde el área no necesita un
-    // multiplicador de contexto: su gate es GEOGRÁFICO — solo aparece cuando la pelota
-    // está de verdad en mi fondo (el bloque bajo la ve mucho; el alto, casi nunca).
+    // La salida desde el área no lleva multiplicador de contexto: su gate es GEOGRÁFICO,
+    // solo aparece con la pelota en mi fondo (el bloque bajo la ve mucho; el alto casi no).
     salida_corta: 2.2,
-    // La espalda, en cambio, sí lee al rival: es la respuesta al bloque adelantado y
-    // contra un equipo metido atrás prácticamente no existe (no hay espalda que atacar).
+    // La espalda sí lee al rival: es la respuesta al bloque adelantado, y contra un equipo
+    // metido atrás prácticamente no existe — no hay espalda que atacar.
     espalda: Math.max(0.3, 1 + 0.55 * (oppHeight(m) - HEIGHT_DEFAULT)) * 1.4 * (losingLate ? 1.3 : 1),
-    // EL CAMBIO DE FRENTE (Eje Horizontal): la respuesta al bloque JUNTO — cuanto más
-    // sólido y amontonado está el rival, más sentido tiene mandarla al otro carril. La
-    // amplitud lo gatea abajo (widthWeights): sin nadie del otro lado, no hay a quién.
+    // EL CAMBIO DE FRENTE: la respuesta al bloque JUNTO — cuanto más amontonado el rival,
+    // más sentido tiene mandarla al otro carril. La amplitud lo gatea en widthWeights:
+    // sin nadie del otro lado, no hay a quién cambiarle el frente.
     cambio_frente: (0.9 + 1.1 * prof.def) * (tired ? 0.8 : 1),
     caceria: 0, sinfonia: 0, contra_letal: 0,
   } : {
@@ -220,28 +177,27 @@ function typeWeights(m, side, plan) {
   heightWeights(m, side, w);
   widthWeights(m, side, w);
   applyFiloWeights(m, side, w, plan.oppFilo);
-  // EL BOTÓN DE PRESIÓN: mientras corre la ráfaga el partido GENERA otro fútbol —
-  // se roba arriba mucho más y no se revienta la pelota. Va DESPUÉS de la filosofía
-  // (mismo criterio que las avanzadas de M2: hereda matriz y firmas ya aplicadas).
+  // EL BOTÓN DE PRESIÓN: mientras corre la ráfaga el partido GENERA otro fútbol — se roba
+  // arriba mucho más y no se revienta la pelota. Va DESPUÉS de la filosofía, para heredar
+  // la matriz y las firmas ya aplicadas.
   if (side === "mine" && pressOn(m)) for (const k of Object.keys(PRESS_POOL)) if (w[k] > 0) w[k] *= PRESS_POOL[k];
   // Memoria de secuencias: no repetir el mismo tipo dos veces seguidas (el partido varía).
   if (m._lastSeqType && w[m._lastSeqType] !== undefined) w[m._lastSeqType] = 0;
   return w;
 }
 
-/* ── [LA ALTURA DEL BLOQUE → EL POOL] (sprint del Territorio, T3) ──────────────
-   El DT decide DÓNDE se juega y eso decide QUÉ jugadas existen. Nunca CUÁNTAS (la
-   densidad no se toca en este sprint) ni con qué probabilidad de gol: el territorio
-   no puede ser un modificador de poder escondido — misma ley que la Filosofía.
+/* ── [LA ALTURA DEL BLOQUE → EL POOL] ─────────────────────────────────────────
+   El DT decide DÓNDE se juega y eso decide QUÉ jugadas existen. Nunca CUÁNTAS ni con
+   qué probabilidad de gol: el territorio no puede ser un modificador de poder
+   escondido, misma ley que la Filosofía.
 
-   Todo vale ×1 con el bloque MEDIO. Es deliberado: la línea base medida del juego
-   se juega en medio, así que el balance calibrado NO se mueve por el solo hecho de
-   que esta palanca exista; lo que se mide aparte es que ninguna altura domine.
+   Todo vale ×1 con el bloque MEDIO — es el punto neutro del dial, y por eso la línea
+   base calibrada del juego no se mueve por el solo hecho de que la palanca exista.
 
-   El fútbol que codifica: arriba se roba arriba y no se revienta la pelota; abajo
-   se revienta y se sale de contra. Y la ESPALDA es simétrica — mi contra vive del
-   bloque rival adelantado, y mi bloque adelantado le regala el mismo fútbol a él
-   (eso lo cobra `field.backlineRisk` en el canal del pelotazo a la espalda). */
+   El fútbol que codifica: arriba se roba arriba y no se revienta la pelota; abajo se
+   revienta y se sale de contra. La ESPALDA es simétrica: mi contra vive del bloque
+   rival adelantado, y mi bloque adelantado le regala ese mismo fútbol a él (lo cobra
+   `field.backlineRisk`). */
 const famOf = id => ADV_SOURCE[id] || id;
 const mulFam = (w, fam, f) => { for (const k of Object.keys(w)) if (famOf(k) === fam && w[k] > 0) w[k] *= f; };
 
@@ -252,11 +208,10 @@ function heightWeights(m, side, w) {
     mulFam(w, "recuperacion", 1 + 0.28 * a);
     mulFam(w, "pelotazo", 1 - 0.20 * a);
     mulFam(w, "transicion", (1 - 0.10 * a) * (1 + 0.18 * o));
-    // El bloque rival ROTA el pool, no lo encoge: lo que la contra pierde contra un
-    // equipo que espera, lo ganan las dos respuestas clásicas al bloque bajo —
-    // circular con paciencia e ir por afuera. (Medido: sin esta rotación, la altura
-    // rival le comía −2.8pp al favorito con MI bloque en medio, o sea que la palanca
-    // movía la línea base sin que el DT tocara nada.)
+    // El bloque rival ROTA el pool, no lo encoge: lo que la contra pierde contra un equipo
+    // que espera lo ganan las dos respuestas clásicas al bloque bajo, circular con
+    // paciencia e ir por afuera. Sin la rotación la altura rival mueve la línea base sin
+    // que el DT toque nada (medido: −2.8pp al favorito con mi bloque en medio).
     mulFam(w, "circulacion", (1 + 0.06 * a) * (1 - 0.10 * o));
     if (w.banda) w.banda *= 1 - 0.10 * o;
   } else {
@@ -273,33 +228,27 @@ function heightWeights(m, side, w) {
 export const typeWeightsFor = (m, side) => typeWeights(m, side, seqPlan(m));
 
 /**
- * [LA AMPLITUD → EL POOL] (sprint del Eje Horizontal): una línea de TRES ocupa los tres
- * carriles y una de UNO solo el centro, así que el dibujo decide cuánto fútbol por afuera
- * existe. Neutro (×1) en las líneas de DOS — el punto medio del dial, igual que el bloque
- * medio en la altura: la línea base medida no se mueve porque la lectura exista.
- *
- * Del lado rival es el espejo: una zaga que cubre las bandas recibe menos ataques por
- * afuera, y una que no las cubre los invita.
+ * [LA AMPLITUD → EL POOL]: una línea de TRES ocupa los tres carriles y una de UNO solo el
+ * centro, así que el dibujo decide cuánto fútbol por afuera existe. Neutro (×1) en las
+ * líneas de DOS, el punto medio del dial — igual que el bloque medio en la altura.
  */
 function widthWeights(m, side, w) {
   if (side !== "mine") return;
   const a = attackWidth(m);            // −1 (todo por el medio) … +1 (los tres carriles)
   mulFam(w, "banda", 1 + 0.35 * a);
   mulFam(w, "cambio_frente", 1 + 0.60 * a);   // ES la jugada del ancho
-  // Y ROTA la mezcla en vez de inflarla (la lección medida del arco del Territorio: un
-  // dial de contexto que solo SUBE una familia diluye a todas las demás y termina
-  // castigando al dibujo que quería premiar). El que no tiene a nadie por afuera ataca
-  // por dentro: más circulación, más pelotazo, más pelota a la espalda.
+  // ROTA la mezcla en vez de inflarla: un dial de contexto que solo SUBE una familia
+  // diluye a todas las demás y termina castigando al dibujo que venía a premiar. El que
+  // no tiene a nadie por afuera ataca por dentro: más circulación, pelotazo y espalda.
   mulFam(w, "circulacion", 1 - 0.12 * a);
   mulFam(w, "pelotazo", 1 - 0.10 * a);
   mulFam(w, "espalda", 1 - 0.10 * a);
 }
 
 /* La amplitud DEFENSIVA no toca el pool: se expresa donde está el fútbol —cortar por
-   afuera y el remate que nace de una banda cubierta (sequence-acts)—. Tocar el pool
-   rival resultó un canal escondido: bajarle peso al repliegue le subía la cuota a la
-   salida asfixiada y al córner en contra, que son PEORES para mí. Medido: −3.6pp al
-   3-1-1, el dibujo al que la amplitud defensiva venía a premiar. */
+   afuera y el remate que nace de una banda cubierta, en sequence-acts—. Tocar el pool
+   rival es un canal escondido: bajarle peso al repliegue le sube la cuota a la salida
+   asfixiada y al córner en contra, que son PEORES para mí (medido: −3.6pp al 3-1-1). */
 
 /**
  * Cuánto inclina la ALTURA el reparto de iniciativa: el que vive arriba tiene la
@@ -308,35 +257,29 @@ function widthWeights(m, side, w) {
  */
 export const heightShareShift = m => 0.045 * (myHeight(m) - HEIGHT_DEFAULT) - 0.02 * (oppHeight(m) - HEIGHT_DEFAULT);
 
-/* [MATRIZ DE COUNTERS] — el CICLO, contado en fútbol (sprint del Rival que Decide,
-   decisión PO 1-ago-2026; nació en F2 como 7 celdas ad hoc con 9 cruces vacíos).
+/* [MATRIZ DE COUNTERS] — el CICLO, contado en fútbol.
 
-   La LEY vive en content/philosophies.COUNTER_CYCLE (Press > Posesión > Bloque >
-   Contra > Press). Esta tabla NO decide quién le gana a quién: solo cuenta, en tipos
-   de jugada, lo que el ciclo ya decidió. `philosophy.test` verifica celda por celda
-   que la dirección de cada una coincida con `counterEdge` — la prosa y los números no
-   pueden divergir de la ley nunca más.
+   La LEY vive en content/identity/philosophies.COUNTER_CYCLE (Press > Posesión >
+   Bloque > Contra > Press). Esta tabla NO decide quién le gana a quién: solo cuenta,
+   en tipos de jugada, lo que el ciclo ya decidió. `philosophy.test` verifica celda por
+   celda que su dirección coincida con `counterEdge`, así la prosa y los números no
+   pueden divergir de la ley.
 
-   El patrón es uno solo: en cada arista A > B, la FIRMA de A se agranda contra B
-   (×1.35/1.40) y la FIRMA de B se achica contra A (×0.72 ≈ 1/1.35, para que el pool
-   se conserve). Los neutros del ciclo —Press↔Bloque y Posesión↔Contra— no tienen
-   celda, y eso es la ausencia diciendo algo, no un hueco.
+   El patrón es uno solo: en cada arista A > B la FIRMA de A se agranda contra B
+   (×1.35/1.40) y la FIRMA de B se achica contra A (×0.72 ≈ 1/1.35, para que el pool se
+   conserve). Los neutros del ciclo —Press↔Bloque y Posesión↔Contra— no tienen celda:
+   la ausencia dice algo, no es un hueco.
 
-   OJO CON EL CANAL. Está medido (ROADMAP-rival §2, n=2000/celda): la matriz mueve el
-   share de tipos hasta ×2 y el win% **0.0pp** — la interacción del matchup era cero.
-   Esta tabla es el NARRADOR del ciclo: cambia qué fútbol sale, que es lo que el Bible
-   §5 le pide a una filosofía. Los DIENTES viven en `filoShareShift`, el canal de
-   posesión, que sí muerde (~0.8pp de win% por 0.01 de share). */
+   OJO CON EL CANAL: esta matriz mueve el share de tipos hasta ×2 y el win% 0.0pp
+. Es el NARRADOR del ciclo — cambia qué fútbol sale, que es lo
+   que se le pide a una filosofía. Los DIENTES viven en `filoShareShift`. */
 const MATRIX = {
   mine: {
     // Press > Posesión — su salida es mi festín; y sin nadie a quien cazar, mi presión
-    // corre al vacío contra el que espera (Contra me gana).
+    // corre al vacío contra el que espera.
     "press|posesion": { recuperacion: 1.4 },
     "press|contra": { recuperacion: 0.72 },
-    // Posesión > Bloque — LA CELDA QUE SE DIO VUELTA. Era ×0.65 + pelotazo forzado, y
-    // convivía con `bloque|posesion` (abajo) haciendo el cruce LOSE-LOSE: las dos
-    // sillas penalizadas. Ahora la paciencia rompe la muralla, como decía su propia
-    // prosa de scouting ("derribar la muralla exige paciencia").
+    // Posesión > Bloque — la paciencia rompe la muralla.
     "posesion|bloque": { circulacion: 1.35 },
     "posesion|press": { circulacion: 0.72 },
     // Bloque > Contra — el duelo directo contra el que también espera lo gana el que
@@ -351,16 +294,14 @@ const MATRIX = {
     "contra|contra": { transicion: 0.6 },
   },
   opp: {
-    // La otra silla de Posesión > Bloque: me sitian, más repliegues en mi área. Sobrevive
-    // intacta al rediseño porque el ciclo mantiene la dirección — y con ella sobrevive su
-    // neutralizador, La Fortaleza Inexpugnable.
+    // La otra silla de Posesión > Bloque: me sitian, más repliegues en mi área. Su
+    // neutralizador es La Fortaleza Inexpugnable.
     "bloque|posesion": { repliegue: 1.35 },
   },
 };
-/** La celda del cruce, o null. EXPUESTA para que los tests puedan verificar dos cosas
- *  que antes se escribían a mano y por lo tanto derivaban: (1) que la dirección de cada
- *  celda coincide con `counterEdge` —la matriz no puede contradecir al ciclo—, y (2) que
- *  los rasgos neutralizadores devuelven a tablas la celda REAL y no una copiada. */
+/** La celda del cruce, o null. EXPUESTA para que los tests verifiquen que su dirección
+ *  coincide con `counterEdge` y que los rasgos neutralizadores devuelven a tablas la
+ *  celda REAL y no una copia. */
 export const counterCell = (side, myId, oppId) => MATRIX[side]?.[`${myId}|${oppId}`] || null;
 /** Todos los cruces declarados, como [side, miFilo, suFilo, pesos]. Solo para tests. */
 export const counterCells = () => Object.entries(MATRIX).flatMap(([side, cells]) =>
@@ -372,15 +313,13 @@ export const counterCells = () => Object.entries(MATRIX).flatMap(([side, cells])
 const RIVAL_FIRMA_OPP = { press: "salida_fondo", posesion: "repliegue" };
 
 /**
- * Todo el sesgo de FILOSOFÍA sobre el pool en un solo lugar (F1 + F2; extraído para que
- * typeWeights no se vuelva sopa — riesgo registrado del arco): mi firma por nivel
- * (×1.35/×1.7/×2.1, F1) · la matriz de counters mía×rival · la firma rival por SU nivel.
- * Muta `w` in place. Todo se lee EN VIVO al generar (nada cacheado salvo oppFilo, fijo).
+ * Todo el sesgo de FILOSOFÍA sobre el pool en un solo lugar: mi firma por nivel · la
+ * matriz de counters mía×rival · la firma rival por SU nivel. Muta `w` in place y se lee
+ * EN VIVO al generar (nada cacheado salvo oppFilo, que es fijo por partido).
  */
-// M2 — de qué tipo BASE se desprende cada avanzada (su peso es una fracción del de la
-// familia, ya multiplicado por el nivel de la firma cuando es lado mine): a nivel 1 la
-// avanzada asoma (×0.6 de su base), en Consolidada casi lo iguala (×0.9). La fortaleza
-// vive del lado opp (nace del repliegue: el Bloque castiga desde su trinchera).
+// De qué tipo BASE se desprende cada avanzada: su peso es una FRACCIÓN del de su familia
+// — a nivel 1 asoma (×0.6), en Consolidada casi la iguala (×0.9). La fortaleza vive del
+// lado opp: el Bloque castiga desde su trinchera.
 const ADV_SOURCE = { caceria: "recuperacion", sinfonia: "circulacion", contra_letal: "transicion", fortaleza: "repliegue" };
 const ADV_SHARE = [0.6, 0.9]; // [nivel 1, nivel 2]
 
@@ -388,72 +327,64 @@ const ADV_SHARE = [0.6, 0.9]; // [nivel 1, nivel 2]
  *  para saltar al último acto (Sin Escalas) antes de que exista `m.seq.plan`. */
 const planOfType = type => type.plan;
 
-/** La FAMILIA de un tipo: la avanzada pertenece a su tipo base (cacería ES
- *  recuperación profunda). Los hooks de rasgos que no canibalizan la jugada
- *  avanzada matchean por familia (T1, hallazgo del gate: sin esto, el rasgo
- *  básico se apagaba justo cuando la identidad consolidaba y la avanzada
- *  desplazaba a su base — share 0.9). */
+/** La FAMILIA de un tipo: la avanzada pertenece a su tipo base (cacería ES recuperación
+ *  profunda). Los hooks de rasgos matchean por familia — si matchearan por id, el rasgo
+ *  básico se apagaría justo al consolidar, cuando la avanzada desplaza a su base. */
 export const familyOf = type => ADV_SOURCE[type.id] || type.id;
 
 function applyFiloWeights(m, side, w, oppFilo) {
   const filo = m.my.filo;
-  // F1 — mi tipo firma pesa por mi nivel (llega por matchCtx, como la moral).
-  // T1: nivel FINO (0..9, mult interpolado ×1.35→×2.10) — cada sesión táctica
-  // se siente en el pool; el rival sigue en etapas (abajo).
+  // Mi tipo firma pesa por mi nivel, fino (0..9, mult interpolado ×1.35→×2.10): cada
+  // nivel se siente en el pool. El rival usa la escala de ETAPAS (más abajo).
   if (filo) {
     const t = FIRMA_TYPE[filo.id];
     if (w[t] !== undefined && w[t] > 0) w[t] *= FILO_LEVELS[filo.nivel]?.mult || 1;
   }
-  // F2 — matriz de counters (solo si ambos tienen identidad; el rival siempre tiene)
+  // Matriz de counters (solo si ambos tienen identidad; el rival siempre tiene)
   if (filo && oppFilo) {
     const cell = MATRIX[side][`${filo.id}|${oppFilo.id}`];
     if (cell) for (const k of Object.keys(cell)) { if (w[k] !== undefined) w[k] *= cell[k]; }
   }
-  // F2 (ajuste PO tras el gate: el Bloque medía −5.5pp con puros palos) — el arma
-  // propia del Bloque: el balón parado ES su gol (el scouting ya lo decía). No es
-  // celda de matriz: es su fortaleza incondicional, como la firma.
+  // El arma propia del Bloque: el balón parado ES su gol. No es celda de matriz — es su
+  // fortaleza incondicional, como la firma.
   if (filo?.id === "bloque" && side === "mine") w.balon_parado *= 1.3;
-  // T1/T3 — los RASGOS también sesgan el pool (Amplitud vs Bloque; Abrir la Lata y
-  // La Invitación NEUTRALIZAN celdas — a tablas, jamás invertidas). Se APILAN
-  // (Amplitud ×1.25 × Lata ×1.23 devuelve la celda 0.65 a ≈1.0), condicionales al
-  // rival si el hook lo pide (vsFilo acepta id o lista).
+  // Los RASGOS también sesgan el pool, y algunos NEUTRALIZAN celdas de la matriz — a
+  // tablas, jamás invertidas. Se APILAN, y son condicionales al rival si el hook lo pide
+  // (vsFilo acepta un id o una lista).
   if (side === "mine") {
     for (const pm of traitHooks(m).poolMod || []) {
       if (pm.vsFilo && ![].concat(pm.vsFilo).includes(oppFilo?.id)) continue;
       for (const k of Object.keys(pm.weights)) if (w[k] !== undefined && w[k] > 0) w[k] *= pm.weights[k];
     }
   }
-  // T3 — La Fortaleza neutraliza el SITIO: la celda opp bloque|posesion vuelve a
-  // tablas (1.35 × 0.74 ≈ 1.0). Mismo mecanismo, lado rival.
+  // La Fortaleza neutraliza el SITIO: la celda opp bloque|posesion vuelve a tablas
+  // (1.35 × 0.74 ≈ 1.0). Mismo mecanismo, lado rival.
   if (side === "opp") {
     for (const pm of traitHooks(m).oppPoolMod || []) {
       if (pm.vsFilo && ![].concat(pm.vsFilo).includes(oppFilo?.id)) continue;
       for (const k of Object.keys(pm.weights)) if (w[k] !== undefined && w[k] > 0) w[k] *= pm.weights[k];
     }
   }
-  // T2 — Pelota Parada Ensayada: la jugada ensayada también sale MÁS seguido
-  // (se apila sobre el ×1.3 incondicional del Bloque: su arma, más afilada).
+  // Pelota Parada Ensayada: la jugada ensayada sale más seguido (se apila sobre el ×1.3
+  // incondicional del Bloque: su arma, más afilada).
   const sr = hookOf(m, "setpieceRehearsed");
   if (sr && side === "mine" && w.balon_parado > 0) w.balon_parado *= sr.poolMult;
-  // F2 — la firma rival sesga SU lado, con su nivel como magnitud (escala de
-  // ETAPAS: el rival no tiene escalera fina — sus mults F2 quedan exactos, T1).
-  // T3 — Asfixia Total le pone BOZAL a esa firma: la identidad rival se expresa
-  // mucho menos (×0.6 sobre su mult) — no ataca menos: renuncia a SU fútbol.
+  // La firma rival sesga SU lado, con su nivel como magnitud (escala de ETAPAS: el rival
+  // no tiene escalera fina). Asfixia Total le pone BOZAL: la identidad rival se expresa
+  // mucho menos — no ataca menos, renuncia a SU fútbol.
   if (oppFilo && side === "opp") {
     const t = RIVAL_FIRMA_OPP[oppFilo.id];
     const muzzle = hookOf(m, "muzzleOppFirma");
     if (t && w[t] !== undefined) w[t] *= (FILO_ETAPAS[oppFilo.nivel]?.mult || 1) * (muzzle ? muzzle.factor : 1);
     if (oppFilo.id === "bloque") { w.balon_parado_def *= 1.3; w.salida_fondo *= 0.6; }
   }
-  // M2 — la secuencia AVANZADA de mi filosofía entra al pool desde En desarrollo
-  // (nivel 1) y en Consolidada casi desplaza a su tipo base. REPARTE el peso de la
-  // familia, no lo suma (medido: sumar inflaba el volumen de la familia y hundía a las
-  // identidades cuyas jugadas cargan riesgo — Contra −5pp). VA AL FINAL a propósito:
-  // la avanzada hereda TODO lo que la matriz y las firmas le hicieron a su familia —
-  // si tu transición vale ×0.6 contra un bloque, tu Contragolpe letal también (medido:
-  // repartir ANTES de la matriz dejaba al letal sobre-jugado justo en sus peores cruces).
-  // Bible regla 3: la progresión desbloquea GENERACIÓN — la avanzada REEMPLAZA a tu
-  // fútbol básico: quien no entrena su idea se queda en él.
+  // La secuencia AVANZADA de mi filosofía entra al pool desde En desarrollo y en
+  // Consolidada casi desplaza a su tipo base: la progresión desbloquea GENERACIÓN.
+  //
+  // REPARTE el peso de la familia, no lo suma — sumarlo infla el volumen de la familia y
+  // hunde a las identidades cuyas jugadas cargan riesgo (medido: Contra −5pp). Y va AL
+  // FINAL para que herede lo que la matriz y las firmas le hicieron a su familia: si tu
+  // transición vale ×0.6 contra un bloque, tu Contragolpe Letal también.
   if (filo && filo.etapa >= 1) {
     const advId = ADVANCED_BY_FILO[filo.id]?.id;
     if (advId && w[advId] !== undefined) {
@@ -465,53 +396,31 @@ function applyFiloWeights(m, side, w, oppFilo) {
   }
 }
 
-/* EL DIENTE DEL CICLO (sprint del Rival que Decide, decisión PO 1-ago-2026).
+/* EL DIENTE DEL CICLO: el ciclo de counters muerde ACÁ, en el reparto de iniciativa, y
+   no en la matriz de pool.
 
-   Por qué acá y no en la matriz de pool. Medido en banco de plantel fijo, BRA vs GER,
-   n=2000 por celda, nivel 10, grupos (ROADMAP-rival §2): descomponiendo el win% en
-   fila + columna + interacción, **el residuo de interacción máximo fue 0.65pp contra
-   un error estándar de 1.02pp**. La matriz movía el share de tipos hasta ×2 —Contra
-   pasaba de 27.4% de transiciones contra Press a 13.5% contra otro Contra— y el
-   resultado no se movía NADA. Es la misma lección que R3 ya había dejado escrita:
-   "los sesgos de pool miden ~0pp".
+   Es la lección más cara del proyecto y conviene no volver a pagarla: los sesgos de POOL
+   miden ~0pp de win%. Medido con plantel fijo, n=2000 por celda — la matriz movía el
+   share de tipos hasta ×2 (Contra pasaba de 27.4% de transiciones a 13.5%) y el residuo
+   de interacción del resultado fue 0.65pp contra un error estándar de 1.02pp: cero.
 
-   Toda la variación real de matchup que existía hoy salía de ESTA función. Su tabla
-   predecía el win% medido casi punto por punto: el rival que espera me cede pelota y
-   yo gano más. El tipo de cambio del canal, medido: **~0.8pp de win% por 0.01 de
-   share**. Así que el ciclo se muda acá, que es donde el fútbol se decide.
-
-   Y es VISIBLE por construcción, que era el otro requisito: la posesión se ve en las
-   estadísticas del partido y se siente en cuántas jugadas propone cada uno. No hace
-   falta una línea de UI para que el DT note que le están quitando la pelota. */
+   El canal de POSESIÓN sí muerde: ~0.8pp de win% por 0.01 de share. Y es VISIBLE por
+   construcción — la posesión se ve en las estadísticas y se siente en cuántas jugadas
+   propone cada uno, sin necesidad de una línea de UI que lo explique. */
 export const CICLO_SHARE = 0.05;
 
 /**
- * Cuánto inclina la FILOSOFÍA el reparto de iniciativa. Dos sumandos:
+ * Cuánto inclina la FILOSOFÍA el reparto de iniciativa. Puro. Dos sumandos:
  *
- * 1. COSTOS DE IDENTIDAD (F2, con la fila de Contra RETIRADA): mi Bloque sigue
- *    cediendo volumen ofensivo (−0.08 — era −0.10, ajuste PO tras medir el gate: el
- *    Bloque cargaba −5.5pp de piso); el rival que espera me la cede a mí (contra
- *    +0.04 · bloque +0.06). Son de la IDENTIDAD, no del cruce: se pagan contra todos.
- *
- *    LA FILA DEL CONTRA (sprint del Rival que Decide, hallazgo post-cierre): el −0.05
- *    de "mi Contra cede posesión" nació en F2 para compensar que el counter vivía en
- *    el pool y necesitaba un costo. Con el pool degradado a narrador (0.0pp) ese costo
- *    quedó huérfano, y se APILABA con el diente nuevo en el MISMO canal: en el cruce
- *    que Contra gana (vs Press), −0.05 + diente (+0.05) = 0.00 — el diente se anulaba
- *    a sí mismo. Posesión y Press no pagan costo de identidad, así que se quedaban con
- *    el diente entero en su propio cruce favorable. Medido (banco BRA vs GER,
- *    n=2500/celda): la fila de Contra rendía −2.5pp de share NETO medio contra los 4
- *    rivales — Press y Posesión +2.5pp cada una — y eso bajaba al Contra a la peor
- *    identidad de las cuatro en el resultado, pese a que Bloque paga MÁS costo en
- *    papel (su formación defensiva 3-1-1 lo compensa; la 2-2-1 de Contra no tiene ese
- *    colchón). Se retira el costo: Contra vuelve a jugar el ciclo en pie de igualdad
- *    con Press y Posesión, como ellas dos.
+ * 1. COSTOS DE IDENTIDAD: mi Bloque cede volumen ofensivo (−0.08) y el rival que espera
+ *    me cede a mí (contra +0.04 · bloque +0.06). Son de la IDENTIDAD y no del cruce: se
+ *    pagan contra todos. Solo el Bloque paga costo propio — su formación 3-1-1 se lo
+ *    compensa; cobrárselo también al Contra lo hundía a la peor identidad de las cuatro,
+ *    porque el costo se apilaba con el diente en el MISMO canal y lo anulaba.
  *
  * 2. EL CICLO: ±CICLO_SHARE según `counterEdge`. Es de suma cero por construcción
- *    —`mineShare` es un solo número, así que lo que gano se lo saco—, y por eso el
- *    ciclo no puede inflar el partido: solo decide de quién es.
- *
- * Puro.
+ *    —`mineShare` es un solo número—, así que el ciclo no puede inflar el partido: solo
+ *    decide de quién es la pelota.
  */
 export function filoShareShift(myFilo, oppFilo) {
   let d = 0;
@@ -521,23 +430,14 @@ export function filoShareShift(myFilo, oppFilo) {
   return d + CICLO_SHARE * counterEdge(myFilo?.id, oppFilo?.id);
 }
 
-/* filoRasgo() MURIÓ en T2 (migración F2, decisión PO #2): el efecto profundo que
-   Consolidada regalaba automático ahora se COMPRA en el árbol — el gate es
-   trait-hooks.hasTrait (gegenpressing · desesperantes · trampa_cerrada · area_blindada).
-   Consolidada da su PI, el mult 2.1 y el share 0.9 de la avanzada — nada más. */
-
-/* ============================================================
-   LA EXPERIENCIA SE GANA EN LA CANCHA (arco de Progresión,
-   28-jul-2026). Se aprende el fútbol que se juega: cada secuencia
-   le da XP a LA FILOSOFÍA DUEÑA DE ESE TIPO (filoOfType), sea o no
-   la que declaraste. El reparto del GDD:
+/* LA EXPERIENCIA SE GANA EN LA CANCHA: se aprende el fútbol que se juega. Cada
+   secuencia le da XP a LA FILOSOFÍA DUEÑA DE ESE TIPO (filoOfType), sea o no la que
+   declaraste. El reparto:
      70% INTENCIÓN   — la jugada se propuso (noteFiloIntent)
      30% EFECTIVIDAD — el acto salió bien (noteFiloHit)
-   La XP se acumula YA multiplicada por afinidad y Plan de Partido
-   (m.my.filo.mult, que arma game/philosophy.filoXpMults): así la
-   barra que se ve crecer en vivo y la que se acredita al cerrar
-   son el mismo número, y el Match sigue sin conocer la run.
-   ============================================================ */
+   Se acumula YA multiplicada por afinidad y Plan de Partido (m.my.filo.mult, que arma
+   game/philosophy.filoXpMults): la barra que crece en vivo y la que se acredita al
+   cerrar son el mismo número, y el Match sigue sin conocer la run. */
 
 /** Suma XP de identidad al Match y anuncia la SUBIDA DE NIVEL en vivo. */
 function grantFiloXp(m, filoId, base, campo) {
@@ -551,15 +451,15 @@ function grantFiloXp(m, filoId, base, campo) {
   const antes = xpLevelOf((m.my.filo.xp?.[filoId] || 0) + (m.filoXp[filoId] || 0));
   m.filoXp[filoId] = (m.filoXp[filoId] || 0) + add;
   const ahora = xpLevelOf((m.my.filo.xp?.[filoId] || 0) + m.filoXp[filoId]);
-  // SKILL-UP EN VIVO (decisión PO): el nivel sube EN el partido y el relato lo grita.
+  // SKILL-UP EN VIVO: el nivel sube DENTRO del partido y el relato lo grita.
   if (ahora > antes) {
     const f = getPhilosophy(filoId);
     m.log("filo", `${f.icon} min ${m.clock()}' — ¡${f.name.toUpperCase()} NIVEL ${ahora + 1}! El equipo entendió algo jugando: esa idea ya se sabe mejor.`);
   }
 }
 
-/** La INTENCIÓN: el equipo propuso una jugada de ese fútbol (la llama el arranque
- *  de secuencia). Es el 70% de la XP — jugar tu idea vale aunque no salga. */
+/** La INTENCIÓN: el equipo propuso una jugada de ese fútbol. Es el 70% de la XP —
+ *  jugar tu idea vale aunque no salga. */
 export function noteFiloIntent(m, type) {
   if (type?.side !== "mine" && !DEF_XP_TYPES.includes(type?.id)) return;
   grantFiloXp(m, filoOfType(type), XP_INTENCION, "filoIntentos");
@@ -568,10 +468,8 @@ export function noteFiloIntent(m, type) {
 // que se ejercita es MÍA: aguantar el bloque ES el fútbol del Bloque bajo).
 const DEF_XP_TYPES = ["repliegue", "fortaleza"];
 
-/**
- * La EFECTIVIDAD: un acto de la secuencia salió bien (lo cuentan sequence-acts) o
- * el gol la coronó (chances.goalMine). Es el 30% restante.
- */
+/** La EFECTIVIDAD: un acto salió bien (lo cuentan sequence-acts) o el gol la coronó.
+ *  Es el 30% restante. */
 export function noteFiloHit(m) {
   const s = m.seq;
   if (!s) return;
@@ -579,10 +477,9 @@ export function noteFiloHit(m) {
 }
 
 /**
- * ¿Arranca una secuencia en este tick? Cada secuencia tiene su MINUTO sorteado en el plan
- * (ventanas repartidas — ver seqSlots): arranca al pisarlo. Devuelve true (y deja
- * m.decision) si arrancó una. Todo el contexto —lado, tipo, protagonista— se decide acá,
- * en el momento, exactamente como antes.
+ * ¿Arranca una secuencia en este tick? Cada una tiene su ventana sorteada en el plan (ver
+ * seqSlots). Devuelve true (y deja m.decision) si arrancó. Todo el contexto —lado, tipo,
+ * protagonista— se decide acá, en el momento.
  */
 export function maybeStartSequence(m) {
   if (m.seq) return false; // ya hay una en curso (no debería: la decisión bloquea el tick)
@@ -601,25 +498,24 @@ export function maybeStartSequence(m) {
   const slot = plan.slots[done];
   if (slot && m.min < slot.cierra && !(m.min >= slot.abre && zonaViva(m))) return false;
   const mentShift = m.my.mentalidad === "ofensiva" ? 0.10 : m.my.mentalidad === "defensiva" ? -0.10 : 0;
-  // Contexto dinámico (A3): el partido inclina el reparto EN VIVO — perder tarde te vuelca
-  // al ataque (+0.07, y te expones: el rival gana repliegues/contras), ganar tarde te
-  // repliega (−0.05, el rival empuja), y cada expulsado inclina la cancha (±0.06).
+  // El partido inclina el reparto EN VIVO: perder tarde te vuelca al ataque (+0.07, y te
+  // expone), ganar tarde te repliega (−0.05, el rival empuja) y cada expulsado inclina la
+  // cancha (±0.06).
   const late = m.min >= 75 ? (m.gMy < m.gOpp ? 0.07 : m.gMy > m.gOpp ? -0.05 : 0) : 0;
   const reds = 0.06 * (m.oppLineup.filter(p => p.expulsado).length - m.my.lineup.filter(p => p.expulsado).length);
-  // F2: las identidades que esperan CEDEN iniciativa (mi Contra/Bloque; el rival igual)
-  // T3: los MASTER inclinan el reparto de raíz — La Pelota es Nuestra estrangula al
-  // rival por posesión (+0.06) y Contragolpe Total por MIEDO (+0.04: atacar contra
-  // esa contra es regalarse — el rival se cuida). Suma de todos los shareShift.
+  // Las identidades que esperan CEDEN iniciativa, y los rasgos MASTER inclinan el reparto
+  // de raíz: uno estrangula al rival por posesión, otro por miedo (atacar contra esa
+  // contra es regalarse, así que el rival se cuida). Suma de todos los shareShift.
   const traitShift = Object.values(traitHooks(m)).flat().reduce((s, h) => s + (h.shareShift || 0), 0);
   const mineShare = clamp(0.5 + plan.edge * 0.045 + mentShift + late + reds + filoShareShift(m.my.filo, plan.oppFilo) + traitShift + heightShareShift(m), 0.3, 0.72);
   const side = rnd() < mineShare ? "mine" : "opp";
-  // FRÍOS (Press, Master): el DT congeló el partido renunciando a un remate, y lo que
-  // compró fue esto — la próxima llegada rival NO ocurre. Se descuenta del objetivo del
-  // partido, no se pospone: si solo se retrasara, no habría comprado nada.
+  // FRÍOS: el DT congeló el partido renunciando a un remate, y lo que compró fue esto —
+  // la próxima llegada rival NO ocurre. Se DESCUENTA del objetivo del partido en vez de
+  // posponerse: si solo se retrasara, no habría comprado nada.
   if (side === "opp" && (m._frozen || 0) > 0) {
     m._frozen--;
-    // Se descuenta el objetivo Y se consume su MOMENTO: sin sacarlo de la agenda, el
-    // minuto ya vencido volvería a dispararse en el tick siguiente (y otra vez, y otra).
+    // Se consume también su MOMENTO: sin sacarlo de la agenda, el minuto ya vencido se
+    // volvería a disparar en el tick siguiente, y otra vez, y otra.
     plan.slots.splice(done, 1);
     plan.target = Math.max(done, plan.target - 1);
     m.log("plain", `min ${m.clock()}' — El equipo la hace circular sin apuro: ${m.oppTeam.name} no la ve pasar.`);
@@ -627,9 +523,9 @@ export function maybeStartSequence(m) {
   }
   const pool = SEQUENCE_TYPES.filter(t => t.side === side);
   const w = typeWeights(m, side, plan);
-  // [EL TERRITORIO DECIDE QUÉ JUGADA SALE] (T4): además de todo lo anterior, cada tipo
-  // pesa según cuán lejos está la pelota de la altura donde ese fútbol NACE. Como el
-  // sorteo normaliza dentro del lado, esto cambia la MEZCLA y nunca el número de jugadas.
+  // [EL TERRITORIO DECIDE QUÉ JUGADA SALE]: cada tipo pesa según cuán lejos está la
+  // pelota de la altura donde ese fútbol NACE. Como el sorteo normaliza dentro del lado,
+  // esto cambia la MEZCLA y nunca el número de jugadas.
   startSequence(m, m._weightedPick(pool, pool.map(t => (w[t.id] ?? 1) * zoneWeight(t, m.field?.v ?? 3, m.field?.h ?? 2))));
   return true;
 }
@@ -638,8 +534,8 @@ export function maybeStartSequence(m) {
 export function startSequence(m, type) {
   m._seqCount = (m._seqCount || 0) + 1;
   noteFiloIntent(m, type);   // la INTENCIÓN: proponer ese fútbol ya enseña (70% de la XP)
-  m._lastSeqType = type.id; // memoria del contexto dinámico: no repetir tipo dos veces seguidas
-  m._flow.push({ min: m.min, side: type.side, w: 3 }); // posesión/momentum derivados (A3, #11)
+  m._lastSeqType = type.id;  // memoria: no repetir el mismo tipo dos veces seguidas
+  m._flow.push({ min: m.min, side: type.side, w: 3 });   // posesión y momentum derivados
   // EL TERRITORIO: la jugada PLANTA la pelota donde ese fútbol nace (`zone.from` del
   // catálogo, llevado al borde más cercano) y deja mucho más calor que un minuto de
   // relleno. Del lado de quien la propone: una defensiva es SU posesión.
@@ -647,24 +543,21 @@ export function startSequence(m, type) {
   m.stats.decisiones++;
   if (type.side === "mine") {
     const cands = m.activeMine().filter(p => p.pos !== "POR");
-    // Momento → protagonista (decisión #15): ver protMomentum.
+    // Momento → protagonista: ver protMomentum.
     const prot = m._weightedPick(cands, cands.map(p => (type.protWeight[playedPos(p)] ?? 1) * protMomentum(p) * protStatW(type, p)));
     m.seq = { type, prot, actIdx: 0, bonus: 0 };
-    // El 4º compás de la sinfonía profunda: era el rasgo F2 de Posesión (Consolidada);
-    // desde T2 lo COMPRA Sitio al Área (migración al árbol, decisión PO #2).
+    // El 4º compás de la sinfonía profunda lo aporta el rasgo Desesperantes.
     if (type.id === "sinfonia" && hasTrait(m, "desesperantes")) m.seq.plan = ["build", ...type.plan];
-    // T1 — hooks de ARRANQUE del árbol de rasgos: la secuencia puede nacer en su
-    // variante del rasgo, con relato propio (el momento nombrable abre la jugada).
-    // Ambos matchean por FAMILIA (gate T1: sin esto el básico moría al consolidar).
-    // El salto de Tres Pases va al ACTO 1: en la transición base es el desenlace
-    // (la contra a una), en el contragolpe letal conserva un tramo + definición —
-    // acelera la avanzada sin canibalizar sus bonus de escalada.
+    // Hooks de ARRANQUE del árbol de rasgos: la secuencia puede nacer en su variante,
+    // con relato propio. Matchean por FAMILIA (ver familyOf). El salto va al ACTO 1: en
+    // la transición base ese es el desenlace (la contra a una) y en el contragolpe letal
+    // conserva un tramo + definición, acelerándolo sin canibalizar sus bonus de escalada.
     let traitIntro = null;
     const fam = familyOf(type);
     const vd = hookOf(m, "variantDeep", fam); // Angriffpressing: el robo nace sobre el saque de meta
     if (vd && rnd() < vd.p) {
       m.seq.bonus += vd.bonus;
-      m.seq.deepVariant = true; // Arco a la Vista (T2) profundiza ESTE desenlace
+      m.seq.deepVariant = true; // Arco a la Vista profundiza ESTE desenlace
       traitIntro = vd.intro;
     }
     // Variante condicional al RIVAL: la Salida Lavolpiana de Posesión la usa contra
@@ -674,9 +567,9 @@ export function startSequence(m, type) {
       m.seq.bonus += vs.bonus;
       traitIntro = vs.intro;
     }
-    // SIN ESCALAS (Contra, Master): la contra puede nacer YA RESUELTA — se saltean los
-    // actos intermedios y el desenlace es el mano a mano. Va antes del salto normal
-    // porque es su versión superlativa: si sale esta, la otra no se tira.
+    // SIN ESCALAS: la contra puede nacer YA RESUELTA — se saltean los actos intermedios y
+    // el desenlace es el mano a mano. Va antes del salto normal porque es su versión
+    // superlativa: si sale esta, la otra no se tira.
     const oo = fam === "transicion" ? hookOf(m, "oneOnOne") : null;
     if (oo && rnd() < oo.p) {
       m.seq.actIdx = planOfType(type).length - 1;
@@ -694,8 +587,8 @@ export function startSequence(m, type) {
         if (up) { m.seq.bonus += up.bonus; traitIntro = up.intro; }
       }
     }
-    // [RELATO CON IDENTIDAD] (F3): cuando la secuencia es MI tipo firma, la narra la
-    // filosofía ("el pressing que entrenamos toda la semana") en vez del intro genérico.
+    // [RELATO CON IDENTIDAD]: cuando la secuencia es MI tipo firma, la narra la filosofía
+    // ("el pressing que entrenamos toda la semana") en vez del intro genérico.
     const filoIntros = m.my.filo && FIRMA_TYPE[m.my.filo.id] === type.id ? getPhilosophy(m.my.filo.id).firmaIntros : null;
     m.log("event", `${type.icon} min ${m.clock()}' — ${traitIntro ? traitIntro(prot) : filoIntros ? pick(filoIntros)(prot) : type.flavor.intro(prot)}`);
   } else {
@@ -715,8 +608,8 @@ export function startSequence(m, type) {
       m.seq.prot = pool.sort((a, b) => (b.stats.pase_corto || 0) - (a.stats.pase_corto || 0))[0];
     }
     m.log("event", `${type.icon} min ${m.clock()}' — ${type.flavor.intro(m.oppTeam)}`);
-    // T3 — el bozal de Asfixia Total se NARRA de vez en cuando: el rival con identidad
-    // amordazada juega otro fútbol, y el relato lo dice (momento nombrable del rasgo).
+    // El bozal de Asfixia Total se NARRA de vez en cuando: el rival con la identidad
+    // amordazada juega otro fútbol, y el relato lo dice.
     const muzzle = hookOf(m, "muzzleOppFirma");
     const oppFilo = m._seqPlan?.oppFilo;
     if (muzzle && oppFilo && RIVAL_FIRMA_OPP[oppFilo.id] && rnd() < 0.12) traitMoment(m, muzzle.traitId, [muzzle.texto]);

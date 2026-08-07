@@ -1,6 +1,6 @@
 /* ============================================================
    ui/screens/hub/rival — TODO LO QUE SE SABE DEL QUE VIENE:
-   la card del rival del día, el Informe completo (Bible §4.6) y el
+   la card del rival del día, el Informe completo y el
    selector de Oportunidad. Mirar el informe es gratis e ilimitado: la
    curiosidad no se castiga.
    ============================================================ */
@@ -35,7 +35,7 @@ export function keyPlayers(team, max = 5) {
 }
 
 
-/* La TEMPERATURA del Modo Mundial por ronda (sprint de la Escalada): el bloque se pone
+/* La TEMPERATURA del Modo Mundial por ronda: el bloque se pone
    más caliente a medida que el torneo aprieta, para que el salto de la escalada se LEA
    antes de jugarlo. Es puro estilo — el texto lo decide game/scouting, la vista no
    conoce ninguna regla. */
@@ -47,7 +47,7 @@ const MODO_TONO = {
   5: { icon: "🏆", borde: "border-red-500", fondo: "bg-red-500/20", titulo: "text-red-200", texto: "text-red-100/80" },
 };
 
-/* EL CRUCE del ciclo de counters, en color (sprint del Rival que Decide). Verde/ámbar/
+/* EL CRUCE del ciclo de counters, en color. Verde/ámbar/
    rojo y no la escala de temperatura del Modo Mundial: aquello escala con la RONDA (todo
    ámbar→rojo), esto es un semáforo de tres estados que puede ser BUENA noticia. Si los
    dos usaran la misma paleta, un cruce a favor se leería como una amenaza. */
@@ -65,7 +65,7 @@ const NIVEL_CHIP = {
 const RES_CHIP = { V: "text-emerald-400 border-emerald-500/50", E: "text-slate-300 border-slate-500/50", D: "text-red-400 border-red-500/50" };
 
 /**
- * Modal del Informe del Rival (Bible §4.6): las tres líneas del cruce con su
+ * Modal del Informe del Rival: las tres líneas del cruce con su
  * nivel cualitativo, la figura, la forma reciente y las bajas confirmadas.
  * Gratis e ilimitado — mirar nunca gasta el día.
  */
@@ -149,7 +149,7 @@ export function showScoutReport(oppId) {
 
 
 /**
- * Card de la Oportunidad del día (Bible §4.5): la oferta única que compite con
+ * Card de la Oportunidad del día: la oferta única que compite con
  * las acciones normales. Borde y badge de su rareza; el calendario nunca la
  * anticipó y mañana no va a estar — la card lo dice. "" si hoy no hay.
  * `state`: "active" (elegible) · "chosen" (fue la acción de hoy) · "muted"

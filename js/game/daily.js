@@ -1,5 +1,5 @@
 /* ============================================================
-   game/daily — el World Cup Daily (Bible §4.4): la portada que
+   game/daily — el World Cup Daily: la portada que
    responde "¿qué cambió desde ayer?" ANTES de decidir el día.
 
    Genera 1-5 titulares desde el estado real de la run, con la
@@ -19,7 +19,7 @@
 
    El Daily INFORMA; el evento del día TRANSFORMA (llega después).
    Casi nada de acá muta la run: es una consulta de solo lectura
-   (salvo el pick() del flavor, que consume rng, y `_dailySeen`,
+   (salvo el pick del flavor, que consume rng, y `_dailySeen`,
    la memoria anti-repetición: texto → último día en portada).
    ============================================================ */
 import { pick } from "../core/rng.js";
@@ -33,13 +33,13 @@ import { PREP_EVENTS } from "../content/daily/prep-events.js";
 import { RANDOM_EVENTS } from "../content/daily/conflicts.js";
 import { buildOpponentReport } from "./scouting.js";
 
-// H6 (sprint Preparación con dientes): el framing de la previa cita UN dato del
+// H6: el framing de la previa cita UN dato del
 // Informe del Rival — la debilidad si la hay (accionable), si no la amenaza.
 const LINEA_TXT = { ataque: "su ataque", defensa: "su defensa", arquero: "su arquero" };
 function scoutHint(run, oppId) {
   const rep = buildOpponentReport(run, oppId);
   // F3 (deuda de F2): la previa NOMBRA la identidad rival — el informe completo da la lectura
-  // R2: y anuncia el MODO MUNDIAL (la escalada de eliminatorias se narra, no se sufre a
+  // y anuncia el MODO MUNDIAL (la escalada de eliminatorias se narra, no se sufre a
   // ciegas). R3: si además nos gana en idea, la brecha se nombra — improvisar se paga.
   // Sprint de la Escalada: acá tampoco va un porcentaje. El titular cita el TÍTULO de la
   // ronda que arma el informe (una sola fuente para la voz del Modo Mundial) y deja el
@@ -99,7 +99,7 @@ function worldHeadlines(run, max = 2) {
       const tW = difficultyOf(W).tier, tL = difficultyOf(L).tier;
       const gap = teamRating(L) - teamRating(W);
       // Umbral alto a propósito: con ~5 partidos por noche, un "batacazo" diario
-      // devalúa la palabra (Bible §4.4: si todos los días son espectaculares, ninguno lo es)
+      // devalúa la palabra
       if (tL === "favorito" && (tW === "sorpresa" || tW === "leyenda")) { s += 100; kind = "batacazo"; }
       else if (gap >= 12) { s += 60; kind = "batacazo"; }
       if (ko && tL === "favorito" && !kind) { s += 50; kind = "favorito_out"; }
@@ -233,7 +233,7 @@ export function buildDaily(run) {
     if (src?.teaser) items.push({ icon: "🔭", tag: "HOY", text: src.teaser });
   }
 
-  // Sin repetirse en la semana (bug PO 22-jul): un titular con EXACTAMENTE el mismo texto
+  // Sin repetirse en la semana (bug PO): un titular con EXACTAMENTE el mismo texto
   // que ya salió en los últimos 7 días se suprime — si el estado cambió (otro marcador,
   // otro lesionado), el texto cambia y vuelve a ser noticia. La PORTADA de día de partido
   // no se toca. Re-armar la edición del MISMO día no se suprime a sí misma (seen == hoy).

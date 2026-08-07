@@ -21,7 +21,7 @@
 import { rnd } from "../core/rng.js";
 import { getTeam } from "../data/teams-repo.js";
 
-// Qué fracción de los goles de jugada llevan asistencia (decisión PO 20-jul-2026):
+// Qué fracción de los goles de jugada llevan asistencia:
 // los penales y las individuales quedan sin asistidor.
 export const ASSIST_CHANCE = 0.70;
 // Peso de cada puesto al repartir asistencias: PRO-MED (el volante habilita), el DEL

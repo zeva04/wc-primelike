@@ -39,7 +39,7 @@ export function rivalLook(name, team) {
   };
 }
 
-/** Camiseta que viste el jugador (arco usa kits.gk; el resto, la titular): {shirt, accent}. */
+/** Camiseta que viste el jugador: {shirt, accent}. */
 export function kitOf(player, team) {
   const field = team.kits ? team.kits.field : (team.kit || { shirt: "#64748B", accent: "#334155" });
   const gk = team.kits ? (team.kits.gk || field) : { shirt: "#52525B", accent: "#18181B" };

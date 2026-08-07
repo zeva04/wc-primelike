@@ -5,7 +5,7 @@
    más que ganar de trámite; que te empaten al final duele más
    que un empate cualquiera; pasar de ronda celebra.
 
-   v1 (decisión PO 17-jul-2026): la moral es VISIBLE (hub, Daily,
+   v1: la moral es VISIBLE (hub, Daily,
    diario en cambios de banda) y es target de efectos de
    contenido (content/ la muta directo con clamp), pero NO tiene
    efecto mecánico en el partido todavía.
@@ -41,7 +41,7 @@ export function moraleBand(v) { return MORAL_BANDS.find(b => v >= b.min) || MORA
 // Un gol del minuto 85 en adelante es "agónico" (la prórroga entera lo es).
 const MIN_AGONICO = 85;
 
-// SPRINT 4 — interacción cruzada Momento → Moral (decisión PO 21-jul-2026): un vestuario
+// SPRINT 4 — interacción cruzada Momento → Moral: un vestuario
 // lleno de jugadores apagados hunde el ánimo colectivo. Cierra el loop individual →
 // colectivo sin sistemas nuevos: la forma de cada uno ya la calcula momentum.js, acá solo
 // se cuenta. Es un CASTIGO sin premio espejo a propósito (Bible §4.5: los sistemas deben
@@ -75,11 +75,11 @@ export function bumpMorale(run, delta, motivo) {
 /**
  * Cierre anímico del partido (lo llama flow.postMatchUpdate):
  *  - base: victoria +10 · derrota −10 · empate 0 (el RESULTADO mueve la moral del equipo,
- *    no el momento individual — decisión PO 18-jul)
+ *    no el momento individual)
  *  - gol agónico (≥85') que decide: triunfo por la mínima +5 · empate propio al
  *    final +4 · nos empatan al final −4 · derrota por la mínima al final −5
  *  - tanda de penales: ganarla +3 extra, perderla −3 extra (el drama pesa)
- *  - vestuario apagado: FRIOS_UMBRAL+ jugadores en momento ≤2 restan FRIOS_MORAL (Sprint 4)
+ *  - vestuario apagado: FRIOS_UMBRAL+ jugadores en momento ≤2 restan FRIOS_MORAL
  * "Pasar de ronda" suma aparte en flow.advanceStage (bumpMorale +5).
  *
  * Devuelve el RESUMEN para el análisis del cuerpo técnico del post-partido:
@@ -104,7 +104,7 @@ export function applyMoralePostMatch(run, match) {
     else if (oppMin > myMin && oppMin >= MIN_AGONICO) { delta -= 4; reasons.push("empate sufrido al final"); }
   }
   if (res.pens) { delta += won ? 3 : -3; reasons.push(won ? "tanda ganada" : "tanda perdida"); }
-  // Cruce Momento → Moral: demasiados jugadores apagados pesan en el vestuario (Sprint 4).
+  // Cruce Momento → Moral: demasiados jugadores apagados pesan en el vestuario.
   const frios = (run.squad || []).filter(p => (p.momento ?? 4) <= FRIOS_MOMENTO).length;
   if (frios >= FRIOS_UMBRAL) { delta -= FRIOS_MORAL; reasons.push(`${frios} jugadores apagados`); }
 

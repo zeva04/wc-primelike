@@ -66,7 +66,7 @@ export function renderCalendarCard(opp) {
 
 
 /**
- * Panel de la Acción del Día (Bible §4.7): un día sin partido = una inversión.
+ * Panel de la Acción del Día: un día sin partido = una inversión.
  * La Oportunidad del día (si hay) va arriba, tentando; Entrenar agrupa sus
  * focos en una fila de botones; las demás acciones son una tarjeta-botón cada
  * una. Una vez elegida la acción, el panel NO desaparece: se queda con la
@@ -93,7 +93,7 @@ export function actionCard() {
   const stOf = id => !chosen ? "active" : (id === chosenId ? "chosen" : "muted");
   const tMult = actionMult(run, training[0]);
   const trainState = !chosen ? "active" : (chosenGroup === "entrenar" ? "chosen" : "muted");
-  // EL PLAN DE PARTIDO (arco de Progresión): panel de las 4 filosofías. Declarar
+  // EL PLAN DE PARTIDO: panel de las 4 filosofías. Declarar
   // una la vuelve la identidad que se juega y multiplica la XP que esa idea gane
   // en el próximo partido. Nada sube desde acá: la experiencia se gana jugando.
   const filo = getPhilosophy(run.filoId);
@@ -206,7 +206,7 @@ export function actionCard() {
 
 
 /**
- * El World Cup Daily (Bible §4.4) como PORTADA de diario: papel crema, serifas,
+ * El World Cup Daily como PORTADA de diario: papel crema, serifas,
  * cabecera con doble filete y la nota de tapa en grande. Se abre al llegar a un
  * día nuevo, ANTES del evento — primero informar, después transformar. `onClose`
  * encadena lo que siga (modal de evento/conflicto o el toast de día de partido).
@@ -253,7 +253,7 @@ export const bajasDelOnce = () => (S.selectedLineup || []).filter(p => p.suspend
 
 /**
  * Si el evento recién cerrado tumbó a un TITULAR (lesión), el DT lo resuelve AHORA:
- * se navega directo a Gestión de Plantilla con el caído a la vista (PO 22-jul — nada
+ * se navega directo a Gestión de Plantilla con el caído a la vista (PO — nada
  * se reemplaza solo). Solo dispara ante una baja NUEVA (`prev` = cuántas había antes
  * del evento): una baja vieja pendiente ya tiene su aviso fijo en el hub, no secuestra
  * la navegación cada mañana. Devuelve true si navegó (el caller no repinta el hub).

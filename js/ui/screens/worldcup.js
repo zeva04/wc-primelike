@@ -81,7 +81,7 @@ export function renderGroupTableCard() {
 
 /**
  * Tarjeta de eliminación directa (reemplaza a la tabla en fases finales).
- * Compacta y con la ronda como protagonista: antes eran dos líneas sueltas
+ * Compacta y con la ronda como protagonista, en vez de dos líneas sueltas
  * flotando en una card genérica que solo ocupaba el espacio de la tabla.
  */
 export function renderKoInfoCard() {

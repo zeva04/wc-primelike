@@ -24,7 +24,7 @@ export function shootMyPen(m, takerName, dir) {
   const p = m.my.lineup.find(x => x.name === takerName) || m.my.bench.find(x => x.name === takerName);
   m.pens.takers.push(takerName);
   // Si patea el arquero (obligado en tandas largas), usa reflejos con castigo en vez de tiro.
-  // La tanda va SIN el % del Momento (recorte de balance 17-jul: ver chances.resolvePenaltyMine).
+  // La tanda va SIN el % del Momento (recorte de balance ver chances.resolvePenaltyMine).
   const base = p.pos === "POR" ? effStat(p, "reflejos", m.my.buffs) * 0.8 : effStat(p, "tiro", m.my.buffs);
   const q = (base + effStat(p, "aura", m.my.buffs)) / 2 / momentoMult(p);
   let prob = clamp(0.5 + q * 0.07 + (m.my.buffs.penales || 0), 0.45, 0.92);

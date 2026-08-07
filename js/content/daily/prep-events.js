@@ -39,7 +39,7 @@ export const PREP_EVENTS = [
     teaser: "El plan del día huele a siesta, pileta y masajes.",                         effect: r => energia(r, 20) },
   { id: "lluvia",     rareza: "comun", tema: "fisico",        icon: "🌧️", title: "Entrenamiento pasado por agua", tipo: "debuff", desc: "−10 de energía para todo el plantel.",
     teaser: "El pronóstico no pinta bien: nubes negras sobre la concentración.",
-    // Evento × filosofía (F3, Bible §4.5): la lluvia castiga distinto según tu fútbol —
+    // Evento × filosofía: la lluvia castiga distinto según tu fútbol —
     // el Press corre en el barro y la cancha pesada le corta el toque a la Posesión.
     effect: r => {
       energia(r, -10);
@@ -76,7 +76,7 @@ export const PREP_EVENTS = [
     desc: "La prensa publicó el plan de partido: hoy la Sesión táctica no sirve de nada.",
     teaser: "Hay revuelo en la prensa: alguien habló de más.",
     mod: { mods: { tactica: 0 }, desc: "Sesión táctica no disponible hoy" }, effect: () => {} },
-  // SPRINT 4 — evento-PROBLEMA (Bible §4.5: los eventos generan problemas, no premios).
+  // SPRINT 4 — evento-PROBLEMA.
   // Pega donde más duele desde el rebalance del núcleo: el descanso. No baja un número —
   // rompe el plan del día, que es la decisión que el DT ya tenía tomada.
   { id: "jet_lag", rareza: "infrecuente", tema: "fisico", icon: "🥱", title: "Jet lag", tipo: "debuff",
@@ -108,7 +108,7 @@ export const PREP_EVENTS = [
     teaser: "Se escuchan bombos a lo lejos: la hinchada anda cerca del hotel.",          effect: r => buff(r, "aura", 8) },
   { id: "viaje_pesado",rareza: "infrecuente", tema: "fisico",        icon: "✈️", title: "Viaje pesado",             tipo: "debuff", desc: "−12 de energía para todo el plantel.",
     teaser: "Toca micro y avión: día de traslado a la próxima sede.",                    effect: r => energia(r, -12) },
-  // Interactúan con Forma y Ánimo (sprint 17-jul): content/ muta run con primitivas + clamp, sin importar game/ (ARQUITECTURA §4)
+  // Interactúan con Forma y Ánimo: content/ muta run con primitivas + clamp, sin importar game/
   { id: "psicologo_deportivo", rareza: "infrecuente", tema: "vestuario", icon: "🧠", title: "Sesión con el psicólogo deportivo", tipo: "buff",
     desc: "El jugador más golpeado anímicamente recupera la confianza.",
     teaser: "Un especialista llegó a la concentración con una libreta bajo el brazo.",
@@ -138,7 +138,7 @@ export const PREP_EVENTS = [
     desc: "−15 de energía para todo el plantel, y hoy Recuperar rinde la mitad.",
     teaser: "El termómetro amenaza con romper récords hoy.",
     mod: { mods: { recuperar: 0.5 }, desc: "Recuperar rinde la mitad hoy" },
-    // Evento × filosofía (F3): correr arriba con 40 grados es doble castigo para el Press.
+    // Evento × filosofía: correr arriba con 40 grados es doble castigo para el Press.
     effect: r => {
       energia(r, -15);
       if (r.filoId === "press") { energia(r, -5); return "−20 de energía para el plantel: presionar bajo este sol es un suplicio."; }

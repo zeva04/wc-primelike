@@ -57,7 +57,7 @@ export const BUILDERS = {
 
 export function resolveSetpiece(m, s, key, f) {
   // Balón parado a favor: una decisión, desenlace inmediato (secuencia de un solo duelo).
-  // T2 — Pelota Parada Ensayada: la pizarra entra en acción — ambas opciones llegan
+  // Pelota Parada Ensayada: la pizarra entra en acción — ambas opciones llegan
   // mejor ensayadas (bonus de situación) y el momento se narra una vez por jugada.
   const sr = hookOf(m, "setpieceRehearsed");
   const srB = sr ? sr.bonus : 0;
@@ -87,9 +87,9 @@ export function resolveSetpiece(m, s, key, f) {
 
 export function resolveDefendSp(m, s, key, f) {
   // Córner en contra: zona = seguro; salir = puede matarla de una, o dejar solo al cabeceador.
-  // T2 — Dueños del Área: el córner DEFENDIDO puede encadenar pelotazo propio
+  // Dueños del Área: el córner DEFENDIDO puede encadenar pelotazo propio
   // (comer centros → lanzar: la cadena completa de la firma del Bloque).
-  // T3 — Contragolpe Total (Master): la contra también nace del córner rival —
+  // Contragolpe Total (Master): la contra también nace del córner rival —
   // el momento más improbable del catálogo, comprado con toda la doctrina.
   const { mine } = m.powers();
   // Dos filosofías encadenan desde acá hacia jugadas distintas (Atentos lanza el

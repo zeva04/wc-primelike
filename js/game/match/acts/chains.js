@@ -53,7 +53,7 @@ export function escalate(m) {
   // Escalar ES acertar el acto (los fallos cierran o encadenan, nunca escalan… salvo la
   // contención rota, que escala al remate rival — pero el repliegue no es tipo firma de
   // nadie: las 4 firmas son del lado mine). Si la secuencia es de MI tipo firma, el
-  // acierto alimenta la progresión por ejecución (F1).
+  // acierto alimenta la progresión por ejecución.
   noteFiloHit(m);
   s.actIdx++;
   if (s.actIdx >= planOf(s).length) return closeSilent(m);
@@ -62,13 +62,13 @@ export function escalate(m) {
   return false;
 }
 
-// ---------- El fallo que encadena (Sprint A2, regla 7 del Bible) ----------
+// ---------- El fallo que encadena ----------
 // "Los errores deben generar nuevos problemas de fútbol en vez de terminar la jugada."
-// BIDIRECCIONAL a propósito (decisión PO): el rebote me regala remates, la pérdida
+// BIDIRECCIONAL a propósito: el rebote me regala remates, la pérdida
 // arriesgada le regala contras al rival — las dos direcciones se compensan en el balance.
 const REBOUND_CHANCE = 0.30;  // mi remate fallado deja la pelota viva
 const COUNTER_CHANCE = 0.28;  // mi pérdida ARRIESGADA (filtrado/conducción/presión rota) abre contra
-// Absorción del último hombre (decisión PO #7): ya no asoma como evento suelto del tick —
+// Absorción del último hombre: ya no asoma como evento suelto del tick —
 // nace del FÚTBOL: una contención rota o una contra tras pérdida se vuelven el mano a mano.
 export const LASTMAN_FROM_CONTAIN = 0.70; // contención rota → último hombre
 const LASTMAN_FROM_COUNTER = 1.0;  // TODA contra con el equipo partido es un mano a mano (si hay DEF en pie)
@@ -99,11 +99,11 @@ export function maybeCounter(m, failText, risky = false) {
   if (rnd() >= COUNTER_CHANCE) {
     const out = closeSeq(m, "chance", failText);
     if (risky) dtFail(m);
-    // T1 — Morder Tras Pérdida: si la pérdida NO abrió contra rival, la jauría puede
+    // Morder Tras Pérdida: si la pérdida NO abrió contra rival, la jauría puede
     // cazarla de vuelta — recuperación REACTIVA en campo rival. El orden importa: el
     // riesgo del contragolpe rival queda EXACTO (0.28, calibración A2); la mordida
     // vive en el 72% restante, donde antes la jugada simplemente moría.
-    // T3 — El Robo es el Pase afila la mordida (chainPlus sobre la p de Morder).
+    // El Robo es el Pase afila la mordida (chainPlus sobre la p de Morder).
     const md = rollChain(m, "chainOnMineFail", hookOf(m, "masterPress")?.chainPlus || 0);
     if (md && chainMine(m, md.to, { bonus: md.bonus, intro: md.intro, buildDecision: buildActDecision })) return false;
     return out;
@@ -140,7 +140,7 @@ export function maybeCounter(m, failText, risky = false) {
   return closeSeq(m, "chance", `min ${m.clock()}' — ${sh.name} remata la contra pero ${mine.por ? mine.por.name : "el arquero"} responde enorme.`);
 }
 
-// ---------- Desenlaces nuevos de las AVANZADAS (M2) ----------
+// ---------- Desenlaces nuevos de las AVANZADAS ----------
 
 /**
  * El balón parado ENCADENADO: la misma jugada sigue como balón parado mío (el patrón de
@@ -180,7 +180,7 @@ export function advFoulSetPiece(m, foulText, bonus = 0) {
 }
 
 /**
- * LA GEOGRAFÍA DE LA FALTA (T4): a un jugador derribado se le cobra donde LO
+ * LA GEOGRAFÍA DE LA FALTA: a un jugador derribado se le cobra donde LO
  * DERRIBARON. Dentro del área rival, penal; al borde, tiro libre peligroso; lejos,
  * uno modesto. Los dos tiros libres siguen como balón parado encadenado, así que la
  * jugada no muere — cambia de forma, que es la regla 7 del Bible.

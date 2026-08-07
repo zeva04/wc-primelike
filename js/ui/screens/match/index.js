@@ -12,7 +12,7 @@
      squad.js    → la Gestión de plantilla en vivo
 
    Contrato de decisiones: ver game/match/Match.js. Agregar una
-   decisión nueva exige su entrada de ruteo en handleDecision().
+   decisión nueva exige su entrada de ruteo en handleDecision.
    ============================================================ */
 import { getTeam } from "../../../data/teams-repo.js";
 import { statLine } from "../../../game/ratings.js";
@@ -33,8 +33,8 @@ function startMatch(oppId) {
   const me = getTeam(S.run.teamId);
   const opp = getTeam(oppId);
   const bench = S.run.squad.filter(p => !S.selectedLineup.includes(p) && !p.suspendido && p.lesionadoPartidos === 0);
-  // La filosofía cruza la frontera run→Match como la moral: {id, nivel}, nada más (F1).
-  // koRound (R2): la profundidad KO enciende la escalada del rival (forma de torneo).
+  // La filosofía cruza la frontera run→Match como la moral: {id, nivel}, nada más.
+  // koRound: la profundidad KO enciende la escalada del rival (forma de torneo).
   // La ALTURA DEL BLOQUE viaja como la mentalidad: es una orden del DT, no estado del
   // simulador. Entra con la que el DT dejó puesta en la Concentración (run.altura) y
   // los cambios en vivo valen solo para este partido.
@@ -166,23 +166,23 @@ function renderMatchScreen() {
   $("#btn-pause").onclick = togglePause;
   $("#btn-subs").onclick = () => openSquadModal(); // sin args: el onclick pasaría el MouseEvent como "caído"
   $("#btn-speed").onclick = () => {
-    // El reloj lee CRUISE() en cada paso, así que cambiar la velocidad tiene efecto solo: no
+    // El reloj lee CRUISE en cada paso, así que cambiar la velocidad tiene efecto solo: no
     // hace falta reiniciar el timer (reiniciar duplicaría el auto-agendado).
     S.speed = S.speed === 1 ? 2 : 1;
     $("#btn-speed").textContent = S.speed === 1 ? "⏩ Rápido" : "🐢 Normal";
   };
 }
 
-// Ritmo del partido (Bible §7, decisión PO "ráfaga"): la simulación CORRE entre secuencias
+// Ritmo del partido: la simulación CORRE entre secuencias
 // —el relato de ambiente pasa rápido, da la sensación de partido vivo— y FRENA en seco al
 // llegar una secuencia (que es una decisión, congela sola). Un gol hace una pausa breve para
 // que se registre. El reloj se auto-agenda con setTimeout para poder variar el ritmo por paso.
-// Ajuste PO 22-jul ("no asfixiar"): todo más lento, y AIRE entre actos encadenados — el
+// Ajuste PO ("no asfixiar"): todo más lento, y AIRE entre actos encadenados — el
 // desenlace de un acto se LEE antes de que el modal siguiente lo tape.
-// EL RELOJ CONTINUO (PO 27-jul): un tick ES un minuto de partido, y se ve correr —
+// EL RELOJ CONTINUO (PO): un tick ES un minuto de partido, y se ve correr —
 // 2 segundos por minuto en velocidad normal (un partido dura ~3'30" de reloj de pared
 // más lo que el DT tarde en decidir). "Rápido" comprime a 0,8 s/minuto para quien ya
-// vio el partido. El congelado en las decisiones lo hace solo el motor: tick() corta
+// vio el partido. El congelado en las decisiones lo hace solo el motor: tick corta
 // con decisión pendiente y el reloj no se reagenda hasta resolverla.
 
 const CRUISE = () => (S.speed === 1 ? 2000 : 800);
@@ -242,7 +242,7 @@ export function updateMatchUI() {
   min.textContent = `${match.clock()}'${match.phase === "extra" ? " (prórroga)" : ""}`;
   min.className = `font-bold text-sm ${enDescuento ? "text-red-400" : "text-amber-400"}`;
   $("#subs-left").textContent = match.subsLeft;
-  // Momentum (A3): quién está generando en los últimos 15'. Vive junto al panel porque
+  // Momentum: quién está generando en los últimos 15'. Vive junto al panel porque
   // es la lectura dinámica de las mismas estadísticas.
   const fl = match.flow();
   const mom = $("#mom-chip");
@@ -273,7 +273,7 @@ export function updateMatchUI() {
 
 /**
  * Presenta la decisión pendiente: el modal genérico, o —si es una lesión (`injury_sub`)—
- * la Gestión de plantilla en vivo con el caído marcado (PO 22-jul: el reemplazo es manual,
+ * la Gestión de plantilla en vivo con el caído marcado (PO el reemplazo es manual,
  * sin lista de recomendados). Se llama con delay para que el relato previo se lea.
  */
 function presentDecision() {
@@ -335,7 +335,7 @@ function handleDecision(d, key) {
     }
   }
   updateMatchUI();
-  // Aire entre actos (PO 22-jul): el desenlace del acto se lee ANTES de que el próximo
+  // Aire entre actos (PO): el desenlace del acto se lee ANTES de que el próximo
   // modal lo tape; y al cerrar una secuencia, el reloj retoma con un respiro.
   stopTimer();
   if (match.decision) { S.timer = setTimeout(presentDecision, ACT_HOLD); return; }

@@ -17,7 +17,7 @@ export function rollInjury() {
 }
 
 // Cansancio por jugar: −14 de energía cada 30' disputados. Subió de 10 a 14 en el
-// rebalance del PO (20-jul-2026), acoplado a bajar el peso de la energía en el
+// rebalance del PO, acoplado a bajar el peso de la energía en el
 // rendimiento (match/powers.effStat: 20% en vez de 35%). La idea: el partido vacía más
 // rápido (rotar importa) pero estar cansado no te deja inservible — así Entrenar deja de
 // ser una trampa sin regalar dificultad. Ver CORE §4 y §Energía.
@@ -25,7 +25,7 @@ export const FATIGUE_PER_30 = 14;
 // Recuperación del que descansó todo el partido (rotar sigue siendo una estrategia real).
 export const REST_RECOVERY = 30;
 
-// SPRINT 4 — interacción cruzada Energía → Lesión (decisión PO 21-jul-2026): las piernas
+// SPRINT 4 — interacción cruzada Energía → Lesión: las piernas
 // cansadas se rompen más. La escala arranca en FATIGUE_INJURY_FROM (energía 50) y crece
 // lineal hasta FATIGUE_INJURY_MAX en el piso de energía (5). Multiplica la probabilidad de
 // que un golpe en juego sea GRAVE (match/incidents.injuryEvent), no la frecuencia de golpes:
@@ -45,7 +45,7 @@ export function fatigueInjuryMult(energia) {
 export function matchFatigue(minutos) { return Math.round(minutos / 30 * FATIGUE_PER_30); }
 
 /**
- * FATIGA DEL RIVAL (decisión PO 26-jul-2026) — el mismo dial, cobrado en otro momento.
+ * FATIGA DEL RIVAL — el mismo dial, cobrado en otro momento.
  *
  * Hasta hoy el once rival nacía al 100% y JAMÁS bajaba: mi plantel llegaba con la
  * energía que arrastra del torneo (55-70 en un titular fijo) y enfrente siempre había

@@ -131,7 +131,7 @@ function moraleBadge() {
 
 /**
  * Trae el once vigente y deja los puestos asignados. Las BAJAS no se auto-reemplazan
- * (PO 22-jul): el caído queda a la vista en su slot (muted 🚑/🟥) y el DT arma el cambio
+ * (PO): el caído queda a la vista en su slot (muted 🚑/🟥) y el DT arma el cambio
  * a mano — arrastrando un suplente sobre él o desde su ficha. La válvula automática queda
  * solo para el plantel diezmado (no llega a 6: sin decisión que tomar, evita el softlock).
  */
@@ -231,7 +231,7 @@ function missingLines(available, f) {
   return ["DEF", "MED", "DEL"].filter(pos => available.filter(p => p.pos === pos).length < f[pos.toLowerCase()]).join(" y ");
 }
 
-/** Diagrama de puntos de una formación: una columna por línea (DEF · MED · DEL). */
+/** Diagrama de puntos de una formación: una columna por línea. */
 function formationDots(f) {
   const col = n => `<span class="flex flex-col justify-center gap-[3px]">${
     Array.from({ length: n }, () => `<i class="block w-[5px] h-[5px] bg-current rounded-[1px]"></i>`).join("")}</span>`;
@@ -247,7 +247,7 @@ function renderPlayerCard() {
   const p = S.run.squad.find(x => x.name === selName);
   if (!p) return;
   const me = getTeam(S.run.teamId);
-  // El arquero de EMERGENCIA (bug fix, 2-ago-2026) se lee por `playedPos`, no por `p.pos`:
+  // El arquero de EMERGENCIA (bug fix,) se lee por `playedPos`, no por `p.pos`:
   // si está parado en el arco, lo que importa mostrarle al DT es su línea de arco (fija,
   // ratings.EMERGENCY_GK_STATS), no sus stats de campo que ahora no cuentan para nada.
   const emergencia = p.pos !== "POR" && playedPos(p) === "POR";
@@ -303,7 +303,7 @@ function renderPlayerCard() {
 }
 
 /**
- * Nota del arquero de EMERGENCIA (bug fix, 2-ago-2026): no es un fuera-de-puesto normal
+ * Nota del arquero de EMERGENCIA (bug fix,): no es un fuera-de-puesto normal
  * (el desglose de `outOfPosNote` compara stats técnicas que ni siquiera pesan en el arco),
  * es que nadie más puede cubrirlo — sus atajadas/reflejos/salidas son una línea fija y
  * floja (`ratings.EMERGENCY_GK_STATS`), igual sin importar a quién se lo pida el DT.
@@ -366,7 +366,7 @@ function renderStatus(available) {
   const f = getFormation(S.formation);
   const fuera = S.selectedLineup.filter(p => outOfPosPenalty(p) > 0);
   // Baja en el once (validateLineup no mira disponibilidad): la instrucción manda, y si el
-  // plantel ya no cubre la formación actual, se LEE que hay que cambiarla (PO 22-jul).
+  // plantel ya no cubre la formación actual, se LEE que hay que cambiarla (PO).
   const bajas = S.selectedLineup.filter(p => !isAvailable(p));
   if (bajas.length) {
     const sinFormacion = !canUseFormation(available, S.formation);
@@ -400,7 +400,7 @@ const slotPos = (i) => formationSlots(S.formation)[i] || S.selectedLineup[i].pos
  * Con quién puede intercambiarse este jugador. Cualquier puesto vale (el castigo por
  * jugar fuera de él ya lo cobra el motor); el único límite es el arco, que solo pueden
  * ocupar los arqueros porque sus stats son otro juego (game/lineup.canPlayAt) — EXCEPTO
- * si no queda ningún arquero disponible (bug fix, 2-ago-2026): ahí el arco pasa a ser un
+ * si no queda ningún arquero disponible (bug fix,): ahí el arco pasa a ser un
  * slot más, y cualquier jugador de campo puede ocuparlo como arquero de emergencia. El DT
  * puede reasignar a quien quiera; `currentLineup` ya eligió a alguien por defecto (el peor
  * de campo libre), pero esto es una elección real, no una imposición.
@@ -410,7 +410,7 @@ function swapCandidates(p) {
   const sinArquero = !availables().some(q => q.pos === "POR");
   const cp = (a, pos) => canPlayAt(a, pos, { emergency: sinArquero });
   // El titular DE BAJA (🚑/🟥) no juega ni se mueve, pero SÍ se reemplaza: puede entrar en
-  // su slot cualquier disponible del banco (PO 22-jul: el reemplazo es manual, acá).
+  // su slot cualquier disponible del banco (PO el reemplazo es manual, acá).
   if (!isAvailable(p)) {
     if (i < 0) return [];
     return S.run.squad.filter(q => q !== p && idxOf(q) < 0 && isAvailable(q) && cp(q, slotPos(i)));

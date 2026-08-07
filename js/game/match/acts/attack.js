@@ -39,7 +39,7 @@ export const BUILDERS = {
     };
   },
   duel: (m, s) => {
-    // El pelotazo VUELA (T4): el duelo se disputa arriba, no donde se lanzó la pelota
+    // El pelotazo VUELA: el duelo se disputa arriba, no donde se lanzó la pelota
     // — por eso el balón viaja ANTES de que el DT elija cómo jugarlo (y por eso las
     // opciones de área, como pivotear, existen en un pelotazo lanzado desde el fondo).
     moveBall(m, 2, 0);
@@ -119,7 +119,7 @@ export const BUILDERS = {
   }),
 };
 
-// ═══ PELOTA A LA ESPALDA (T4) ═══
+// ═══ PELOTA A LA ESPALDA ═══
 export function resolveThroughball(m, s, key, f) {
   const espalda = key === "espalda";
   const r = A.actPass(m, s.prot, { hard: true });
@@ -153,7 +153,7 @@ export function resolveDuel(m, s, key, f) {
   const risky = key === "peinar" || !!pv;   // las dos opciones de riesgo cobran el fallo
   const r = A.actAerial(m, s.prot, { handicap: key === "peinar" ? 0.08 : pv ? 0.05 : 0 });
   if (!r.ok) {
-    // La fortaleza castiga (M2): el pelotazo del castigo que la zaga rival despeja
+    // La fortaleza castiga: el pelotazo del castigo que la zaga rival despeja
     // apurada, de espaldas a su arco, un % de las veces muere en CÓRNER ganado —
     // balón parado encadenado. La fortaleza casi siempre saca algo.
     if (s.cornerOnDuelFail && rnd() < s.cornerOnDuelFail) {
@@ -162,9 +162,9 @@ export function resolveDuel(m, s, key, f) {
       m.log("chance", `min ${m.clock()}' — ${sequenceType("fortaleza").flavor.cornerText}`);
       return chainSetPiece(m, 0.02, true);
     }
-    // T1 — Segunda Jugada: el duelo perdido no siempre es pérdida — la segunda
+    // Segunda Jugada: el duelo perdido no siempre es pérdida — la segunda
     // pelota puede caer nuestra y el bloque vuelve a lanzar (secuencia reactiva).
-    // T2 — Plataforma la sube de calidad: posición establecida, con su propia voz.
+    // Plataforma la sube de calidad: posición establecida, con su propia voz.
     const sj = rollChain(m, "chainOnDuelFail");
     if (sj) {
       if (risky) dtFail(m);
@@ -292,7 +292,7 @@ export function resolveFinish(m, s, key, f) {
     traitMoment(m, ice.traitId, [ice.texto]);
     return closeSeq(m, "info", `min ${m.clock()}' — ${s.prot.name} la devuelve al área propia. El equipo se queda con la pelota y el reloj corre.`);
   }
-  // La sinfonía (M2): si TODOS los compases sonaron (desesperación llena), un % de las
+  // La sinfonía: si TODOS los compases sonaron (desesperación llena), un % de las
   // veces el rival ya no llega con las piernas y te baja DENTRO del área — penal.
   // El penal profundo (y el 4º compás) eran el rasgo F2 de Consolidada — desde T2 los
   // compra Sitio al Área (migración al árbol). Si no hay penal, el remate llega limpio.
@@ -314,20 +314,20 @@ export function resolveFinish(m, s, key, f) {
     s.tapIn = true;
     traitMoment(m, tap.traitId, [tap.texto]);
   }
-  // T1 — Pausa: en el desenlace de la circulación, la aceleración súbita — el
+  // Pausa: en el desenlace de la circulación, la aceleración súbita — el
   // rival dormido por el tempo no llega al cierre (mejor perfil, relato propio).
   // Por FAMILIA: la sinfonía también acelera (hallazgo del gate T1).
   const acc = hookOf(m, "accelFinish", familyOf(s.type));
   if (acc && !s.oneOnOne && rnd() < acc.p) { s.bonus += acc.bonus; s.oneOnOne = true; m.log("event", `min ${m.clock()}' — ${acc.intro(s.prot)}`); }
-  // T2 — Arco a la Vista: si la jugada nació en su variante profunda (la asfixia
+  // Arco a la Vista: si la jugada nació en su variante profunda (la asfixia
   // sobre el saque de meta), el desenlace llega a quemarropa.
   const df = hookOf(m, "deepFinish", familyOf(s.type));
   if (df && s.deepVariant) { s.bonus += df.bonus; traitMoment(m, df.traitId, [df.texto]); }
-  // T3 — A Campo Abierto: la avalancha llega al desenlace de toda la familia de la
+  // A Campo Abierto: la avalancha llega al desenlace de toda la familia de la
   // contra — la defensa no sabe a quién marcar.
   const av = hookOf(m, "avalancha");
   if (av && familyOf(s.type) === "transicion") { s.bonus += av.bonus; if (rnd() < 0.5) traitMoment(m, av.traitId, [av.texto]); }
-  // T3 — El Robo es el Pase (Master): el desenlace de la familia de la recuperación
+  // El Robo es el Pase (Master): el desenlace de la familia de la recuperación
   // define mejor — el robo YA es creación.
   const mp = hookOf(m, "masterPress");
   if (mp && familyOf(s.type) === "recuperacion") { s.bonus += mp.bonus; if (rnd() < 0.4) traitMoment(m, mp.traitId, [mp.texto]); }
@@ -349,7 +349,7 @@ export function resolveFinish(m, s, key, f) {
   }
   if (key === "asistir") {
     const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
-    // T2 — Superioridad Numérica: en la familia de la contra, el pase elige al MEJOR
+    // Superioridad Numérica: en la familia de la contra, el pase elige al MEJOR
     // ubicado DE VERDAD (el de mejor Tiro), no a un corredor cualquiera.
     const supUp = hookOf(m, "supportUpgrade");
     const numeric = supUp && familyOf(s.type) === "transicion" && mates.length > 0;
@@ -362,7 +362,7 @@ export function resolveFinish(m, s, key, f) {
       : m._weightedPick(mates, mates.map(p => (playedPos(p) === "DEL" ? 3 : 1) * desmarqueW(p)));
     const pass = A.actPass(m, s.prot);
     if (!pass.ok) return maybeCounter(m, `min ${m.clock()}' — el pase de ${s.prot.name} no encuentra a nadie.`, true);
-    // T1 — Correr en Manada: en la contra, el "buscar al mejor ubicado" encuentra
+    // Correr en Manada: en la contra, el "buscar al mejor ubicado" encuentra
     // superioridad de verdad — la definición llega con dos camisetas libres.
     // Por FAMILIA: el contragolpe letal también corre en manada (gate T1).
     const sup = hookOf(m, "finishSupport", familyOf(s.type));
@@ -376,7 +376,7 @@ export function resolveFinish(m, s, key, f) {
   }
   const shot = A.actShot(m, s.prot, { stat, bonus: s.bonus + f.finishBonus });
   if (shot.ok) { goalMine(m, s.prot, s.tapIn ? "¡Solo tuvo que empujarla!" : stat === "cabezazo" ? "¡Cabezazo imparable!" : "¡Culminó la jugada!", s.assistFrom || "open"); return closeSilent(m); }
-  // T3 — Cabeza de Playa: el pelotazo que muere sin gol puede fabricar córner —
+  // Cabeza de Playa: el pelotazo que muere sin gol puede fabricar córner —
   // "el equipo YA NO despeja: cada balón largo establece posición" (gate T3: la
   // versión solo-reactiva era invisible en juego real — cadenas demasiado raras).
   const bh = hookOf(m, "beachhead");

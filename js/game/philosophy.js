@@ -1,6 +1,5 @@
 /* ============================================================
-   game/philosophy — la identidad futbolística de la run
-   (arco de Filosofía F1, decisiones PO 22-jul-2026).
+   game/philosophy — la identidad futbolística de la run.
 
    Posee `run.filoId` (la identidad que se JUEGA), `run.filoInicial`
    (la escuela de la que viene el DT, fija) y `run.filoXp` (las 4
@@ -10,14 +9,14 @@
      obligatoriamente en un rasgo básico de la escuela elegida
    - cambio de identidad: cuesta la Acción del Día y declara el
      Plan de Partido (×1.5 de XP para esa idea)
-   - LA PROGRESIÓN (arco de Progresión, 28-jul-2026): toda la XP
+   - LA PROGRESIÓN: toda la XP
      viene del PARTIDO (70% intención / 30% efectividad) y de los
      eventos; subir de nivel una filosofía paga XP al Director
      Técnico (game/coach), que paga Puntos de Identidad.
 
    La filosofía viaja al partido como la moral: matchCtx.filo =
    {id, nivel} (se arma en screens/match.js Y tests/smoke.js);
-   el Match no conoce la run (ARQUITECTURA §3.2).
+   el Match no conoce la run.
    ============================================================ */
 import { getPhilosophy, PHILOSOPHIES, aristaById, filoPointsOf, filoLevelOf, filoEtapaOf, afinidadMult, FILO_LEVELS } from "../content/identity/philosophies.js";
 import { ADVANCED_BY_FILO } from "../content/match/sequences.js";
@@ -30,7 +29,7 @@ import { activeTraitIds } from "./traits.js";
 import { addCoachXp, filoLevelReward } from "./coach.js";
 import { DEEP_TRAIT } from "../content/traits/index.js";
 
-// EL PLAN DE PARTIDO (arco de Progresión, decisión PO 28-jul-2026): la vieja
+// EL PLAN DE PARTIDO: la vieja
 // Sesión Táctica ya no regala progreso desde el menú — declara QUÉ FÚTBOL vas a
 // intentar. Esa declaración vale ×PLAN_XP_MULT sobre toda la XP que ese partido
 // genere para esa filosofía: el día invertido no compra puntos, compra INTENCIÓN.
@@ -43,7 +42,7 @@ export const filoPoints = filoPointsOf;
 export const filoLevel = filoLevelOf;
 
 /** Etapa del nivel (0 Aprendiendo · 1 En desarrollo · 2 Consolidada) — la escala
- *  0-2 original de F1: el rival, la brecha R3 y los gates viven acá (T1). */
+ *  0-2 original de F1: el rival, la brecha R3 y los gates viven acá. */
 export const filoEtapa = filoEtapaOf;
 
 /**
@@ -74,7 +73,7 @@ export function filoCtx(run) {
 }
 
 /**
- * Elección post-sorteo (decisión PO #1): gratis, antes del día 1. Devuelve la
+ * Elección post-sorteo: gratis, antes del día 1. Devuelve la
  * filosofía elegida o null si el id no existe. No valida "ya elegiste" — la
  * pantalla del sorteo solo la llama una vez; re-elegir después pasa por
  * changePhilosophy (con costo).
@@ -83,7 +82,7 @@ export function choosePhilosophy(run, filoId) {
   const f = getPhilosophy(filoId);
   if (!f) return null;
   run.filoId = f.id;
-  // LA ESCUELA (arco de Progresión): la filosofía inicial no se vuelve a elegir —
+  // LA ESCUELA: la filosofía inicial no se vuelve a elegir —
   // es de dónde viene el DT, y de por vida decide a qué velocidad aprende cada
   // idea (afinidad). Cambiar de identidad cambia lo que JUEGAS, no de dónde vienes.
   run.filoInicial = f.id;
@@ -93,7 +92,7 @@ export function choosePhilosophy(run, filoId) {
     icon: f.icon, tone: "gold", title: `El equipo abraza una identidad: ${f.name}`,
     desc: `${f.lema} El plan: jugar ${nombres.join(" y ")} hasta que ese fútbol salga solo.`,
   });
-  // El PI inicial (GDD): elegir filosofía ES el nivel 1 del DT — el flujo de inicio
+  // El PI inicial: elegir filosofía ES el nivel 1 del DT — el flujo de inicio
   // OBLIGA a gastarlo en uno de los 3 rasgos básicos de la escuela elegida.
   run.dtNivel = 1;
   run.identityPoints = (run.identityPoints || 0) + 1;
@@ -101,7 +100,7 @@ export function choosePhilosophy(run, filoId) {
 }
 
 /**
- * Cambio de filosofía a mitad de run: CUESTA la Acción del Día (decisión PO #1).
+ * Cambio de filosofía a mitad de run: CUESTA la Acción del Día.
  * Desde el arco de la Progresión no hay nada que demoler — cada filosofía lleva su
  * propio nivel de XP y sus rasgos comprados siguen activos (build híbrida), así que
  * cambiar no hereda ni pierde: solo declara qué fútbol se va a jugar, y ese día
@@ -115,10 +114,10 @@ export function changePhilosophy(run, filoId) {
   const prev = getPhilosophy(run.filoId);
   run.filoId = f.id;
   // El día invertido ES el Plan de Partido: la identidad nueva cobra el ×1.5 de XP
-  // en el próximo partido (arco de Progresión — declarar cuesta y por eso paga).
+  // en el próximo partido.
   run.planFilo = f.id;
   // Cada filosofía tiene su propio nivel: la nueva NO hereda nada, ni pierde nada.
-  // Sus rasgos comprados siguen ACTIVOS (builds híbridas, decisión PO 28-jul).
+  // Sus rasgos comprados siguen ACTIVOS (builds híbridas).
   run.filoNarrado = filoEtapa(run);
   run.actionPending = false;
   run.lastAction = { day: run.day, id: `filo_${f.id}`, group: null, icon: f.icon, title: `Cambio de identidad: ${f.name}` };
@@ -126,14 +125,14 @@ export function changePhilosophy(run, filoId) {
     icon: "🔄", tone: "neutral", title: `Golpe de timón: de ${prev ? prev.name : "la nada"} a ${f.name}`,
     desc: `El día entero se fue en reinstalar ideas. Lo aprendido no se borra —cada idea tiene su propio camino—, pero desde hoy el equipo juega ${f.aristas.map(k => aristaById(k).label).join(" y ")}.`,
   });
-  // Oxidación (R1): reinstalar ideas ES trabajo táctico — el día cuenta como entrenado
+  // Oxidación: reinstalar ideas ES trabajo táctico — el día cuenta como entrenado
   // (consume el turno por fuera de applyDayAction, así que registra su día acá).
   trackOxidacion(run, true);
   return f;
 }
 
 /**
- * La CONQUISTA narrada (M2): si la ETAPA de identidad cruzó un umbral desde la última
+ * La CONQUISTA narrada: si la ETAPA de identidad cruzó un umbral desde la última
  * vez que se contó, el diario lo celebra — Desarrollo desbloquea la secuencia AVANZADA
  * (el fútbol superior ya sale en los partidos), Consolidada la profundiza. Se llama en
  * los dos beats donde las aristas crecen: la Acción del Día (day-action) y el
@@ -169,7 +168,7 @@ export function noteFiloMilestones(run) {
   return lvl;
 }
 
-/* ---------- El rival tiene identidad (F2, decisión PO #4) ---------- */
+/* ---------- El rival tiene identidad ---------- */
 
 /**
  * Filosofía de un equipo RIVAL: los 16 curados por su fútbol real
@@ -190,17 +189,17 @@ export function derivePhilosophy(team) {
 
 /**
  * Nivel de identidad del rival, por jerarquía: los grandes llegan CONSOLIDADOS
- * a su idea (decisión PO F2), los del medio en desarrollo, los chicos
+ * a su idea, los del medio en desarrollo, los chicos
  * aprendiendo. Escala 0..2 de FILO_ETAPAS (y sus multiplicadores exactos —
  * la escalera de 10 niveles de T1 es solo MÍA: el rival no compra rasgos).
- * LA IDENTIDAD MADURA (R2, decisión PO): en eliminatorias todo rival sube +1
+ * LA IDENTIDAD MADURA: en eliminatorias todo rival sube +1
  * nivel (tope Consolidada) — nadie llega a KO sin idea. Nació "desde cuartos"
- * (koRound 3) y R3 la adelantó a 16avos (decisión PO 22-jul): la brecha de
+ * (koRound 3) y R3 la adelantó a 16avos: la brecha de
  * identidad medía −1.3pp porque en 16avos/octavos los rivales chicos eran nivel
  * 0 y la brecha no existía justo donde mueren las runs del improvisador. El eje
  * es tournament/knockout.koRoundOf.
  */
-export const FILO_MADURA_DESDE = 1; // koRound de 16avos (R3; nació 3 = cuartos en R2)
+export const FILO_MADURA_DESDE = 1; // koRound de 16avos
 export function rivalFiloLevel(team, koRound = 0) {
   const r = teamRating(team);
   const base = r >= 84 ? 2 : r >= 78 ? 1 : 0;
@@ -212,7 +211,7 @@ export function rivalFilo(team, koRound = 0) {
   return { id: derivePhilosophy(team), nivel: rivalFiloLevel(team, koRound), curated: !!TEAM_PHILOSOPHIES[team.id] };
 }
 
-// EL MUNDIAL CASTIGA AL SIN IDEA (arco del Rebalance R3, decisión PO 22-jul-2026):
+// EL MUNDIAL CASTIGA AL SIN IDEA:
 // en KO, el rival con MÁS nivel de identidad que yo amplifica su modo Mundial —
 // +2% de poder por nivel de brecha, apilado sobre p.forma (canal de PODER: la
 // lección de R2 es que los sesgos de pool miden ~0pp). El DT que llega a KO
@@ -221,7 +220,7 @@ export function rivalFilo(team, koRound = 0) {
 // existe (koRound 0). El dial declarado del sprint es ESTA constante.
 export const IDENTITY_GAP_PCT = 0.04; // nació 0.02; el dial declarado de R3 (medido: 2% movía −1.8pp)
 
-// AL FAVORITO LE JUEGAN LA FINAL (29-jul-2026, el dial del techo): el espejo del de
+// AL FAVORITO LE JUEGAN LA FINAL: el espejo del de
 // arriba. En KO, el rival al que le llevo VENTAJA de identidad también se agranda:
 // nadie le juega igual al que llega con todo resuelto — te esperan diez atrás, te
 // estudian, y sale el mejor partido de su torneo.
@@ -246,8 +245,7 @@ export const IDENTITY_LEAD_PCT = 0.16;
 const NIVEL_DE_ETAPA = [0, 1, 2].map(e => FILO_LEVELS.findIndex(l => l.etapa === e));
 
 /** Multiplicador de identidad del rival en KO. ×1 en grupos. Es SIMÉTRICO:
- *  - le llevo MENOS idea (`gap`, en etapas) → me pasa por encima (R3, "el Mundial
- *    castiga al sin idea")
+ *  - le llevo MENOS idea (`gap`, en etapas) → me pasa por encima
  *  - le llevo MÁS idea (`lead`, en niveles) → le juegan la final de su vida
  *  Parejos, ×1: el partido de igual a igual es el único sin condimento. */
 export function identityGapMult(oppTeam, myEtapa, koRound = 0, myNivel = null) {
@@ -259,7 +257,7 @@ export function identityGapMult(oppTeam, myEtapa, koRound = 0, myNivel = null) {
 }
 
 /**
- * El costo físico de MI identidad (F2, decisión PO #7): el Press paga −6 de
+ * El costo físico de MI identidad: el Press paga −6 de
  * energía extra post-partido a los que jugaron (Bible lo exige: correr arriba
  * los 90' pasa factura). Contra y Bloque pagan EN el partido (ceden posesión /
  * volumen ofensivo, match/sequences.filoShareShift); Posesión no paga costo

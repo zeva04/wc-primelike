@@ -37,11 +37,11 @@ export function formationSlots(id) {
 
 /**
  * ¿Este jugador puede pararse en este puesto? El arco es exclusivo de los arqueros y
- * los arqueros no salen de él (decisión del PO 15-jul): sus stats son otro juego —
+ * los arqueros no salen de él: sus stats son otro juego —
  * un delantero no tiene `atajadas` ni un arquero tiene `defensa`, así que cruzarlos
  * no sería un castigo sino una división por la nada. Entre DEF/MED/DEL, todo vale.
  *
- * `{ emergency: true }` es la ÚNICA excepción (bug fix, 2-ago-2026): el equipo nunca
+ * `{ emergency: true }` es la ÚNICA excepción (bug fix,): el equipo nunca
  * puede jugar sin nadie en el arco, y si los dos arqueros del plantel quedan fuera a la
  * vez, alguien de campo tiene que ponerse los guantes. Sus stats de arco no salen de
  * `p.stats` (no existen) sino de `ratings.EMERGENCY_GK_STATS` — `statAt` ya lo resuelve
@@ -55,7 +55,7 @@ export function canPlayAt(player, slotPos, { emergency = false } = {}) {
 
 /**
  * Reubicación táctica: dos titulares intercambian el puesto que juegan. No gasta cambio
- * (decisión del PO 15-jul) y se auto-limita sola — el castigo por jugar fuera de puesto
+ * y se auto-limita sola — el castigo por jugar fuera de puesto
  * ya la hace cara. Devuelve false si alguno no puede ocupar el puesto del otro (el arco).
  *
  * La usa el PARTIDO, donde no hay formación de la que rederivar: ahí `posJugada` es la
@@ -78,7 +78,7 @@ export function swapAssignments(a, b) {
  * `ratings.outOfPosPenalty`, exactamente como una reubicación a mano. El arco es
  * innegociable (`canPlayAt`): lo ocupa el arquero.
  *
- * La usa la Gestión de plantilla EN PARTIDO (PO 28-jul-2026: cambiar el dibujo con el
+ * La usa la Gestión de plantilla EN PARTIDO (PO cambiar el dibujo con el
  * partido en juego). Es la hermana de `assignPositions` para el caso donde el once ya
  * está dado y lo único que se mueve es el dibujo — por eso no toca el resto del plantel
  * ni reordena nada: en el partido `posJugada` es la única verdad (ver swapAssignments).
@@ -101,11 +101,11 @@ export function assignToFormation(lineup, formationId) {
 
 /**
  * Fija en qué puesto juega cada titular (`posJugada`) según la formación y se lo borra
- * al resto del plantel. Es la única pluma de ese campo (ARQUITECTURA §3.1) y hay que
+ * al resto del plantel. Es la única pluma de ese campo y hay que
  * llamarla cada vez que el once cambia: de ahí salen el castigo por jugar fuera de
  * puesto y la nota que ve el DT.
  *
- * EL ARCO NUNCA QUEDA VACÍO (bug fix, 2-ago-2026): es la última red, así que corre
+ * EL ARCO NUNCA QUEDA VACÍO (bug fix,): es la última red, así que corre
  * DESPUÉS de la asignación normal por slots. Si nadie terminó jugando de POR —ni por
  * slot de formación ni por posición natural— y hay al menos un jugador de campo en el
  * once, el PEOR de campo (naturalOverall) se pone los guantes. Cubre TODOS los caminos
@@ -168,7 +168,7 @@ export function currentLineup(squad, prev, formationId) {
     if (!canUseFormation(available, id)) {
       const label = formationLabel(lineup);
       id = lineup.length === 6 && getFormation(label) ? label : null;
-      // SIN NINGÚN ARQUERO DISPONIBLE (bug fix, 2-ago-2026): `bestLineup` no reserva el
+      // SIN NINGÚN ARQUERO DISPONIBLE (bug fix,): `bestLineup` no reserva el
       // arco de emergencia (no sabe de formaciones), así que sus 6 de campo suman 6 en
       // `formationLabel` — y NINGUNA de las 6 formaciones de la tabla suma 6 (todas suman
       // 5: 5 de campo + 1 arquero). El fallback de arriba SIEMPRE daba `null` en este caso
@@ -196,11 +196,11 @@ export function currentLineup(squad, prev, formationId) {
  * (p.ej. pedir 3 DEF con 2 sanos). Los jugadores de `keep` mandan por sobre la nota:
  * así cambiar de formación no borra las elecciones manuales del DT.
  *
- * ARQUERO DE EMERGENCIA (bug fix, 2-ago-2026): si NINGÚN POR está disponible (los dos
+ * ARQUERO DE EMERGENCIA (bug fix,): si NINGÚN POR está disponible (los dos
  * lesionados/suspendidos a la vez), el equipo NUNCA sale a jugar sin nadie en el arco —
  * el puesto se cubre con el PEOR jugador de campo libre (su calidad de arco es la misma
  * línea fija sin importar quién sea — ratings.EMERGENCY_GK_STATS —, así que no tiene
- * sentido sacrificar a la figura de su línea). Se procesa PRIMERO (LINES arranca en POR)
+ * sentido sacrificar a la figura de su línea). Se procesa PRIMERO
  * para que DEF/MED/DEL, más abajo, ya lo encuentren descartado.
  */
 export function fillFormation(available, id, keep = []) {
@@ -277,7 +277,7 @@ export function validateLineup(available, selected) {
   }
   const count = pos => selected.filter(p => p.pos === pos).length;
   const avail = pos => available.some(p => p.pos === pos);
-  // EL ARCO NUNCA PUEDE QUEDAR VACÍO (bug fix, 2-ago-2026). Antes esta regla se saltaba
+  // EL ARCO NUNCA PUEDE QUEDAR VACÍO. Sin esta regla se saltaba
   // entera cuando ningún POR estaba disponible (los dos lesionados/suspendidos a la vez) y
   // el equipo salía a jugar con seis de campo y nadie en el arco. Ahora cuenta por PUESTO
   // JUGADO (`playedPos`), no por posición natural — eso admite al arquero de emergencia

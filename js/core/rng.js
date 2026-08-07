@@ -1,7 +1,7 @@
 /* ============================================================
    core/rng — ÚNICO punto de azar del juego.
-   Nadie fuera de este archivo llama a Math.random(): esto
-   habilita runs con semilla en el futuro (ARQUITECTURA §1.1).
+   Nadie fuera de este archivo llama a Math.random: esto
+   habilita runs con semilla en el futuro.
    ============================================================ */
 
 /** Azar uniforme [0,1). Único punto de aleatoriedad del motor. */

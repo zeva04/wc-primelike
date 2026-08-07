@@ -46,7 +46,7 @@ export const RANDOM_EVENTS = [
     teaser: "El clima en la práctica viene espeso desde temprano.",
     // `run.peleaEntre` guarda los NOMBRES de los dos protagonistas, no las referencias:
     // la regla de serialización de ARQUITECTURA §3.1 exige que `run` sea JSON-izable
-    // (antes eran `_peleaA/_peleaB` apuntando a objetos del squad — deuda saldada 21-jul-2026).
+    // (antes eran `_peleaA/_peleaB` apuntando a objetos del squad — deuda saldada).
     text: (r) => { const [a, b] = shuffle(r.squad).slice(0, 2); r.peleaEntre = [a.name, b.name]; return `${a.name} y ${b.name} se fueron a las manos en la práctica. El camarín está dividido.`; },
     options: [
       { label: "Castigar a ambos", effect: r => { const ps = peleadores(r); ps.forEach(p => p.stats.aura = clamp(p.stats.aura - 5, 1, 99)); return `Disciplina ante todo: ${ps.map(p => p.name).join(" y ")} pierden 5 de Aura, pero el grupo respeta tu autoridad.`; } },
@@ -62,10 +62,10 @@ export const RANDOM_EVENTS = [
       { label: "Seguir la rutina normal", effect: r => { if (rnd() < 0.4) { r.squad.forEach(p => p.energia = clamp(p.energia - 15, 5, 100)); return "El virus se expande: −15 energía para TODOS."; } return "Por suerte era una falsa alarma. No pasa nada."; } },
     ],
   },
-  // ---------- SPRINT 4: conflictos-PROBLEMA (Bible §4.5) ----------
+  // ---------- SPRINT 4: conflictos-PROBLEMA ----------
   // No reparten premios: las dos ramas cobran algo. Usan los recursos que el juego ya
   // tiene escasos (energía y moral) en vez de mover aura como casi todo lo anterior.
-  // F3: el conflicto de FILOSOFÍA — la identidad también se defiende puertas adentro.
+  // el conflicto de FILOSOFÍA — la identidad también se defiende puertas adentro.
   {
     id: "referente_cuestiona", tema: "vestuario", icon: "🗣️", title: "El referente cuestiona la idea",
     teaser: "Se escuchó una discusión táctica subida de tono en la sala de video.",

@@ -65,7 +65,7 @@ export const DAY_ACTIONS = [
     desc: `+${TRAIN_BUFF} de Defensa y Atajadas para el próximo partido · −${TRAIN_FATIGUE} de energía`,
     effect: (r, m = 1) => { const v = Math.round(TRAIN_BUFF * m); r.buffs.defensa = (r.buffs.defensa || 0) + v; r.buffs.atajadas = (r.buffs.atajadas || 0) + v; tire(r); },
   },
-  // ODISEA (sprint 1, decisión PO 29-jul-2026): el viejo foco "Pases" se partió en dos —
+  // ODISEA: el viejo foco "Pases" se partió en dos —
   // la circulación corta y el envío largo son dos entrenamientos distintos — y entró el
   // trabajo de VELOCIDAD, que ahora es una stat de primer orden en la media.
   {
@@ -109,7 +109,7 @@ export const DAY_ACTIONS = [
     effect: (r) => { r.filoId = p.id; r.planFilo = p.id; },
   })),
   {
-    // El contenido muta la moral con primitivas + clamp, SIN importar game/ (ARQUITECTURA §4):
+    // El contenido muta la moral con primitivas + clamp, SIN importar game/:
     // mismo patrón que los eventos anímicos de prep-events (pais_ilusionado / critica_demoledora).
     id: "bonding", icon: "🤝", label: "Team Bonding",
     title: "Jornada de integración",

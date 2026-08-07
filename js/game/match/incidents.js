@@ -35,7 +35,7 @@ export function foulEvent(m) {
       // sin ser una jugada (el gráfico tiene que explicar el quiebre que viene después).
       noteMomentum(m, "roja", "opp"); markMomentum(m, "🟥");
       m.log("card", `min ${m.clock()}' — 🟥 ¡EXPULSADO ${p.name}! Roja directa. Juegan con ${m.activeMine().length}.`);
-      // playedPos, NO p.pos (bug fix, 2-ago-2026): si el expulsado es el arquero de
+      // playedPos, NO p.pos (bug fix,): si el expulsado es el arquero de
       // EMERGENCIA (un jugador de campo que ya estaba parado en el arco), su `p.pos`
       // natural sigue siendo DEF/MED/DEL — chequear eso lo dejaba pasar como si fuera un
       // jugador de campo cualquiera, y el arco se quedaba vacío por segunda vez sin que
@@ -48,14 +48,14 @@ export function foulEvent(m) {
       p.expulsado = true;
       noteMomentum(m, "roja", "opp"); markMomentum(m, "🟥");
       m.log("card", `min ${m.clock()}' — 🟥 Segunda amarilla y EXPULSIÓN de ${p.name}.`);
-      // playedPos, NO p.pos (bug fix, 2-ago-2026): si el expulsado es el arquero de
+      // playedPos, NO p.pos (bug fix,): si el expulsado es el arquero de
       // EMERGENCIA (un jugador de campo que ya estaba parado en el arco), su `p.pos`
       // natural sigue siendo DEF/MED/DEL — chequear eso lo dejaba pasar como si fuera un
       // jugador de campo cualquiera, y el arco se quedaba vacío por segunda vez sin que
       // nada lo reparara.
       return playedPos(p) === "POR" ? forceGkReplacement(m) : false;
     }
-    // La amarilla solo NARRA (PO 22-jul: el popup de "protegerlo" se eliminó — cambiar al
+    // La amarilla solo NARRA (PO el popup de "protegerlo" se eliminó — cambiar al
     // amonestado es una decisión que el DT toma solo, desde la Gestión de plantilla en vivo).
     markMomentum(m, "🟨");
     m.log("card", `min ${m.clock()}' — 🟨 Amarilla para ${p.name}. Queda condicionado: otra falta y se va.`);
@@ -71,13 +71,13 @@ export function foulEvent(m) {
 
 /**
  * El arco se quedó sin arquero (roja o lesión al que estaba parado ahí) y hay que
- * resolverlo YA — el equipo NUNCA sale a jugar con el área vacía (bug fix, 2-ago-2026).
+ * resolverlo YA — el equipo NUNCA sale a jugar con el área vacía (bug fix,).
  * Dos caminos, según lo que quede en la banca:
  *   1. Hay un POR suplente Y cambios disponibles → sustitución normal (`gk_red`): entra
  *      el arquero de la banca por un jugador de campo.
  *   2. No hay arquero en la banca (o no quedan cambios) → alguien de los que YA están en
  *      cancha se pone los guantes (`gk_emergency`): NO es una sustitución, es una
- *      reposición — el DT elige a quién entre `Match.resolveGkEmergency`. Antes esto solo
+ *      reposición — el DT elige a quién entre `Match.resolveGkEmergency`. Cubre también
  *      lo NARRABA ("un jugador de campo se pone los guantes") sin que ocurriera de
  *      verdad: el arco quedaba vacío igual y el partido seguía como si nada.
  * Devuelve true si queda una decisión pendiente (pausa el partido hasta resolverla).
@@ -124,7 +124,7 @@ export function injuryEvent(m) {
     return false;
   }
   const p = pick(m.activeMine());
-  // Cruce Energía → Lesión (Sprint 4): con las piernas vacías, el golpe termina peor.
+  // Cruce Energía → Lesión: con las piernas vacías, el golpe termina peor.
   const grave = rnd() < 0.45 * fatigueInjuryMult(p.energia);
   if (!grave) {
     p.energia = Math.max(10, p.energia - 20);
@@ -140,12 +140,12 @@ export function injuryEvent(m) {
     : `${inj.partidos} partido${inj.partidos > 1 ? "s" : ""} de baja`;
   markMomentum(m, "🚑");
   m.log("event", `min ${m.clock()}' — 🚑 ¡${p.name} sufre ${inj.name} (${inj.severidad})! No puede continuar — ${baja}.`);
-  // EL ARQUERO LESIONADO es un caso aparte (bug fix, 2-ago-2026): si no hay un POR
+  // EL ARQUERO LESIONADO es un caso aparte (bug fix,): si no hay un POR
   // suplente elegible (`m.eligibleFor(p)` ya filtra por `canPlayAt`, así que da vacío sin
   // arquero en la banca), el arco NO puede quedar sin nadie — se resuelve con la misma
   // ruta que la roja al arquero (`forceGkReplacement`), que ahora sabe fabricar un
-  // arquero de emergencia si hace falta. Antes esto caía derecho al mensaje genérico de
-  // abajo y el partido seguía sin que nadie ocupara el arco.
+  // arquero de emergencia si hace falta. Sin ese desvío el caso cae en el mensaje
+  // genérico de abajo y el partido sigue con el arco vacío.
   //
   // playedPos, NO p.pos: si el lesionado es el arquero de EMERGENCIA (un jugador de campo
   // que ya estaba parado en el arco), su `p.pos` natural sigue siendo DEF/MED/DEL —
@@ -156,7 +156,7 @@ export function injuryEvent(m) {
     return forceGkReplacement(m);
   }
   if (m.subsLeft > 0 && m.eligibleFor(p).length > 0) {
-    // El reemplazo es MANUAL (PO 22-jul): nada de lista de recomendados — la UI abre la
+    // El reemplazo es MANUAL (PO): nada de lista de recomendados — la UI abre la
     // Gestión de plantilla en vivo con el caído marcado y el DT arma el cambio a mano.
     // El smoke lo emula con makeSub directo (mismo efecto que la lista vieja).
     m.decision = {

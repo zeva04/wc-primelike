@@ -9,7 +9,7 @@ import { TEAM_PHILOSOPHIES, FILO_FORMATION } from "../content/identity/team-phil
 import { getFormation } from "./lineup.js";
 
 // Desvíos por posición al derivar stats desde el rating del equipo
-// ODISEA (sprint 1): el `pase` se partió en corto/largo y entró la `velocidad`. El perfil
+// ODISEA: el `pase` se partió en corto/largo y entró la `velocidad`. El perfil
 // de cada puesto se mantiene y se le suma el criterio nuevo: el lateral/extremo rival corre,
 // el central es lento, el arquero no corre y el volante reparte corto mejor que largo.
 export const POS_MODS = {
@@ -63,7 +63,7 @@ export function bestSix(pool) {
 }
 
 /**
- * Mejor seis CON FORMA (F2, decisión PO #4 "formación acorde"): mejor POR + los
+ * Mejor seis CON FORMA: mejor POR + los
  * mejores por línea que pide la formación curada; si una línea no alcanza
  * (bajas, plantel sin esa cantidad), completa por nota como bestSix de siempre.
  */
@@ -87,7 +87,7 @@ function curatedShape(team) {
   return filo ? getFormation(FILO_FORMATION[filo]) : null;
 }
 
-/* FORMA DE TORNEO (arco del Rebalance R2, decisión PO 22-jul-2026): "el Mundial de
+/* FORMA DE TORNEO: "el Mundial de
    verdad se juega en 5 finales" — el rival de eliminatorias llega en MODO MUNDIAL.
    Entra como `p.forma` en el once generado y multiplica effStat (match/powers) — el
    mismo patrón de asimetría en los datos que energía/oxid: MIS jugadores nunca llevan
@@ -95,7 +95,7 @@ function curatedShape(team) {
    rival (sequences.rivalProfile) lee los stats BASE a propósito: la escalada no cambia
    QUÉ fútbol te genera, cambia lo bien que lo ejecuta.
 
-   SPRINT DE LA ESCALADA (31-jul-2026, decisión PO): la escalada era LINEAL (+3% por
+   SPRINT DE LA ESCALADA: la escalada era LINEAL (+3% por
    ronda, final ×1.15) y perdía la carrera contra el jugador. Medido: la escalada
    aislada valía −10.9pp de win% en el banco, pero en runs reales la caída de 16avos a
    la final era de solo **5.7pp** (3.1pp jugando bien) — la progresión del DT, que es
@@ -114,9 +114,9 @@ export function tourneyFormaMult(koRound) { return 1 + TOURNEY_FORM[clamp(koRoun
  * Alineación de 6 titulares del rival (Game Vision: formato 6v6), excluyendo a
  * los suspendidos (`banned`: nombres en `run.rivalBans`, las rojas del mundo
  * vivo). Jugables usan sus mejores 6 disponibles; el resto arma su mejor seis
- * del plantel de 10 (figuras + genéricos). Los 16 CURADOS (F2) forman con la
+ * del plantel de 10 (figuras + genéricos). Los 16 CURADOS forman con la
  * formación de su filosofía (el bloque de SWE presenta 3 DEF de verdad).
- * `koRound` (R2) estampa la forma de torneo en el once.
+ * `koRound` estampa la forma de torneo en el once.
  */
 export function genOpponentLineup(team, banned = [], koRound = 0) {
   const pool = (team.players || genOpponentSquad(team)).filter(p => !banned.includes(p.name));
@@ -132,6 +132,6 @@ export function genOpponentLineup(team, banned = [], koRound = 0) {
  */
 export function expectedOpponentLineup(team, banned = []) {
   const pool = (team.players || genOpponentSquad(team, false)).filter(p => !banned.includes(p.name));
-  const shape = curatedShape(team); // el informe estima el once REAL: misma forma curada (F2)
+  const shape = curatedShape(team); // el informe estima el once REAL: misma forma curada
   return (shape ? bestSixShaped(pool, shape) : bestSix(pool)).map(p => ({ name: p.name, pos: p.pos, num: p.num, stats: { ...p.stats }, look: p.look, energia: 100 }));
 }

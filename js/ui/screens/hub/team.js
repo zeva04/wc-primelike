@@ -67,7 +67,7 @@ export function showCanje(key) {
 // Colores del nivel de amenaza del informe: Alto = peligro, Bajo = ventaja tuya
 
 /**
- * LA ALTURA DEL BLOQUE (sprint del Territorio): los 5 botones y la explicación de la elegida.
+ * LA ALTURA DEL BLOQUE: los 5 botones y la explicación de la elegida.
  * Vive en DOS sitios —la card del día de partido y el Informe del Rival— porque la decisión
  * se toma LEYENDO al rival: por eso el markup y el cableado se comparten en vez de copiarse.
  * Acá es gratis; dentro del partido, moverla consume una ventana táctica. Queda puesta para
@@ -102,7 +102,7 @@ export function wireAlturaPicker() {
 
 
 /**
- * Card de IDENTIDAD del estado del equipo (F3, "La vitrina"): filosofía, nivel y la
+ * Card de IDENTIDAD del estado del equipo: filosofía, nivel y la
  * barra de progreso al próximo umbral. Clic → pantalla de identidad. Compacta a
  * propósito: el despliegue completo (aristas, rasgo, counters) vive en la pantalla.
  */
@@ -116,7 +116,7 @@ export function filoCard() {
   const nivel = FILO_LEVELS[lvl];
   const next = FILO_LEVELS[lvl + 1] || null;
   const pct = next ? Math.min(100, (100 * (pts - nivel.min)) / (next.min - nivel.min)) : 100;
-  // La segunda capa (arco de Progresión): el Director Técnico y su barra propia.
+  // La segunda capa: el Director Técnico y su barra propia.
   // Las filosofías son lo que SABE el equipo; el DT es lo que sabe el entrenador.
   const dt = dtProgress(run);
   return `<div id="btn-filo" class="rounded-xl border tp-border tp-bg-soft px-3 py-2 mb-3 shrink-0 cursor-pointer transition-all hover:brightness-125" title="Ver la identidad del equipo">
@@ -178,16 +178,16 @@ export function teamStateCard(v, discipline, fueraDePuesto, forma) {
   if (discipline.aperc.length) avisos.push(`<div class="text-yellow-400" title="Con otra amarilla se pierde un partido">🟨 Apercibido${discipline.aperc.length > 1 ? "s" : ""}: ${discipline.aperc.map(p => p.name).join(", ")}</div>`);
   if (forma.racha.length) avisos.push(`<div class="text-emerald-400" title="Momento alto: rinden por encima">🔥 En racha: ${forma.racha.map(p => p.name).join(", ")}</div>`);
   if (forma.frios.length) avisos.push(`<div class="text-sky-400" title="Momento bajo: rinden por debajo">❄️ Fríos: ${forma.frios.map(p => p.name).join(", ")}</div>`);
-  // Plantel oxidado (R1): el aviso explica el CASTIGO y las dos salidas (riesgo declarado
+  // Plantel oxidado: el aviso explica el CASTIGO y las dos salidas (riesgo declarado
   // del arco: que el jugador nuevo entienda por qué rinde menos).
   if (ox.oxidado) avisos.push(`<div class="${oxidCls(ox.racha)}" title="Cada día de preparación sin Entrenar ni Sesión Táctica suma; al 3º el plantel pierde filo">⚙️ Plantel oxidado: ${ox.racha} días sin entrenar — rinde un ${Math.round((1 - ox.mult) * 100)}% menos hasta entrenar (o jugar: el partido devuelve el ritmo)</div>`);
-  // Clima de vestuario: la Moral modula la frecuencia de conflictos de la ventana (Sprint 2).
+  // Clima de vestuario: la Moral modula la frecuencia de conflictos de la ventana.
   if (mb.id === "suelo" || mb.id === "baja") avisos.push(`<div class="text-orange-400" title="La moral baja convulsiona el vestuario: más conflictos entre partidos">🎭 Vestuario caldeado: se vienen más conflictos</div>`);
   else if (mb.id === "nubes") avisos.push(`<div class="text-emerald-400" title="La moral alta serena el vestuario: menos conflictos entre partidos">🎭 Vestuario en paz: semana tranquila por delante</div>`);
   // min-w-0: sin él la card hereda el piso `min-width:auto` de item de grilla y NO puede
   // achicarse por debajo de su contenido mínimo. En escritorio no se nota (la columna mide
   // 20rem), pero en una sola columna a 375px la card se plantaba en 379 y empujaba la
-  // página a 394 con scroll horizontal (medido con tools/mobile.html, 29-jul). Sus
+  // página a 394 con scroll horizontal (medido con tools/mobile.html,). Sus
   // hermanas de la grilla ya lo llevan; a esta se le había escapado.
   return `<div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 h-full flex flex-col min-w-0">
     <div class="flex items-center justify-between mb-2.5 shrink-0">

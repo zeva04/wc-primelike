@@ -1,6 +1,5 @@
 /* ============================================================
-   game/match/trait-hooks — el intérprete de RASGOS del Match
-   (arco de Rasgos T1.3: EL trabajo de motor del arco).
+   game/match/trait-hooks — el intérprete de RASGOS del Match.
 
    Los rasgos viajan como ids en matchCtx.filo.rasgos (la
    frontera §3.2: el Match no conoce la run); acá se resuelven a
@@ -12,7 +11,7 @@
    tras pérdida, la trampa que convierte el repliegue, la segunda
    pelota del pelotazo). Generaliza el patrón def→of que ya
    existía ad-hoc (playout→transición, fortaleza→pelotazo,
-   chainSetPiece): chainMine() es ese patrón con nombre, para que
+   chainSetPiece): chainMine es ese patrón con nombre, para que
    los 5+ rasgos que lo consumen (T1 y T3) no lo reinventen.
 
    Reglas del motor:
@@ -56,7 +55,7 @@ export function traitHooks(m) {
 /**
  * El hook `name` activo, o null.
  *
- * `family` (rediseño del Contra, 30-jul-2026) DESAMBIGUA las builds híbridas: varios
+ * `family` DESAMBIGUA las builds híbridas: varios
  * hooks son "de una jugada" (`of`/`seq`: skipToFinish de la transición, variantDeep de
  * la recuperación, oppShotMalus del repliegue…) y con las 4 filosofías rediseñadas un
  * DT puede tener dos rasgos que declaran el mismo hook para jugadas DISTINTAS. Sin
@@ -77,14 +76,14 @@ export function hooksOf(m, name) {
 }
 
 /**
- * EL GATE TERRITORIAL DE LOS RASGOS (sprint del Territorio, T4). Un rasgo puede
+ * EL GATE TERRITORIAL DE LOS RASGOS. Un rasgo puede
  * declarar DÓNDE existe su fútbol:
  *   `zone: [vMin, vMax]` — solo con la pelota en esas alturas (reventar el balón es
  *      de zona propia; pivotear al área, del área rival)
  *   `minHeight: n`       — solo con MI bloque en esa altura o más arriba (la trampa
  *      del offside no se puede tender con la línea metida en el área)
  * Sin declaración, el rasgo aplica siempre — solo se gatea lo que el fútbol pide, y
- * a lo gateado se le COMPENSA la frecuencia (decisión PO) para no mover el balance
+ * a lo gateado se le COMPENSA la frecuencia para no mover el balance
  * del árbol recién calibrado: el rasgo cambia de carácter, no de valor.
  */
 function zoneOk(m, h) {
@@ -95,9 +94,9 @@ function zoneOk(m, h) {
   return !h.minHeight || myHeight(m) >= h.minHeight;
 }
 
-/** ¿El DT compró este rasgo? — EL GATE DE LA MIGRACIÓN F2 (T2): donde antes
+/** ¿El DT compró este rasgo? — EL GATE DE LA MIGRACIÓN F2: donde antes
  *  decidía filoRasgo (Consolidada regalaba el efecto profundo), ahora decide
- *  el árbol. Consolidada da su PI y nada más (decisión PO #2). */
+ *  el árbol. Consolidada da su PI y nada más. */
 export function hasTrait(m, traitId) {
   return (m.my.filo?.rasgos || []).includes(traitId);
 }
@@ -140,7 +139,7 @@ export function chainMine(m, typeId, { bonus = 0, intro = null, buildDecision } 
   const prot = m._weightedPick(cands, cands.map(p => (t.protWeight[playedPos(p)] ?? 1) * protMomentum(p)));
   m._flow.push({ min: m.min, side: "mine", w: 3 }); // el fútbol reactivo también pesa en posesión/momentum
   // El territorio también manda en el fútbol reactivo: la cadena nace donde ESE fútbol
-  // nace (T4), no donde quedó la jugada anterior.
+  // nace, no donde quedó la jugada anterior.
   setBall(m, { ...originOf(m, t), side: "mine" });
   m.seq = { type: t, prot, actIdx: 0, bonus, reactive: true };
   m.log("event", `${t.icon} min ${m.clock()}' — ${intro ? intro(prot) : t.flavor.intro(prot)}`);
