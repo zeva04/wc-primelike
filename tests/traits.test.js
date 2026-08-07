@@ -38,6 +38,20 @@ const REDISENADAS = ["press", "posesion", "bloque", "contra"];
     assert(!/\d/.test(t.desc), "la descripción al jugador NUNCA habla de números (tono sobrio, decisión PO)", `${t.id}: "${t.desc}"`);
     assert(t.req && (t.req.nivel || 1) >= 1, "todo rasgo declara su nivel requerido", t.id);
     assert(t.hooks && Object.keys(t.hooks).length >= 1, "todo rasgo declara sus hooks (backlog interno)", t.id);
+    // El EFECTO es lo contrario de la desc: ahí SÍ va el número, porque es lo que el DT
+    // compra. Formato [valor, texto] — la ficha del riel dibuja el valor como placa.
+    assert(Array.isArray(t.efecto) && t.efecto.length, "todo rasgo declara su efecto en el partido", t.id);
+    for (const e of t.efecto || []) {
+      assert(Array.isArray(e) && e.length === 2 && e.every(x => typeof x === "string" && x),
+        "cada efecto es [valor, texto]", `${t.id}: ${JSON.stringify(e)}`);
+      assert(e[0].length <= 14, "el valor del efecto entra en su placa (≤14 caracteres)", `${t.id}: "${e[0]}"`);
+    }
+    // El GATE es OPCIONAL, pero si un hook declara geografía o estado, el jugador tiene
+    // que poder leerlo: sin esto el rasgo se compra creyendo que aplica siempre.
+    const gated = Object.values(t.hooks).some(h => h?.zone || h?.minHeight);
+    if (gated) assert(typeof t.gate === "string" && t.gate.length > 20,
+      "un rasgo con geografía (zone/minHeight) declara su gate para la ficha", t.id);
+    if (t.gate) assert(typeof t.gate === "string" && !/^\s|\s$/.test(t.gate), "el gate es una frase limpia", t.id);
     assert(E.getPhilosophy(t.filo), "la filosofía del rasgo existe", t.id);
   }
   assert(E.traitById("presion_intensificada")?.filo === "press", "traitById encuentra por id");

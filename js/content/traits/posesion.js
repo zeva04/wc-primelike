@@ -1,7 +1,8 @@
 /* Rasgos de 🎼 POSESIÓN — tener y circular.
    Tres ramas: firma (profundiza lo propio) · respuesta (cubre el matchup débil)
    · expansión (abre un fútbol lateral). El nivel de desbloqueo y el costo salen
-   del tier (ver TRAIT_LEVEL / TRAIT_COST en ./index.js). */
+   del tier (ver TRAIT_LEVEL / TRAIT_COST en ./index.js).
+   `efecto` = lo que hace en el partido, leído del hook (convenciones en ./press.js). */
 
 export const TRAITS_POSESION = [
   /* Firma · perfeccionar la estructura ofensiva */
@@ -10,6 +11,7 @@ export const TRAITS_POSESION = [
     nombre: "Buen Pie",
     desc: "El pase de seguridad deja de ser un trámite: el equipo lo da bien incluso con la presión encima, y una pelota que parecía perdida vuelve a ser suya.",
     momento: "El pase interceptado que igual termina en un pie propio.",
+    efecto: [["35%", "de reciclar la posesión cuando te interceptan el pase de construcción: la jugada no muere ahí"]],
     req: {}, pos: { x: 190, y: 200 },
     hooks: { recycleBuild: { p: 0.35,
       texto: "Buen pie: la pelota rebota y vuelve a ser nuestra — la jugada no se muere ahí." } },
@@ -19,6 +21,7 @@ export const TRAITS_POSESION = [
     nombre: "El Tercer Hombre",
     desc: "Las combinaciones de tres jugadores rompen líneas y aseguran la salida bajo presión: siempre aparece uno más para recibir.",
     momento: "La pared que deja atrás a toda la primera línea de presión.",
+    efecto: [["40%", "de rescatar la SALIDA bajo presión cuando el pase falla, sin regalarle el remate al rival"]],
     req: { previo: "buen_pie" },
     pos: { x: 450, y: 200 },
     hooks: { playoutRescue: { p: 0.40,
@@ -29,6 +32,7 @@ export const TRAITS_POSESION = [
     nombre: "Pitagóricos",
     desc: "El equipo triangula con los ojos cerrados: cuando hay que elegir a quién buscar, siempre encuentra al que de verdad está mejor parado.",
     momento: "La triangulación que deja al mejor ubicado solo frente al arco.",
+    efecto: [["+5%", "de acierto al buscar al MEJOR UBICADO en el desenlace de la jugada"]],
     req: { previo: "tercer_hombre" },
     pos: { x: 710, y: 128 },
     hooks: { supportUpgrade: { bonus: 0.05,
@@ -39,6 +43,7 @@ export const TRAITS_POSESION = [
     nombre: "Osciladores",
     desc: "El equipo mueve el balón de un lado al otro hasta que la presión rival se parte: cada cambio de orientación deja la jauría corriendo el carril equivocado.",
     momento: "El cambio de cuarenta metros con los tres que venían a presionar mirando cómo pasa por arriba.",
+    efecto: [["×1.39", "más CIRCULACIÓN en tu sorteo, pero solo frente a 🦁 High Press: neutraliza esa celda, no la invierte"]],
     req: { previo: "tercer_hombre" },
     pos: { x: 710, y: 275 },
     hooks: { poolMod: { vsFilo: "press", weights: { circulacion: 1.39 } } },
@@ -48,6 +53,11 @@ export const TRAITS_POSESION = [
     nombre: "La Máquina Colectiva",
     desc: "Once jugadores moviéndose como una sola pieza. El rival deja de disputar el partido: corre detrás de una pelota que nunca le pertenece.",
     momento: "El gol a puerta vacía tras treinta pases, empujándola sin oposición.",
+    efecto: [
+      ["+6%", "de INICIATIVA: el reparto de jugadas del partido se inclina a tu favor de raíz"],
+      ["38%", "de «pelota servida» con la circulación ya en zona de remate (+22% de acierto: el gol a puerta vacía)"],
+    ],
+    gate: "La pelota servida solo existe con la jugada ya metida en ZONA DE REMATE (la iniciativa, en cambio, aplica siempre).",
     req: { previo: "pitagoricos" },
     pos: { x: 960, y: 128 },
     hooks: {
@@ -60,6 +70,7 @@ export const TRAITS_POSESION = [
     nombre: "Hombre Libre",
     desc: "Después de tanto tejer, siempre termina apareciendo uno solo. El equipo lo encuentra, y lo que sigue es el delantero contra el arquero.",
     momento: "Veinte pases y el nueve de cara al arquero.",
+    efecto: [["30%", "de que el desenlace de la CIRCULACIÓN se acelere hasta el mano a mano (+6% de acierto)"]],
     req: { previo: "osciladores" },
     pos: { x: 960, y: 275 },
     hooks: { accelFinish: { of: "circulacion", p: 0.30, bonus: 0.06,
@@ -72,6 +83,11 @@ export const TRAITS_POSESION = [
     nombre: "La Trampa",
     desc: "El equipo puede devolver la pelota atrás a propósito, para sacar al rival de su bloque y volver a empezar el ataque desde otro sitio.",
     momento: "El rival saliendo a buscarla y dejando el espacio que se estaba negando.",
+    efecto: [
+      ["NUEVA", "desbloquea DEVOLVERLA ATRÁS: sacar al rival de su bloque y rearmar (+6% de acierto)"],
+      ["−6%", "de acierto en el remate del rival cuando te recupera la pelota: recupera lejos"],
+    ],
+    gate: "Devolverla atrás solo existe con el equipo YA ADELANTADO, de mediocampo en adelante: retroceder desde tu propia salida no saca a nadie de su bloque.",
     req: {}, pos: { x: 190, y: 390 },
     hooks: {
       oppShotMalus: { seq: "recuperacion", bonus: -0.06,
@@ -84,6 +100,7 @@ export const TRAITS_POSESION = [
     nombre: "Salida Lavolpiana",
     desc: "Contra la presión alta, un mediocampista baja entre los centrales: de golpe hay un hombre más para salir y la primera línea rival queda sobrando.",
     momento: "El cinco entre los centrales y la presión rival saltando al vacío.",
+    efecto: [["30%", "de que la circulación arranque ya saltando su primera línea (+7% de acierto), solo frente a 🦁 High Press"]],
     req: { previo: "la_trampa" },
     pos: { x: 450, y: 390 },
     hooks: { variantSwitch: { of: "circulacion", vsFilo: "press", p: 0.30, bonus: 0.07,
@@ -94,6 +111,11 @@ export const TRAITS_POSESION = [
     nombre: "La Frontera",
     desc: "La línea sube y se sostiene: cuando la pierden arriba y el rival busca la espalda, el equipo levanta la mano en bloque. Exige jugar con el BLOQUE ALTO: sin línea adelantada no hay trampa que tender.",
     momento: "El contragolpe rival muriendo en offside con toda la línea levantando el brazo.",
+    efecto: [
+      ["40%", "de cortar el pelotazo a tu espalda antes de que se vuelva mano a mano"],
+      ["50%", "de anular la contra rival por OFFSIDE"],
+    ],
+    gate: "La trampa del offside pide BLOQUE ALTO o MUY ALTO: sin línea adelantada no hay trampa que tender (el corte del pelotazo sí aplica siempre).",
     req: { previo: "salida_lavolpiana" },
     pos: { x: 710, y: 390 },
     hooks: {
@@ -107,6 +129,8 @@ export const TRAITS_POSESION = [
     nombre: "Rest Defense",
     desc: "Incluso volcado en campo rival el equipo deja el ataque preparado para defender: la transición del rival se apaga antes de cruzar la mitad.",
     momento: "El rival recuperando la pelota y no pudiendo dar dos pases seguidos.",
+    efecto: [["36%", "de que el avance rival pierda continuidad y muera ANTES de llegar a tu área"]],
+    gate: "El resto defensivo corta ARRIBA: si el rival ya llegó a tu propia área, la jugada no se apaga sola.",
     req: { previo: "la_frontera" },
     pos: { x: 960, y: 390 },
     hooks: { oppLoseActs: { zone: [2, 5], p: 0.36,
@@ -119,6 +143,10 @@ export const TRAITS_POSESION = [
     nombre: "El Rondo",
     desc: "El equipo instala el rondo en campo rival y no lo suelta: el partido entero se juega donde el rival no quiere, y las piernas que corren detrás no son las nuestras.",
     momento: "Diez minutos seguidos de toque en campo rival.",
+    efecto: [
+      ["×1.20", "más CIRCULACIÓN en el sorteo de jugadas del partido"],
+      ["+10%", "de desgaste de energía del RIVAL: el que corre detrás de la pelota es él"],
+    ],
     req: {}, pos: { x: 190, y: 545 },
     hooks: {
       poolMod: { weights: { circulacion: 1.20 } },
@@ -130,6 +158,7 @@ export const TRAITS_POSESION = [
     nombre: "Profundos",
     desc: "Tanto toque tiene un para qué: cuando la línea rival se descuida un segundo, el pase ya salió hacia el espacio.",
     momento: "El pase filtrado que parte a la defensa después de veinte toques.",
+    efecto: [["26%", "de que la circulación saltee los actos intermedios: el filtrado al espacio (+4% de acierto)"]],
     req: { previo: "el_rondo" },
     pos: { x: 450, y: 545 },
     hooks: { skipToFinish: { of: "circulacion", p: 0.26, bonus: 0.04,
@@ -140,6 +169,7 @@ export const TRAITS_POSESION = [
     nombre: "Sorpresivos",
     desc: "El equipo que toca y toca de pronto la manda por arriba: nadie lo espera, y la línea rival queda partida por el aire.",
     momento: "El pelotazo aéreo tras cuarenta toques, con la defensa adelantada.",
+    efecto: [["30%", "de que la circulación nazca en su versión PROFUNDA: el pelotazo aéreo (+6% de acierto)"]],
     req: { previo: "profundos" },
     pos: { x: 710, y: 505 },
     hooks: { variantDeep: { of: "circulacion", p: 0.30, bonus: 0.06,
@@ -150,6 +180,7 @@ export const TRAITS_POSESION = [
     nombre: "Desesperantes",
     desc: "Perseguir la pelota sin tocarla enloquece a cualquiera. El rival termina entrando mal, y eso se cobra en tiros libres y en tarjetas.",
     momento: "El penal en el minuto ochenta tras diez minutos de sitio.",
+    efecto: [["PROFUNDA", "la jugada firma de Posesión gana su 4º compás y abre el penal por desesperación"]],
     req: { previo: "profundos" },
     pos: { x: 710, y: 615 },
     hooks: { deepPosesion: {} },
@@ -159,6 +190,10 @@ export const TRAITS_POSESION = [
     nombre: "Polivalentes",
     desc: "Delanteros que arman y mediocampistas que atacan: nadie ocupa el puesto que dice su camiseta, y la defensa rival ya no sabe a quién seguir.",
     momento: "El mediocampista definiendo de nueve mientras el nueve dio el pase.",
+    efecto: [
+      ["60%", "de reciclar la posesión (sube desde el 35% de Buen Pie)"],
+      ["×2", "hasta dos reciclajes en la misma jugada: el ataque deja de morir"],
+    ],
     req: { alguno: ["sorpresivos", "desesperantes"] },
     pos: { x: 960, y: 560 },
     hooks: { recycleUpgrade: { p: 0.60, max: 2,

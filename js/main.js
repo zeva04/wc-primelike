@@ -24,9 +24,19 @@ import "./ui/screens/shootout.js";
 import "./ui/screens/post-match.js";
 import "./ui/screens/end.js";
 
+/** ¿Estamos en la máquina de desarrollo? Es la única llave que abre el deep-link. */
+const LOCAL = ["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname);
+
 if (!WC_DATA || !WC_DATA.teams || !WC_DATA.teams.length) {
   document.getElementById("app").innerHTML =
     `<div class="text-center mt-20 text-red-400">❌ No se pudieron cargar los datos de las selecciones (data/teams.js).</div>`;
+} else if (LOCAL && location.search.includes("dev=")) {
+  // DEEP-LINK DE DESARROLLO (?dev=philosophy&…): monta un estado y abre esa pantalla,
+  // para poder verificar la UI navegando a una URL en vez de inyectando scripts. El
+  // import es DINÁMICO y va detrás de dos llaves —origen local y el parámetro— así que
+  // en cualquier otro sitio el archivo ni se descarga. Ver js/dev/deeplink.js.
+  const { bootDeepLink } = await import("./dev/deeplink.js");
+  if (!bootDeepLink()) go("menu");
 } else {
   go("menu");
 }

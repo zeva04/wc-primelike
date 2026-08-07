@@ -7,7 +7,8 @@
 
    El detalle de cada rasgo NO se muestra en reposo (el nodo es ícono + nombre): se abre al
    tocarlo, la cámara hace zoom sobre él y la ficha entra por el riel de la derecha con
-   desc, momento, faltas y la compra. Esa es la única profundidad de la pantalla.
+   desc, momento, EFECTO EN EL PARTIDO, faltas y la compra. Esa es la única profundidad de
+   la pantalla.
 
    Doble modo: pantalla normal desde el hub, y ONBOARDING en el flujo de inicio (elegir
    filosofía trae acá con 1 PI para el 1-de-3 de rasgos básicos; el botón sigue al sorteo). */
@@ -26,15 +27,48 @@ import { tacticBoard, nodePos, camTransform, markerColor, TIER_LABEL, NOTES_ID, 
 const MAGNETS = `<span class="tb-magnet" style="left:9px"></span><span class="tb-magnet" style="right:9px"></span>`;
 
 /**
- * La ficha del rasgo, escrita en EL RIEL DEL PIZARRÓN.
- * Lo narrativo (nombre, descripción, su momento) va en tiza sobre la misma
- * superficie del tablero; lo funcional (requisitos y compra) va en una ETIQUETA
- * IMANTADA — el único objeto que puede permitirse alto contraste, porque es lo
- * que hay que poder tocar.
+ * De qué NATURALEZA es un valor de efecto. Los tres números de un rasgo no dicen
+ * lo mismo y hasta el sprint de rasgos se veían todos iguales:
+ *   prob  "28%"    la probabilidad de que ALGO PASE (una jugada nueva, una cadena)
+ *   acc   "+5%"    el acierto de algo que YA pasa — y "−5%" el del rival, que también
+ *                  te favorece: por eso comparten color
+ *   freq  "×1.22"  la FRECUENCIA con que sale la jugada en el sorteo del partido
+ *   new   NUEVA    contenido, no dial: una jugada que antes no existía
+ * Se deriva del texto del valor, no de un campo aparte: un rasgo nuevo se pinta
+ * solo con escribir su número.
+ */
+const fxKind = v =>
+  /^(NUEVA|PROFUNDA)$/.test(v) ? "new"
+    : v.startsWith("×") ? "freq"
+      : /^[+−-]/.test(v) ? "acc"
+        : "prob";
+
+/**
+ * LA JERARQUÍA DE LA FICHA. Cuatro textos distintos hablan de un rasgo y hasta
+ * ahora competían casi al mismo tamaño. El orden de lectura de un DT que va a
+ * gastar su PI es:
+ *
+ *   1. QUÉ ES        el nombre + su ícono (17px black) — la etiqueta
+ *   2. QUÉ HACE      el EFECTO en el partido (la placa de tiza: valor 13px
+ *                    black + texto 12px) — es lo que decide la compra
+ *   3. POR QUÉ       la descripción futbolística (11.5px, apagada) — el contexto
+ *   4. CÓMO SE VE    el momento (14px manuscrito) — el sabor, la firma del rasgo
+ *
+ * El efecto va DESPUÉS del momento (decisión PO: primero se enamora, después se
+ * calcula) pero pesa más que él en tamaño y contraste: llega último y grita.
+ *
+ * `efecto` es una lista de [valor, texto] escrita al lado del hook en
+ * content/traits — el valor es el número real del motor, no una etiqueta suelta.
+ *
+ * Lo narrativo va en tiza sobre la misma superficie del tablero; lo funcional
+ * (requisitos y compra) va en una ETIQUETA IMANTADA — el único objeto que puede
+ * permitirse alto contraste, porque es lo que hay que poder tocar.
  *
  * El bloque de acción va PEGADO AL FONDO (`mt-auto`): así el botón aterriza en
  * el mismo píxel para todos los rasgos, largos o cortos. Esa es la "elegancia
- * equidistante y firme" — la ficha ya no baila según cuánto texto traiga.
+ * equidistante y firme" — la ficha ya no baila según cuánto texto traiga. Con el
+ * efecto adentro hay rasgos de tres líneas: el cuerpo narrativo SCROLLEA y la
+ * compra no se mueve.
  *
  * El requisito de principio AJENO se anota en el color de ESE principio (regla
  * de color del sprint: el color es información — "esto está escrito con un
@@ -67,6 +101,25 @@ function traitCard(t, f, run, color) {
             <span style="color:${ink}">·</span><span>${x}</span></li>`).join("")}</ul>
         </div>`;
 
+  // EL EFECTO: la placa de tiza. Cada línea entra con su valor adelante — el número
+  // manda la lectura y el texto explica dónde muerde. Un rasgo sin `efecto` declarado
+  // simplemente no dibuja la placa (nada se rompe si mañana entra un rasgo nuevo).
+  const efecto = t.efecto?.length
+    ? `<div class="tb-fx mt-4" style="--ink:${ink}">
+        <div class="text-[9px] font-black uppercase tracking-[.22em] mb-2.5" style="color:${ink}">En el partido</div>
+        <ul class="space-y-2.5">${t.efecto.map(([v, txt]) => `<li>
+          <span class="tb-val is-${fxKind(v)}">${v}</span><span class="text-[12px] leading-snug text-[#dff0e5]/80">${txt}</span>
+        </li>`).join("")}</ul>
+      </div>`
+    : "";
+
+  // EL GATE: la letra chica, y va aparte. Un efecto dice cuánto sumás; esto dice
+  // CUÁNDO existís — si no se cumple, el rasgo vale cero. Se pega al pie del cuerpo,
+  // pegado al precio, que es el momento exacto en que el DT decide.
+  const gate = t.gate
+    ? `<p class="tb-gate mt-4">⚠ <span>${t.gate}</span></p>`
+    : "";
+
   return `<button id="tb-close" class="absolute top-2.5 right-4 chalk-hand text-[24px] leading-none text-white/30 hover:text-white/80 cursor-pointer">×</button>
 
     <div class="text-[9px] font-black uppercase tracking-[.22em]" style="color:${ink}a6">
@@ -77,12 +130,16 @@ function traitCard(t, f, run, color) {
       <h2 class="text-[17px] font-black leading-tight" style="color:${t.owned ? "#eef7f1" : ink}">${t.nombre}</h2>
     </div>
 
-    <div class="tb-chalkline my-4"></div>
+    <div class="tb-chalkline my-3.5"></div>
 
-    <p class="text-[12.5px] leading-relaxed text-[#dff0e5]/85">${t.desc}</p>
-    <p class="chalk-hand text-[16px] leading-snug mt-4" style="color:${ink}">“${t.momento}”</p>
+    <div class="tb-body">
+      <p class="text-[11.5px] leading-relaxed text-[#dff0e5]/65">${t.desc}</p>
+      <p class="chalk-hand text-[14px] leading-snug mt-3" style="color:${ink}bb">“${t.momento}”</p>
+      ${efecto}
+      ${gate}
+    </div>
 
-    <div class="mt-auto pt-5">
+    <div class="mt-auto pt-4">
       ${precio}
       ${accion}
     </div>`;

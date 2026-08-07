@@ -1,7 +1,8 @@
 /* Rasgos de 🧱 BLOQUE BAJO — orden y muralla.
    Tres ramas: firma (profundiza lo propio) · respuesta (cubre el matchup débil)
    · expansión (abre un fútbol lateral). El nivel de desbloqueo y el costo salen
-   del tier (ver TRAIT_LEVEL / TRAIT_COST en ./index.js). */
+   del tier (ver TRAIT_LEVEL / TRAIT_COST en ./index.js).
+   `efecto` = lo que hace en el partido, leído del hook (convenciones en ./press.js). */
 
 export const TRAITS_BLOQUE = [
   /* Firma · el área como fortaleza */
@@ -10,6 +11,7 @@ export const TRAITS_BLOQUE = [
     nombre: "Compactación",
     desc: "El bloque se cierra y le tapa el carril del medio: por el centro no se pasa, y al rival solo le queda dar la vuelta por afuera.",
     momento: "El rival dando vueltas por afuera sin encontrar la puerta.",
+    efecto: [["−5%", "de acierto en el remate rival del REPLIEGUE: con el centro cerrado, remata desde afuera"]],
     req: {}, pos: { x: 190, y: 140 },
     hooks: { oppShotMalus: { seq: "repliegue", bonus: -0.05,
       texto: "El centro está clausurado: el remate llegó incómodo, forzado desde afuera." } },
@@ -19,6 +21,7 @@ export const TRAITS_BLOQUE = [
     nombre: "Sobrepoblado",
     desc: "Hay siempre una pierna más de la que el rival contaba: los pases entre líneas se topan con alguien y el ataque muere antes de nacer.",
     momento: "El pase rival que no llega a destino tres veces seguidas.",
+    efecto: [["25%", "de que el avance rival de varios actos muera interceptado ANTES del remate"]],
     req: {}, pos: { x: 190, y: 250 },
     hooks: { oppLoseActs: { p: 0.25,
       texto: "Zona sobrepoblada: el pase entre líneas se topa con una pierna y el ataque muere en la nada." } },
@@ -28,6 +31,10 @@ export const TRAITS_BLOQUE = [
     nombre: "Área Blindada",
     desc: "Dentro del área manda el equipo: cada centro se come, cada remate sale a destiempo y el rival termina buscando desde afuera.",
     momento: "El despeje número diez del central y la contra que nace de ahí.",
+    efecto: [
+      ["PROFUNDA", "la fortaleza contiene mejor y castiga más: convierte el 75% de las veces en vez del 55%"],
+      ["−5%", "de acierto en el remate rival DENTRO del área"],
+    ],
     req: { todos: ["compactacion", "sobrepoblado"] },
     pos: { x: 450, y: 195 },
     hooks: {
@@ -41,6 +48,7 @@ export const TRAITS_BLOQUE = [
     nombre: "Defensa Escalonada",
     desc: "Las líneas se escalonan: al que rompe la primera lo espera la segunda. El rival tarda medio partido en entender por dónde entrar.",
     momento: "La primera llegada rival muriendo contra una línea que ya estaba ahí.",
+    efecto: [["−6%", "de acierto en la PRIMERA ocasión rival del partido — se consume una vez por partido"]],
     req: { previo: "area_blindada" },
     pos: { x: 710, y: 125 },
     hooks: { firstChanceGuard: { bonus: -0.06,
@@ -51,6 +59,8 @@ export const TRAITS_BLOQUE = [
     nombre: "Muralla",
     desc: "Mientras el marcador no vaya en contra, la zaga juega con una convicción distinta: nadie se saca la camiseta de encima y no pasa nadie.",
     momento: "Los últimos veinte minutos defendiendo el resultado sin conceder una sola llegada limpia.",
+    efecto: [["−5%", "de acierto en TODO remate rival"]],
+    gate: "Rasgo de ESTADO: solo con el marcador empatado o a favor. Yendo perdiendo no aporta nada.",
     req: { previo: "area_blindada" },
     pos: { x: 710, y: 245 },
     hooks: { wall: { bonus: -0.05,
@@ -61,6 +71,11 @@ export const TRAITS_BLOQUE = [
     nombre: "Fortaleza Inexpugnable",
     desc: "El rival puede tener la pelota todo el partido: no va a tener una sola ocasión clara. Ataca, ataca, y termina discutiendo entre ellos.",
     momento: "El delantero rival discutiendo con sus compañeros tras la enésima llegada muerta.",
+    efecto: [
+      ["25%", "de que la OCASIÓN CLARA rival (mano a mano, contra tras tu pérdida) directamente no ocurra"],
+      ["×0.74", "menos asedio del rival de 🎼 Posesión: neutraliza la celda que te castiga, no la invierte"],
+      ["−8%", "de acierto rival como tope: cada remate que fallan les suma frustración (−2% por remate)"],
+    ],
     req: { alguno: ["defensa_escalonada", "muralla"] },
     pos: { x: 960, y: 185 },
     hooks: {
@@ -78,6 +93,7 @@ export const TRAITS_BLOQUE = [
     nombre: "Dominio Aéreo",
     desc: "Todo lo que entra por el aire lo gana el equipo: centros, córners y pelotas divididas terminan siempre en una cabeza propia.",
     momento: "El central ganando el décimo cabezazo del partido.",
+    efecto: [["−5%", "de acierto en el cabezazo rival del córner en contra"]],
     req: {}, pos: { x: 190, y: 395 },
     hooks: { aerialDef: { bonus: -0.05,
       texto: "Por arriba no se les gana: el cabezazo rival salió forzado, con la zaga encima." } },
@@ -87,6 +103,10 @@ export const TRAITS_BLOQUE = [
     nombre: "Atentos",
     desc: "Tras cada atajada y cada bloqueo, la segunda pelota es del equipo: nadie mira la jugada, todos van al rechace.",
     momento: "El rechace del córner que ya es un pelotazo nuestro.",
+    efecto: [
+      ["30%", "de que el córner rival defendido encadene PELOTAZO mío (+3% de acierto)"],
+      ["30%", "de que el rechace de un duelo aéreo perdido encadene PELOTAZO mío (+2% de acierto)"],
+    ],
     req: { previo: "dominio_aereo" },
     pos: { x: 450, y: 380 },
     hooks: {
@@ -101,6 +121,11 @@ export const TRAITS_BLOQUE = [
     nombre: "Pelotazo",
     desc: "Desbloquea la jugada Reventar el Balón: cuando el peligro aprieta, la zaga la manda lejos y obliga al rival a empezar todo de nuevo desde atrás.",
     momento: "El pelotazo a la tribuna que apaga el incendio y hace bramar al estadio.",
+    efecto: [
+      ["NUEVA", "desbloquea REVENTAR EL BALÓN como tercera opción del acto de contención: mata el ataque rival sin remate"],
+      ["30%", "de córner concedido — y resignás la conversión de la fortaleza: es un canje, no un regalo"],
+    ],
+    gate: "Solo defendiendo en CAMPO PROPIO: reventar el balón desde el campo rival no es una jugada.",
     req: { previo: "atentos" },
     pos: { x: 710, y: 360 },
     hooks: { clearBall: { zone: [1, 3], p: 0.30,
@@ -111,6 +136,11 @@ export const TRAITS_BLOQUE = [
     nombre: "Al Área",
     desc: "Desbloquea la jugada Saque Largo al Área: los saques de banda en campo rival dejan de ser un trámite y se convierten en un envío al área.",
     momento: "El saque de banda que termina en un córner a favor.",
+    efecto: [
+      ["NUEVA", "desbloquea SAQUE LARGO AL ÁREA: balón parado encadenado en vez de jugada muerta"],
+      ["42%", "de que el pelotazo sin gol termine en ese envío al área"],
+    ],
+    gate: "Solo cerca del ÁREA RIVAL: el saque largo se juega desde el campo de enfrente.",
     req: { previo: "atentos" },
     pos: { x: 710, y: 480 },
     hooks: { beachhead: { zone: [4, 5], p: 0.42,
@@ -121,6 +151,11 @@ export const TRAITS_BLOQUE = [
     nombre: "Hombre Objetivo",
     desc: "Desbloquea la jugada Pivoteo al Área: el nueve ya no solo cabecea, también la baja para el que llega de frente al arco.",
     momento: "El nueve aguantando de espaldas y la descarga que termina en gol.",
+    efecto: [
+      ["NUEVA", "desbloquea PIVOTEO AL ÁREA como tercera opción del duelo aéreo"],
+      ["+8%", "de acierto: la baja al mejor rematador, que define de frente al arco"],
+    ],
+    gate: "Solo cerca del ÁREA RIVAL: el pivoteo pide tener el arco enfrente.",
     req: { alguno: ["pelotazo_fuera", "al_area"] },
     pos: { x: 960, y: 420 },
     hooks: { pivot: { zone: [4, 5], bonus: 0.08,
@@ -133,6 +168,7 @@ export const TRAITS_BLOQUE = [
     nombre: "Especialistas",
     desc: "El equipo tiene pateadores de verdad: cada centro de pelota quieta cae donde tiene que caer.",
     momento: "El córner que cae clavado en la cabeza del nueve.",
+    efecto: [["+6%", "de acierto en la ejecución de TU balón parado"]],
     req: {}, pos: { x: 280, y: 600 },
     hooks: { setpieceRehearsed: { bonus: 0.06, poolMult: 1,
       texto: "Esto lo patea un especialista: la pelota quieta cae exactamente donde se ensayó." } },
@@ -142,6 +178,7 @@ export const TRAITS_BLOQUE = [
     nombre: "Estrategia Ensayada",
     desc: "La pizarra del balón parado se ensaya toda la semana: córners y tiros libres laterales terminan en remate mucho más seguido.",
     momento: "Tres córners seguidos que terminan los tres en remate.",
+    efecto: [["×1.15", "más BALÓN PARADO en tu sorteo, apilado sobre el ×1.3 que el Bloque ya tiene de fábrica"]],
     req: { previo: "especialistas" },
     pos: { x: 490, y: 600 },
     hooks: { poolMod: { weights: { balon_parado: 1.15 } } },
@@ -151,6 +188,7 @@ export const TRAITS_BLOQUE = [
     nombre: "Salida Vertical",
     desc: "Recuperada la pelota, el equipo no la esconde: la primera intención es siempre hacia adelante, y esos pases salen.",
     momento: "El pase vertical inmediato tras el robo, con el rival todavía volviendo.",
+    efecto: [["+5%", "de acierto en los pases de la TRANSICIÓN: el pase hacia adelante llega"]],
     req: { previo: "estrategia_ensayada" },
     pos: { x: 720, y: 600 },
     hooks: { transitionPass: { bonus: 0.05,
@@ -161,6 +199,7 @@ export const TRAITS_BLOQUE = [
     nombre: "Contragolpe Letal",
     desc: "Desbloquea la jugada Contraataque: cada pelota recuperada en campo propio puede lanzarse de inmediato, sin pasar por armar el ataque.",
     momento: "El robo en la puerta del área propia que termina en gol en la de enfrente.",
+    efecto: [["30%", "de que contener el ataque rival encadene TRANSICIÓN mía sin pasar por armar (+4% de acierto)"]],
     req: { previo: "salida_vertical" },
     pos: { x: 960, y: 600 },
     hooks: { chainOnContain: { to: "transicion", p: 0.30, bonus: 0.04,

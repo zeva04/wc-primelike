@@ -1,7 +1,8 @@
 /* Rasgos de ⚡ CONTRAGOLPE — atacar el espacio.
    Tres ramas: firma (profundiza lo propio) · respuesta (cubre el matchup débil)
    · expansión (abre un fútbol lateral). El nivel de desbloqueo y el costo salen
-   del tier (ver TRAIT_LEVEL / TRAIT_COST en ./index.js). */
+   del tier (ver TRAIT_LEVEL / TRAIT_COST en ./index.js).
+   `efecto` = lo que hace en el partido, leído del hook (convenciones en ./press.js). */
 
 export const TRAITS_CONTRA = [
   /* Firma · la contra misma */
@@ -10,6 +11,7 @@ export const TRAITS_CONTRA = [
     nombre: "Primer Pase",
     desc: "El primer pase tras recuperar la pelota no se piensa: sale hacia adelante y sale bien. La contra nace ya lanzada.",
     momento: "El pase que sale en el mismo movimiento del robo.",
+    efecto: [["+5%", "de acierto en el PRIMER pase de la contra, el que la lanza"]],
     req: {}, pos: { x: 190, y: 150 },
     hooks: { transitionPass: { act: "first", bonus: 0.05,
       texto: "El primer pase salió al toque: la contra nace lanzada, sin escala de seguridad." } },
@@ -19,6 +21,7 @@ export const TRAITS_CONTRA = [
     nombre: "Primera Marcha",
     desc: "Ya en carrera, el equipo se entiende: los pases de la contra encuentran siempre al que va lanzado.",
     momento: "Tres pases a toda velocidad sin que la pelota toque el piso dos veces.",
+    efecto: [["+5%", "de acierto en TODOS los pases de la contra (se apila con Primer Pase)"]],
     req: { previo: "primer_pase" },
     pos: { x: 450, y: 125 },
     hooks: { transitionPass: { bonus: 0.05,
@@ -29,6 +32,7 @@ export const TRAITS_CONTRA = [
     nombre: "Ataque al Espacio",
     desc: "Cuando uno arranca, arrancan tres: el que conduce siempre tiene a quién buscar en carrera.",
     momento: "Tres contra dos y definición cruzada.",
+    efecto: [["+6%", "de acierto al buscar al desmarcado en el desenlace de la CONTRA"]],
     req: { previo: "primer_pase" },
     pos: { x: 450, y: 250 },
     hooks: { finishSupport: { of: "transicion", bonus: 0.06,
@@ -39,6 +43,10 @@ export const TRAITS_CONTRA = [
     nombre: "Ataque Relámpago",
     desc: "Del robo al remate en el menor número de pases posible: la jugada se resuelve antes de que el rival vuelva a estar en su sitio.",
     momento: "Robo, pase, gol: ocho segundos.",
+    efecto: [
+      ["30%", "de que la contra saltee los actos intermedios y se juegue a UNA (+5% de acierto)"],
+      ["PROFUNDA", "la jugada firma del Contragolpe gana su tramo extra"],
+    ],
     req: { todos: ["primera_marcha", "ataque_espacio"] },
     pos: { x: 700, y: 190 },
     hooks: {
@@ -52,6 +60,7 @@ export const TRAITS_CONTRA = [
     nombre: "Duelista",
     desc: "En cada contra hay un jugador que se suelta solo: el equipo lo busca siempre, y el mano a mano es el desenlace natural.",
     momento: "El delantero solo contra el arquero, otra vez.",
+    efecto: [["30%", "de que el desenlace de la CONTRA se acelere hasta el mano a mano (+7% de acierto)"]],
     req: { previo: "ataque_relampago" },
     pos: { x: 940, y: 130 },
     hooks: { accelFinish: { of: "transicion", p: 0.30, bonus: 0.07,
@@ -62,6 +71,10 @@ export const TRAITS_CONTRA = [
     nombre: "El Enjambre",
     desc: "La contra ya no la corren dos: la corren cinco. Cuando la pelota llega al área, la defensa rival no sabe a quién marcar.",
     momento: "Cuatro camisetas cruzando mediocampo a la vez.",
+    efecto: [
+      ["+5%", "de acierto al buscar al MEJOR rematador real, no al más cercano"],
+      ["+6%", "de acierto cuando la contra llega en oleada a campo abierto"],
+    ],
     req: { previo: "ataque_relampago" },
     pos: { x: 940, y: 265 },
     hooks: {
@@ -78,6 +91,7 @@ export const TRAITS_CONTRA = [
     nombre: "Anaeróbicos",
     desc: "El equipo está hecho para el esfuerzo explosivo: salir a apretar y volver a correr le cuesta menos que a cualquiera.",
     momento: "La cuarta ráfaga de presión del partido, corrida igual que la primera.",
+    efecto: [["−15%", "de energía por cada botón de PRESIÓN que aprietes en el partido"]],
     req: {}, pos: { x: 190, y: 395 },
     hooks: { pressStamina: { factor: 0.85 } },
   },
@@ -86,6 +100,7 @@ export const TRAITS_CONTRA = [
     nombre: "Defensa Intencionada",
     desc: "El despeje de cabeza deja de ser un manotazo de ahogado: el central cabecea buscando a un compañero, y ahí ya empezó la contra.",
     momento: "El cabezazo del central que termina en gol treinta metros más allá.",
+    efecto: [["30%", "de que el córner rival defendido de cabeza encadene CONTRA mía (+4% de acierto)"]],
     req: { previo: "anaerobicos" },
     pos: { x: 430, y: 350 },
     hooks: { chainOnDefendSp: { to: "transicion", p: 0.30, bonus: 0.04,
@@ -96,6 +111,11 @@ export const TRAITS_CONTRA = [
     nombre: "El Anzuelo",
     desc: "El equipo tiene la pelota en su propio campo y espera: el rival, aburrido de mirar, termina saliendo a buscarla — y eso es exactamente lo que se quería.",
     momento: "El rival dando dos pasos afuera de su bloque y el espacio a su espalda abierto de par en par.",
+    efecto: [
+      ["×1.20", "el rival sale a presionar tu salida más seguido: sobrevivirla YA es una contra"],
+      ["×1.67", "más TRANSICIONES en tu sorteo, solo contra ⚡ Contragolpe y 🧱 Bloque bajo (el partido muerto)"],
+      ["30%", "de convertir la circulación-cebo en contra mía (+5% de acierto)"],
+    ],
     req: { previo: "anaerobicos" },
     pos: { x: 430, y: 455 },
     hooks: {
@@ -110,6 +130,7 @@ export const TRAITS_CONTRA = [
     nombre: "Segundo Aire",
     desc: "En el tramo final del partido, cuando todos arrastran las piernas, los que corren la contra encuentran un aire que el rival ya no tiene.",
     momento: "El minuto ochenta y cinco, y el que arranca la contra es el que más corrió.",
+    efecto: [["+8%", "de acierto al conducir la contra con menos de 50 de energía: cuando todos están fundidos"]],
     req: { todos: ["defensa_intencionada", "el_anzuelo"] },
     pos: { x: 680, y: 405 },
     hooks: { tiredLegs: { under: 50, bonus: 0.08,
@@ -120,6 +141,7 @@ export const TRAITS_CONTRA = [
     nombre: "Skiller",
     desc: "Al que conduce la contra no lo frena nadie de pie: el rival tiene que elegir entre dejarlo pasar o cometerle la falta.",
     momento: "La falta desesperada al borde del área, y el tiro libre es nuestro.",
+    efecto: [["+6%", "de que le hagan FALTA al que conduce la contra: más tiros libres y más penales"]],
     req: { previo: "segundo_aire" },
     pos: { x: 930, y: 405 },
     hooks: { counterFouls: { plus: 0.06,
@@ -132,6 +154,7 @@ export const TRAITS_CONTRA = [
     nombre: "Estóicos",
     desc: "Replegado, el equipo aguanta lo que le tiren: cede terreno sin ceder el área, y espera su momento.",
     momento: "El rival estrellándose contra el bloque una y otra vez.",
+    efecto: [["+5%", "de acierto en el acto de CONTENER el ataque rival cuando estás replegado"]],
     req: {}, pos: { x: 280, y: 600 },
     hooks: { containBonus: { bonus: 0.05,
       texto: "El bloque aguanta estoico: cortan la jugada sin despeinarse." } },
@@ -141,6 +164,7 @@ export const TRAITS_CONTRA = [
     nombre: "Balonazo",
     desc: "Una pelota que cruza el cielo del área propia es una contra en potencia: el equipo la disputa pensando ya en el arco de enfrente.",
     momento: "El rechace del duelo aéreo que cae al pie y ya son cuatro corriendo.",
+    efecto: [["28%", "de que la segunda pelota de un duelo aéreo perdido lance la CONTRA (+4% de acierto)"]],
     req: { previo: "estoicos" },
     pos: { x: 500, y: 545 },
     hooks: { chainOnDuelFail: { to: "transicion", p: 0.28, bonus: 0.04,
@@ -151,6 +175,7 @@ export const TRAITS_CONTRA = [
     nombre: "Saque Rápido",
     desc: "Reventarla ya no es rendirse: el equipo reinicia antes de que el rival se acomode, y la jugada que parecía muerta sale corriendo para el otro lado.",
     momento: "El despeje que el rival mira caer mientras dos ya salieron corriendo.",
+    efecto: [["30%", "de que el despeje de una salida asfixiada reinicie rápido y sea CONTRA mía (+4% de acierto)"]],
     req: { previo: "estoicos" },
     pos: { x: 500, y: 648 },
     hooks: { quickRestart: { p: 0.30, bonus: 0.04,
@@ -161,6 +186,10 @@ export const TRAITS_CONTRA = [
     nombre: "Pase Atrás",
     desc: "Desbloquea la jugada Pase Atrás: llegado al área, el que conduce no remata — la pisa y la devuelve para el que entra de frente al arco.",
     momento: "La pisada en el área chica y el compañero entrando solo a empujarla.",
+    efecto: [
+      ["NUEVA", "desbloquea PASE ATRÁS como opción del desenlace de la contra"],
+      ["+14%", "de acierto respecto de rematar — pero es un pase de verdad: perderlo abre contra rival"],
+    ],
     req: { todos: ["balonazo", "saque_rapido"] },
     pos: { x: 720, y: 600 },
     hooks: { squarePass: { bonus: 0.14,
@@ -171,6 +200,7 @@ export const TRAITS_CONTRA = [
     nombre: "Sin Escalas",
     desc: "A veces no hay jugada: hay un pase y un jugador solo contra el arquero. El equipo entero juega esperando ese momento.",
     momento: "Un pase, cincuenta metros, y el nueve de cara al arquero.",
+    efecto: [["14%", "de que la contra NAZCA resuelta: sin actos intermedios y con el mano a mano de desenlace (+12% de acierto)"]],
     req: { previo: "pase_atras" },
     pos: { x: 940, y: 600 },
     hooks: { oneOnOne: { p: 0.14, bonus: 0.12,

@@ -85,15 +85,15 @@ cansa físicamente, y el pelotazo por arriba sobre la presión te parte.
 | Expansión | Intermediate | 🏇 Contragolpistas | 28% de que el rechace de un duelo aéreo perdido lance transición mía. | Nivel 3 + Directo. |
 | Expansión | Advanced | ♟️ Pacientes | El "buscar al mejor ubicado" del desenlace mejora (+0.05): el pase de gol sin apuro. | Nivel 6 + Egoístas. |
 | Expansión | Advanced | 🗡️ Tres Toques | El salto directo al desenlace llega mejor (+0.06): robo, pase, gol en ocho segundos. | Nivel 6 + Contragolpistas. |
-| Expansión | Master | 👑 Fríos | **Rasgo de ESTADO**: con ventaja, devolverla atrás para comer reloj. ⚠️ *Ver deuda abajo.* | Nivel 10 + Pacientes. |
+| Expansión | Master | 👑 Fríos | **Rasgo de ESTADO**: desde el 70' y sin ir perdiendo, aparece la opción "congelar" en el desenlace — se resigna la ocasión propia y se le **descuenta una llegada al rival**. | Nivel 10 + Pacientes. |
 | Expansión | Master | 👑 Calientes | El rival se repliega más (×1.28 en su pool): diez minutos metido en su área. | Nivel 10 + Pacientes. |
 | Expansión | Master | 👑 Carrileños | El desenlace de la transición llega en su versión profunda (+0.06): el centro del lateral que arrancó de su propia área. | Nivel 10 + Tres Toques. |
 | Expansión | Master | 👑 El Jaguar | 28% de que el desenlace de la transición se acelere al mano a mano (+0.06). | Nivel 10 + Tres Toques. |
 
-> ⚠️ **Deuda declarada: `iceGame` (Fríos) no está implementado.** Es un rasgo de ESTADO que
-> habilita una decisión nueva en partido —devolver la pelota al área propia para comer reloj
-> con ventaja— y es la pieza de motor más cara del rediseño. Hoy el hook existe con su texto
-> pero sin la jugada detrás.
+> ✅ **Deuda saldada (verificado 6-ago-2026): `iceGame` (Fríos) SÍ está implementado.**
+> `canFreeze` (acts/common.js) lo gatea al 70' sin ir perdiendo, `resolveFinish` ofrece
+> la opción "congelar" y `maybeStartSequence` descuenta la llegada rival con `_frozen`.
+> Este aviso decía lo contrario y quedó viejo.
 
 ---
 
@@ -110,7 +110,7 @@ Firma**, y su rama de Respuesta es la que carga la neutralización del matchup d
 | Firma | Basic | 🦶 Buen Pie | 35% de reciclar la posesión cuando el pase se intercepta: la jugada no se muere ahí. | Nivel 1. |
 | Firma | Intermediate | 🔺 El Tercer Hombre | 40% de rescatar la salida bajo presión cuando el pase falla — sin regalar el remate. | Nivel 3 + Buen Pie. |
 | Firma | Advanced | 📐 Pitagóricos | El desenlace busca al mejor ubicado de verdad, no al más cercano (+0.05). | Nivel 6 + El Tercer Hombre. |
-| Firma | Advanced | 🌊 Osciladores | **Neutralización del matchup débil**: solo vs Bloque, circulación ×1.54 y pelotazo ×0.77 — la celda floja vuelve a tablas, nunca la supera. | Nivel 6 + El Tercer Hombre. |
+| Firma | Advanced | 🌊 Osciladores | **Neutralización del matchup**: solo vs 🦁 Press, circulación ×1.39 — la celda vuelve a tablas, nunca la supera. *(corregido 6-ago-2026: el texto viejo decía "vs Bloque, ×1.54 y pelotazo ×0.77"; el hook dice `vsFilo: "press"`, `circulacion: 1.39`).* | Nivel 6 + El Tercer Hombre. |
 | Firma | Master | 👑 La Máquina Colectiva | El reparto de iniciativa se inclina de raíz (+0.06) **y** 38% de "pelota servida" cerca del área (+0.22): el gol a puerta vacía tras treinta pases. | Nivel 10 + Pitagóricos. |
 | Firma | Master | 👑 Hombre Libre | 30% de que el desenlace de la circulación se acelere (+0.06): veinte pases y el nueve de cara al arquero. | Nivel 10 + Osciladores. |
 | Respuesta | Basic | 🪤 La Trampa | Cuando el rival recupera está lejos y su remate no asusta (−0.06) + devolverla atrás para sacarlo de su bloque (+0.06, solo ya adelantado). | Nivel 1. |
