@@ -365,7 +365,11 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
 // AGENDA de momentos (28-jul: las secuencias arrancan en el minuto sorteado por seqSlots —
 // sin vaciarla, el muestreo se frena en el primer momento aún futuro) y cuenta lados y
 // tipos. La memoria "no repetir" se resetea por muestra para no sesgar.
-function genSample(oppId, mut, n = 4000) {
+// n=12000 y no 4000: los tipos RAROS del pool (banda ~4%) recibían ~160 muestras por
+// lado, y comparar dos shares así contra un umbral de ×1.25 fallaba ~1 de cada 13
+// corridas sin que nada estuviera roto. El sesgo que se mide es real; lo que faltaba
+// era potencia estadística para verlo siempre.
+function genSample(oppId, mut, n = 12000) {
   const m = makeMatch(oppId);
   m.min = 50;
   E.maybeStartSequence(m); // primera llamada: crea m._seqPlan (target/edge/prof cacheados)
