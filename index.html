@@ -359,32 +359,54 @@
     .px-tag-off { background: var(--wc-black); color: var(--px-bad); border-color: var(--px-line); }
     .px-tag-mine { background: var(--team-primary); color: var(--team-text); box-shadow: 2px 2px 0 var(--px-shadow); }
 
-    /* ── EL COMPLEJO. Cada edificio es una PARCELA en rombo (el plano isométrico) con
-       su sprite encima y su cartel colgando debajo. Los estados se pintan en el borde
-       del rombo y en el cartel, nunca en el sprite: el arte no cambia, cambia el sitio. ── */
-    .px-plot { position: absolute; cursor: pointer; }
-    .px-plot[data-locked] { cursor: not-allowed; }
-    .px-rhomb { position: relative; width: 100%; height: 100%; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); filter: drop-shadow(3px 3px 0 var(--px-shadow-soft)); }
-    .px-rhomb-in { position: absolute; inset: 3px; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+    /* ── EL COMPLEJO. Cada edificio es un sprite con su cartel colgando debajo.
+       EL HITBOX ES EL EDIFICIO, y nada más: el contenedor de la parcela NO recibe el
+       puntero — solo lo hacen el sprite y el cartel. Como un <svg> hace hit-test
+       sobre lo que PINTA (no sobre su caja), el área sensible acaba siendo la
+       silueta del edificio.
+
+       Antes cada edificio se apoyaba en una parcela romboidal de color que era
+       bastante más grande que él: su vértice de arriba asomaba por encima del techo
+       y ESE era el elemento clickeable, así que había un bloque de color reactivo
+       flotando sobre cada edificio (decisión PO del 7-ago-2026: fuera). El color de
+       estado se mudó al cartel, que ya lo llevaba a medias. ── */
+    .px-plot { position: absolute; pointer-events: none; }
     .px-sprite { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    /* El puntero lo reciben LOS POLÍGONOS, no el <svg> ni el div que lo envuelve.
+       Los dos son rectángulos del tamaño de la parcela y volverían a capturar el
+       aire de alrededor — medido: con el <svg> capturando, el 83% del rectángulo
+       seguía siendo sensible; con los polígonos, el 33%, que es la silueta real
+       del edificio. */
+    .px-sprite svg { pointer-events: none; }
+    .px-sprite svg *, .px-sign { pointer-events: auto; cursor: pointer; }
+    .px-plot[data-locked] .px-sprite svg *, .px-plot[data-locked] .px-sign { cursor: not-allowed; }
+    .px-plot[data-off] .px-sprite svg *, .px-plot[data-off] .px-sign { cursor: default; }
+    /* La sombra dura del edificio vive acá y no en el `style` del <svg> para que el
+       hover pueda AÑADIRLE el contorno en vez de tener que pisarla. */
+    .px-sprite svg { filter: drop-shadow(4px 6px 0 rgba(9, 20, 12, .45)); }
     .px-sign {
       position: absolute; left: 50%; transform: translateX(-50%); width: max-content; max-width: 210px; text-align: center;
       background: rgba(18, 15, 26, .94); border: 2px solid #3a2a12; box-shadow: 2px 2px 0 var(--px-shadow);
       padding: 4px 8px; font-family: Silkscreen, monospace; font-size: 8px; letter-spacing: .06em; color: #d8d8de;
     }
-    /* Hover: el edificio FLOTA y su cartel se enciende en oro. Es el único movimiento
-       de la pantalla, y por eso alcanza para decir "esto se puede tocar". */
+    /* Hover: el edificio FLOTA, se perfila en oro y su cartel se enciende. El
+       contorno son cuatro sombras duras a ±2px (drop-shadow no tiene "spread"): así
+       el perfil sigue siendo pixel y no un halo difuso. */
     .px-plot:not([data-locked]):not([data-off]):hover { z-index: 30; }
-    .px-plot:not([data-locked]):not([data-off]):hover .px-rhomb { filter: drop-shadow(3px 3px 0 var(--px-shadow-soft)) drop-shadow(0 0 0 2px var(--wc-gold)); }
     .px-plot:not([data-locked]):not([data-off]):hover .px-sprite { animation: pxFloat 2.4s ease-in-out infinite; }
+    .px-plot:not([data-locked]):not([data-off]):hover .px-sprite svg {
+      filter: drop-shadow(4px 6px 0 rgba(9, 20, 12, .45))
+        drop-shadow(2px 0 0 var(--wc-gold)) drop-shadow(-2px 0 0 var(--wc-gold))
+        drop-shadow(0 2px 0 var(--wc-gold)) drop-shadow(0 -2px 0 var(--wc-gold));
+    }
     .px-plot:not([data-locked]):not([data-off]):hover .px-sign { border-color: var(--wc-gold); color: var(--wc-gold-light); }
     @keyframes pxFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
     /* Ya decidiste: lo que gasta el día se apaga. Lo gratis sigue encendido. */
-    .px-plot[data-off] { opacity: .38; cursor: default; }
+    .px-plot[data-off] { opacity: .38; }
     /* Bloqueado ≠ apagado. Apagado es "ya elegiste otra cosa" y solo baja la opacidad;
        bloqueado es "hoy acá no se puede" y apaga el COLOR del edificio, para que el
        candado del centro se lea sobre un sitio que ya parece cerrado. */
-    .px-plot[data-locked] .px-rhomb, .px-plot[data-locked] .px-sprite { filter: grayscale(.75) brightness(.45); }
+    .px-plot[data-locked] .px-sprite svg { filter: grayscale(.75) brightness(.45); }
     .px-plot[data-locked] .px-sign { opacity: .5; }
     .px-plot[data-mine] .px-sign { border-color: var(--team-primary); color: var(--px-ink); }
 

@@ -56,6 +56,14 @@ for (let i = 0; i < PLOTS.length; i++) {
 
 /* ── Los estados de una parcela ─────────────────────────────────────────────── */
 
+// EL HITBOX ES EL EDIFICIO (decisión PO del 7-ago-2026). La parcela romboidal de
+// color se eliminó porque era más grande que el edificio, su vértice asomaba por
+// encima del techo y ERA el elemento clickeable. Si alguien la reintroduce, el
+// bloque reactivo vuelve — y en una captura estática no se distingue de arte.
+const marcado = plotHtml(PLOTS[0], { titulo: "Campo", tip: "T" });
+assert(!/px-rhomb/.test(marcado), "la parcela de color no vuelve: el hitbox es el edificio");
+assert((marcado.match(/<svg/g) || []).length === 1, "el edificio se dibuja una sola vez", `${(marcado.match(/<svg/g) || []).length}`);
+
 const st = extra => plotHtml(PLOTS[0], { titulo: "Campo", tip: "T", ...extra });
 assert(st({ free: true }).includes("no gasta el día"), "el edificio GRATIS lo declara en su cartel");
 assert(st({ boost: true }).includes("×2 hoy"), "el edificio POTENCIADO muestra su multiplicador");

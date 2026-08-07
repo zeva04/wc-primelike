@@ -69,8 +69,10 @@ function draw() {
     flat(pts, fill, stroke) { poly(pts, fill, stroke); return api; },
     P,
     done() {
+      // Sin `filter` inline: la sombra dura la pone el CSS (.px-sprite svg) para que
+      // el hover pueda AÑADIRLE el contorno de oro en vez de tener que pisarla.
       return `<svg width="260" height="230" viewBox="-130 -150 260 230" shape-rendering="crispEdges"
-        style="overflow:visible;image-rendering:pixelated;filter:drop-shadow(4px 6px 0 rgba(9,20,12,.45))">${out.join("")}</svg>`;
+        style="overflow:visible;image-rendering:pixelated">${out.join("")}</svg>`;
     },
   };
   return api;
@@ -176,10 +178,6 @@ const SPRITES = {
 
 /* ── El plano del complejo ──────────────────────────────────────────────────── */
 
-const CESPED = "repeating-linear-gradient(90deg,#1e7a3a 0 14px,#1b7035 14px 28px)";
-const TIERRA = "repeating-linear-gradient(90deg,#6b5a3e 0 14px,#63533a 14px 28px)";
-const ASFALTO = "repeating-linear-gradient(90deg,#3a3548 0 14px,#332f42 14px 28px)";
-
 /**
  * EL PLANO, en su propio sistema de coordenadas de 1440×672.
  *
@@ -194,12 +192,12 @@ const ASFALTO = "repeating-linear-gradient(90deg,#3a3548 0 14px,#332f42 14px 28p
 export const PLANO_H = 672;
 
 export const PLOTS = [
-  { id: "campo", cx: 225, cy: 190, w: 330, h: 188, acento: "#fbbf24", piso: CESPED },
-  { id: "residencia", cx: 562, cy: 162, w: 300, h: 172, acento: "#38bdf8", piso: CESPED },
-  { id: "video", cx: 868, cy: 200, w: 300, h: 172, acento: "#D4AF37", piso: ASFALTO },
-  { id: "asado", cx: 178, cy: 458, w: 300, h: 172, acento: "#fb923c", piso: TIERRA },
-  { id: "enfermeria", cx: 518, cy: 442, w: 300, h: 172, acento: "#34d399", piso: CESPED },
-  { id: "scouting", cx: 852, cy: 480, w: 300, h: 172, acento: "#0057B8", piso: ASFALTO },
+  { id: "campo", cx: 225, cy: 190, w: 330, h: 188, acento: "#fbbf24" },
+  { id: "residencia", cx: 562, cy: 162, w: 300, h: 172, acento: "#38bdf8" },
+  { id: "video", cx: 868, cy: 200, w: 300, h: 172, acento: "#D4AF37" },
+  { id: "asado", cx: 178, cy: 458, w: 300, h: 172, acento: "#fb923c" },
+  { id: "enfermeria", cx: 518, cy: 442, w: 300, h: 172, acento: "#34d399" },
+  { id: "scouting", cx: 852, cy: 480, w: 300, h: 172, acento: "#0057B8" },
 ];
 
 /* ── LA RED DE CALLES ────────────────────────────────────────────────────────
@@ -416,7 +414,9 @@ export function complexGround() {
  * La diferencia importa: apagado sigue explicándose, bloqueado dice por qué no.
  */
 export function plotHtml(def, st) {
-  const borde = st.locked ? "#332e42" : st.mine ? "var(--team-primary)" : st.boost ? "#D4AF37" : st.free ? "#38bdf8" : def.acento;
+  // El color del estado ya no pinta una parcela: pinta el CARTEL. Idle lleva el
+  // acento del edificio, y los estados lo pisan en el orden en que importan.
+  const tinta = st.locked ? "#332e42" : st.mine ? "var(--team-primary)" : st.boost ? "#D4AF37" : st.free ? "#38bdf8" : def.acento;
   const flags = [st.locked ? "data-locked" : "", st.off ? "data-off" : "", st.mine ? "data-mine" : ""].join(" ");
   // El BLOQUEADO se marca con un velo sobre la parcela entera, no con una cinta al
   // margen: es un estado del sitio ("hoy acá no se puede"), no una etiqueta del sitio.
@@ -435,13 +435,10 @@ export function plotHtml(def, st) {
       <div class="px-body mt-1" style="font-size:12.5px;line-height:1.3;color:#d8d8de">${st.tip}</div>
     </div>
     <div style="position:relative;width:${def.w}px;height:${def.h}px">
-      <div class="px-rhomb" style="background:${borde}">
-        <div class="px-rhomb-in" style="background:${def.piso}"></div>
-      </div>
       <div class="px-sprite">${SPRITES[def.id]()}</div>
       ${cintas}
     </div>
-    <div class="px-sign" style="top:${def.h - 4}px">${st.titulo}</div>
+    <div class="px-sign" style="top:${def.h - 4}px;border-color:${tinta}">${st.titulo}</div>
     ${st.free ? `<div class="px-tag px-tag-free absolute" style="left:50%;transform:translateX(-50%);top:${def.h + 24}px">no gasta el día</div>` : ""}
   </div>`;
 }
