@@ -372,7 +372,7 @@ lo que separa "jugué una run" de "construí una doctrina".
 
 ---
 
-## Los rasgos con GEOGRAFÍA (sprint del Territorio, 30-jul-2026)
+## Los rasgos con GEOGRAFÍA
 
 Desde que el motor sabe dónde está la pelota, ocho rasgos existen **solo donde su fútbol
 existe**. La regla de diseño fue: gatear únicamente lo que el fútbol pide y **compensarle la

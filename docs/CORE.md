@@ -221,7 +221,7 @@ delta, reasons}`) que alimenta el **"Análisis del cuerpo técnico"** del post-p
 subió o bajó y por qué (goles, penales, valla o enfriamiento por no jugar) — el motor,
 dueño de la regla, también narra el motivo.
 
-### Sprint 4 — el titular ya no decae (decisión PO 21-jul-2026)
+### El titular ya no decae
 
 Hasta el Sprint 3, **todo** el plantel decaía un paso hacia el neutro tras cada partido si no
 tenía señal individual. Dos problemas: (a) el que jugaba 90' sin marcar era castigado igual que
@@ -331,7 +331,7 @@ forma      = 1 + 0.03 × ronda_KO                SOLO el once rival (modo Mundia
   que R3 daba por sentada **ya no existe** desde el arco de Progresión, porque llegar a
   Consolidada dejó de ser rutinario.
 
-### La Escalada: por qué el torneo no se endurecía (31-jul-2026)
+### La Escalada: por qué el torneo no se endurecía
 
 **La métrica que faltaba: la CURVA CONDICIONAL.** No "cuántas runs terminan campeonas" sino
 **de los que LLEGAN a cada ronda, cuántos la ganan**. El % de campeón cae de 100 a ~28 solo
@@ -630,7 +630,7 @@ Penal y último hombre eran ramas internas de las viejas ocasiones (`myChance`/`
 retiradas en A1); ahora asoman como **eventos independientes** a baja frecuencia, con su
 resolución del Sprint 1 **intacta** (A1 no toca su matemática).
 
-### Estadísticas del partido (`game/match/stats.js`) — PO 28-jul-2026
+### Estadísticas del partido (`game/match/stats.js`)
 
 El panel derecho del partido pasó de mostrar las dos alineaciones a mostrar **Posesión ·
 Tiros · % Pases con éxito · Córners** (la barra de posesión se mudó ahí desde el marcador,
@@ -652,7 +652,7 @@ contra (que ES un córner) y el córner que gana la Fortaleza.
 > pases reales de las secuencias. Los córners sí sortean (2 tiradas por minuto).
 > Verificado: campeón 24.6% n=2000, idéntico al de antes del panel.
 
-### Match Momentum (`game/match/match-momentum.js`) — PO 28-jul-2026
+### Match Momentum (`game/match/match-momentum.js`)
 
 El gráfico de barras de las transmisiones, debajo del relato: **quién está ejerciendo más
 peligro AHORA**. No es posesión, no son tiros, no es xG — es la respuesta continua a "¿quién
@@ -728,7 +728,7 @@ los actos viven en `sequence-acts.js`, extraído de la máquina por presupuesto 
 | 🗼 Salida bajo presión | def→of | reventarla (gratis) o salir jugando: la pérdida regala un remate letal… o la jugada **SE CONVIERTE en transición mía** | — |
 | 🧱 Repliegue defensivo | defensiva | contener · (último hombre o remate rival) | Bloque bajo |
 
-### 🏃 El desborde por la banda (Odisea, 2ª mitad — decisión PO 29-jul-2026)
+### 🏃 El desborde por la banda
 
 La jugada que el motor no tenía: el fútbol por afuera. Es la primera secuencia cuya
 **primera pregunta es "¿tenés piernas?"** en vez de "¿tenés pase?".
@@ -759,7 +759,7 @@ El que centra queda como **asistidor** si el remate entra. En el pool pesa
 cansado casi no sale (×0.7 — el sprint es lo primero que se pierde) y perdiendo tarde se
 busca más (×1.4). Medido en 120 partidos: **7.5% de los actos de secuencia**.
 
-### La velocidad, ya en la cancha (Odisea, 2ª mitad)
+### La velocidad, ya en la cancha
 
 Hasta acá la stat solo pesaba en la media. Ahora decide en cuatro sitios más, elegidos
 porque el fútbol los pide:
@@ -776,7 +776,7 @@ porque el fútbol los pide:
 > entró sin mover el gate porque **la media de cada jugador no cambió** (§2): lo que se
 > redistribuyó fue quién es bueno en qué, no cuánto vale nadie.
 
-### El fallo que encadena (A2, regla 7 del Bible) — bidireccional a propósito
+### El fallo que encadena — bidireccional a propósito
 
 - **Rebote** (`REBOUND_CHANCE` 0.30): mi remate fallado deja la pelota viva y alguien la caza
   (remate sucio, bonus −0.03, sin asistidor; **un solo rebote por secuencia**).
@@ -787,7 +787,7 @@ porque el fútbol los pide:
 La bidireccionalidad es la clave del balance: el rebote suma goles míos, la contra se los da al
 rival — medido, casi se cancelan (GF +0.05, GA +0.02 por partido).
 
-### Absorción del último hombre (A2, decisión PO #7) + el canal plano
+### Absorción del último hombre + el canal plano
 
 El último hombre ya no asoma como evento suelto arbitrario: **nace del fútbol** — una contención
 rota (`LASTMAN_FROM_CONTAIN` 0.70) o **toda contra con el equipo partido** (`LASTMAN_FROM_COUNTER`
@@ -803,7 +803,7 @@ roja 0.12, penal barrerse 0.28 — `resolveLastMan` no se tocó). Exposición re
 > pelotazo a la espalda que no nace de ninguna pérdida) — deliberadamente plano: **es el arma del
 > underdog**. Es un dial fino: 0 → +3.7pp · 0.035 → −3.4pp.
 
-### Identidad del rival y mentalidad (A2, decisiones #3 y #14)
+### Identidad del rival y mentalidad
 
 `rivalProfile` deriva de los promedios del once rival (sin datos nuevos, 0..1): **atk** (su peligro
 directo) · **def** (su solidez/intensidad, proxy de cuánto te presiona) · **pase** (su vocación de
@@ -1024,7 +1024,7 @@ quedaba muerto entre jugada y jugada.
 > es del jugador: elegir bien el riesgo de cada acto rinde por encima del rating puro. El smoke,
 > que decide al azar, mide el piso; el humano que decide bien saca la diferencia.
 
-### El partido vivo (A3, decisiones #9, #10, #11 y #15)
+### El partido vivo
 
 **Contexto dinámico en la generación** — todo se lee **EN VIVO** al generar (seqPlan cachea
 target/edge/perfil; el partido no se cachea):
@@ -1058,7 +1058,7 @@ arma `Match._ambientLine` (marcador tardío, rojas, fatiga, momentum, bandas de 
 contextuales pesan 2-3× sobre las genéricas cuando aplican. El ambiente anticipa en el relato lo
 que el contexto ya hace en el motor.
 
-### ⚠️ Balance del Sprint A3
+### ⚠️ Balance: el partido vivo (contexto, moral y momento)
 
 Baseline fresco **33.2% n=4000**. Por etapas: contexto dinámico **~35.0** (+1.8, dos corridas
 35.2/34.7) → moral+momento **34.3** (+1.1, no acumula) → integrado final **35.7/36.0 (+2.5,
@@ -1069,9 +1069,9 @@ gate**. Exposición del último hombre 0.86/partido (histórico ~0.9). Siempre-R
 48.3 n=1500 (+1.0 = ruido; el refuerzo temido de la fatiga→generación no apareció con fuerza —
 vigilado, reportado, no arreglado: es de otro sprint).
 
-### ⚠️ Balance del Sprint A2
+### ⚠️ Balance: catálogo de jugadas, encadenamiento y absorción
 
-Baseline (con los planteles nuevos del PO: +ESP/GER/NED): **33.8% n=4000**. Medido POR ETAPAS
+Baseline (con los planteles nuevos: +ESP/GER/NED): **33.8% n=4000**. Medido POR ETAPAS
 (lección del Sprint 4): catálogo+identidad **34.1** (+0.3, tras calibrar recuperación/pelotazo —
 la primera pasada dio 27.1: los tipos nuevos con compuerta rendían la mitad que circulación, misma
 lección de A1: el éxito de la compuerta debe pagar mejor) → encadenamiento **33.0** (−0.8, el diseño
@@ -1080,7 +1080,7 @@ bidireccional se auto-compensa) → absorción **37.5 (¡+3.7, fuera del gate!)*
 `finishBonus`, `actAerial`/`actContain(bonus)`, `BREAKAWAY_TICK` (el más fino), pesos de
 `typeWeights`. Y de nuevo: **n=1500 mintió dos veces** (32.7 → 30.4 real; el gate SIEMPRE a n=4000).
 
-### ⚠️ Balance del Sprint A1 (leer antes de tocar el partido)
+### ⚠️ Balance: el paso a Key Sequences (leer antes de tocar el partido)
 
 Baseline HEAD **29.1% n=4000**. El cambio de "muchas decisiones cortas" a "2-6 secuencias largas"
 es el gate grande del arco. Primera pasada: **6.7%** (derrumbe) — la causa fue el fallo-por-acto
@@ -1190,7 +1190,7 @@ en el panel de acción y bloquea/etiqueta los botones afectados.
 > el smoke pierde ~1-3 pp de campeón respecto a la versión sin rarezas — un DT humano
 > que aprovecha los ×2 recupera esa diferencia. Es la "ventaja del DT humano" (§6).
 
-### Eventos-problema (Sprint 4)
+### Eventos-problema
 
 Bible §4.5: **los eventos deben generar problemas, no repartir premios**. Hasta el Sprint 3
 casi todo el contenido movía aura o energía en una sola dirección. El Sprint 4 sumó tres
@@ -1204,7 +1204,7 @@ sucesos cuyo rasgo común es que **las dos (o tres) ramas cobran algo**:
 
 El pool de conflictos pasó de 6 a **8**; el de eventos inevitables, de 33 a **34**.
 
-### Interacciones cruzadas (Sprint 4)
+### Interacciones cruzadas
 
 Profundidad barata: reglas que conectan dos sistemas que ya existen, sin sumar sustantivos
 nuevos al dominio. Ambas son **castigos sin premio espejo**, a propósito.
@@ -1552,7 +1552,7 @@ Visible como card top-5 en el hub (clic → pantalla con la tabla completa). No 
 balance: solo consume rng al asignar autores (desplaza la secuencia, sin cambiar el
 modelo — verificado, BRA campeón sin deriva).
 
-### Asistidores del torneo (`run.assists`, `game/assists.js`) — Sprint 1
+### Asistidores del torneo (`run.assists`, `game/assists.js`)
 
 Espejo exacto de los goleadores, otra estadística. El motor no modela pases, así que a una
 **fracción de los goles** (`ASSIST_CHANCE` = **70%**; penales y jugadas individuales no llevan
@@ -1572,7 +1572,7 @@ En el hub, la card de goleadores es un **carrusel** de 2 pestañas (⚽ Goleador
 Asistidores); la pantalla completa tiene el mismo toggle. Igual que los goleadores, solo
 consume rng (desplaza la secuencia, sin cambiar el modelo).
 
-### Decisión de "último hombre" (`game/match/chances.js`) — Sprint 1
+### Decisión de "último hombre" (`game/match/chances.js`)
 
 Nueva decisión de partido (id `last_man`, contrato §3.2): el **25%** de las ocasiones
 peligrosas del rival (si hay un DEF mío en cancha) se convierte en una elección para ese
@@ -1640,12 +1640,11 @@ del DT: se fija al empezar y no cambia nunca.
 Con ~2-3 jugadas y ~2-3 aciertos por partido de un mismo tipo el reparto queda ~70/30,
 que es la distribución objetivo del GDD.
 
-> Nacieron en **125/55**, calibrados contra una densidad de **2-6 jugadas por partido**. El
-> sprint de la Densidad (31-jul-2026) los bajó a **73/32** ×0.58 —la razón de densidad medida—
-> para que el presupuesto de XP POR PARTIDO no se moviera al pasar el objetivo a 5-9. Es el
-> mismo cuidado que la lección de calibración del arco: **la escalera está calibrada contra un
-> número de jugadas, así que cualquier sprint que toque la densidad tiene que tocar esto**.
-> Verificado tras el cambio: filosofía tope 6.0/10 y DT 12.7/20, idénticos a antes del sprint.
+> ⚠️ **Estos dos diales están acoplados a la DENSIDAD** (`SEQ_MIN`/`SEQ_MAX`, hoy 5-9). La
+> escalera de niveles está calibrada contra un número de jugadas por partido, así que cambiar
+> la densidad sin reescalar la XP mueve toda la progresión. La regla: multiplicar ambos por la
+> razón inversa de densidad, y verificar después que la filosofía tope y el nivel de DT medios
+> del smoke no se movieron.
 
 Qué filosofía aprende cada tipo de secuencia (`FILO_BY_TIPO`; las avanzadas mandan con
 su `advFor`):
@@ -1699,12 +1698,18 @@ uno de los 3 rasgos básicos de la escuela elegida.
 
 ### 5. Rasgos: dos requisitos y la forma del árbol
 
-Los "Principios mínimos" se borraron de los 51 rasgos del catálogo. Queda lo que pide el
-GDD —**nivel de la filosofía DEL RASGO** (básico 1 · intermedio 3 · avanzado 6 · maestro
-10) y **1 PI**— más el recorrido de la rama (`previo` / `todos` / `alguno`), que es lo
-que hace que el árbol sea un árbol y no una lista (decisión PO).
+El catálogo tiene **64 rasgos** (18 Press · 15 Posesión · 16 Contragolpe · 15 Bloque bajo;
+por tier: 13 básicos · 16 intermedios · 18 avanzados · 17 maestros). Un rasgo pide dos
+cosas —**nivel de la filosofía DEL RASGO** y **1 PI**— más el recorrido de la rama
+(`previo` / `todos` / `alguno`), que es lo que hace que el árbol sea un árbol y no una
+lista.
 
-**Sin latencia (decisión PO 28-jul):** todos los rasgos comprados están activos a la vez,
+Los dos requisitos numéricos son **diales por tier** y viven en `js/content/traits/index.js`:
+`TRAIT_COST` (hoy 1 PI para los cuatro tiers) y `TRAIT_LEVEL` (básico 1 · intermedio 3 ·
+avanzado 6 · maestro 10). Tocar el dial aplica a todos los rasgos de esa rareza; un rasgo
+puede pisarlo declarando `costo` o `req.nivel` propios.
+
+**Sin latencia:** todos los rasgos comprados están activos a la vez,
 de cualquier filosofía. `run.rasgos` sigue siendo `{filoId: [ids]}` para saber de qué
 árbol es cada uno, pero `activeTraitIds` los devuelve todos. Es lo que hace real la build
 híbrida del GDD.
@@ -1821,7 +1826,7 @@ nadie tiene la copa asegurada, que es exactamente el espíritu roguelike.
 > re-medido tras retirar el pasivo, **30.5%** — el +3.4pp de ventaja sobre `--smart` (27.1%)
 > se mantiene casi intacto.
 
-### La escalera de estrategias, y el PISO PLANO (decisión PO 1-ago-2026, RE-MEDIDA 2-ago-2026)
+### La escalera de estrategias, y el PISO PLANO
 
 Medición vigente sobre el árbol post-Escalada (BRA, n=4000 por peldaño). **La columna del
 1-ago se midió CON el descanso pasivo diario vivo; la del 2-ago es DESPUÉS de retirarlo y
@@ -1887,7 +1892,7 @@ re-corrió la escalera entera, no solo el número que se tocó:
 7. La secuencia cierra, el relato se actualiza y el partido vuelve al ritmo de crucero (§6).
 
 
-## Botón de presión (25-jul-2026)
+## Botón de presión
 
 La primera palanca que el DT acciona **durante** el juego: hasta ahora el partido solo
 ofrecía decisiones puntuales dentro de una secuencia; esto es un ESTADO que se enciende
@@ -1926,7 +1931,7 @@ sobrecosto, jamás la fatiga general del partido.
 usa (juega sin presionar nunca), así que el win-rate del smoke no lo refleja. Va al
 próximo gate de dificultad, junto con el rediseño de árboles.
 
-## Fatiga del rival (26-jul-2026)
+## Fatiga del rival
 
 Hasta hoy el once rival nacía al 100% de energía y **jamás bajaba**: mi plantel llegaba
 con lo que arrastra del torneo (55-70 en un titular fijo) y enfrente siempre había once
@@ -1986,7 +1991,7 @@ margen que antes.
 > sino que las dos puntas del piso no despeguen de ~10.
 
 
-## El Territorio (sprint del Territorio, 30-jul-2026)
+## El Territorio
 
 El partido pasa a saber **dónde** se juega. Hasta acá el motor sabía qué jugada salía y qué tan
 buena quedaba (el canal `bonus`), pero no existía el concepto de posición: un penal y una
@@ -2012,8 +2017,8 @@ momentum, la narración y qué jugadas aparecen.
 
 ### La deriva ambiente (y por qué NO consume azar)
 
-Con 5-9 secuencias por partido (2-6 cuando nació el sprint del Territorio), un mapa de calor
-alimentado solo por jugadas tendría un puñado de muestras.
+Con 5-9 secuencias por partido, un mapa de calor alimentado solo por jugadas tendría un
+puñado de muestras.
 El relleno de los ~90 minutos sale **determinista** de la posesión ya derivada del juego
 (`Match.flow`), los poderes y las dos alturas de bloque — misma ley que `stats.js` y
 `match-momentum.js`: el sistema territorial puede existir **sin correr el flujo del RNG ni
@@ -2093,7 +2098,7 @@ Barrido de alturas (n=1500, BRA): 26.3 · 25.9 · 27.2 · 28.1 · 27.7 — **nin
 (el criterio de "ningún dibujo dominado" aplicado a esta palanca).
 
 
-## El Eje Horizontal (30-jul-2026)
+## El Eje Horizontal
 
 El Territorio dejó los carriles alimentando el mapa de calor y poco más. Este arco los
 convierte en una dimensión táctica: **el ancho de la cancha se ocupa o no se ocupa**, y eso

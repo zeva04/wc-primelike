@@ -198,7 +198,7 @@ sobrevive a cualquier re-agendado.
 | `gkQuality(por,buffs)` | Calidad global del arquero (atajadas 60% · reflejos 25% · salidas 15%). |
 | `teamPowers(lineup,ment,buffs)` | Ataque y defensa (~0–5) de una alineación, con mentalidad e inferioridad numérica. El bonus de `buffs.tactica` MURIÓ en F1 (la táctica ya no compra poder: construye identidad). |
 
-### 8b. El TERRITORIO — `js/game/match/field.js` (sprint del Territorio, 30-jul-2026)
+### 8b. El TERRITORIO — `js/game/match/field.js`
 Dónde está la pelota, cómo están paradas las dos líneas y dónde se jugó cada tiempo. **Marco
 absoluto anclado a mi arco** (`v1` = mi área … `v5` = área rival · `h1..h3` = izquierda, centro,
 derecha) y **cero `rnd()`**: la deriva ambiente es determinista a propósito (misma ley que
@@ -409,8 +409,53 @@ El esquema de todo este contenido es LEY en `tests/events.validate.js`, que adem
 aplica cada efecto contra una run fresca (energías en rango, buffs finitos, stats 1-99,
 momento 1..7 y moral 1..100).
 
+### 9b. La progresión — `js/game/philosophy.js`, `coach.js`, `traits.js`
+
+Las tres capas encadenadas: jugar sube filosofías → las filosofías pagan XP al DT → cada
+nivel del DT imprime 1 Punto de Identidad → los PI compran rasgos.
+
+**`philosophy.js` — las 4 identidades.** Posee `run.filoId`, `run.filoInicial` y `run.filoXp`.
+
+| Función | Qué hace |
+|---|---|
+| `choosePhilosophy(run, filoId)` | La elección inicial. Cobra el nivel 1 del DT (y con él el primer PI). |
+| `changePhilosophy(run, filoId)` | Cambiar de identidad en plena run: exige y consume la Acción del Día. Nada se pierde — cada idea guarda su nivel y sus rasgos siguen activos. |
+| `filoPoints` · `filoLevel` · `filoEtapa` | XP acumulada, nivel 0..9 y etapa 0..2 de una filosofía (por defecto, la activa). |
+| `filoXpMults(run)` | Los multiplicadores de XP por filosofía: afinidad de la escuela × `PLAN_XP_MULT` si es el Plan de Partido del día. Se los lleva el Match para que la barra en vivo y la acreditada al cerrar sean el mismo número. |
+| `filoCtx(run)` | El paquete de identidad que el Match recibe (`m.my.filo`): id, nivel, etapa, mult y XP. El Match nunca lee la run. |
+| `derivePhilosophy(team)` | La identidad de un rival NO curado, derivada de sus stats. |
+| `rivalFilo(team, koRound)` · `rivalFiloLevel` | La identidad del rival y su nivel, que MADURA con la profundidad del torneo. |
+| `identityGapMult(...)` | La brecha de identidad en eliminatorias: el que te gana en idea te pasa por encima (`IDENTITY_GAP_PCT`), y al que llega con todo resuelto le juegan la final (`IDENTITY_LEAD_PCT`). |
+| `applyFiloCosts(run, match)` | La factura de la identidad tras el partido (el pressing cuesta `PRESS_FATIGUE` de energía). |
+| `applyFiloXp(run, match)` | Acredita a la run la XP que el partido generó, y dispara las subidas de nivel. |
+| `noteFiloMilestones(run)` | Escribe en el diario los hitos de identidad alcanzados. |
+
+**`coach.js` — el Director Técnico (1..20).** El DT no gana XP directa: toda su experiencia
+viene de que las filosofías suban de nivel, y la recompensa crece con el nivel alcanzado
+(`FILO_LEVEL_REWARD`), así que especializar rinde más que repartirse. `DT_STEP` es el costo
+de cada nivel suyo. `addCoachXp(run, xp, motivo)` acredita, resuelve las subidas y otorga
+1 PI por nivel; `dtProgress(run)` devuelve `{curr, need, pct}` para el HUD.
+
+**`traits.js` — el árbol.** Posee `run.identityPoints` y `run.rasgos` (`{filoId: [ids]}`).
+
+| Función | Qué hace |
+|---|---|
+| `traitTree(run, filoId)` | El árbol de una filosofía con el estado de cada nodo (`owned` / `buyable` / `locked`) y las faltas en lenguaje de jugador. Puro: es lo que pinta la pizarra. |
+| `traitReqs(run, t)` | `{ok, faltas}` — valida recorrido de rama (`previo`/`todos`/`alguno`), nivel de SU filosofía y PI disponibles. |
+| `traitCost(t)` | El precio en PI: sale del dial por tier (`content/traits.TRAIT_COST`) salvo que el rasgo declare el suyo. |
+| `buyTrait(run, traitId)` | Compra: valida, cobra y escribe el diario. El PRIMER Maestro de una filosofía dispara la consagración de prensa. |
+| `activeTraitIds` · `activeTraits` | Todos los rasgos comprados, de cualquier filosofía: no hay latencia, la build híbrida juega de verdad. |
+| `planPayoff(run, filoId)` | Lo que la pizarra del hub muestra al pasar por cada idea: nivel, XP, próximo umbral y el siguiente nodo que se abre. |
+
+**`match/trait-hooks.js` — cómo el partido lee los rasgos.** Traduce los `hooks` del catálogo
+en primitivas que los actos consultan sin conocer el árbol: `traitHooks(m)` los agrupa por
+nombre, `hookOf(m, name, family)` devuelve el que aplica a esa familia de jugada,
+`hasTrait(m, id)` es el gate directo, `rollChain` tira el encadenamiento respetando el tope
+`MAX_CHAINS`, `chainMine` convierte una jugada en otra mía, y `traitMoment` narra el momento
+nombrable del rasgo.
+
 ### 10. API pública
-No existe fachada (F7): la superficie pública del motor es la suma de los exports de sus
+No existe fachada: la superficie pública del motor es la suma de los exports de sus
 módulos, y cada pantalla importa exactamente lo que usa. Para los tests, `tests/load-engine.js`
 agrega todos los módulos en un objeto `Engine` de conveniencia.
 
@@ -499,6 +544,32 @@ equipo y posiciona el carrusel sin iniciar la partida.
 | `renderChooseIdentity()` (identity.js) | Pantalla previa al sorteo (F1, decisión PO #1: se elige apenas confirmado el equipo, ANTES de ver el grupo): confirma equipo o vuelve a `menu`, y 4 cards de identidad en grilla 2×2 con aristas, lema, fortaleza, advertencia de counter y el rasgo de Consolidada. "Confirmar" queda deshabilitado hasta elegir; aplica con `choosePhilosophy` y sigue a `draw`. |
 | `renderDraw()` (draw.js, `draw`) | Pantalla de sorteo con los 12 grupos (la identidad ya quedó fijada). "Comenzar la aventura" lleva a `hub`. |
 
+### 6c. La pantalla de Identidad y LA PIZARRA DEL DT — `ui/screens/philosophy.js` + `ui/board.js`
+
+La pantalla donde vive el árbol de rasgos. Dos piezas y nada más: el **HUD** de estado
+arriba y la **pizarra táctica** debajo, ocupando todo el alto que sobre.
+
+| Función | Qué hace |
+|---|---|
+| `renderPhilosophy(opts, selected)` (`philosophy`) | La pantalla. `opts.view` elige QUÉ árbol se mira (las 4 filosofías progresan a la vez, así que la franja de cabecera del tablero es un selector). `opts.onboarding` la pone en modo inicio: sin medidor de DT, con 1 PI para gastar en un básico y el botón "Al sorteo". |
+| `fitBoard()` (interna) | Iguala el ancho del HUD al de la pizarra. El tablero manda por ALTO —llena lo que le sobra a la pantalla— y su ancho sale del aspecto del viewBox (12/7); el alto del HUD se MIDE, no se constantea. |
+| `traitCard(t, …)` / `notesCard(…)` (internas) | El contenido del RIEL derecho: la ficha del rasgo enfocado (desc, momento, costo y compra) o las Notas del DT. |
+
+**`ui/board.js` — el dibujo.** Módulo puro: recibe el árbol ya resuelto por
+`game/traits.traitTree` y devuelve SVG. No lee estado ni toca el DOM.
+
+| Función | Qué hace |
+|---|---|
+| `tacticBoard(run, f, tree, opts)` | El SVG completo: cancha, franja de las 4 filosofías (con su nivel), nodos, flechas y la chincheta de notas. |
+| `markerColor(f)` / `PRINCIPLE_COLORS` | El color del marcador = el del principio FIRMA de la filosofía. El color es información, no decoración. |
+| `nodePos(tree, id)` / `camTransform(pos, zoom)` | Dónde está un nodo y la transformación de cámara para hacerle zoom al enfocarlo. |
+| `notesBlocks(...)` / `NOTES_ID` | El contenido de las Notas del DT (counters y fútbol superior) y el id del nodo-chincheta. |
+
+El lenguaje visual: **la forma dice la rama** (○ Firma · ▢ Respuesta · △ Expansión · ★
+Maestro) y **el trazo dice la profundidad** (el marcador engorda por tier). El ataque va de
+izquierda a derecha: los básicos nacen en campo propio y el Maestro se firma cerca del área
+rival.
+
 ### 6b. La cancha reutilizable — `ui/pitch.js`
 | Función | Qué hace |
 |---|---|
@@ -554,7 +625,7 @@ runtime, el mismo patrón que `sequences` ↔ `sequence-acts`.
 | `partnersFor(p)` / `onPick(name)` | Recambios válidos (solo misma posición: la posición ES la formación) y clic sobre una ficha: permuta si es recambio, si no abre su ficha. |
 | `showRandomEvent(ev)` | Modal de un conflicto con decisión y aplicación del efecto elegido. |
 
-### 8. Partido en vivo — `ui/screens/match/` (carpeta desde el 30-jul-2026)
+### 8. Partido en vivo — `ui/screens/match/`
 
 La pantalla más grande del juego, partida en cuatro módulos que operan sobre el MISMO DOM
 (mudanza pura: ninguna regla cambió). Quién hace qué:
@@ -611,7 +682,7 @@ La pantalla más grande del juego, partida en cuatro módulos que operan sobre e
 
 ---
 
-## `tests/` — Verificación (EN el repo desde el 15-jul-2026)
+## `tests/` — Verificación
 
 - **`run-all.js`** — corre toda la batería en orden y resume (`node tests/run-all.js`).
 - **`smoke.js`** — simula runs completas sin UI con decisiones al azar y verifica invariantes

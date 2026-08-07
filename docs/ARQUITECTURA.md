@@ -1,10 +1,14 @@
-# 🏗️ ARQUITECTURA — Diseño modular de WC 2026 Game
+# 🏗️ ARQUITECTURA — Diseño modular de WC Prime
 
-**Estado**: propuesta aprobada en diseño · migración NO ejecutada aún
-**Fecha**: 14-jul-2026 (post v9: Diario de Campaña + amarillas acumuladas)
-**Decisión de base tomada por el PO**: ES Modules nativos + servidor local (`npx http-server -p 8347`). El doble clic a `index.html` (file://) deja de estar soportado desde la Fase 1 de la migración.
+**Estado**: ✅ **migración ejecutada**. El árbol de §2.2 es el que existe hoy en el repo: el monolito `engine.js` + `ui.js` ya no existe, y las reglas viven en `js/game/`, el contenido editable en `js/content/` y las pantallas en `js/ui/screens/`.
 
-Este documento es la referencia para: entender por qué se migra, a qué estructura se migra, qué puede depender de qué, y dónde vive cada feature futura. Complementa a [CORE.md](CORE.md) (matemáticas) y [FUNCIONES.md](FUNCIONES.md) (referencia función por función).
+**Base técnica**: ES Modules nativos + servidor local (`npx http-server -p 8347`). El doble clic a `index.html` (`file://`) no está soportado.
+
+Este documento es la referencia para: **dónde vive cada cosa**, **qué puede depender de qué** (§4, las reglas de dependencia) y **dónde va una feature nueva** (§7). Complementa a [CORE.md](CORE.md) (matemáticas) y [FUNCIONES.md](FUNCIONES.md) (referencia función por función).
+
+> El §1 (Diagnóstico) describe el monolito del que se partió y **está escrito en presente
+> por ser el registro de esa decisión**: es el "por qué" de la estructura actual, no una
+> descripción del código de hoy.
 
 ---
 
@@ -277,7 +281,7 @@ Este mapa es ley: si un módulo escribe un campo que no le pertenece, es un bug 
 | `journal` | `journal.js` (todos anotan vía addJournal) | ui/journal |
 | `stats`, `champion` | `flow.js` | ui/end |
 
-Campos muertos a eliminar en la migración (F7): `lineup`, `extraPos`, `mentalidad`, `lastResults`, `eliminated`, `bracket`, `prepDone`. Y `koMatches`/`lastWinners` pasan a nacer en `newRun` (como `null`) para que la forma del estado sea estable.
+✅ Los campos muertos (`lineup`, `extraPos`, `mentalidad`, `lastResults`, `eliminated`, `bracket`, `prepDone`) ya no existen, y `koMatches`/`lastWinners` nacen en `newRun` como `null`: la forma del estado es estable.
 
 **Regla de serialización**: `run` contiene solo datos planos (JSON-izable). Prohibido guardar funciones, nodos DOM o referencias circulares. ✅ **DEUDA SALDADA (Sprint 4, 21-jul-2026)**: el hack `_peleaA/_peleaB` del conflicto "pelea" —que guardaba **referencias a objetos del squad** dentro de `run`— quedó reemplazado por `run.peleaEntre = [nombreA, nombreB]`, resuelto contra `run.squad` en el momento de aplicar el efecto (helper `peleadores(r)` en `content/daily/conflicts.js`). El conflicto nuevo `fuga_vestuario` nace ya con el patrón correcto (`run.filtrador` = nombre). Verificado en navegador: `JSON.stringify(run)` no explota y los campos viejos ya no existen. Esto deja gratis el futuro "guardar run a medias". Excepción documentada: la instancia `Match` NO es serializable a mitad de partido — limitación aceptada.
 
@@ -443,7 +447,7 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
   - Limpieza: campos muertos de `run` fuera (`bracket`, `lineup`, `extraPos`, `mentalidad`, `lastResults`, `eliminated`, `prepDone`); `koMatches`/`lastWinners` nacen en `newRun` (forma estable, §3.1 documentado en el propio run.js); LEGACY `PREP_ACTIONS`/`applyPrep` borrados; shim `window.WC_DATA` retirado.
   - Gates: batería verde · BRA campeón 34,7% (n=1500, vs 35,0% base — sin deriva) · recorrido completo en navegador (menú aleatorio→run→plantilla→mundial→diario→días→partido a x2 con decisiones→post-partido→hub→abandono→desenlace→diario→historial) · consola limpia · 0 referencias a la fachada.
   - La migración F0→F7 está **cerrada**. Las secciones §2–§7 de este documento describen ahora el estado real del código, con una enmienda: la navegación entre pantallas usa el registro `ui/nav.js` (ver entrada F6).
-- **Recomendación abierta al PO**: `git init` — la migración se hizo sin control de versiones a punta de tests y backups manuales; no volvamos a tentar la suerte para el desarrollo de features.
+- ✅ **Control de versiones**: el proyecto está en git (remoto `wc-primelike`). La migración se hizo sin él, a punta de tests y backups manuales; desde entonces cada arco se commitea.
 - Este documento se revisa al cerrar cada fase y cada vez que una feature contradiga una regla (gana el que tenga mejor argumento, pero queda escrito).
 - **30-jul-2026 — SPRINT DEL TERRITORIO** (T1-T5, decisiones PO al arrancar): el partido pasa a
   saber DÓNDE se juega. Nace `game/match/field.js` (el único módulo nuevo del sprint) con el

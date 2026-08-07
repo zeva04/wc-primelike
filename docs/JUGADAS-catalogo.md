@@ -10,7 +10,7 @@ Documento de referencia para el sprint de **situaciones de juego**. Fuente:
 [incidents.js](../js/game/match/incidents.js) (faltas y lesiones),
 [Match.js](../js/game/match/Match.js) (el tick).
 
-## El territorio manda (sprint del Territorio, 30-jul-2026)
+## El territorio manda
 
 Desde este sprint, **todo lo que sigue depende de dónde está la pelota**. La cancha se lee en
 cinco alturas —área propia · salida · mediocampo · tres cuartos · área rival— y tres carriles.
