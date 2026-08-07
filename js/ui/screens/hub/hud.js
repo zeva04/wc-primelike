@@ -36,12 +36,26 @@ import { pxIcon } from "../../pixicons.js";
    es el mismo orden de rareza traducido a hex. */
 const RAREZA_HEX = { comun: "#94a3b8", infrecuente: "#34d399", rara: "#a78bfa", legendaria: "#fbbf24" };
 
-/** Bandera pixelada de tres franjas horizontales, del ancho que se le pida. */
+/**
+ * LA BANDERA del equipo, en su marco del kit.
+ *
+ * Usa la bandera de verdad (`data/flags/<iso>.png`, la misma que el resto del
+ * juego). La versión anterior no dibujaba una bandera: apilaba tres franjas con los
+ * colores de la CAMISETA (shirt · blanco · accent). Con Argentina daba celeste,
+ * blanco y celeste —o sea, acertaba por casualidad— y por eso el bug sobrevivió a
+ * todas las capturas; con Brasil daba amarillo, blanco y verde.
+ *
+ * La imagen va SUAVIZADA a propósito, contra la regla del kit: los PNG son de
+ * 160×105 y a 32px de ancho el escalado nearest-neighbour tira cuatro de cada cinco
+ * píxeles — las estrellas de Brasil o el escudo de México desaparecen. Lo que sí
+ * mantiene el kit es el MARCO: borde duro de 2px y sombra sólida sin blur.
+ */
 export function pxFlag(team, w = 32, h = 22) {
-  const k = team?.kits?.field || team?.kit || {};
-  const bandas = [k.shirt || "#75AADB", "#f4f4f0", k.accent || "#75AADB"];
-  return `<div style="display:flex;flex-direction:column;width:${w}px;height:${h}px;border:2px solid #0B0B0E;box-shadow:2px 2px 0 var(--px-shadow);flex-shrink:0">
-    ${bandas.map(c => `<div style="flex:1;background:${c}"></div>`).join("")}</div>`;
+  const marco = `width:${w}px;height:${h}px;border:2px solid var(--wc-black);box-shadow:2px 2px 0 var(--px-shadow);flex-shrink:0`;
+  if (!team?.iso) return `<div style="${marco};background:var(--px-line)"></div>`;
+  return `<div style="${marco};overflow:hidden">
+    <img src="data/flags/${team.iso}.png" alt="${team.name}" title="${team.name}"
+      style="width:100%;height:100%;object-fit:cover;display:block;image-rendering:auto"></div>`;
 }
 
 /* ── 1 · La Oportunidad del día ─────────────────────────────────────────────── */

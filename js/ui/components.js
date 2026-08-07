@@ -201,7 +201,12 @@ export function screenStage(inner) {
   const fit = () => {
     // `contain`: la escala la manda el lado que primero se queda sin sitio, así el
     // lienzo entra completo y nunca hay scroll. El sobrante queda como marco negro.
-    el.style.transform = `scale(${Math.min(window.innerWidth / 1440, window.innerHeight / 900)})`;
+    const k = Math.min(window.innerWidth / 1440, window.innerHeight / 900);
+    // Una ventana que mide CERO (pestaña de fondo, panel plegado, restaurando) daría
+    // `scale(0)` y la pantalla desaparecería — y como `fit` solo vuelve a correr con
+    // un `resize`, se quedaría invisible. Ante ese caso no se toca la escala: peor es
+    // un lienzo sin encoger que un lienzo que no está.
+    if (k > 0) el.style.transform = `scale(${k})`;
   };
   fit();
   return fit;

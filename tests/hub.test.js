@@ -14,6 +14,8 @@
    ============================================================ */
 import { PLOTS, PLANO_H, ACCESOS, plotHtml, complexGround } from "../js/ui/screens/hub/complex.js";
 import { pxIcon, PX_ICON_NAMES } from "../js/ui/pixicons.js";
+import { pxFlag } from "../js/ui/screens/hub/hud.js";
+import { WC_DATA } from "../data/teams.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -112,6 +114,26 @@ for (const p of PLOTS) {
   const ramal = tramos.find(([x0, , x1, y1]) => x0 === puertaX && x1 === puertaX && Math.abs(y1 - puertaY) <= 8);
   assert(ramal, "el ramal muere en la puerta del edificio", p.id);
   if (ramal) assert(ramal[1] > ramal[3], "el ramal baja de la puerta hacia la avenida", `${p.id}: ${ramal.join(",")}`);
+}
+
+/* ── La bandera ─────────────────────────────────────────────────────────────── */
+
+// EL BUG (7-ago-2026): pxFlag no dibujaba una bandera — apilaba tres franjas con los
+// colores de la CAMISETA. Con Argentina daba celeste/blanco/celeste, o sea acertaba
+// por casualidad, y por eso sobrevivió a todas las capturas. La prueba tiene que
+// usar un equipo donde camiseta y bandera NO coincidan.
+const bandera = id => pxFlag(WC_DATA.teams.find(t => t.id === id));
+const bra = WC_DATA.teams.find(t => t.id === "BRA");
+
+assert(/data\/flags\/br\.png/.test(bandera("BRA")), "la bandera sale del archivo del país, no de los colores del kit");
+assert(!bandera("BRA").includes(bra.kits.field.shirt), "la bandera de Brasil no se pinta con su camiseta", bra.kits.field.shirt);
+assert(pxFlag(null).includes("width:32px"), "sin equipo, el marco se dibuja igual y no rompe la cabecera");
+
+// Un `iso` sin archivo deja un hueco mudo: el <img> no carga y no hay error en consola.
+for (const t of WC_DATA.teams) {
+  assert(t.iso, "todo equipo declara su iso", t.id);
+  if (t.iso) assert(fs.existsSync(path.join(ROOT, "data/flags", `${t.iso}.png`)),
+    "la bandera del equipo existe en disco", `${t.id} → data/flags/${t.iso}.png`);
 }
 
 /* ── El suelo ───────────────────────────────────────────────────────────────── */
