@@ -85,9 +85,9 @@ export function lastManChance(m) {
     title: `🛡️ min ${m.clock()}' — ¡${prot.name} filtra un pase y se escapa! ${def.name} es el último hombre`,
     text: "¿Cómo lo encara?",
     options: [
-      { label: "🏃 Anticipar", hint: `Defensa ${def.stats.defensa} — corte limpio, o queda de cara al arco`, key: "anticipar" },
-      { label: "🧹 Barrerse", hint: "Puede cortar, pero arriesga tarjeta o penal", key: "barrerse" },
-      { label: "🧍 Esperar / contener", hint: "Seguro: baja la peligrosidad, remate a atajar", key: "esperar" },
+      { label: "🏃 Anticipar", hint: `Defensa ${def.stats.defensa} — corte limpio, o queda de cara al arco`, key: "anticipar", risk: 3 },
+      { label: "🧹 Barrerse", hint: "Puede cortar, pero arriesga tarjeta o penal", key: "barrerse", risk: 5 },
+      { label: "🧍 Esperar / contener", hint: "Seguro: baja la peligrosidad, remate a atajar", key: "esperar", risk: 2 },
     ],
   };
   m.stats.decisiones++;

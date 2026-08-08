@@ -31,22 +31,22 @@ export const BUILDERS = {
     title: `🗼 min ${m.clock()}' — ${m.oppTeam.name} asfixia la salida: la tiene ${s.prot.name}`,
     text: "¿Cómo salen del fondo?",
     options: [
-      { label: "💎 Salir jugando", hint: `Pase corto ${s.prot.stats.pase_corto} — romper la presión regala una contra tuya`, key: "jugar" },
-      { label: "🚀 Reventarla", hint: "Seguro: se pierde la pelota, no se arriesga nada", key: "despeje" },
+      { label: "💎 Salir jugando", hint: `Pase corto ${s.prot.stats.pase_corto} — romper la presión regala una contra tuya`, key: "jugar", risk: 4 },
+      { label: "🚀 Reventarla", hint: "Seguro: se pierde la pelota, no se arriesga nada", key: "despeje", risk: 1 },
     ],
   }),
   contain: (m, s) => ({
     title: `🧱 min ${m.clock()}' — ¡${s.shooter.name} encara! Hay que defender`,
     text: "¿Cómo lo frena la zaga?",
     options: [
-      { label: "🧍 Contener y esperar", hint: "Seguro: baja la peligrosidad", key: "contener" },
-      { label: "🏃 Salir a presionar", hint: "Corta más, pero si falla queda mejor perfilado", key: "presionar" },
+      { label: "🧍 Contener y esperar", hint: "Seguro: baja la peligrosidad", key: "contener", risk: 2 },
+      { label: "🏃 Salir a presionar", hint: "Corta más, pero si falla queda mejor perfilado", key: "presionar", risk: 4 },
       // PELOTAZO (Bloque, avanzada): "Reventar el Balón" — la tercera jugada NUEVA del
       // catálogo, junto al Retroceso de La Trampa y el Congelar de Fríos. No se sortea:
       // la elige el DT. Mata el ataque rival sin remate… y renuncia a todo lo que la
       // contención podía darte (convertir, encadenar contra) — y a veces sale al córner.
       ...(hookOf(m, "clearBall")
-        ? [{ label: "🚀 Reventar el balón", hint: "Mata la jugada sin remate: el rival empieza de nuevo desde atrás… o se lleva un córner", key: "reventar" }]
+        ? [{ label: "🚀 Reventar el balón", hint: "Mata la jugada sin remate: el rival empieza de nuevo desde atrás… o se lleva un córner", key: "reventar", risk: 1 }]
         : []),
     ],
   }),

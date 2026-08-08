@@ -336,6 +336,52 @@ piso se asiente:
 
 ---
 
+## SPRINT VISUAL — El puente de mando ✅ **CERRADO (7-ago-2026)**
+
+Sprint de PIEL, no de motor: adaptación del diseño **"Partido - Mockups v2"** (Claude Design),
+el hermano del rediseño del hub. Ninguna regla de juego se movió; lo que cambió es dónde vive
+cada cosa y qué puede ver el DT sin abrir nada.
+
+**Las cuatro decisiones del PO** (AskUserQuestion, 7-ago-2026):
+
+| Decisión | Elegido | Costo aceptado |
+|---|---|---|
+| Dónde vive el carrusel momentum ↔ mapa de calor | **Columna izquierda**, al pie, quedándose con todo el alto que sobre | El momentum NO se lleva la franja ancha de 1440px que proponía el mockup; a cambio el mapa de calor sigue siendo el vertical de siempre, sin tocarlo |
+| Lienzo fijo 1440×900 | **Sí**, como el hub | **El partido pierde el layout de móvil** que hoy tenía |
+| Barra de riesgo por opción | **Autorar riesgo real** (`option.risk` 1..5 a mano en los constructores de actos) | Es un cambio de balance, no cosmético: decirle al jugador cuánto está apostando cambia lo que elige |
+| Decisiones fuera del modal | **Inline hasta 3 opciones, modal el resto** | Las decisiones que son una lista de jugadores no entran en columnas |
+
+**Lo que se movió, y por qué**
+
+- **El mando dejó de estar repartido.** Mentalidad, altura del bloque, presión, plantilla y
+  energía vivían entre la cabecera y dos modales. Ahora son una columna de 404px siempre a la
+  vista. La pizarra de la altura (`openHeightModal`) **desapareció**: son cinco escalones que
+  suben, y la forma es el significado — repliegue a la izquierda, asfixia a la derecha.
+- **La decisión aterriza dentro del relato**, en el mismo sitio donde se venía leyendo el
+  minuto, y el relato pasó a ir **del minuto más nuevo al más viejo**: lo que se decide y lo
+  que lo provocó quedan pegados, en vez de a media pantalla de distancia.
+- **El asistente técnico tiene sitio propio** al pie del mando (`mm.talk`). Antes su consejo
+  era una línea `plain` del relato que duraba tres segundos y se la llevaba el scroll — o sea,
+  un sistema entero (`assistantLine`, con su silencio mínimo y su rotación sin azar) que el
+  jugador se perdía la mitad de las veces. **Salió del feed**: ahora se queda hasta el próximo.
+- **El riesgo era información que el jugador ya pagaba y no veía.** Los hints decían "50/50",
+  "seguro", "si falla queda mejor perfilado": la información estaba, dispersa en prosa y sin
+  escala común. `option.risk` la vuelve comparable de un vistazo (verde ≤2 · ámbar 3 · rojo ≥4).
+  La escala está documentada en `game/match/sequence-acts.js` — es dato de diseño, NO una
+  probabilidad calculada, porque la probabilidad real depende de las stats de quien la juega.
+
+**Deuda que este sprint deja abierta**
+
+- La **Gestión de plantilla en vivo** (`squad.js`) sigue siendo un modal de Tailwind redondeado
+  sobre un lienzo pixel: funciona, pero se lee como otra aplicación. Es la pantalla más grande
+  que queda sin migrar al kit `px-*`.
+- La **energía del mando es la del arranque**: mis jugadores no pierden energía DURANTE el
+  partido (el desgaste lo cobra `medical.matchFatigue` al final). El número es real y es el que
+  decide si conviene presionar, pero no se mueve en los 90 minutos.
+- El partido **ya no tiene móvil**, como el hub. Un layout propio sigue sin existir.
+
+---
+
 ## Apéndice: estado del documento
 
 - **21-jul-2026** — Creado tras 15 decisiones de diseño del PO (AskUserQuestion, 4 rondas). El PO
@@ -343,5 +389,7 @@ piso se asiente:
 - **22-jul-2026** — A3 cerrado: el arco A1-A3 queda completo. Los tres pendientes congelados
   siguen congelados (siempre-Recuperar quedó en 48.3 n=1500, +1.0 = ruido; la fatiga→generación
   no lo disparó). Próximo: el sprint de Filosofía.
+- **7-ago-2026** — Sprint visual del puente de mando cerrado: el partido pasa a lienzo fijo, el
+  mando a columna y la decisión al relato. El motor solo suma `option.risk` y `feed[].clock`.
 - Se revisa al cerrar cada sprint y cada vez que una decisión contradiga lo escrito acá (gana el
   que tenga mejor argumento, pero queda registrado).

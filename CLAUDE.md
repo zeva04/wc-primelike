@@ -32,11 +32,22 @@ http://localhost:8347/?dev=philosophy&team=BRA&filo=contra&nivel=10&pi=12&node=e
 http://localhost:8347/?dev=hub&team=ARG&filo=press&nivel=4&node=campo
 ```
 
+```
+http://localhost:8347/?dev=partido&team=ARG&filo=contra&nivel=3&min=67&dec=1
+```
+
 Los parámetros están documentados en [js/dev/deeplink.js](js/dev/deeplink.js): `dev` `team`
-`filo` `view` `nivel` `pi` `traits` `node` `onb` `anim` `dia`. `node` abre lo que esa
-pantalla pueda abrir — la ficha de un rasgo en la pizarra, un edificio en el hub. `dia=partido`
-salta al día del partido. Solo funciona servido en local; en cualquier otro origen el módulo
-ni se descarga.
+`filo` `view` `nivel` `pi` `traits` `node` `onb` `anim` `dia` `min` `dec`. `node` abre lo que
+esa pantalla pueda abrir — la ficha de un rasgo en la pizarra, un edificio en el hub.
+`dia=partido` salta al día del partido. Solo funciona servido en local; en cualquier otro
+origen el módulo ni se descarga.
+
+**`dev=partido`** no es una pantalla de `ui/nav` (el partido necesita un once y un rival: el
+deep-link los deriva como el hub). Recién montado está 0-0 al minuto 0 y con el relato, el
+momentum y el mapa de calor VACÍOS, o sea que no se parece a nada de lo que hay que verificar
+— para eso están `min` (adelanta el reloj de golpe, resolviendo por el camino cada decisión
+con su primera opción), `min=ht` (frena en el entretiempo) y `dec=1` (sigue hasta que se abra
+una decisión). Son los tres estados de la pantalla.
 
 El deep-link **congela las animaciones** por defecto: el riel del pizarrón se desliza en
 420ms y la cámara del tablero hace zoom en 500ms, así que una captura disparada a destiempo
@@ -86,10 +97,11 @@ automatización de navegador de una forma que **no se recupera sola**:
 
 ---
 
-## El hub es una pantalla aparte
+## Dos pantallas van por su cuenta: el hub y el partido
 
-La Concentración Mundialista (`js/ui/screens/hub/`) no sigue las reglas del resto de la UI, y
-es a propósito (rediseño del 6-ago-2026, adaptado de un diseño de Claude Design):
+La Concentración Mundialista (`js/ui/screens/hub/`) y el partido en vivo
+(`js/ui/screens/match/`) no siguen las reglas del resto de la UI, y es a propósito
+(rediseños del 6 y el 7-ago-2026, adaptados de diseños de Claude Design):
 
 - **Lienzo FIJO de 1440×900**, escalado entero con `transform` (`screenStage` en
   `ui/components.js`). No reflowea: es pixel art y un layout elástico obligaría a escalar en
@@ -101,6 +113,10 @@ es a propósito (rediseño del 6-ago-2026, adaptado de un diseño de Claude Desi
 - **Todo el arte se dibuja**, no se carga: los seis edificios isométricos
   (`hub/complex.js`) y los iconos de 16×16 (`ui/pixicons.js`) son SVG generados. El repo
   sigue sin assets binarios más allá de la fuente.
+- **En el partido, el mando es una COLUMNA y la decisión vive DENTRO del relato**: no hay
+  modal que tape el partido mientras se decide. El modal quedó solo para las decisiones que
+  son una lista de jugadores (más de 3 opciones). La altura del bloque son cinco escalones
+  clickeables en la columna, no una pizarra que se abre.
 - **Geometría con presupuesto**: el complejo tiene su propio sistema de coordenadas de
   1440×`PLANO_H` anclado abajo, y la columna del HUD arranca en x=1056. `tests/hub.test.js`
   verifica que ninguna parcela se salga ni se solape — es lo que una captura no chequea.

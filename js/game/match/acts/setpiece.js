@@ -33,11 +33,11 @@ export const BUILDERS = {
         : `🎯 min ${m.clock()}' — Tiro libre frontal: ${s.prot.name} se para detrás de la pelota`,
       text: corner ? "El área se llena de camisetas. ¿Qué ensayaron en la semana?" : "Hay barrera, y el arco de frente. ¿Qué ensayaron en la semana?",
       options: [
-        ...(corner ? [] : [{ label: "🎯 Tiro libre directo al arco", hint: `Tiro ${s.prot.stats.tiro} — de frente hay ángulo: es la opción más peligrosa`, key: "directo" }]),
+        ...(corner ? [] : [{ label: "🎯 Tiro libre directo al arco", hint: `Tiro ${s.prot.stats.tiro} — de frente hay ángulo: es la opción más peligrosa`, key: "directo", risk: 4 }]),
         { label: `📡 Centro al área para ${s.target.name}`, hint: corner
           ? `Cabezazo ${s.target.stats.cabezazo} — desde el costado el envío llega perfecto`
-          : `Cabezazo ${s.target.stats.cabezazo} — de frente, el centro sale peor`, key: "centro" },
-        { label: "🎭 Jugada preparada", hint: `Descarga corta y remate (Tiro ${s.prot.stats.tiro})`, key: "jugada" },
+          : `Cabezazo ${s.target.stats.cabezazo} — de frente, el centro sale peor`, key: "centro", risk: 3 },
+        { label: "🎭 Jugada preparada", hint: `Descarga corta y remate (Tiro ${s.prot.stats.tiro})`, key: "jugada", risk: 3 },
       ],
     };
   },
@@ -45,8 +45,8 @@ export const BUILDERS = {
     title: `🚨 min ${m.clock()}' — Córner de ${m.oppTeam.name}: ${s.shooter.name} manda en el área`,
     text: "¿Cómo lo defiende la zaga?",
     options: [
-      { label: "🧲 Defensa en zona", hint: "Seguro: cada uno cuida su espacio", key: "zonal" },
-      { label: "🥊 Salir a despejar", hint: "Puede matar la jugada de una… pero si falla, el cabeceador queda solo", key: "salir" },
+      { label: "🧲 Defensa en zona", hint: "Seguro: cada uno cuida su espacio", key: "zonal", risk: 2 },
+      { label: "🥊 Salir a despejar", hint: "Puede matar la jugada de una… pero si falla, el cabeceador queda solo", key: "salir", risk: 4 },
     ],
   }),
   // ═══ EL DESBORDE POR LA BANDA (Odisea, 2ª mitad) ═══

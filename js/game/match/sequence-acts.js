@@ -36,6 +36,33 @@ import * as Defense from "./acts/defense.js";
 /** Todos los constructores de decisión, por `kind`: cada familia trae los suyos. */
 const BUILDERS = { ...Build.BUILDERS, ...Attack.BUILDERS, ...Setpiece.BUILDERS, ...Defense.BUILDERS };
 
+/**
+ * EL RIESGO DE UNA OPCIÓN (`option.risk`, 1..5). Es DATO DE DISEÑO —lo escribe a mano
+ * quien autora el acto—, no una probabilidad que salga de la matemática: el número que
+ * el motor tira depende de las stats del protagonista y del rival, así que "qué tan
+ * probable es que salga bien" cambia en cada jugada. Lo que NO cambia es cuánto se está
+ * apostando, y eso es lo que el ayudante te diría al oído.
+ *
+ *   1  no se arriesga nada (reventarla, pase seguro, congelar)
+ *   2  bajo: si sale mal se pierde la jugada, nada más
+ *   3  medio: moneda al aire, o la pérdida deja al equipo mal parado
+ *   4  alto: el fallo REGALA algo (contra, remate rival, cabeceador solo)
+ *   5  muy alto: el fallo puede costar tarjeta, penal o gol hecho
+ *
+ * Una opción SIN `risk` (elegir pateador, elegir quién sale) no dibuja la barra: ahí no
+ * hay apuesta, hay un nombre. La UI lo trata como opcional a propósito.
+ */
+export const RISK_MAX = 5;
+
+/** ¿En qué acto de la secuencia estamos? Para el "Acto 2 de 3" del Centro de mando.
+ *  Devuelve null si no hay secuencia viva (penal suelto, último hombre, cambio). */
+export function actProgress(m) {
+  const s = m.seq;
+  if (!s) return null;
+  const total = (s.plan || s.type.plan).length;
+  return { idx: Math.min(s.actIdx + 1, total), total };
+}
+
 /** Y todos los resolvers, por `kind`. `clear` es el único que no nace de una decisión. */
 const RESOLVERS = {
   build: Build.resolveBuild, buildout: Build.resolveBuildout, switch: Build.resolveSwitch,

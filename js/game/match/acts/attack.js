@@ -33,8 +33,8 @@ export const BUILDERS = {
       title: `🏹 min ${m.clock()}' — ${s.prot.name} pica al espacio: la zaga rival está adelantadísima`,
       text: "Hay toda una pradera detrás de los centrales rivales. ¿Qué pelota le ponen?",
       options: [
-        { label: "🏹 Pelota a la espalda", hint: `Pase largo ${s.prot.stats.pase_largo} + carrera (Velocidad ${s.prot.stats.velocidad} vs ${s.chaser ? s.chaser.stats.velocidad : "la zaga"}) — si gana, queda solo`, key: "espalda" },
-        { label: "🎯 Entre líneas al pie", hint: `Pase largo ${s.prot.stats.pase_largo} — llega más seguido, pero sin ventaja de campo`, key: "lineas" },
+        { label: "🏹 Pelota a la espalda", hint: `Pase largo ${s.prot.stats.pase_largo} + carrera (Velocidad ${s.prot.stats.velocidad} vs ${s.chaser ? s.chaser.stats.velocidad : "la zaga"}) — si gana, queda solo`, key: "espalda", risk: 4 },
+        { label: "🎯 Entre líneas al pie", hint: `Pase largo ${s.prot.stats.pase_largo} — llega más seguido, pero sin ventaja de campo`, key: "lineas", risk: 2 },
       ],
     };
   },
@@ -47,13 +47,13 @@ export const BUILDERS = {
     title: `🌩️ min ${m.clock()}' — Pelotazo a ${s.prot.name}: se viene el duelo aéreo`,
     text: "¿Cómo lo juega?",
     options: [
-      { label: "🤜 Ir al choque", hint: `Cabezazo ${s.prot.stats.cabezazo} — ganarla es rematar de cabeza`, key: "choque" },
-      { label: "🪶 Peinarla al espacio", hint: "Prolonga para un compañero lanzado: más letal, más difícil", key: "peinar" },
+      { label: "🤜 Ir al choque", hint: `Cabezazo ${s.prot.stats.cabezazo} — ganarla es rematar de cabeza`, key: "choque", risk: 2 },
+      { label: "🪶 Peinarla al espacio", hint: "Prolonga para un compañero lanzado: más letal, más difícil", key: "peinar", risk: 3 },
       // HOMBRE OBJETIVO (Bloque, Master): "Pivoteo al Área". El que gana por arriba no
       // remata: la aguanta de espaldas y la BAJA para el mejor rematador, que llega de
       // frente al arco. Tampoco se sortea — es una decisión del DT.
       ...(hookOf(m, "pivot")
-        ? [{ label: "🎯 Pivotear al área", hint: "La aguanta de espaldas y la baja al mejor rematador, de frente al arco", key: "pivotear" }]
+        ? [{ label: "🎯 Pivotear al área", hint: "La aguanta de espaldas y la baja al mejor rematador, de frente al arco", key: "pivotear", risk: 2 }]
         : []),
     ],
     };
@@ -68,9 +68,9 @@ export const BUILDERS = {
       title: `🏃 min ${m.clock()}' — Banda: ${s.prot.name} encara a ${s.chaser ? s.chaser.name : "su marca"}`,
       text: "El pasillo de afuera está abierto. ¿Qué hace?",
       options: [
-        { label: "🏁 Ir a la línea de fondo", hint: `Velocidad ${s.prot.stats.velocidad} vs ${s.chaser ? s.chaser.stats.velocidad : "el lateral"} — si llega, centra con la zaga de espaldas`, key: "fondo" },
-        { label: "📡 Centrar de primera", hint: "No arriesga el desborde, pero la defensa llega acomodada", key: "primera" },
-        { label: "✂️ Cortar hacia adentro", hint: `Se perfila y busca el remate él mismo (Tiro ${s.prot.stats.tiro})`, key: "adentro" },
+        { label: "🏁 Ir a la línea de fondo", hint: `Velocidad ${s.prot.stats.velocidad} vs ${s.chaser ? s.chaser.stats.velocidad : "el lateral"} — si llega, centra con la zaga de espaldas`, key: "fondo", risk: 3 },
+        { label: "📡 Centrar de primera", hint: "No arriesga el desborde, pero la defensa llega acomodada", key: "primera", risk: 1 },
+        { label: "✂️ Cortar hacia adentro", hint: `Se perfila y busca el remate él mismo (Tiro ${s.prot.stats.tiro})`, key: "adentro", risk: 3 },
       ],
     };
   },
@@ -89,10 +89,10 @@ export const BUILDERS = {
         : `📡 min ${m.clock()}' — ${s.prot.name} arma el envío desde el costado`,
       text: fondo ? "La zaga rival quedó de espaldas a su arco. ¿Qué manda?" : "La defensa está acomodada dentro del área. ¿Qué manda?",
       options: [
-        { label: "📡 Centro al área", hint: `Pase largo ${s.prot.stats.pase_largo} — busca la cabeza del mejor rematador${fondo ? "" : ", con la zaga ya parada"}`, key: "centro" },
+        { label: "📡 Centro al área", hint: `Pase largo ${s.prot.stats.pase_largo} — busca la cabeza del mejor rematador${fondo ? "" : ", con la zaga ya parada"}`, key: "centro", risk: 2 },
         fondo
-          ? { label: "🎯 Pase atrás rasante", hint: `Pase corto ${s.prot.stats.pase_corto} — al que llega de frente al arco`, key: "atras" }
-          : { label: "🌙 Al espacio, segundo palo", hint: `Pase largo ${s.prot.stats.pase_largo} — más difícil, pero lo ataca el que llega LANZADO desde atrás`, key: "segundo" },
+          ? { label: "🎯 Pase atrás rasante", hint: `Pase corto ${s.prot.stats.pase_corto} — al que llega de frente al arco`, key: "atras", risk: 2 }
+          : { label: "🌙 Al espacio, segundo palo", hint: `Pase largo ${s.prot.stats.pase_largo} — más difícil, pero lo ataca el que llega LANZADO desde atrás`, key: "segundo", risk: 3 },
       ],
     };
   },
@@ -104,16 +104,16 @@ export const BUILDERS = {
     title: `🎯 min ${m.clock()}' — ¡Momento de definir! ${s.prot.name}`,
     text: "¿Cómo resuelve la jugada?",
     options: [
-      { label: "💥 Rematar", hint: `Tiro ${s.prot.stats.tiro}`, key: "rematar" },
-      { label: "🤝 Buscar al mejor ubicado", hint: "Un pase más para una definición mejor", key: "asistir" },
+      { label: "💥 Rematar", hint: `Tiro ${s.prot.stats.tiro}`, key: "rematar", risk: 2 },
+      { label: "🤝 Buscar al mejor ubicado", hint: "Un pase más para una definición mejor", key: "asistir", risk: 3 },
       // FRÍOS (Press, Master): la otra jugada NUEVA del catálogo. Solo en el tramo
       // final y sin ir perdiendo — congelar ganando o empatando es fútbol; hacerlo
       // en el minuto 20 sería renunciar al partido.
-      ...(canFreeze(m) ? [{ label: "🧊 Congelar el partido", hint: "Renuncias al remate: a cambio, el rival pierde su próxima llegada", key: "congelar" }] : []),
+      ...(canFreeze(m) ? [{ label: "🧊 Congelar el partido", hint: "Renuncias al remate: a cambio, el rival pierde su próxima llegada", key: "congelar", risk: 1 }] : []),
       // PASE ATRÁS (Contra, avanzada): la jugada de finalización de la contra. Solo en
       // SU familia — es el que llegó al fondo pisándola para el que entra de frente.
       ...(hookOf(m, "squarePass") && familyOf(s.type) === "transicion"
-        ? [{ label: "🎯 Pase atrás", hint: `La pisa y la devuelve al que entra de frente (Pase corto ${s.prot.stats.pase_corto})`, key: "pase_atras" }]
+        ? [{ label: "🎯 Pase atrás", hint: `La pisa y la devuelve al que entra de frente (Pase corto ${s.prot.stats.pase_corto})`, key: "pase_atras", risk: 2 }]
         : []),
     ],
   }),

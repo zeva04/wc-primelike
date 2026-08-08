@@ -109,12 +109,15 @@ function heatColor(i) {
  * La cancha pintada. `cells` = [{h, v, i}] del motor; `lanes`/`rows` la grilla.
  * Devuelve HTML (no toca el DOM): quien lo llama decide dónde vive.
  */
-export function heatPitch(cells, { lanes = 3, rows = 5, blur = 9 } = {}) {
+export function heatPitch(cells, { lanes = 3, rows = 5, blur = 9, radius = "0.5rem" } = {}) {
   const w = 100 / lanes, hgt = 100 / rows;
   const manchas = cells.map(c => `<span class="absolute" style="left:${(c.h - 1) * w}%;width:${w}%;top:${(rows - c.v) * hgt}%;height:${hgt}%;background:${heatColor(c.i)}"></span>`).join("");
-  return `<div class="relative w-full h-full overflow-hidden rounded-lg" style="background:#0b2016">
+  // `radius` sale afuera porque el partido dibuja en el kit pixel (bordes duros de 2px):
+  // un canto redondeado ahí se lee como un error de escalado. El resto del juego usa el
+  // redondeo de siempre y no tiene que enterarse.
+  return `<div class="relative w-full h-full overflow-hidden" style="background:#0b2016;border-radius:${radius}">
     <div class="absolute inset-0" style="filter:blur(${blur}px)">${manchas}</div>
-    <div class="absolute inset-0 border border-white/15 rounded-lg"></div>
+    <div class="absolute inset-0 border border-white/15" style="border-radius:${radius}"></div>
     <div class="absolute left-0 right-0 top-1/2 h-px bg-white/15"></div>
     <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15" style="width:26%;aspect-ratio:1"></div>
     <div class="absolute left-1/4 w-1/2 border border-white/15 border-t-0" style="top:0;height:16%"></div>

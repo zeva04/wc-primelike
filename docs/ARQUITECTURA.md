@@ -287,7 +287,11 @@ Este mapa es ley: si un módulo escribe un campo que no le pertenece, es un bug 
 
 ### 3.2 El contrato de decisiones Match ↔ UI
 
-Las decisiones siguen siendo `{id, title, text, options[{label, hint, key}]}` con ids string. El contrato pasa a estar documentado en `Match.js` con esta tabla, y la regla es: **agregar una decisión = 3 pasos siempre** (creador en `match/*`, resolver en `match/*`, entrada de ruteo en `screens/match.js`). El checklist vive como comentario encima del router de la UI.
+Las decisiones siguen siendo `{id, title, text, options[{label, hint, key, risk?}]}` con ids
+string. `risk` (1..5, opcional) es **dato de diseño** —lo autora a mano quien escribe el acto,
+no sale de la matemática— y dice cuánto se está apostando en esa opción; la escala vive
+documentada en `game/match/sequence-acts.js`. Una opción sin `risk` (elegir pateador, elegir
+quién sale) no dibuja la barra: ahí no hay apuesta, hay un nombre. El contrato pasa a estar documentado en `Match.js` con esta tabla, y la regla es: **agregar una decisión = 3 pasos siempre** (creador en `match/*`, resolver en `match/*`, entrada de ruteo en `screens/match.js`). El checklist vive como comentario encima del router de la UI.
 
 | id | La crea | La resuelve |
 |---|---|---|

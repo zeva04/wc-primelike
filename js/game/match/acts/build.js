@@ -24,19 +24,23 @@ import { passTo, dtOk, dtFail, desmarqueW } from "./common.js";
 import { escalate, closeSeq, closeSilent, maybeCounter, chainSetPiece, advFoulSetPiece, foulGeography } from "./chains.js";
 import { oppShotBlockMalus } from "./block.js";
 
-/** Los constructores de decisión de esta familia (los monta buildActDecision). */
+/** Los constructores de decisión de esta familia (los monta buildActDecision).
+ *
+ *  EL RIESGO (`risk` 1..5) es DATO DE DISEÑO, no una probabilidad calculada: dice cuánto
+ *  se está apostando en esa opción, que es lo que un ayudante te diría al oído. La escala
+ *  vive documentada una sola vez, en sequence-acts.js (RISK). */
 export const BUILDERS = {
   build: (m, s) => ({
     title: `⚡ min ${m.clock()}' — Circulación: ${s.prot.name} tiene la pelota`,
     text: "¿Cómo la hacen circular?",
     options: [
-      { label: "🎩 Pase seguro", hint: `Mantiene la posesión (Pase corto ${s.prot.stats.pase_corto})`, key: "seguro" },
-      { label: "🔑 Pase filtrado", hint: "Arriesgado, pero deja mejor perfil de remate", key: "filtrado" },
+      { label: "🎩 Pase seguro", hint: `Mantiene la posesión (Pase corto ${s.prot.stats.pase_corto})`, key: "seguro", risk: 1 },
+      { label: "🔑 Pase filtrado", hint: "Arriesgado, pero deja mejor perfil de remate", key: "filtrado", risk: 3 },
       // LA TRAMPA (Posesión): la jugada NUEVA que desbloquea el rasgo — una tercera
       // opción en el acto, no un modificador escondido. Una sola vez por secuencia:
       // es un recurso del DT, no una forma de circular eternamente.
       ...(hookOf(m, "backPass") && !s.backUsed
-        ? [{ label: "🔙 Retroceso de posesión", hint: "Saca al rival de su bloque: mejor perfil, pero la jugada no avanza", key: "atras" }]
+        ? [{ label: "🔙 Retroceso de posesión", hint: "Saca al rival de su bloque: mejor perfil, pero la jugada no avanza", key: "atras", risk: 2 }]
         : []),
     ],
   }),
@@ -44,9 +48,9 @@ export const BUILDERS = {
     title: `🧤 min ${m.clock()}' — Salida desde el área: la tiene ${s.prot.name}`,
     text: "El rival espera arriba y el equipo está metido en su campo. ¿Cómo la sacan?",
     options: [
-      { label: "💎 Salir jugando en corto", hint: `Pase corto ${s.prot.stats.pase_corto} — romper la primera línea y salir de verdad`, key: "corto" },
-      { label: "🌩️ Buscar al punta", hint: `Pase largo ${s.prot.stats.pase_largo} — la jugada se vuelve un duelo aéreo arriba`, key: "largo" },
-      { label: "🚀 Afuera y a respirar", hint: "Seguro: se cede la pelota, no se arriesga nada", key: "seguro" },
+      { label: "💎 Salir jugando en corto", hint: `Pase corto ${s.prot.stats.pase_corto} — romper la primera línea y salir de verdad`, key: "corto", risk: 3 },
+      { label: "🌩️ Buscar al punta", hint: `Pase largo ${s.prot.stats.pase_largo} — la jugada se vuelve un duelo aéreo arriba`, key: "largo", risk: 2 },
+      { label: "🚀 Afuera y a respirar", hint: "Seguro: se cede la pelota, no se arriesga nada", key: "seguro", risk: 1 },
     ],
   }),
   // El ataque a la ESPALDA del bloque adelantado: la otra jugada que el territorio
@@ -55,8 +59,8 @@ export const BUILDERS = {
     title: `🔀 min ${m.clock()}' — ${s.prot.name} levanta la cabeza: el otro carril está vacío`,
     text: "Todo el bloque rival se corrió a este lado. ¿Cómo cambian el frente?",
     options: [
-      { label: "🔀 Diagonal larga al otro carril", hint: `Pase largo ${s.prot.stats.pase_largo} — si llega, el que recibe queda SOLO para centrar`, key: "largo" },
-      { label: "🎯 Circular por dentro", hint: "Llega siempre… pero el rival se corre a tiempo y el centro sale contra la defensa acomodada", key: "dentro" },
+      { label: "🔀 Diagonal larga al otro carril", hint: `Pase largo ${s.prot.stats.pase_largo} — si llega, el que recibe queda SOLO para centrar`, key: "largo", risk: 3 },
+      { label: "🎯 Circular por dentro", hint: "Llega siempre… pero el rival se corre a tiempo y el centro sale contra la defensa acomodada", key: "dentro", risk: 1 },
     ],
   }),
   // ═══ LAS DOS JUGADAS DEL TERRITORIO ═══
@@ -67,8 +71,8 @@ export const BUILDERS = {
     title: `⚡ min ${m.clock()}' — Transición: ${s.prot.name} conduce`,
     text: "La defensa rival viene a la carrera. ¿Qué hace?",
     options: [
-      { label: "🏃 Conducir al espacio", hint: `Puede ganar una falta (Aura ${s.prot.stats.aura})`, key: "conducir" },
-      { label: "🎯 Pase al pie", hint: `Rápido y seguro (Pase corto ${s.prot.stats.pase_corto})`, key: "pase" },
+      { label: "🏃 Conducir al espacio", hint: `Puede ganar una falta (Aura ${s.prot.stats.aura})`, key: "conducir", risk: 3 },
+      { label: "🎯 Pase al pie", hint: `Rápido y seguro (Pase corto ${s.prot.stats.pase_corto})`, key: "pase", risk: 1 },
     ],
   }),
   press: (m, s) => ({
@@ -79,8 +83,8 @@ export const BUILDERS = {
       : `🦁 min ${m.clock()}' — ¡Presión alta! ${s.prot.name} achica sobre la salida rival`,
     text: "¿Cómo cazan la pelota?",
     options: [
-      { label: "🔥 Presión total", hint: "Robo en zona letal (remate top)… pero si la rompen, duele", key: "total" },
-      { label: "🕸️ Cerrar líneas de pase", hint: "Roba más seguido, en posición más discreta", key: "lineas" },
+      { label: "🔥 Presión total", hint: "Robo en zona letal (remate top)… pero si la rompen, duele", key: "total", risk: 4 },
+      { label: "🕸️ Cerrar líneas de pase", hint: "Roba más seguido, en posición más discreta", key: "lineas", risk: 2 },
     ],
   }),
 };

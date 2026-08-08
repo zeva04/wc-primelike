@@ -7,6 +7,10 @@
    (matchStats, momentumBars, heatCells) y esta capa no decide nada
    del partido. El markup fijo lo crea la pantalla (index.js); estos
    pintores lo rellenan por id.
+
+   Desde el rediseño del 7-ago-2026 pinta con el kit px-* (bordes
+   duros, Silkscreen en las cifras, la paleta morada del hub): lo
+   que cambió es la piel, no de dónde salen los números.
    ============================================================ */
 import { matchStats } from "../../../game/match/stats.js";
 import { momentumBars } from "../../../game/match/match-momentum.js";
@@ -18,8 +22,7 @@ import { $, heatPitch } from "../../components.js";
 /**
  * Pinta las Estadísticas del partido desde `matchStats` — la vista no conoce ninguna
  * regla: recibe [{label, mine, opp, txt}] y arma la fila de transmisión (número mío ·
- * etiqueta · número suyo, y debajo la barra repartida). Reutiliza el idioma visual de la
- * vieja barra de posesión: verde lo mío, rojo lo suyo.
+ * etiqueta · número suyo, y debajo la barra repartida). Verde lo mío, rojo lo suyo.
  *
  * Se pinta con innerHTML solo la PRIMERA vez y después se actualizan los nodos: así la
  * transición CSS de las barras se ve (un innerHTML nuevo cada tick las haría saltar).
@@ -30,13 +33,13 @@ export function paintStats(match) {
   if (!box.firstChild) {
     box.innerHTML = rows.map(r => `
       <div>
-        <div class="flex items-baseline justify-between gap-2 text-[11px] mb-1">
-          <b data-v="${r.id}-mine" class="tabular-nums text-emerald-300 text-sm">–</b>
-          <span class="text-slate-400 uppercase tracking-wider text-[9.5px] font-bold">${r.label}</span>
-          <b data-v="${r.id}-opp" class="tabular-nums text-red-300 text-sm">–</b>
+        <div class="flex items-baseline justify-between" style="gap:8px;margin-bottom:4px">
+          <b data-v="${r.id}-mine" class="px" style="font-size:12px;color:var(--px-ok)">–</b>
+          <span class="px-body uppercase" style="font-size:11px;letter-spacing:.1em;font-weight:700;color:var(--px-dim)">${r.label}</span>
+          <b data-v="${r.id}-opp" class="px" style="font-size:12px;color:var(--px-bad)">–</b>
         </div>
-        <div class="h-1.5 rounded-full overflow-hidden bg-red-400/60">
-          <div data-bar="${r.id}" class="h-full bg-emerald-400 transition-all duration-500" style="width:50%"></div>
+        <div style="height:8px;background:var(--px-bad);border:2px solid var(--wc-black);overflow:hidden">
+          <div data-bar="${r.id}" class="h-full transition-all duration-500" style="width:50%;background:var(--px-ok)"></div>
         </div>
       </div>`).join("");
   }
@@ -61,19 +64,24 @@ export function paintFiloXp(match) {
   const box = $("#filo-xp"); if (!box || !match.my.filo) return;
   const ganado = match.filoXp || {};
   const filas = PHILOSOPHIES.filter(p => ganado[p.id]);
-  if (!filas.length) { box.innerHTML = ""; return; }
+  // El vacío se DICE: un panel en blanco parece roto, y además informa —todavía no se
+  // propuso ninguna idea reconocible.
+  if (!filas.length) {
+    box.innerHTML = `<div class="px-body" style="font-size:12.5px;color:var(--px-faint)">Ninguna idea sonó todavía. La experiencia se gana jugándola.</div>`;
+    return;
+  }
   box.innerHTML = filas.map(p => {
     const total = (match.my.filo.xp?.[p.id] || 0) + ganado[p.id];
     const lvl = xpLevelOf(total);
     const piso = FILO_LEVELS[lvl].min, techo = FILO_LEVELS[lvl + 1]?.min ?? null;
     const pct = techo ? Math.min(100, (100 * (total - piso)) / (techo - piso)) : 100;
     return `<div>
-      <div class="flex items-baseline justify-between gap-2 text-[10px]">
-        <span class="font-bold text-slate-300">${p.icon} ${p.name}<span class="text-slate-500"> nv ${lvl + 1}</span></span>
-        <b class="tabular-nums text-amber-300">+${Math.round(ganado[p.id])}</b>
+      <div class="flex items-baseline justify-between" style="gap:8px">
+        <span class="px-body" style="font-size:13px;font-weight:700;color:#d4cee0">${p.icon} ${p.name}<span style="color:var(--px-faint)"> nv${lvl + 1}</span></span>
+        <b class="px" style="font-size:10px;color:var(--wc-gold-light)">+${Math.round(ganado[p.id])}</b>
       </div>
-      <div class="h-1 rounded-full overflow-hidden bg-slate-900/80 mt-1">
-        <div class="h-full bg-amber-400 transition-all duration-500" style="width:${pct}%"></div>
+      <div style="height:6px;background:var(--wc-black);border:1px solid var(--px-line-off);margin-top:5px">
+        <div class="h-full transition-all duration-500" style="width:${pct}%;background:var(--wc-gold)"></div>
       </div>
     </div>`;
   }).join("");
@@ -105,8 +113,8 @@ export function paintMomentum(match) {
   const cuerpo = bars.map((b, i) => {
     const alto = Math.max(2, b.h * 100);          // un mínimo visible: 0 exacto no se ve
     const lado = b.mine
-      ? `bottom:50%;height:${alto / 2}%;background:#34d399`
-      : `top:50%;height:${alto / 2}%;background:#f87171`;
+      ? `bottom:50%;height:${alto / 2}%;background:var(--px-ok)`
+      : `top:50%;height:${alto / 2}%;background:var(--px-bad)`;
     // La marca va sobre la PUNTA de su barra, no sobre la línea del cero. Se posiciona con
     // `calc(50% + N%)`: en `top`/`bottom` los porcentajes se resuelven contra la ALTURA del
     // contenedor, que es lo que queremos. (Con `margin-bottom:N%` se resolvían contra el
@@ -117,12 +125,12 @@ export function paintMomentum(match) {
            style="${b.mine ? `bottom:calc(50% + ${alto / 2}%);margin-bottom:2px` : `top:calc(50% + ${alto / 2}%);margin-top:2px`}">${b.marks.join("")}</span>`
       : "";
     return `<div class="absolute" style="left:${i * w}%;width:${w}%;top:0;bottom:0">
-      <div class="absolute rounded-[1px]" style="left:8%;right:8%;${lado}"></div>${marcas}</div>`;
+      <div class="absolute" style="left:8%;right:8%;${lado}"></div>${marcas}</div>`;
   }).join("");
   box.innerHTML = `
     ${cuerpo}
-    <div class="absolute left-0 right-0 top-1/2 h-px bg-slate-600"></div>
-    ${htIdx > 0 ? `<div class="absolute top-0 bottom-0 w-px bg-slate-600/70" style="left:${htIdx * w}%"></div>` : ""}`;
+    <div class="absolute left-0 right-0 top-1/2" style="height:1px;background:var(--px-line)"></div>
+    ${htIdx > 0 ? `<div class="absolute top-0 bottom-0" style="width:1px;background:rgba(70,64,90,.7);left:${htIdx * w}%"></div>` : ""}`;
   // El eje: cada marca se planta sobre la primera barra que alcanza ese minuto.
   const eje = $("#mm-axis");
   if (eje) eje.innerHTML = MM_AXIS.map(t => {
@@ -136,7 +144,12 @@ export function paintMomentum(match) {
 
 /* ── EL CARRUSEL: Match Momentum ↔ Mapa de calor ────────────────────────────
    Estado de VISTA, no de partido: cuál diapositiva se mira y de quién es el mapa.
-   Vive en el módulo (no en `S`) porque muere con la pantalla, como `slide`. */
+   Vive en el módulo (no en `S`) porque muere con la pantalla, como `slide`.
+
+   El rediseño del partido movió el momentum a lo ancho de la pantalla y el mapa de
+   calor a la columna de lectura. Decisión PO del 7-ago-2026: los dos siguen siendo
+   UN CARRUSEL, y vive donde el diseño puso el mapa — al pie de la columna izquierda,
+   quedándose con todo el alto que sobra. */
 const SLIDES = ["Match Momentum", "Mapa de calor"];
 let slide = 0, heatSide = "mine";
 
@@ -157,17 +170,18 @@ function paintCarousel() {
   heat.classList.toggle("flex", slide === 1);
   const me = S.matchCtx.team.name, opp = S.match.oppTeam.name;
   $("#car-legend").innerHTML = slide === 0
-    ? `<span class="flex items-center gap-1 text-emerald-400"><i class="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></i>${me}</span>
-       <span class="flex items-center gap-1 text-red-400"><i class="w-2 h-2 rounded-sm bg-red-400 inline-block"></i>${opp}</span>`
+    ? `<span class="flex items-center gap-1.5" style="color:var(--px-ok)"><i class="inline-block" style="width:8px;height:8px;background:var(--px-ok)"></i>${me}</span>
+       <span class="flex items-center gap-1.5" style="color:var(--px-bad)"><i class="inline-block" style="width:8px;height:8px;background:var(--px-bad)"></i>${opp}</span>`
     // La escala del mapa se explica sola: de "sin uso" a rojo, como en la tele.
-    : `<span class="text-slate-500">Sin uso</span>
-       <i class="inline-block h-1.5 w-16 rounded-full" style="background:linear-gradient(90deg,rgba(250,204,21,.25),rgb(250,204,21),rgb(249,115,22),rgb(239,68,68))"></i>
-       <span class="text-red-400">Intenso</span>`;
+    : `<span style="color:var(--px-faint)">Sin uso</span>
+       <i class="inline-block" style="height:6px;width:64px;background:linear-gradient(90deg,rgba(250,204,21,.25),rgb(250,204,21),rgb(249,115,22),rgb(239,68,68))"></i>
+       <span style="color:var(--px-bad)">Intenso</span>`;
   // Los botones de a quién se mira (solo tienen sentido en el mapa).
   document.querySelectorAll(".heat-side").forEach(b => {
     const on = b.dataset.heat === heatSide;
-    b.className = `heat-side px-2 py-0.5 rounded-md text-[9px] font-black border cursor-pointer transition-colors ${
-      on ? "border-amber-400 bg-amber-400/20 text-amber-200" : "border-slate-700 bg-slate-800 text-slate-500 hover:text-slate-300"}`;
+    b.style.borderColor = on ? "var(--wc-gold)" : "var(--px-line-off)";
+    b.style.background = on ? "#2e2415" : "var(--px-panel-lo)";
+    b.style.color = on ? "var(--wc-gold-light)" : "var(--px-faint)";
   });
   paintHeat(S.match, true);
 }
@@ -184,7 +198,8 @@ export function paintHeat(match, force = false) {
   const marca = `${match.min}-${heatSide}-${match.field?.maps.length}`;
   if (!force && box.dataset.k === marca) return;
   box.dataset.k = marca;
-  box.innerHTML = heatPitch(heatCells(match, heatSide));
+  // Sin redondeo y con borde duro: la cancha vive dentro del kit pixel del partido.
+  box.innerHTML = `<div style="width:100%;height:100%;border:2px solid var(--wc-black)">${heatPitch(heatCells(match, heatSide), { radius: "0" })}</div>`;
 }
 
 

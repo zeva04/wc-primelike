@@ -102,6 +102,7 @@ export const newMomentum = () => ({
   _marks: [],      // marcas pendientes del minuto en curso
   _lastTalk: -99,  // minuto del último comentario del asistente (para no spamear)
   _talks: 0,       // cuántas veces habló (rota la frase sin usar azar)
+  talk: null,      // lo ÚLTIMO que dijo el asistente {min, text} — su sitio en la pantalla
 });
 
 /**
@@ -164,44 +165,50 @@ export function momentumTrend(m, n = 5) {
    pasando, que es lo que diría el ayudante desde el banco. Las condiciones
    miran también el marcador porque "dominamos" significa cosas distintas
    ganando 2-0 que perdiendo 0-1.
-   Elegir la frase NO usa `rnd` (ver la regla de oro): rota por minuto. */
+   Elegir la frase NO usa `rnd` (ver la regla de oro): rota por minuto.
+
+   Las frases se guardan LIMPIAS (sin el "🎧 El ayudante:") porque desde el
+   rediseño del partido tienen sitio propio en pantalla —el slot al pie del
+   Centro de mando, que ya dice de quién es la voz— y ahí el prefijo sobra.
+   `assistantLine` sigue devolviendo la línea decorada: es lo que espera quien
+   la quiera narrar (y lo que el test del asistente verifica). */
 const TALK = [
   {
     when: (t, m) => t > 22 && m.gMy <= m.gOpp,
     lines: [
-      "🎧 El ayudante: «Los tenemos contra su arco. Falta el último pase, nada más.»",
-      "🎧 El ayudante: «Estamos dominando pero no conseguimos finalizar. Insistan.»",
-      "🎧 El ayudante: «El partido es nuestro. Si seguimos así, cae.»",
+      "Los tenemos contra su arco. Falta el último pase, nada más.",
+      "Estamos dominando pero no conseguimos finalizar. Insistan.",
+      "El partido es nuestro. Si seguimos así, cae.",
     ],
   },
   {
     when: t => t > 22,
     lines: [
-      "🎧 El ayudante: «Recuperamos el control del mediocampo. Ahora hay que administrar.»",
-      "🎧 El ayudante: «Los pasamos por encima. No aflojen.»",
+      "Recuperamos el control del mediocampo. Ahora hay que administrar.",
+      "Los pasamos por encima. No aflojen.",
     ],
   },
   {
     when: (t, m) => t < -22 && m.min >= 70,
     lines: [
-      "🎧 El ayudante: «Nos están encerrando y quedan minutos. Hay que cortar el partido.»",
-      "🎧 El ayudante: «No salimos de nuestro campo. Esto se va a romper si no cambiamos algo.»",
+      "Nos están encerrando y quedan minutos. Hay que cortar el partido.",
+      "No salimos de nuestro campo. Esto se va a romper si no cambiamos algo.",
     ],
   },
   {
     when: t => t < -22,
     lines: [
-      "🎧 El ayudante: «Nos están encerrando desde hace varios minutos.»",
-      "🎧 El ayudante: «Ellos crecieron. No estamos llegando ni a la mitad de cancha.»",
-      "🎧 El ayudante: «Nos comieron el medio. Hay que ajustar algo.»",
+      "Nos están encerrando desde hace varios minutos.",
+      "Ellos crecieron. No estamos llegando ni a la mitad de cancha.",
+      "Nos comieron el medio. Hay que ajustar algo.",
     ],
   },
   {
     when: (t, m) => Math.abs(t) < 6 && m.min >= 60,
     lines: [
-      "🎧 El ayudante: «Partido trabado, no se saca ventaja ninguno. Lo va a definir un detalle.»",
-      "🎧 El ayudante: «Está todo en el medio. El que se anime primero se lo lleva.»",
-      "🎧 El ayudante: «Nadie encuentra el partido. Habría que mover algo del banco.»",
+      "Partido trabado, no se saca ventaja ninguno. Lo va a definir un detalle.",
+      "Está todo en el medio. El que se anime primero se lo lleva.",
+      "Nadie encuentra el partido. Habría que mover algo del banco.",
     ],
   },
 ];
@@ -213,6 +220,10 @@ export const MM_TALK_EVERY = 12;
  * ¿Tiene algo que decir el asistente en este minuto? Devuelve la línea o null.
  * Pide una tendencia SOSTENIDA (5 minutos de barras) y respeta el silencio
  * mínimo: el valor de estas frases es que se sientan ganadas.
+ *
+ * Deja además lo dicho en `mm.talk` ({min, text} sin decorar): el slot del
+ * asistente lo muestra hasta que haya algo nuevo, así el consejo no se lo lleva
+ * el scroll del relato tres segundos después de aparecer.
  */
 export function assistantLine(m) {
   const mm = m.mm;
@@ -224,7 +235,9 @@ export function assistantLine(m) {
   // Sin azar: rota por CUÁNTAS VECES habló, no por el minuto (con el minuto, un pool de
   // una sola frase repetía siempre la misma y dos pools distintos podían sincronizarse —
   // se vio en el navegador: tres «partido trabado» idénticos en un partido).
-  return rule.lines[mm._talks++ % rule.lines.length];
+  const text = rule.lines[mm._talks++ % rule.lines.length];
+  mm.talk = { min: m.min, text };
+  return `🎧 El ayudante: «${text}»`;
 }
 
 /**

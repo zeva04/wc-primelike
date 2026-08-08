@@ -24,6 +24,7 @@
      ?dev=philosophy&team=BRA&filo=press&nivel=10&pi=12&node=angriffpressing
      ?dev=hub&team=ARG&filo=bloque
      ?dev=philosophy&filo=contra&view=posesion&traits=buen_pie,tercer_hombre
+     ?dev=partido&team=ARG&filo=contra&nivel=3&min=67
 
    | parámetro | qué hace                                                        |
    |-----------|-----------------------------------------------------------------|
@@ -38,6 +39,22 @@
    | `onb`     | `1` para el modo ONBOARDING de la pizarra.                       |
    | `anim`    | `1` para NO congelar las animaciones (por defecto se congelan).   |
    | `dia`     | `partido` salta al día del partido (el hub cambia de cara ahí).   |
+   | `min`     | en `partido`, adelanta el reloj hasta ese minuto — o `ht`.       |
+   | `dec`     | en `partido`, sigue hasta que se abra una DECISIÓN (máx. 20' más). |
+
+   ── `dev=partido` ────────────────────────────────────────────────────────────
+   No es una pantalla de `ui/nav`: el partido necesita un once y un rival, así que
+   el deep-link los deriva igual que el hub (currentLineup + nextOpponentId) y
+   arranca `start-match`. Recién montado, ese partido está 0-0 al minuto 0 y el
+   relato, el momentum y el mapa de calor están VACÍOS — o sea, no se parece a
+   nada de lo que hay que verificar. Para eso está `min`: adelanta el reloj de
+   golpe (sin esperar los 2s por minuto) resolviendo por el camino cada decisión
+   con su PRIMERA opción —siempre la misma, para que dos capturas del mismo link
+   se parezcan— y frena en el minuto pedido. Con `dec=1` sigue un poco más, hasta
+   que se abra una decisión: son los dos estados de la pantalla, el minuto
+   corriendo y la decisión abierta. `min=ht` frena en el entretiempo, que es el
+   tercer estado y no tiene número propio (cae en el 45 más lo que sortee el
+   descuento).
 
    ── La señal de listo ────────────────────────────────────────────────────────
    Al terminar marca `<html data-dev-ready="philosophy">` y `window.__devReady`.
@@ -49,10 +66,13 @@ import { newRun } from "../game/run.js";
 import { getTeam } from "../data/teams-repo.js";
 import { applyTeamColors } from "../ui/theme.js";
 import { choosePhilosophy } from "../game/philosophy.js";
+import { currentLineup } from "../game/lineup.js";
+import { nextOpponentId } from "../game/tournament/knockout.js";
 import { FILO_LEVELS } from "../content/identity/philosophies.js";
 import { traitById } from "../content/traits/index.js";
 import { S } from "../ui/session.js";
 import { go } from "../ui/nav.js";
+import { devFastForward } from "../ui/screens/match/index.js";
 
 const q = new URLSearchParams(location.search);
 
@@ -112,7 +132,18 @@ export function bootDeepLink() {
 
     // Saltar al día del partido: se mueve el CALENDARIO, no un flag de UI, para que la
     // pantalla derive su estado igual que en una partida real (isMatchDay sale de ahí).
-    if (q.get("dia") === "partido") run.day = run.nextMatchDay;
+    if (q.get("dia") === "partido" || screen === "partido") run.day = run.nextMatchDay;
+
+    // EL PARTIDO no es una pantalla de nav: necesita un once y un rival. Se derivan
+    // igual que en el hub —mismas funciones, mismo camino— y recién ahí se arranca.
+    if (screen === "partido") {
+      ({ lineup: S.selectedLineup, formationId: S.formation } = currentLineup(run.squad, S.selectedLineup, S.formation));
+      go("start-match", nextOpponentId(run));
+      const min = q.get("min") === "ht" ? "ht" : +q.get("min");
+      if (min === "ht" || min > 0) devFastForward(min, q.get("dec") === "1");
+      signal(true, screen);
+      return true;
+    }
 
     const opts = {};
     if (q.get("view")) opts.view = q.get("view");

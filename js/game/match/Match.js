@@ -31,6 +31,7 @@
      4. Al final: result
    ============================================================ */
 import { rnd } from "../../core/rng.js";
+import { clamp } from "../../core/math.js";
 import { genOpponentLineup } from "../opponents.js";
 import { identityGapMult } from "../philosophy.js";
 import { canPlayAt } from "../lineup.js";
@@ -44,11 +45,11 @@ import * as SeqActs from "./sequence-acts.js";
 import * as Incidents from "./incidents.js";
 import * as Shootout from "./shootout.js";
 import { hookOf, traitMoment } from "./trait-hooks.js";
-import { newPressState, pressOn, tickPress, PRESS_MOD } from "./press.js";
+import { newPressState, pressOn, tickPress, pressExtraMinutes, PRESS_MOD } from "./press.js";
 import { newTally, tickStats } from "./stats.js";
 import { newField, tickField, startHalfField, backlineRisk } from "./field.js";
 import { newMomentum, closeMinute, assistantLine, noteMomentum, markMomentum } from "./match-momentum.js";
-import { drainOppEnergy } from "../medical.js";
+import { drainOppEnergy, matchFatigueRaw, LIVE_FATIGUE_SHARE } from "../medical.js";
 
 // Frecuencias por tick de los eventos INDEPENDIENTES de las secuencias. Penal y
 // último hombre se calibraron antes y quedan intactos; acá solo se fija cada cuánto asoman
@@ -147,15 +148,17 @@ export class Match {
     this.press = newPressState();
     this._pressMin = new Map();                             // jugador → minutos presionados
     this._highMin = new Map();                              // jugador → sobrecosto del bloque adelantado
+    this._drained = new Map();                              // jugador → energía ya cobrada EN VIVO (ver _drainMine)
     this.enHalftime = false;                                // el equipo está parado: mover el bloque es gratis
   }
 
   // ---------- Estado y consultas ----------
 
   /** Agrega una línea al relato del partido (kind define el estilo visual en la UI).
-   *  `min` es el minuto CRUDO (91, 92…): lo lee el cálculo del descuento. Lo que se
-   *  muestra al jugador lo canta clock dentro del texto. */
-  log(kind, text) { this.feed.push({ min: this.min, kind, text }); }
+   *  `min` es el minuto CRUDO (91, 92…): lo lee el cálculo del descuento. `clock` es el
+   *  mismo instante como lo canta la tele ("45+2"), para que el relato pueda mostrar el
+   *  minuto en su propia columna sin tener que sacarlo del texto a fuerza de regex. */
+  log(kind, text) { this.feed.push({ min: this.min, clock: this.clock(), kind, text }); }
 
   /** El minuto como lo canta la tele: "45+2" durante el descuento, "63" en juego corrido.
    *  TODO el relato lo usa (`min ${m.clock}'`); `m.min` sigue siendo el número crudo. */
@@ -210,8 +213,10 @@ export class Match {
     // congelado (fuera de tick), así que sus empujones caen en el minuto en que arrancó
     // la jugada — que es donde el jugador los vio pasar.
     closeMinute(this);
-    const consejo = assistantLine(this);
-    if (consejo) this.log("plain", consejo);
+    // El consejo del asistente ya NO va al relato: desde el rediseño del partido tiene
+    // sitio propio al pie del Centro de mando, donde queda FIJO hasta que haya uno nuevo.
+    // En el relato duraba tres segundos y se lo llevaba el scroll. Lo deja en `mm.talk`.
+    assistantLine(this);
 
     // EL DESCUENTO: al pisar el minuto nominal el cuarto árbitro levanta el cartel y se
     // sigue jugando hasta nominal+added. Se calcula UNA vez por tiempo (added === null =
@@ -237,6 +242,9 @@ export class Match {
     // 58 de energía. El Rondo (Posesión) acelera el drenaje — el rondo son ELLOS
     // corriendo. Va ANTES de powers para que el tick ya lo cobre en sus duelos.
     drainOppEnergy(this.oppLineup, MIN_PER_TICK, hookOf(this, "oppStamina")?.factor || 1);
+    // Y MI equipo también. Va acá, al lado del rival, porque es el mismo hecho: el
+    // partido se juega con las piernas y las piernas se vacían mientras corre.
+    this._drainMine();
 
     const { mine, opp } = this.powers();
     // Estadísticas de transmisión (pases y córners ambiente). Va ANTES de las jugadas:
@@ -280,6 +288,54 @@ export class Match {
     // Relato ambiente contextual: el pool vive en content/match/ambient.js y LEE el partido.
     if (this._roll(AMBIENT_LINE)) this.log("plain", this._ambientLine());
     return false;
+  }
+
+  /**
+   * EL DESGASTE EN VIVO — mis jugadores se vacían MIENTRAS
+   * el partido corre, no de un saque al terminar.
+   *
+   * Antes, un titular jugaba los 90 minutos con la energía exacta con la que había
+   * llegado y el costo entero se le descontaba en el cierre. O sea: el partido tenía un
+   * precio pero no se sentía nunca DENTRO del partido — el equipo del minuto 88 rendía
+   * igual que el del minuto 3, y el rival (que sí se cansaba, drainOppEnergy) era el
+   * único de los dos que se apagaba. Ahora los dos pagan el mismo dial en el mismo sitio.
+   *
+   * LO QUE NO CAMBIA es cuánto cuesta un partido: se cobra minuto a minuto lo mismo que
+   * antes se cobraba de golpe, y el cierre solo cobra la diferencia (`drainedByName` →
+   * medical.applyMedicalPostMatch). La economía de energía entre partidos —el dial más
+   * sensible del juego, ver powers.ENERGY_OK— queda intacta punto por punto.
+   *
+   * Se calcula por TOTALES y no por deltas a propósito: leer los acumuladores
+   * (`_minutes`/`_enteredAt`, `_pressMin`, `_highMin`) y cobrar lo que falte es idempotente
+   * — un tick de más no cobra dos veces, y el que entra desde el banco arranca su cuenta
+   * en cero sin que haya que avisarle a nadie. El sobrecosto del bloque adelantado del
+   * minuto en curso entra un tick más tarde (lo acumula tickField, más abajo en el tick):
+   * es un minuto de retraso sobre 90, y el total del partido igual sale exacto.
+   *
+   * El golpe de una lesión (−20, incidents) NO se toca: como acá solo se cobra la
+   * diferencia, ese descuento sobrevive entero.
+   */
+  _drainMine() {
+    for (const p of this.activeMine()) {
+      const jugados = (this._minutes.get(p) || 0) + Math.max(0, this.min - (this._enteredAt.get(p) ?? this.min));
+      // Los minutos presionados cuestan el DOBLE: ya están dentro de `jugados` una vez y
+      // se suman una segunda, con el descuento de Pulmones de Acero / Anaeróbicos. El
+      // sobrecosto del bloque alto va por el mismo caño y sin ese descuento (field.js).
+      const extra = pressExtraMinutes(this, this._pressMin.get(p) || 0) + (this._highMin.get(p) || 0);
+      const debe = matchFatigueRaw(jugados + extra) * LIVE_FATIGUE_SHARE;
+      const cobrado = this._drained.get(p) || 0;
+      if (debe <= cobrado) continue;
+      p.energia = clamp(p.energia - (debe - cobrado), 5, 100);
+      this._drained.set(p, debe);
+    }
+  }
+
+  /** Energía ya descontada EN VIVO, por NOMBRE (§3.1). La lee el cierre del partido para
+   *  cobrar solo lo que falte y no cobrar el partido dos veces (game/flow). */
+  drainedByName() {
+    const out = {};
+    for (const [p, e] of this._drained) out[p.name] = e;
+    return out;
   }
 
   /**

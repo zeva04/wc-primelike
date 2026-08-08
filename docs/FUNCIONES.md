@@ -370,7 +370,8 @@ Lo que sigue documenta los actos por dentro (dónde vive cada uno se lee en la t
 | `closeMatch(run,match)` | **flow**: cierra un partido del usuario — stats, diario, goles del rival a la tabla de goleadores (`assignScorers`) y sus asistidores (`assignAssists`), resultado al grupo/ronda, simulación del resto de la fecha y `postMatchUpdate`. Devuelve `{res, otherResults, advanced, momentum, filoExec}` (`momentum` = resumen anímico por jugador; `filoExec` = progreso por ejecución de F1, para narrarlo en F3). |
 | `postMatchUpdate(run,match)` | **flow**: cierre físico/disciplinario/anímico por jugador (delega en `applyMedicalPostMatch` con los **minutos** de `match.minutesByName()`, `applyDisciplinePostMatch` y `applyMomentumPostMatch` — este ANTES de resetear flags: lee `p.sustituido`), cierra la moral (`applyMoralePostMatch`), aplica la **progresión por ejecución** de la filosofía (`applyFiloExecution`, F1), limpia buffs y **re-agenda**. "Jugó" = está en el once final, entró del banco (`usado`) o **salió por un cambio** (`sustituido`). **Devuelve** `{momentum, morale, filoExec}`. |
 | `advanceStage(run,advanced)` | **flow**: avanza el torneo y devuelve `{type: "next-matchday"\|"qualified"\|"eliminated"\|"next-round"\|"champion"}`; dispara `clearAmarillas` al cerrar grupos y tras 4tos, y `bumpMorale(+5)` al pasar de ronda. La UI solo rutea. |
-| `applyMedicalPostMatch(run,p,played,minutos)` / `matchFatigue(minutos)` | **medical**: energía — jugar **cansa** (`matchFatigue`: −14 cada 30' disputados), descansar (no jugar ese partido) recupera **+30** (`REST_RECOVERY`). Sin descanso pasivo (retirado 2-ago-2026 — ver CORE §Energía): la única fuente de energía fuera del banco es la acción 🧘 Recuperar. Además descuenta la baja por lesión y anota el diario. `minutos` los calcula `Match.minutesByName`. |
+| `applyMedicalPostMatch(run,p,played,minutos,presionados,yaCobrado)` / `matchFatigue(minutos)` / `matchFatigueRaw` | **medical**: energía — jugar **cansa** (`matchFatigue`: −14 cada 30' disputados), descansar (no jugar ese partido) recupera **+30** (`REST_RECOVERY`). Sin descanso pasivo (retirado 2-ago-2026 — ver CORE §Energía): la única fuente de energía fuera del banco es la acción 🧘 Recuperar. Además descuenta la baja por lesión y anota el diario. `minutos` los calcula `Match.minutesByName`. **`yaCobrado`** (7-ago-2026) es lo que el partido ya descontó minuto a minuto (`Match.drainedByName`): acá se cobra solo el resto, así el total por partido no se mueve ni un punto. Redondea al cerrar — entre partidos la energía es entera. |
+| `LIVE_FATIGUE_SHARE` / `Match._drainMine()` / `Match.drainedByName()` | **El desgaste en vivo**: qué fracción del costo del partido se siente MIENTRAS se juega (0.2) y el mecanismo que la cobra. `_drainMine` calcula por TOTALES (minutos jugados + sobrecosto de presión + sobrecosto de bloque alto) y cobra la diferencia, así que es idempotente y el suplente que entra arranca su cuenta solo. El dial está en 0.2 porque `p.energia` es a la vez tanque de torneo y entrada de rendimiento: la escalera medida a n=4000 vive en el comentario de la constante. |
 | `fatigueInjuryMult(energia)` | **medical** (Sprint 4, cruce Energía→Lesión): multiplicador de **gravedad** de lesión según la energía — 1.0 desde `FATIGUE_INJURY_FROM` (50) hacia arriba, creciendo lineal hasta `FATIGUE_INJURY_MAX` (1.8) en el piso de energía. Lo aplica `match/incidents.injuryEvent` sobre la probabilidad de que el golpe sea grave. Sin campo `energia` devuelve 1 (la asimetría vive en los datos). |
 | `applyDisciplinePostMatch(run,p)` | **discipline**: roja→suspensión; **acumulación de amarillas** (2 en el torneo = 1 partido fuera, contador a 0; doble amarilla = roja y NO acumula). |
 | `momentoPct(p)` / `momentoMult(p)` | **momentum**: efecto % del Momento 1..7 sobre las stats (±2% por paso desde el neutro 4, tope ±4%; CORE §2c). Sin campo `momento` (rivales) → 0 / ×1: la asimetría vive en los datos. |
@@ -485,7 +486,7 @@ entre pantallas es `go("nombre", ...args)` — así no hay imports circulares (�
 | `ui/screens/squad.js` | §7: Gestión de Plantilla (las reglas viven en `game/lineup`) |
 | `ui/screens/worldcup.js` | §7: Estado del Mundial + tarjetas de posición reutilizables |
 | `ui/screens/journal.js` | §7: Diario de Campaña |
-| `ui/screens/match/` | §8: partido en vivo — `index` (pantalla, reloj, decisiones) · `panels` (columna de lectura) · `tactics` (palancas del DT) · `squad` (plantilla en vivo) |
+| `ui/screens/match/` | §8: partido en vivo — `index` (pantalla, reloj, decisiones) · `panels` (columna de lectura) · `tactics` (Centro de mando) · `squad` (plantilla en vivo) |
 | `ui/screens/shootout.js` | §9: tanda de penales |
 | `ui/screens/post-match.js` | §10: pinta resultados y rutea según `flow.advanceStage` |
 | `ui/screens/end.js` | §11: desenlace |
@@ -627,15 +628,28 @@ runtime, el mismo patrón que `sequences` ↔ `sequence-acts`.
 
 ### 8. Partido en vivo — `ui/screens/match/`
 
-La pantalla más grande del juego, partida en cuatro módulos que operan sobre el MISMO DOM
-(mudanza pura: ninguna regla cambió). Quién hace qué:
+La pantalla más grande del juego, partida en cuatro módulos que operan sobre el MISMO DOM.
+Quién hace qué:
 
 | Módulo | Responsabilidad | Exporta hacia afuera |
 |---|---|---|
-| `index.js` | La pantalla: estructura fija (marcador, controles, relato), el **reloj del relato** y el **ruteo de decisiones**. Registra `start-match`. | `stopTimer`, `startTimer`, `updateMatchUI` |
+| `index.js` | La pantalla: estructura fija (cabecera, relato, mando), el **reloj del relato** y el **ruteo de decisiones**. Registra `start-match`. | `stopTimer`, `startTimer`, `updateMatchUI`, `devFastForward` |
 | `panels.js` | La **columna de lectura**: estadísticas, XP de identidad en vivo, Match Momentum, mapa de calor y el carrusel que alterna los dos últimos. Es PINTURA pura: el motor sirve los datos masticados. | `paintStats`, `paintFiloXp`, `paintMomentum`, `paintHeat`, `wireCarousel`, `resetCarousel` |
-| `tactics.js` | Las **palancas del DT** en juego: botón de presión y pizarra de la altura del bloque. Las reglas viven en `game/match/press` y `game/match/field`. | `wireTactics`, `paintTactics` |
+| `tactics.js` | El **Centro de mando**: mentalidad, altura del bloque, ráfaga de presión, plantilla, energía y el slot del asistente técnico. Las reglas viven en `game/match/press` y `game/match/field`. | `commandColumn`, `wireCommand`, `paintCommand` |
 | `squad.js` | La **Gestión de plantilla en vivo**: cancha, dibujo, plan de cambios. | `openSquadModal` |
+
+**El rediseño del 7-ago-2026** (diseño "Partido - Mockups v2" de Claude Design) cambió la
+piel y la gramática espacial; ni una regla de juego se movió. Tres cosas nuevas:
+
+- **Lienzo FIJO de 1440×900** escalado entero (`components.screenStage`), igual que la
+  Concentración, con el kit `px-*` del bloque "EL PARTIDO" en `index.html`. El partido
+  dejó de reflowear y **dejó de tener layout de móvil** (decisión PO, misma que el hub).
+- **El mando es una columna**, siempre a la vista: la altura del bloque son cinco
+  escalones que se clickean, no un modal que se abre. Desapareció `openHeightModal`.
+- **La decisión aterriza dentro del relato** (`#dec-slot`), arriba del feed y con el
+  minuto más nuevo pegado debajo. El modal quedó **solo** para las decisiones que son una
+  lista de jugadores (más de 3 opciones: elegir pateador, quién sale por la roja al
+  arquero, quién se pone los guantes) — ahí no hay apuesta táctica, hay un nombre.
 
 **Dos reglas de la frontera**: (1) cada módulo cablea SUS controles —el estado de la vista
 (`slide`, `heatSide`) no cruza a mano—; (2) `tactics` y `squad` importan `updateMatchUI` /
@@ -644,14 +658,14 @@ La pantalla más grande del juego, partida en cuatro módulos que operan sobre e
 |---|---|
 | `openSquadModal()` | **Gestión de plantilla en vivo**: la cancha de `ui/pitch.js` con el partido en pausa. Arrastrar titular sobre titular reubica (azul, gratis) — **salvo dos que jueguen el MISMO puesto** (enrocar dos defensas no cambia nada: se prohíbe, pedido del PO); traer a alguien del banco es un cambio (verde, gasta 1 de 3). **Nada toca el partido hasta Confirmar**: los cambios se arman como plan y se aplican juntos; "Salir sin guardar" lo descarta. Las reubicaciones sí mutan `posJugada` en el momento (es lo que la cancha lee para previsualizar), por eso se guarda el estado previo y se restaura al cancelar. Al confirmar se aplican **primero los cambios y después las posiciones finales**: si el DT reubicó a alguien DESPUÉS de meterlo, `makeSub` le pondría el puesto del que salió y el plan quedaría pisado. |
 | `startMatch(oppId)` | Crea el `Match` y arranca el reloj. |
-| `renderMatchScreen()` | Estructura fija: marcador, controles, relato, alineaciones. |
+| `renderMatchScreen()` / `cabecera(me,opp)` | Estructura fija del lienzo: cabecera (banderas, marcador, minuto, pausa/rápido), columna de lectura, relato y el `commandColumn()` de `tactics`. |
 | `step()` / `startTimer()` / `stopTimer()` / `togglePause()` | Control del reloj. **Ritmo ráfaga (A1, recalibrado 22-jul)**: el reloj se auto-agenda con `setTimeout` (no `setInterval`), corre entre secuencias (`CRUISE` ~600 ms, ~260 en Rápido) y **frena** en cada decisión; un gol pausa `GOAL_HOLD` 1600 ms. **Aire entre actos**: la intro de una secuencia respira `SEQ_INTRO_HOLD` (900) antes del primer modal, cada acto resuelto respira `ACT_HOLD` (1300) antes del siguiente, y el desenlace `SEQ_END_HOLD` (900) antes de que el reloj retome — todo vía `presentDecision`, que además rutea `injury_sub` a la Gestión en vivo en lugar del modal genérico. |
-| `updateMatchUI()` | Refresca marcador, minuto, relato, estadísticas, momentum, mapa de calor y el botón del bloque. |
+| `updateMatchUI()` / `sinMinuto(t)` | Refresca marcador, minuto, relato, estadísticas, momentum, mapa de calor y el mando entero. El relato va del **más nuevo al más viejo** (la línea recién ocurrida queda pegada a la tarjeta de decisión) y con **columna de minuto propia**: `sinMinuto` le quita al texto el `min 48' —` que el motor canta adentro —conservando el emoji— para no decirlo dos veces en la misma línea. El minuto de la columna sale de `feed[].clock` (el que canta la tele: `45+2`). |
 | `paintCarousel()` / `moveCarousel(d)` / `paintHeat(match)` | **El carrusel de lectura** (Territorio): Match Momentum ↔ Mapa de calor en el mismo sitio, con toggle mío/rival. El mapa se repinta una vez por minuto (15 nodos con desenfoque), no en cada refresco. |
-| `openHeightModal()` | **La pizarra de la altura**: las 5 alturas con su explicación y el costo a la vista (gratis / consume ventana táctica). El motor manda (`fieldState` dice qué se puede elegir); acá solo se pinta y se rutea. Muestra cómo está parado el rival **con palabras**. |
-| `showDecision()` / `handleDecision(d,key)` | Muestran y enrutan las decisiones al motor. `sequence` → `resolveSequenceAct`; penales y último hombre como antes. |
-| `showHalftime()` | Pausa de entretiempo. |
-| `openSubsModal()` | Modal de cambios con reglas (sustituido en gris, POR solo por POR). |
+| `commandColumn()` / `wireCommand()` / `paintCommand(m)` | **El Centro de mando** (`tactics.js`): markup fijo, cableado y pintura. `paintHeights` deja el escalón vigente en oro y apaga los que el motor no habilita (`fieldState.opciones`), con el costo al lado (gratis / N ventanas tácticas) y la lectura del rival **con palabras**; `paintPress` conserva los 4 estados del botón de presión (la barra ES el fondo). La energía es el promedio del once EN CANCHA. |
+| `showDecision()` / `showDecisionModal(d)` / `handleDecision(d,key)` | Muestran y enrutan las decisiones al motor. **≤3 opciones → tarjeta en el relato** con teclas A/B/C (y 1/2/3), el hint y la **barra de riesgo** (`option.risk`, ver `sequence-acts.RISK_MAX`); más opciones → modal. La cabecera de la tarjeta canta el acto (`actProgress`) y el `×1.5 XP` cuando la idea dueña de la secuencia (`filoOfType`) es la declarada como Plan de Partido. `sequence` → `resolveSequenceAct`; penales y último hombre como antes. |
+| `showHalftime()` | Pausa de entretiempo, en el mismo sitio que una decisión — porque lo es. |
+| `devFastForward(min, hastaDecision)` | **Solo dev** (lo llama `js/dev/deeplink` con `?dev=partido&min=…`): adelanta el reloj sin esperar el reloj de pared, resolviendo por el camino cada decisión con su primera opción. `min="ht"` frena en el entretiempo; `dec=1` sigue hasta que se abra una decisión. Existe para poder MIRAR el partido jugado: un deep-link recién montado está 0-0 al minuto 0 y no se parece a nada de lo que hay que verificar. |
 
 ### 9. Tanda de penales — `ui/screens/shootout.js`
 | Función | Qué hace |
