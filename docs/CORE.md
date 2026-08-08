@@ -1414,7 +1414,21 @@ Las palancas de la economía:
   (`matchFatigue`: un titular de 90' pierde −42; un suplente que entra a los 30' del final,
   −14). Subió de −10 a −14 en el rebalance del 20-jul-2026, acoplado a bajar el peso de la
   energía en el rendimiento — hoy ese peso es la **banda verde** (§4): sobre 65 no pesa,
-  bajo 65 castiga convexo. El que **descansó** (no jugó ese partido) recupera **+30**
+  bajo 65 castiga convexo.
+
+  > **Una parte se paga MIENTRAS se juega (7-ago-2026).** Hasta acá el descuento entero
+  > llegaba con el pitazo final, así que un equipo rendía exactamente igual en el minuto
+  > 88 que en el 3 — y el rival, que sí se cansaba (`drainOppEnergy`), era el único de los
+  > dos que se apagaba. Ahora `Match._drainMine` cobra minuto a minuto la fracción
+  > `LIVE_FATIGUE_SHARE` del costo del partido y el cierre cobra el resto
+  > (`applyMedicalPostMatch(…, yaCobrado)`): **el total por partido no se mueve ni un
+  > punto**, o sea que toda la economía de arriba sigue calibrada igual.
+  >
+  > El dial está en **0.2** y no más arriba porque `p.energia` hace dos trabajos a la vez
+  > —tanque de torneo y entrada de rendimiento— y volcarlo entero al partido lo cobra dos
+  > veces: medido a n=4000, con la fracción en 1.0 el título cae de 7.9% a 5.1% (−3.0pp,
+  > fuera del gate de ±2pp) y en 0.35 el **techo** cae 2.2pp, que es la ley que ningún dial
+  > global puede romper. La escalera completa está en `medical.LIVE_FATIGUE_SHARE`. El que **descansó** (no jugó ese partido) recupera **+30**
   (`REST_RECOVERY`) — rotar sigue siendo una estrategia real. Alimenta el factor de
   `effStat` (§4), así que descuidar la energía castiga de verdad. Los rivales siempre están
   al 100% (asimetría en contra del DT humano). Para poder decidir la rotación, la
@@ -1943,6 +1957,14 @@ Ahora **el rival se cansa dentro del partido** (`medical.drainOppEnergy`, llamad
 el único sitio donde su costo puede morder es el partido en curso. Con el mismo dial que
 mi equipo (`FATIGUE_PER_30`), llega al 90' cerca de 58. Lectura buscada: **al rival
 fresco hay que aguantarlo; si llegás descansado, lo pasás por arriba en el tramo final.**
+
+> **Desde el 7-ago-2026 mi equipo también se vacía en vivo** (`Match._drainMine`), pero
+> solo la fracción `LIVE_FATIGUE_SHARE` del costo del partido — ver el bloque de Energía
+> arriba. La asimetría de arriba **sigue en pie y sigue siendo el punto**: el rival cae
+> los 42 puntos completos dentro del partido (no tiene un mañana que pagar) y por su curva
+> LINEAL, mientras que mi caída en vivo es de ~8 puntos sobre una curva con banda verde.
+> El que llega descansado sigue pasando por arriba al final; lo que cambió es que ahora
+> el que llega fundido también lo siente antes del pitazo.
 
 ### Dos curvas de energía distintas, a propósito
 

@@ -74,6 +74,84 @@ assert(0.45 * E.FATIGUE_INJURY_MAX < 1, "ni con las piernas vacías el golpe es 
 assert(E.matchFatigue(90) === Math.round(90 / 30 * E.FATIGUE_PER_30), "90' cuestan 3 × FATIGUE_PER_30", E.matchFatigue(90));
 assert(E.matchFatigue(0) === 0, "el que no entró no se cansa");
 assert(E.matchFatigue(45) < E.matchFatigue(90), "el cansancio es proporcional a los minutos");
+assert(Math.abs(E.matchFatigueRaw(90) - 90 / 30 * E.FATIGUE_PER_30) < 1e-12, "matchFatigueRaw es el MISMO dial sin redondear", E.matchFatigueRaw(90));
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   EL DESGASTE EN VIVO (7-ago-2026): la energía se pierde MIENTRAS se juega.
+
+   Lo que se fija acá no es que baje —eso es la mitad fácil— sino que el partido
+   siga costando EXACTAMENTE lo mismo que cuando se cobraba todo al final. La
+   economía de energía es el dial más sensible del juego (powers.ENERGY_OK, y el
+   arco del Meta midió ~5pp de título por punto de recuperación diaria): si el
+   desgaste en vivo cobrara de más, cada partido saldría el doble y toda la
+   calibración de Recuperar/Entrenar se caería sin que ningún test lo dijera.
+   ══════════════════════════════════════════════════════════════════════════════ */
+{
+  /** 20 minutos de un partido real, resolviendo lo que aparezca. Siempre la PRIMERA
+   *  opción: acá se mide energía, no balance — que no entre azar propio. */
+  function jugar20() {
+    const run = E.newRun("BRA");
+    const { lineup } = E.currentLineup(run.squad, null, null);
+    const bench = run.squad.filter(p => !lineup.includes(p));
+    run.squad.forEach(p => { p.energia = 100; });   // desde el techo: así nada roza el piso de 5
+    const m = new E.Match({ team: E.getTeam("BRA"), lineup, bench, mentalidad: "normal", buffs: {}, filo: null },
+      E.getTeam("ARG"), false, []);
+    const resolver = () => {
+      const d = m.decision;
+      if (!d) return;
+      const k = d.options[0]?.key;
+      if (d.id === "sequence") m.resolveSequenceAct(k);
+      else if (d.id === "penalty_mine") m.resolvePenaltyMine(k);
+      else if (d.id === "penalty_opp") m.resolvePenaltyOpp(k);
+      else if (d.id === "last_man") m.resolveLastMan(k);
+      else if (d.id === "gk_emergency") m.resolveGkEmergency(k);
+      else m.decision = null;
+    };
+    for (let i = 0; i < 20; i++) { m.tick(); let g = 0; while (m.decision && g++ < 20) resolver(); }
+    return { run, m, lineup, bench };
+  }
+
+  // Se REPITE hasta dar con un partido en el que el titular medido no se lesionó: el
+  // golpe de una lesión descuenta 20 por su cuenta (incidents) y es un mecanismo
+  // distinto del que se está midiendo acá. Sin esto, el test daría rojo ~1 de cada 10
+  // corridas por una lesión legítima — un test que miente una vez cada diez es peor
+  // que no tenerlo.
+  let caso = null;
+  for (let i = 0; i < 25 && !caso; i++) {
+    const c = jugar20();
+    if (!c.lineup[0].lesionado && !c.lineup[0].expulsado) caso = c;
+  }
+  assert(!!caso, "hubo al menos un partido de 20' con el titular medido entero");
+  if (caso) {
+    const { run, m, lineup, bench } = caso;
+    const titular = lineup[0];
+
+    assert(titular.energia < 100, "el titular pierde energía DURANTE el partido", `100 → ${titular.energia}`);
+    // Lo que se siente en vivo es LIVE_FATIGUE_SHARE del costo del partido, prorrateado
+    // al minuto que va. El resto llega con el pitazo (ver el invariante, más abajo).
+    const esperado = E.matchFatigueRaw(m.min) * E.LIVE_FATIGUE_SHARE;
+    assert(Math.abs((100 - titular.energia) - esperado) < 1.5,
+      "y lo que perdió es la parte EN VIVO del dial, prorrateada al minuto que va",
+      `perdió ${(100 - titular.energia).toFixed(2)} · esperado ~${esperado.toFixed(2)} al ${m.min}'`);
+    assert(E.LIVE_FATIGUE_SHARE > 0 && E.LIVE_FATIGUE_SHARE < 1,
+      "la fracción en vivo es una fracción: en 0 no se siente nada y en 1 el partido cobra dos veces el mismo tanque",
+      E.LIVE_FATIGUE_SHARE);
+    assert(Math.abs((m.drainedByName()[titular.name] || 0) - (100 - titular.energia)) < 1e-9,
+      "el Match declara lo mismo que descontó (drainedByName es lo que el cierre resta)");
+
+    // El banco no corre: nadie que no esté en cancha pierde nada.
+    assert(bench.every(p => p.energia === 100), "el que mira desde el banco no se cansa");
+
+    // EL INVARIANTE: cerrar el partido no lo cobra dos veces. El estado final tiene que
+    // ser el mismo que daba el cierre de golpe — energía inicial menos el dial completo.
+    const minutos = m.minutesByName()[titular.name];
+    E.applyMedicalPostMatch(run, titular, true, minutos, 0, m.drainedByName()[titular.name] || 0);
+    assert(titular.energia === Math.round(100 - E.matchFatigue(minutos)),
+      "tras el cierre, la energía es la de SIEMPRE: el partido no se cobra dos veces",
+      `${titular.energia} vs ${Math.round(100 - E.matchFatigue(minutos))} (${minutos}')`);
+    assert(Number.isInteger(titular.energia), "y entre partidos vuelve a ser un entero (la UI de gestión la pinta así)");
+  }
+}
 
 console.log(`medical.test: ${checks} checks · fallos: ${fails}`);
 console.log(fails ? "❌ medical con fallos" : "✅ medical OK");

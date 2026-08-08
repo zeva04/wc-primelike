@@ -44,6 +44,47 @@ export function fatigueInjuryMult(energia) {
 /** Energía perdida por disputar `minutos` (proporcional: −14 cada 30'). */
 export function matchFatigue(minutos) { return Math.round(minutos / 30 * FATIGUE_PER_30); }
 
+/** El MISMO dial sin redondear. Lo usa el desgaste minuto a minuto (`Match._drainMine`):
+ *  redondear en cada uno de los 90 ticks acumularía un error que el cierre no podría
+ *  reconciliar, y el total del partido tiene que ser exactamente `matchFatigue`. */
+export const matchFatigueRaw = minutos => (minutos / 30) * FATIGUE_PER_30;
+
+/**
+ * QUÉ PARTE DEL CANSANCIO SE SIENTE DENTRO DEL PARTIDO (7-ago-2026).
+ *
+ * `p.energia` hace DOS trabajos a la vez, y ahí está todo el asunto: es el tanque de
+ * TORNEO (lo que decide si hay que rotar, lo que Recuperar rellena) y es la entrada de
+ * rendimiento de cada duelo (`powers.energyMult`). El costo de un partido en el tanque
+ * es grande a propósito —14 cada 30', o sea 42 puntos por los 90— porque tiene que doler
+ * a lo largo de siete partidos. Volcarlo ENTERO minuto a minuto lo hace valer dos veces:
+ * un titular que llega a 65 termina el partido en 23, adentro de la parte convexa de la
+ * banda verde, que es donde el castigo muerde de verdad. Y no es lo que pasa en un
+ * partido de fútbol: el jugador del minuto 90 no rinde a un cuarto del que arrancó — la
+ * mayor parte de esos 42 puntos es DESGASTE ACUMULADO, la factura que llega después del
+ * pitazo, no el bajón de piernas de la última media hora.
+ *
+ * Así que el desgaste en vivo cobra esta FRACCIÓN del costo del partido y el resto lo
+ * sigue cobrando el cierre. El total por partido no se mueve **ni un punto** (la economía
+ * de energía entre partidos queda intacta): esto es el dial de "cuánto se SIENTE", no el
+ * de "cuánto cuesta".
+ *
+ * ── LA ESCALERA MEDIDA (n=4000, BRA, % de título) ──────────────────────────────
+ *   share │ piso (azar) │ techo (--smart)
+ *   ──────┼─────────────┼────────────────
+ *    0    │  7.7 · 8.1  │  27.1 · 27.8     ← control: dos corridas, el ruido a 2σ es ~±0.9
+ *    0.2  │  7.5        │  27.6            ← ELEGIDO: las dos puertas en pie
+ *    0.35 │  6.1        │  25.2            ← rompe la LEY del techo (−2.2pp)
+ *    0.5  │  6.1        │  —
+ *    1.0  │  5.1        │  —               ← −3.0pp: fuera del gate de ±2pp
+ *
+ * Sube más de 0.2 y el juego se pone MÁS DIFÍCIL de verdad, y no solo por el rendimiento:
+ * el cruce Energía→Lesión (`fatigueInjuryMult`, arriba) empieza a morder en la segunda
+ * mitad de cada partido y el plantel llega diezmado a las rondas finales. Si el PO quiere
+ * el efecto más marcado, el precio hay que devolverlo por otro lado — no subir este
+ * número solo (precedente FEAT-003: se recorta el efecto, no el gate).
+ */
+export const LIVE_FATIGUE_SHARE = 0.2;
+
 /**
  * FATIGA DEL RIVAL — el mismo dial, cobrado en otro momento.
  *
@@ -71,17 +112,28 @@ export function drainOppEnergy(lineup, minutos, factor = 1) {
 }
 
 /**
- * Parte médica del cierre de partido para UN jugador: energía (jugar CANSA −10 cada 30'
+ * Parte médica del cierre de partido para UN jugador: energía (jugar CANSA −14 cada 30'
  * jugados; descansar recupera +30), descuento de la baja por lesión y registro en el
  * diario si la lesión de este partido lo deja fuera de los próximos. `minutos` = los que
  * disputó (0 si no jugó), lo calcula el Match.
+ *
+ * `yaCobrado` es la energía que el PARTIDO ya le fue descontando minuto a minuto
+ * (`Match.drainedByName`, 7-ago-2026): acá se cobra solo lo que falte, así el total del
+ * partido sigue siendo EXACTAMENTE el mismo dial de siempre y la economía de energía
+ * —que es el dial más sensible del juego— no se mueve ni un punto. Sin ese descuento,
+ * cada partido cobraría dos veces. Con `yaCobrado = 0` (el default, y lo que pasan los
+ * tests que miden el dial en frío) el comportamiento es el histórico.
  */
-export function applyMedicalPostMatch(run, p, played, minutos = 0, presionados = 0) {
+export function applyMedicalPostMatch(run, p, played, minutos = 0, presionados = 0, yaCobrado = 0) {
   // Los minutos PRESIONADOS cuestan el doble (botón de presión, match/press.js): se cobran
   // una vez como minutos jugados —ya vienen dentro de `minutos`— y una segunda vez acá.
   // El sobrecosto llega ya descontado por Pulmones de Acero, si el DT lo compró.
-  const gasto = matchFatigue(minutos) + matchFatigue(presionados);
-  p.energia = clamp(p.energia + (played ? -gasto : REST_RECOVERY), 5, 100);
+  // El `max(0, …)` importa: el redondeo del cierre puede quedar por DEBAJO de lo ya
+  // cobrado en vivo, y un gasto negativo sería regalar energía por haber jugado.
+  const gasto = Math.max(0, matchFatigue(minutos) + matchFatigue(presionados) - yaCobrado);
+  // Se redondea acá: entre partidos la energía es un entero (es lo que pinta toda la UI
+  // de gestión); dentro del partido corre con decimales para no acumular error.
+  p.energia = Math.round(clamp(p.energia + (played ? -gasto : REST_RECOVERY), 5, 100));
   if (p.lesionadoPartidos > 0) p.lesionadoPartidos--;
   // Lesión sufrida en este partido con baja real → queda registrada en el diario
   if (p.lesionado && p.lesionadoPartidos > 0) {

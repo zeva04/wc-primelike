@@ -375,10 +375,53 @@ cada cosa y qué puede ver el DT sin abrir nada.
 - La **Gestión de plantilla en vivo** (`squad.js`) sigue siendo un modal de Tailwind redondeado
   sobre un lienzo pixel: funciona, pero se lee como otra aplicación. Es la pantalla más grande
   que queda sin migrar al kit `px-*`.
-- La **energía del mando es la del arranque**: mis jugadores no pierden energía DURANTE el
-  partido (el desgaste lo cobra `medical.matchFatigue` al final). El número es real y es el que
-  decide si conviene presionar, pero no se mueve en los 90 minutos.
+- ~~La **energía del mando es la del arranque**~~ — ✅ **SALDADA el mismo día**: ver el sprint
+  de acá abajo.
 - El partido **ya no tiene móvil**, como el hub. Un layout propio sigue sin existir.
+
+---
+
+## SPRINT DEL DESGASTE — la energía se pierde jugando ✅ **CERRADO (7-ago-2026)**
+
+Pedido del PO al ver el Centro de mando con un `100%` que no se movía en 90 minutos.
+
+**El problema real, que no era el visible.** `p.energia` hace **dos trabajos a la vez**: es
+el tanque de TORNEO (lo que decide si hay que rotar, lo que Recuperar rellena) y es la
+entrada de rendimiento de cada duelo (`powers.energyMult`). El costo de un partido en el
+tanque es de 42 puntos por los 90 minutos — grande a propósito, porque tiene que doler a lo
+largo de siete partidos. Volcarlo entero minuto a minuto lo cobra **dos veces**: un titular
+que llega a 65 termina el partido en 23, adentro de la parte convexa de la banda verde. Y
+además no es lo que pasa en un partido de fútbol: el jugador del minuto 90 no rinde a un
+cuarto del que arrancó. La mayor parte de esos 42 puntos es desgaste ACUMULADO, la factura
+que llega después del pitazo.
+
+**La solución.** `Match._drainMine` cobra minuto a minuto la fracción `LIVE_FATIGUE_SHARE`
+del costo del partido; el cierre cobra el resto (`applyMedicalPostMatch(…, yaCobrado)`).
+**El total por partido no se mueve ni un punto** — la economía de energía entre partidos,
+que es el dial más sensible del juego, queda intacta. Es el dial de "cuánto se SIENTE", no
+el de "cuánto cuesta", y `tests/medical.test.js` custodia el invariante.
+
+**La escalera medida** (n=4000, BRA, % de título; el ruido a 2σ es ~±0.9 en el piso y ~±1.4
+en el techo):
+
+| share | piso (azar) | techo (`--smart`) | veredicto |
+|---|---|---|---|
+| 0 (control) | 7.7 · 8.1 | 27.1 · 27.8 | la línea base, medida dos veces |
+| **0.2** | **7.5** | **27.6** | **elegido: las dos puertas en pie** |
+| 0.35 | 6.1 | 25.2 | rompe la LEY del techo (−2.2pp) |
+| 0.5 | 6.1 | — | −1.8pp de piso |
+| 1.0 | 5.1 | — | −3.0pp: fuera del gate de ±2pp |
+
+**La lección.** El costo no viene solo del rendimiento: con el tanque cayendo dentro del
+partido, el cruce **Energía→Lesión** (`fatigueInjuryMult`, Sprint 4) empieza a morder en la
+segunda mitad de CADA partido y el plantel llega diezmado a las rondas finales. Por eso la
+caída es mayor de lo que sugiere la curva de `energyMult` sola: son **dos canales, no uno**.
+Si el PO quiere el efecto más marcado, el precio hay que devolverlo por otro lado — subir
+este número solo no es una opción (precedente FEAT-003: se recorta el efecto, no el gate).
+
+**Lo que se ve**: la energía del Centro de mando baja sola durante el partido (verificado en
+navegador: 100% al minuto 5 → 92% al 88'), más rápido si se presiona o si el bloque juega
+adelantado, y cambia de color por el mismo umbral de siempre.
 
 ---
 
@@ -391,5 +434,8 @@ cada cosa y qué puede ver el DT sin abrir nada.
   no lo disparó). Próximo: el sprint de Filosofía.
 - **7-ago-2026** — Sprint visual del puente de mando cerrado: el partido pasa a lienzo fijo, el
   mando a columna y la decisión al relato. El motor solo suma `option.risk` y `feed[].clock`.
+- **7-ago-2026** — Sprint del desgaste: la energía se pierde jugando (`LIVE_FATIGUE_SHARE` en
+  0.2). El total por partido no cambia; lo que cambia es cuándo se paga. Las dos puertas
+  (piso ±2pp y la LEY del techo) verificadas a n=4000.
 - Se revisa al cerrar cada sprint y cada vez que una decisión contradiga lo escrito acá (gana el
   que tenga mejor argumento, pero queda registrado).

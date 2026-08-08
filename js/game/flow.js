@@ -96,6 +96,10 @@ export function postMatchUpdate(run, match) {
   // presionar, no la decisión estructural de vivir veinte metros más arriba.
   const altoRaw = match.heightMinutesByName ? match.heightMinutesByName() : {};
   for (const [name, min] of Object.entries(altoRaw)) presionados[name] = (presionados[name] || 0) + min;
+  // Lo que el partido YA le fue descontando minuto a minuto (Match._drainMine): el cierre
+  // cobra solo la diferencia. El total del partido es el mismo dial de siempre; lo único
+  // que cambió es que ahora se paga mientras se juega y se SIENTE en los últimos minutos.
+  const cobrado = match.drainedByName ? match.drainedByName() : {};   // duck-typed en algunos tests
   // El costo físico de la identidad (F2: el Press corre y lo paga) se cobra ANTES
   // del loop por jugador: usa los flags usado/sustituido que ese loop resetea.
   const filoCost = applyFiloCosts(run, match);
@@ -106,7 +110,7 @@ export function postMatchUpdate(run, match) {
     // energía como si hubiera descansado (bug reportado por el PO).
     const played = match.my.lineup.includes(p) || p.usado || p.sustituido;
     if (played) p.partidos++;
-    applyMedicalPostMatch(run, p, played, minutos[p.name] || 0, presionados[p.name] || 0);
+    applyMedicalPostMatch(run, p, played, minutos[p.name] || 0, presionados[p.name] || 0, cobrado[p.name] || 0);
     applyDisciplinePostMatch(run, p);
     momentum.push(applyMomentumPostMatch(run, p, played, match)); // antes de resetear flags: lee p.sustituido
     p.usado = false;
