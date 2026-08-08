@@ -42,6 +42,7 @@ import { showDaily, showDayEvent, showRandomEvent, bajasDelOnce } from "./day.js
 import { PLOTS, PLANO_H, complexGround, plotHtml } from "./complex.js";
 import { barraOportunidad, cabecera, franjaAnfitriones, lineaDias, columnaDerecha, barraAccion } from "./hud.js";
 import { panelFocos, panelPlan } from "./panels.js";
+import { hojaPrevia, hojaResultado, animarHoja, fotoAntes } from "./confirm.js";
 
 /** Qué edificio ejecuta qué. `accion` resuelve en el clic; `panel` pide otra elección. */
 const EDIFICIOS = {
@@ -62,6 +63,11 @@ const EDIFICIOS = {
 // Qué panel hay abierto (null = ninguno). Vive fuera del render porque un re-pintado
 // tras comprar/canjear no debe cerrar el panel que el DT tenía abierto.
 let panelAbierto = null;
+// La hoja de confirmación (hub/confirm), en uno de sus dos estados. `confirmando`
+// es la acción que se está mirando ANTES de gastar el día; `resultado` es la foto
+// del antes que la hoja usa para animar lo que ya pasó. Nunca los dos a la vez.
+let confirmando = null;
+let resultado = null;
 let desengancharResize = null;
 
 /**
@@ -78,7 +84,7 @@ function pasarDia() {
   const bajasPre = bajasDelOnce().length;
   const res = advanceDay(S.run);
   if (!res) { renderHub(); return; }
-  panelAbierto = null;
+  panelAbierto = confirmando = resultado = null;
   renderHub();
   // Bible §4.4: el día arranca con el Daily (informa); el evento llega después (transforma)
   // showDaily NO cierra su propio modal: el que encadena decide. Los dos modales que
@@ -212,6 +218,9 @@ export function renderHub(opts = {}) {
         ${parcelas.map(p => plotHtml(p.def, p.st)).join("")}
       </div>
       ${panelAbierto === "focos" ? panelFocos() : panelAbierto === "plan" ? panelPlan() : ""}
+      <!-- La hoja de confirmación va SOBRE todo lo demás (su velo incluido): mientras
+           está abierta, la única decisión posible es confirmar o cancelar. -->
+      ${confirmando ? hojaPrevia(confirmando) : resultado ? hojaResultado(resultado) : ""}
       ${isMatchDay ? `<div class="px-panel absolute" style="left:24px;bottom:16px;width:420px;z-index:35;padding:10px 12px">
         <div class="px" style="font-size:10px;letter-spacing:.1em;color:var(--wc-gold-light)">Altura del bloque</div>
         <div class="mt-2">${alturaPicker()}</div>
@@ -278,6 +287,12 @@ export function renderHub(opts = {}) {
   document.querySelectorAll(".da-opt").forEach(b => b.onclick = () => aplicar(b.dataset.action));
   on("#px-sheet-x", () => { panelAbierto = null; renderHub(); });
 
+  // LA HOJA DE CONFIRMACIÓN. Cancelar no toca el run: el día sigue entero.
+  on("#pxc-cancel", () => { confirmando = null; renderHub(); });
+  on("#pxc-ok", () => confirmar());
+  on("#pxc-close", () => { resultado = null; renderHub(); });
+  if (resultado) animarHoja();
+
   document.querySelectorAll(".canje-opt").forEach(b => b.onclick = () => showCanje(b.dataset.key));
 
   if (isMatchDay) {
@@ -289,12 +304,27 @@ export function renderHub(opts = {}) {
     on("#btn-nextday", pasarDia);
   }
 
-  /** Ejecuta una acción del día y re-pinta. La validación la hace el motor. */
+  /**
+   * Abre la hoja de confirmación de una acción del día. Nada se aplica todavía: lo
+   * que gasta el día se mira con números antes de gastarlo (hub/confirm).
+   */
   function aplicar(actionId) {
-    const a = applyDayAction(S.run, actionId);
-    if (!a) return;
-    toast(`${a.icon} ${a.title}${a.mult !== 1 ? ` (${multLabel(a.mult)} hoy)` : ""}: ${a.desc}.`);
+    confirmando = { id: actionId };
+    renderHub();
+  }
+
+  /**
+   * Confirma lo que la hoja venía mostrando. El orden importa: primero la FOTO del
+   * antes (con el run todavía intacto), después el motor. La hoja pasa a su cara de
+   * resultado y anima desde esa foto hasta lo que ya es verdad.
+   */
+  function confirmar() {
+    const foto = fotoAntes(confirmando.id);
+    const a = applyDayAction(S.run, confirmando.id);
+    confirmando = null;
+    if (!a) { renderHub(); return; }        // el motor la rechazó: no hay nada que cantar
     panelAbierto = null;
+    resultado = foto;
     renderHub();
   }
 }

@@ -36,6 +36,9 @@
    | `pi`      | Puntos de Identidad disponibles.                                 |
    | `traits`  | ids de rasgos ya comprados, separados por coma.                  |
    | `node`    | en `philosophy`, abre la ficha de ese rasgo en el riel.          |
+   | `en`      | 5..100 de energía para TODO el plantel (recién montado va 100).   |
+   | `moral`   | 1..100 de Moral del equipo (recién montada va 50).               |
+   | `oxid`    | días sin entrenar (la racha de oxidación; recién montada va 0).   |
    | `onb`     | `1` para el modo ONBOARDING de la pizarra.                       |
    | `anim`    | `1` para NO congelar las animaciones (por defecto se congelan).   |
    | `dia`     | `partido` salta al día del partido (el hub cambia de cara ahí).   |
@@ -63,6 +66,8 @@
    marca `data-dev-error` con el motivo, y el motivo se ve en pantalla.
    ============================================================ */
 import { newRun } from "../game/run.js";
+import { clamp } from "../core/math.js";
+import { trackOxidacion } from "../game/oxidation.js";
 import { getTeam } from "../data/teams-repo.js";
 import { applyTeamColors } from "../ui/theme.js";
 import { choosePhilosophy } from "../game/philosophy.js";
@@ -120,6 +125,17 @@ export function bootDeepLink() {
     }
 
     if (q.has("pi")) run.identityPoints = Math.max(0, +q.get("pi") || 0);
+
+    // El ESTADO DEL EQUIPO. Una run recién montada está al 100% de energía, con la
+    // moral en 50 y sin racha de óxido — o sea, en el único punto donde media
+    // pantalla del hub no tiene nada que mostrar (la hoja de confirmación de
+    // Recuperar, por ejemplo, promete +15 sobre un tanque que ya está lleno). Estos
+    // tres parámetros mueven el ESTADO, no la UI: las barras lo derivan como siempre.
+    if (q.has("en")) { const e = clamp(+q.get("en") || 0, 5, 100); run.squad.forEach(p => { p.energia = e; }); }
+    if (q.has("moral")) run.moral = clamp(+q.get("moral") || 0, 1, 100);
+    // La racha se acumula día a día en vez de escribirse a mano: así el multiplicador
+    // queda estampado en el plantel por el mismo camino que en una partida real.
+    if (q.has("oxid")) for (let d = Math.max(0, +q.get("oxid") || 0); d > 0; d--) trackOxidacion(run, false);
 
     const traits = (q.get("traits") || "").split(",").filter(Boolean);
     for (const id of traits) {

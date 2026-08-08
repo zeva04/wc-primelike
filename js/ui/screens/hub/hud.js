@@ -156,14 +156,48 @@ export function lineaDias(opp) {
 
 /* ── 4 · La columna derecha ─────────────────────────────────────────────────── */
 
-/** Medidor segmentado de 16 casillas: se cuenta de un vistazo, no se estima. */
-function medidor(ico, label, pct, valor, color) {
-  const llenas = Math.round((Math.max(0, Math.min(100, pct)) / 100) * 16);
+/** Casillas de un medidor. 16 y no una barra continua: un valor en bloques se cuenta de un vistazo. */
+export const SEGS = 16;
+/** Color de una casilla apagada (la parte del tanque que falta). */
+export const SEG_VACIO = "#3a3548";
+/** Cuántas casillas prende un porcentaje. La usan el panel y la hoja de confirmación. */
+export const segsLlenos = pct => Math.round((Math.max(0, Math.min(100, pct)) / 100) * SEGS);
+
+/**
+ * LOS TRES MEDIDORES del equipo, derivados del run. Es la ÚNICA fuente de esos tres
+ * números y de sus colores: los pinta el panel "Mi equipo" y los vuelve a pintar la
+ * hoja de confirmación de la Acción del Día (hub/confirm), que muestra el ANTES y el
+ * DESPUÉS con las mismas barras. Calculados en dos sitios, la promesa de la hoja y el
+ * estado del panel podrían llegar a decir cosas distintas.
+ *
+ * `num` es el número que se puede escribir como "56% → 71%"; el Ritmo no tiene (su
+ * barra es una escala de tres escalones, no un porcentaje) y por eso va en null: ahí
+ * lo que se compara es `valor`, el texto.
+ */
+export function medidoresEquipo(run) {
+  const moral = run.moral ?? 50;
+  const mb = moraleBand(moral);
+  const energia = Math.round(run.squad.reduce((s, p) => s + p.energia, 0) / run.squad.length);
+  const ox = oxidState(run);
+  return [
+    { id: "moral", ico: "moral", label: "Moral", pct: moral, num: moral, valor: mb.label,
+      color: moral >= 61 ? "var(--px-ok)" : moral >= 41 ? "#c8c8d2" : "var(--px-bad)" },
+    { id: "energia", ico: "energia", label: "Energía", pct: energia, num: energia, valor: `${energia}%`,
+      color: energia >= 70 ? "var(--px-ok)" : energia >= 45 ? "var(--px-warn)" : "var(--px-bad)" },
+    { id: "ritmo", ico: "ritmo", label: "Ritmo", pct: ox.oxidado ? 30 : ox.racha ? 65 : 100, num: null,
+      valor: ox.oxidado ? `Oxidado −${Math.round((1 - ox.mult) * 100)}%` : ox.racha ? `${ox.racha}d sin entrenar` : "Al día",
+      color: ox.oxidado ? "var(--px-bad)" : ox.racha ? "var(--px-warn)" : "var(--px-ok)" },
+  ];
+}
+
+/** Un medidor pintado, tal como sale de `medidoresEquipo`. */
+export function medidor({ ico, label, pct, valor, color }) {
+  const llenas = segsLlenos(pct);
   return `<div class="flex items-center gap-2 mb-1.5">
     ${pxIcon(ico, 16)}
     <span class="px" style="width:56px;font-size:8px;color:var(--px-dim)">${label}</span>
     <div class="flex-1 flex gap-0.5">
-      ${Array.from({ length: 16 }, (_, k) => `<div class="px-seg" style="background:${k < llenas ? color : "#3a3548"}"></div>`).join("")}
+      ${Array.from({ length: SEGS }, (_, k) => `<div class="px-seg" style="background:${k < llenas ? color : SEG_VACIO}"></div>`).join("")}
     </div>
     <span class="px text-right" style="width:88px;font-size:8px;letter-spacing:.04em;color:${color}">${valor}</span>
   </div>`;
@@ -203,12 +237,6 @@ function efectos() {
  */
 function cardEquipo(avisos) {
   const run = S.run;
-  const mb = moraleBand(run.moral ?? 50);
-  const energia = Math.round(run.squad.reduce((s, p) => s + p.energia, 0) / run.squad.length);
-  const ox = oxidState(run);
-  const oxVal = ox.oxidado ? `Oxidado −${Math.round((1 - ox.mult) * 100)}%` : ox.racha ? `${ox.racha}d sin entrenar` : "Al día";
-  const oxPct = ox.oxidado ? 30 : ox.racha ? 65 : 100;
-  const moralPct = run.moral ?? 50;
   const visibles = avisos.slice(0, 3), resto = avisos.length - visibles.length;
 
   return `<div class="px-panel flex flex-col" style="flex:1;min-height:0">
@@ -220,9 +248,7 @@ function cardEquipo(avisos) {
     <div id="hub-pitch" class="pitch pitch-mini relative cursor-pointer" title="Ir a Gestión de Plantilla"
       style="flex:1;min-height:96px;max-height:188px;margin:6px;border:2px solid var(--wc-black);overflow:hidden"></div>
     <div class="px-2.5 pb-2">
-      ${medidor("moral", "Moral", moralPct, mb.label, moralPct >= 61 ? "var(--px-ok)" : moralPct >= 41 ? "#c8c8d2" : "var(--px-bad)")}
-      ${medidor("energia", "Energía", energia, energia + "%", energia >= 70 ? "var(--px-ok)" : energia >= 45 ? "var(--px-warn)" : "var(--px-bad)")}
-      ${medidor("ritmo", "Ritmo", oxPct, oxVal, ox.oxidado ? "var(--px-bad)" : ox.racha ? "var(--px-warn)" : "var(--px-ok)")}
+      ${medidoresEquipo(run).map(medidor).join("")}
     </div>
     ${efectos()}
     <div class="px-2.5 pb-2 flex flex-col gap-1.5" style="min-height:0;overflow:hidden">

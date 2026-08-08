@@ -446,6 +446,22 @@
        cuenta en bloques se compara de un vistazo. ── */
     .px-seg { flex: 1; height: 10px; border: 1px solid var(--px-shadow-soft); }
 
+    /* ── La HOJA DE CONFIRMACIÓN de la Acción del Día (ui/screens/hub/confirm).
+       Lo que gasta el día se mira con números antes de gastarlo: la hoja se planta
+       en el medio del complejo y lo apaga con un velo, porque mientras está abierta
+       no hay otra decisión posible que confirmar o cancelar. ── */
+    .px-scrim { position: absolute; inset: 0; z-index: 55; background: rgba(11, 11, 14, .72); }
+    .px-confirm {
+      position: absolute; left: 24px; right: 396px; top: 0; bottom: 0; margin: auto;
+      width: 452px; height: fit-content; z-index: 60;
+      background: var(--px-panel); border: 2px solid var(--wc-gold); box-shadow: 6px 6px 0 var(--px-shadow);
+    }
+    /* Los cuadrados que la acción VA A MOVER: contorno en el color de su destino y
+       titileo entre lleno y vacío. El contorno es lo que queda cuando el deep-link
+       congela las animaciones, así que una captura sigue diciendo cuáles se mueven. */
+    .px-seg-pend { box-shadow: inset 0 0 0 3px var(--seg-a); animation: pxSegPend .7s steps(2, end) infinite; }
+    @keyframes pxSegPend { 0%, 100% { background: var(--seg-b); } 50% { background: var(--seg-a); } }
+
     /* ═══════════════════════════════════════════════════════════════════════════
        EL PARTIDO · el puente de mando (ui/screens/match)
        ═══════════════════════════════════════════════════════════════════════════

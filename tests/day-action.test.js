@@ -174,6 +174,88 @@ assert(TH === 4 && PERM === 1, "umbral 4 → +1 permanente (constantes; +1 es el
   assert(p.energia === 100, "la energía se topa en 100", p.energia);
 }
 
+/* ──────────────────────────────────────────────────────────────────────────────
+   previewDayAction: la PROMESA de la hoja de confirmación del hub.
+
+   La ley de esta sección: lo que la hoja muestra antes de gastar el día tiene que
+   ser EXACTAMENTE lo que pasa al confirmar. Si algún día alguien reimplementa la
+   fórmula en la UI "para no clonar el run", esto se pone rojo.
+   ────────────────────────────────────────────────────────────────────────────── */
+
+/** Todo lo que la hoja puede llegar a mostrar, en una sola cadena comparable. */
+const foto = r => JSON.stringify({
+  energias: r.squad.map(p => p.energia), moral: r.moral, buffs: r.buffs,
+  sinEntrenar: r.diasSinEntrenar, filo: r.filoId, plan: r.planFilo,
+});
+
+{
+  // El preview no toca el run de verdad: mirar nunca cuesta.
+  const run = E.newRun("BRA");
+  const antes = foto(run);
+  const pv = E.previewDayAction(run, "recuperar");
+  assert(!!pv, "recuperar se puede previsualizar");
+  assert(foto(run) === antes, "previewDayAction NO muta el run");
+  assert(run.actionPending, "y no consume la Acción del Día");
+}
+
+{
+  // El corazón: preview === aplicar, para TODAS las acciones del complejo.
+  for (const a of E.DAY_ACTIONS) {
+    const run = E.newRun("BRA");
+    run.squad.forEach((p, i) => { p.energia = 40 + i * 5; });   // energías desparejas: los clamps se notan
+    run.moral = 55;
+    run.buffs.tiro = 2;
+    run.diasSinEntrenar = 2;
+    const pv = E.previewDayAction(run, a.id);
+    const prometido = foto(pv.sim);
+    E.applyDayAction(run, a.id);
+    assert(prometido === foto(run), `la hoja de "${a.id}" promete exactamente lo que aplica`, `${prometido}\n  vs ${foto(run)}`);
+  }
+}
+
+{
+  // El multiplicador del día entra solo (viene del mismo effect, no de una cuenta aparte).
+  const run = E.newRun("BRA");
+  run.squad.forEach(p => { p.energia = 50; });
+  run.dayMod = { title: "Spa del hotel", mods: { recuperar: 2 } };
+  const pv = E.previewDayAction(run, "recuperar");
+  assert(pv.mult === 2, "el preview trae el multiplicador del día", pv.mult);
+  assert(pv.sim.squad[0].energia === 80, "y lo aplica al proyectar (50 +15×2)", pv.sim.squad[0].energia);
+}
+
+{
+  // Los clamps se ven en la promesa: "+15" con el tanque casi lleno son +5 de verdad.
+  const run = E.newRun("BRA");
+  run.squad.forEach(p => { p.energia = 95; });
+  const pv = E.previewDayAction(run, "recuperar");
+  assert(pv.sim.squad.every(p => p.energia === 100), "la energía proyectada se topa en 100", pv.sim.squad[0].energia);
+}
+
+{
+  // El RITMO también es parte de lo que cuesta el día, y la hoja lo proyecta.
+  const run = E.newRun("BRA");
+  run.diasSinEntrenar = 3;
+  assert(E.previewDayAction(run, "entrenar_ataque").sim.diasSinEntrenar === 0, "entrenar resetea la racha en la proyección");
+  assert(E.previewDayAction(run, "recuperar").sim.diasSinEntrenar === 4, "recuperar suma un día sin entrenar en la proyección");
+  assert(run.diasSinEntrenar === 3, "y ninguna de las dos tocó la racha real");
+}
+
+{
+  // Las mismas puertas cerradas que applyDayAction: si no se puede, no hay hoja.
+  const run = E.newRun("BRA");
+  assert(E.previewDayAction(run, "no_existe") === null, "id desconocido → null");
+  run.dayMod = { title: "Cancha anegada", mods: { entrenar: 0 } };
+  assert(E.previewDayAction(run, "entrenar_ataque") === null, "acción bloqueada hoy → null");
+  assert(E.previewDayAction(run, "recuperar") !== null, "pero el resto del día sigue disponible");
+  run.actionPending = false;
+  assert(E.previewDayAction(run, "recuperar") === null, "sin acción pendiente → null");
+}
+
+{
+  // Todas las acciones traen su titular para la cara de RESULTADO de la hoja.
+  for (const a of E.DAY_ACTIONS) assert(typeof a.done === "string" && a.done.length > 0, `"${a.id}" declara su titular (done)`, a.done);
+}
+
 console.log(`day-action.test: ${checks} checks · fallos: ${fails}`);
 console.log(fails ? "❌ day-action con fallos" : "✅ day-action OK");
 process.exit(fails ? 1 : 0);

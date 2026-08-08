@@ -64,6 +64,45 @@ export function canjeBuff(run, key) {
   return { key, label, permanent: CANJE_PERMANENT, alcance: jugadores.length, jugadores: jugadores.map(p => p.name) };
 }
 
+/** Lo que un día de trabajo de cancha resetea (Entrenar y Táctica); ver oxidation.js. */
+const esTrabajo = a => a.group === "entrenar" || a.group === "tactica";
+
+/**
+ * PROYECTA una Acción del Día sin ejecutarla: devuelve la acción más `sim`, que es
+ * el run TAL COMO QUEDARÍA si el DT confirmara. La hoja de confirmación del hub
+ * (ui/screens/hub/confirm) pinta el antes/después leyendo `run` y `sim` con las
+ * mismas funciones — así la promesa no puede diferir de lo que después pasa.
+ *
+ * Cómo se calcula: clonando el run y corriendo el EFECTO REAL de la acción encima.
+ * Nadie reimplementa la fórmula, así que los clamps (la energía tope 100, la moral
+ * 1..100) y el multiplicador del día entran solos. `tests/day-action.test` fija la
+ * igualdad preview == aplicar de verdad.
+ *
+ * `sim` es de SOLO LECTURA y descartable: no se guarda ni se devuelve al juego.
+ *
+ * OJO — solo para DAY_ACTIONS, y la Oportunidad del día queda AFUERA a propósito.
+ * Proyectar exige que el efecto sea determinista: `rng` es un módulo global (core/rng,
+ * ÚNICO punto de azar), así que un efecto que sortee algo desplazaría la secuencia de
+ * la run de verdad con solo mirarlo. Las acciones del complejo lo son por construcción
+ * (suman, restan y clampean). Las oportunidades hoy también, pero nada las obliga: su
+ * contrato permite cualquier `effect`, y ningún test lo prohíbe. Si alguna vez la
+ * Oportunidad quiere su hoja, primero hay que fijar esa regla.
+ *
+ * Devuelve null en los mismos casos en que `applyDayAction` no haría nada: sin
+ * acción pendiente, id desconocido o acción bloqueada por el día.
+ */
+export function previewDayAction(run, actionId) {
+  if (!run.actionPending) return null;
+  const a = DAY_ACTIONS.find(x => x.id === actionId);
+  if (!a) return null;
+  const mult = actionMult(run, a);
+  if (mult === 0) return null;
+  const sim = structuredClone(run);
+  a.effect(sim, mult);
+  trackOxidacion(sim, esTrabajo(a));    // el ritmo también se mueve: es parte de lo que cuesta el día
+  return { ...a, mult, sim };
+}
+
 /** Multiplicador de una acción HOY según el modificador del día (1 si no hay; 0 = bloqueada). */
 export function actionMult(run, action) {
   const m = run.dayMod?.mods?.[action.group || action.id];
@@ -110,6 +149,6 @@ export function applyDayAction(run, actionId, targetName) {
   noteFiloMilestones(run); // un evento pudo cruzar un umbral de identidad: la conquista se narra
   // Oxidación: solo el trabajo de cancha resetea la racha — Entrenar y Táctica.
   // Todo lo demás (Recuperar, Bonding, Oportunidades) es un día sin entrenar.
-  trackOxidacion(run, a.group === "entrenar" || a.group === "tactica");
+  trackOxidacion(run, esTrabajo(a));
   return { ...a, mult, desc };
 }

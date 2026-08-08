@@ -52,17 +52,24 @@ const tire = r => r.squad.forEach(p => p.energia = clamp(p.energia - TRAIN_FATIG
 // (run.dayMod, ver prep-events.js) escala la RECOMPENSA. El costo de energía
 // de entrenar no se escala: un doble turno que rinde ×2 sigue cansando lo
 // mismo — el modificador es el premio/castigo, no un rebalance del costo.
+//
+// `desc` es la PROMESA (lo que la hoja de confirmación del hub muestra antes de
+// gastar el día) y `done` es el TITULAR de lo que pasó (lo que esa misma hoja
+// canta después, ya con las barras movidas). Los números exactos no se escriben
+// acá: los deriva `previewDayAction` corriendo este mismo `effect` sobre un clon.
 export const DAY_ACTIONS = [
   {
     id: "entrenar_ataque", group: "entrenar", icon: "🎯", label: "Ataque",
     title: "Entrenamiento de definición",
     desc: `+${TRAIN_BUFF} de Tiro para el próximo partido · −${TRAIN_FATIGUE} de energía`,
+    done: "¡El equipo afinó la puntería!",
     effect: (r, m = 1) => { r.buffs.tiro = (r.buffs.tiro || 0) + Math.round(TRAIN_BUFF * m); tire(r); },
   },
   {
     id: "entrenar_defensa", group: "entrenar", icon: "🛡️", label: "Defensa",
     title: "Entrenamiento defensivo",
     desc: `+${TRAIN_BUFF} de Defensa y Atajadas para el próximo partido · −${TRAIN_FATIGUE} de energía`,
+    done: "¡El equipo se paró mejor atrás!",
     effect: (r, m = 1) => { const v = Math.round(TRAIN_BUFF * m); r.buffs.defensa = (r.buffs.defensa || 0) + v; r.buffs.atajadas = (r.buffs.atajadas || 0) + v; tire(r); },
   },
   // ODISEA: el viejo foco "Pases" se partió en dos —
@@ -72,12 +79,14 @@ export const DAY_ACTIONS = [
     id: "entrenar_pase_corto", group: "entrenar", icon: "🎩", label: "Pase corto",
     title: "Entrenamiento de circulación",
     desc: `+${TRAIN_BUFF} de Pase corto para el próximo partido · −${TRAIN_FATIGUE} de energía`,
+    done: "¡El equipo hizo circular la pelota!",
     effect: (r, m = 1) => { r.buffs.pase_corto = (r.buffs.pase_corto || 0) + Math.round(TRAIN_BUFF * m); tire(r); },
   },
   {
     id: "entrenar_pase_largo", group: "entrenar", icon: "🏹", label: "Pase largo",
     title: "Entrenamiento de envíos largos",
     desc: `+${TRAIN_BUFF} de Pase largo para el próximo partido · −${TRAIN_FATIGUE} de energía`,
+    done: "¡El equipo afinó los envíos largos!",
     effect: (r, m = 1) => { r.buffs.pase_largo = (r.buffs.pase_largo || 0) + Math.round(TRAIN_BUFF * m); tire(r); },
   },
   {
@@ -87,6 +96,7 @@ export const DAY_ACTIONS = [
     id: "entrenar_velocidad", group: "entrenar", icon: "💨", label: "Velocidad",
     title: "Trabajo de piques",
     desc: `+${TRAIN_BUFF} de Velocidad para el próximo partido · −${TRAIN_FATIGUE + VELOCIDAD_FATIGUE_EXTRA} de energía`,
+    done: "¡El equipo ganó piernas!",
     effect: (r, m = 1) => {
       r.buffs.velocidad = (r.buffs.velocidad || 0) + Math.round(TRAIN_BUFF * m);
       tire(r); r.squad.forEach(p => p.energia = clamp(p.energia - VELOCIDAD_FATIGUE_EXTRA, 5, 100));
@@ -96,6 +106,7 @@ export const DAY_ACTIONS = [
     id: "recuperar", icon: "🧘", label: "Recuperar",
     title: "Jornada de recuperación",
     desc: `+${RECOVER_ENERGY} de energía para todo el plantel`,
+    done: "¡El plantel recuperó energía!",
     effect: (r, m = 1) => r.squad.forEach(p => p.energia = clamp(p.energia + Math.round(RECOVER_ENERGY * m), 5, 100)),
   },
   // Los 4 focos del Plan de Partido: uno por filosofía, generados desde el
@@ -106,6 +117,7 @@ export const DAY_ACTIONS = [
     id: `plan_${p.id}`, group: "tactica", icon: p.icon, label: p.name,
     title: `Plan de partido: ${p.name}`,
     desc: `El equipo sale a jugar ${p.name} — ×${PLAN_XP_MULT} de experiencia de esa idea en el próximo partido`,
+    done: `¡El equipo sale a jugar ${p.name}!`,
     effect: (r) => { r.filoId = p.id; r.planFilo = p.id; },
   })),
   {
@@ -114,6 +126,7 @@ export const DAY_ACTIONS = [
     id: "bonding", icon: "🤝", label: "Team Bonding",
     title: "Jornada de integración",
     desc: `+${BONDING_MORAL} de Moral del equipo · −${BONDING_FATIGUE} de energía`,
+    done: "¡Ha subido la moral del equipo!",
     effect: (r, m = 1) => {
       r.moral = clamp((r.moral ?? 50) + Math.round(BONDING_MORAL * m), 1, 100);
       r.squad.forEach(p => p.energia = clamp(p.energia - BONDING_FATIGUE, 5, 100));

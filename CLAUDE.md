@@ -37,10 +37,16 @@ http://localhost:8347/?dev=partido&team=ARG&filo=contra&nivel=3&min=67&dec=1
 ```
 
 Los parámetros están documentados en [js/dev/deeplink.js](js/dev/deeplink.js): `dev` `team`
-`filo` `view` `nivel` `pi` `traits` `node` `onb` `anim` `dia` `min` `dec`. `node` abre lo que
-esa pantalla pueda abrir — la ficha de un rasgo en la pizarra, un edificio en el hub.
-`dia=partido` salta al día del partido. Solo funciona servido en local; en cualquier otro
-origen el módulo ni se descarga.
+`filo` `view` `nivel` `pi` `traits` `node` `onb` `anim` `dia` `min` `dec` `en` `moral` `oxid`.
+`node` abre lo que esa pantalla pueda abrir — la ficha de un rasgo en la pizarra, un edificio
+en el hub. `dia=partido` salta al día del partido. Solo funciona servido en local; en cualquier
+otro origen el módulo ni se descarga.
+
+**`en` / `moral` / `oxid` mueven el ESTADO DEL EQUIPO** (energía de todo el plantel, Moral y
+días sin entrenar). Sin ellos, una run recién montada está al 100% de energía, con la moral en
+50 y sin óxido — o sea, en el único punto donde media pantalla del hub no tiene nada que
+mostrar: la hoja de confirmación de Recuperar promete "+15" sobre un tanque lleno y no dibuja
+ni una barra. Si vas a mirar algo que dependa del estado, montalo cansado.
 
 **`dev=partido`** no es una pantalla de `ui/nav` (el partido necesita un once y un rival: el
 deep-link los deriva como el hub). Recién montado está 0-0 al minuto 0 y con el relato, el
