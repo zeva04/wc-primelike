@@ -20,6 +20,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { loadEngine, ROOT } from "./load-engine.js";
+// La regla de choque de camisetas vive en la UI; el validador la reusa para no
+// tener dos umbrales que se puedan desincronizar.
+import { kitDistance, CLASH_DIST } from "../js/ui/sprites.js";
 
 const { WC_DATA } = await loadEngine();
 const teams = WC_DATA.teams;
@@ -64,6 +67,15 @@ for (const t of playables) {
   for (const kit of ["field", "gk"]) {
     const K = t.kits && t.kits[kit];
     if (!K || !HEX.test(K.shirt || "") || !HEX.test(K.accent || "")) fail(`${tag}: kits.${kit} incompleto`);
+  }
+  /* kits.alt — la camiseta alternativa que el motor pone cuando choca con la del rival
+     (ui/sprites.fieldKitVs). OBLIGATORIA en las 48: sin ella, ese cruce se juega con las
+     dos selecciones vestidas igual. Y tiene que estar de verdad LEJOS de la titular: un
+     alternativo a menos de CLASH_DIST es una variante del mismo color, no una alternativa. */
+  const ALT = t.kits && t.kits.alt;
+  if (!ALT || !HEX.test(ALT.shirt || "") || !HEX.test(ALT.accent || "")) fail(`${tag}: kits.alt incompleto`);
+  else if (kitDistance(ALT.shirt, t.kits.field.shirt) < CLASH_DIST) {
+    fail(`${tag}: kits.alt (${ALT.shirt}) está a ${Math.round(kitDistance(ALT.shirt, t.kits.field.shirt))} de la titular (${t.kits.field.shirt}) — no deshace ningún choque`);
   }
   if (!Array.isArray(t.players)) { fail(`${tag}: sin players`); continue; }
 

@@ -126,7 +126,7 @@ export function showScoutReport(oppId) {
             <p class="text-[11px] text-slate-400 mt-1">${l.detalle}</p>
           </div>`).join("")}
         <div class="rounded-xl border border-slate-700 bg-slate-900/50 p-3 flex items-center gap-3">
-          ${figuraObj ? spriteSvg(figuraObj, opp, "w-8 h-9") : ""}
+          ${figuraObj ? spriteSvg(figuraObj, opp, "w-8 h-9", getTeam(S.run.teamId)) : ""}
           <div class="flex-1">
             <div class="font-semibold text-sm">⭐ ${rep.figura.name} <span class="text-[10px] text-slate-500">${rep.figura.pos}${rep.figura.nota ? ` · ${rep.figura.nota}` : ""}</span></div>
             <p class="text-[11px] text-slate-400 mt-0.5">${rep.figura.por_que}</p>

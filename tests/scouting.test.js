@@ -53,8 +53,13 @@ const byRating = [...qualified].sort((a, b) => E.teamRating(b) - E.teamRating(a)
 // ---------- bajas confirmadas: se listan y el informe las descuenta ----------
 {
   const run = E.newRun("BRA");
-  const opp = qualified.find(t => !t.playable && t.id !== "BRA");
-  const star = opp.figures[0].name;
+  /* Antes buscaba un clasificado NO jugable, pero ya no queda ninguno: las 48 del
+     Mundial 2026 tienen plantel completo. Se toma cualquier rival del torneo y su
+     figura sale del plantel (`teamFigure`) o de `figures` si fuera de los que no
+     clasificaron. Lo que se prueba —que la baja se lista y no mejora al rival— es
+     exactamente lo mismo. */
+  const opp = qualified.find(t => t.id !== "BRA");
+  const star = opp.players ? E.teamFigure(opp).name : opp.figures[0].name;
   const clean = E.buildOpponentReport(run, opp.id);
   run.rivalBans[opp.id] = [star];
   const banned = E.buildOpponentReport(run, opp.id);

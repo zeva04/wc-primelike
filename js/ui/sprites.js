@@ -39,20 +39,65 @@ export function rivalLook(name, team) {
   };
 }
 
-/** Camiseta que viste el jugador: {shirt, accent}. */
-export function kitOf(player, team) {
-  const field = team.kits ? team.kits.field : (team.kit || { shirt: "#64748B", accent: "#334155" });
-  const gk = team.kits ? (team.kits.gk || field) : { shirt: "#52525B", accent: "#18181B" };
-  return player.pos === "POR" ? gk : field;
+/* ---------- Choque de camisetas y kit alternativo ----------
+   El Mundial real resuelve esto con la designación de colores de FIFA: si los dos
+   equipos visten parecido, uno se cambia. Acá pasa lo mismo, con dos reglas:
+
+   1. CHOCAN si sus camisetas están a menos de CLASH_DIST en distancia RGB. El umbral
+      es 60 porque a esa distancia el ojo ya no las separa en un busto de 12×14 píxeles
+      —el blanco de Inglaterra contra el de Alemania da 0, y el naranja de Costa de
+      Marfil contra el de Países Bajos da 21—, mientras que dos rojos de identidad
+      distinta (Suiza #FF0000 vs Austria #ED2939) dan 72 y conviven bien.
+   2. SE CAMBIA EL RIVAL, nunca vos: tu selección siempre sale con su camiseta titular.
+      Es decisión de diseño, no una regla del fútbol: el jugador tiene que reconocer a
+      los suyos de un vistazo, siempre, en cualquier cruce.
+
+   Un equipo sin `kits.alt` no se cambia: se queda con la titular (el choque se ve, pero
+   nada se rompe). */
+export const CLASH_DIST = 60;
+
+const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+
+/** Distancia RGB entre dos colores hex. */
+export function kitDistance(a, b) {
+  const [r1, g1, b1] = rgb(a), [r2, g2, b2] = rgb(b);
+  return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
+}
+
+/** ¿Dos camisetas se confunden a la vista? */
+export function kitsClash(a, b) { return kitDistance(a, b) < CLASH_DIST; }
+
+/** Camiseta titular de un equipo (jugable o rival), sin mirar el cruce. */
+export function fieldKit(team) {
+  return (team.kits && team.kits.field) || team.kit || { shirt: "#64748B", accent: "#334155" };
+}
+
+/**
+ * Camiseta de campo que le toca a `team` en un partido contra `vs`: la titular, o la
+ * alternativa si chocan. `vs` ausente = no hay cruce, siempre la titular.
+ */
+export function fieldKitVs(team, vs) {
+  const field = fieldKit(team);
+  const alt = team.kits && team.kits.alt;
+  if (!vs || !alt) return field;
+  return kitsClash(field.shirt, fieldKit(vs).shirt) ? alt : field;
+}
+
+/** Camiseta que viste el jugador: {shirt, accent}. `vs` es el equipo rival, si se lo conoce. */
+export function kitOf(player, team, vs) {
+  const gk = team.kits ? (team.kits.gk || fieldKit(team)) : { shirt: "#52525B", accent: "#18181B" };
+  return player.pos === "POR" ? gk : fieldKitVs(team, vs);
 }
 
 /**
  * Sprite pixelado (busto 12×14): piel + pelo (estilo) + barba + camiseta del equipo, dibujado
  * píxel a píxel en SVG. El arquero usa la equipación kits.gk; los rivales usan su `kit` titular.
+ * `vs` (opcional) es el equipo que tiene enfrente: si las camisetas chocan, este se cambia a
+ * la alternativa. Se lo pasa solo quien dibuja los DOS equipos junto (el informe del rival).
  */
-export function spriteSvg(player, team, sizeCls = "w-8 h-9") {
+export function spriteSvg(player, team, sizeCls = "w-8 h-9", vs = null) {
   const look = player.look || rivalLook(player.name || "?", team);
-  const kit = kitOf(player, team);
+  const kit = kitOf(player, team, vs);
   const S = look.skin, H = look.hair, K = kit.shirt, A = kit.accent, E = "#12161C";
   const st = look.style || "short";
   const px = [];
