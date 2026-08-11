@@ -2049,17 +2049,86 @@ moverle un dial al balance calibrado**. El azar se gasta donde hay fútbol de ve
 - **De quién es la pelota**: Bresenham sobre la posesión, en bloques de 3 minutos (con 1 la
   posesión alternaba cada minuto y el balón quedaba clavado en el mediocampo: el mapa salía una
   mancha central en todos los partidos).
-- **Hacia dónde tira**: `3 + 0.55·(miAltura−3) + 3·ventajaAtaque − 0.25·(suAltura−3)`, con paso
-  máximo de 0.8 alturas por minuto y un tirón extra de 0.7 en el minuto del robo. El espejo
-  exacto para su posesión.
-- **El carril**: un ciclo fijo (~50% centro, 25% cada banda) desfasado por partido.
+- **Hacia dónde tira** (el CENTRO de gravedad, no el sitio):
+  `3 + 0.55·(miAltura−3) + 3·ventajaAtaque − 0.25·(suAltura−3) + filoPush + matchPush`.
+  El espejo exacto para su posesión, que recibe `+matchPush` con el mismo signo: si lo tengo
+  contra su arco, su pelota tampoco sale de ahí.
+- **El RECORRIDO**: cada fase es un VIAJE, no una posición. La posesión nace un tramo por
+  detrás del centro y muere un tramo por delante, hacia el arco de quien la tiene. El viaje se
+  abre a los dos lados por igual, así el centro de masa **no se mueve** y lo único que cambia
+  es que el mapa deja de ser un punto (misma técnica del punto neutro del bloque medio).
+- **El carril**: Bresenham sobre la AMPLITUD de quien tiene la pelota (mi `attackWidth` cuando
+  ataco; mi `defenseWidth` invertida cuando defiendo — el que deja las bandas libres las sufre)
+  ×0.45 dentro de las áreas: se ataca por afuera y se define por adentro.
+
+#### El rediseño de la deriva (11-ago-2026)
+
+La deriva original convergía a un **punto fijo**: `vf` alcanzaba el target en dos minutos y se
+quedaba clavado ahí los otros ochenta y ocho. Sin azar (la ley de arriba), un atractor puntual
+no dibuja una nube — dibuja un punto. **Medido antes de tocarlo, sobre 150 partidos × 3
+escenarios: el pico del mapa cayó en el mediocampo en 150 de 150, con ~75% del calor en una
+sola fila, y golear movía el reparto 2.7pp (ruido).**
+
+| canal | antes | después |
+|---|---|---|
+| calor en el mediocampo (v3) | 74.9% | **28.2%** |
+| pico del mapa en v3 | 150/150 partidos | **41/120** |
+| último tercio, goleada +3 vs ajustado | 43.6% vs 43.5% (**+0.1pp**) | 50.8% vs 46.4% (**+7.7pp**) |
+| banda, 1-3-1 vs 3-1-1 | idéntico (ciclo fijo) | **46.7% vs 27.8%** |
+| identidades con mapa propio | 0 de 4 (salían de a pares) | **4 de 4** |
+
+Tres causas y tres arreglos:
+
+1. **El atractor puntual** → el RECORRIDO de arriba (`PHASE_SPAN = 1.45`).
+2. **El marcador no estaba en la ecuación** (`gMy`/`gOpp` no aparecían en ninguna fórmula: el
+   rival ya reaccionaba vía `oppReaction`, mi lado no tenía el espejo) → `matchPush`, abajo.
+3. **El carril era un ciclo fijo de diez valores**, idéntico en todos los partidos, con
+   `attackWidth`/`defenseWidth` ya calculados y sin usar → el Bresenham de amplitud de arriba.
+
+#### `matchPush`: el partido empuja el territorio
+
+Dos fuerzas medidas por separado porque dicen cosas distintas, en alturas:
+
+- **DOMINIO** = `clamp(momentumTrend(10) / 14, ±1) × 1.0`. El 14 está **medido, no elegido**: el
+  p95 real de la tendencia en partido es 14.2. Puesto a ojo en 40 (la escala nominal del
+  gráfico) el empuje entero valía ±0.35 alturas y el marcador seguía sin verse en el mapa.
+- **URGENCIA** = `reloj × difGoles`, con el reloj en 0 / 0.5 / 1 según los tramos 0-30 / 30-65 /
+  65+ (igual que `oppReaction`), y **asimétrica**: ×0.9 el que pierde, ×0.30 el que gana. Con el
+  freno simétrico, golear dejaba el mapa ABAJO —el que golea se replegaría hasta su área— que es
+  lo contrario de lo que muestra una transmisión.
+- Más **±0.5 por hombre** de diferencia en rojas.
+
+Así una goleada sale volcada al último tercio **por acumulación** (goleé porque estuve setenta
+minutos arriba): es una salida del simulador, no una regla que pinte el mapa.
+
+#### La identidad dibuja su propio mapa
+
+Dos diales, porque con uno solo las cuatro identidades salían **de a pares** (Press == Posesión y
+Contra == Bloque, mapa por mapa). Lo que separa una Contra de un Bloque no es la altura —las dos
+esperan atrás— es cuánto VIAJA la pelota cuando por fin sale.
+
+| identidad | `FILO_PUSH` (cuna) | `FILO_SPAN` (viaje) |
+|---|---|---|
+| Press | +0.55 | 1.00 (vive donde ya está) |
+| Posesión | +0.20 | 1.20 (progresa despacio) |
+| Contra | −0.45 | **2.10** (de su campo al área rival de un tirón) |
+| Bloque | −0.60 | 1.70 |
+| sin identidad | 0 | 1.45 = `PHASE_SPAN` (**punto neutro**: nada se mueve solo) |
+
+El paso **se escala con el span** (`paso × span/PHASE_SPAN`). Sin eso el span quedaba saturado
+—la pelota avanza 0.8 por minuto apunte donde apunte, así que apuntar más lejos no la llevaba
+más lejos en los 3 minutos de la fase— y la Contra volvía a dibujar el mapa del Bloque.
+Recorrer más cancha en los mismos minutos **es** ir más rápido: son el mismo dial.
 
 ### El mapa de calor
 
 Cada minuto suma **1** a la celda donde está la pelota, del lado de quien la tiene; cada acto de
-una jugada real suma **3** (es fútbol, no relleno). **Cada tiempo tiene su propio mapa** y se
-reinicia al empezar el siguiente; los anteriores se conservan para el post-partido. La UI lo
-recibe normalizado 0..1 contra la celda más caliente de ese mapa (`heatCells`).
+una jugada real suma **5**. La proporción es un dial de **LECTURA**, no de simulación: con el
+relleno pesando 3 a 1 sobre las Key Sequences, el mapa contestaba "dónde estuvo la pelota" —el
+dibujo de la circulación intrascendente— en vez de "dónde se jugó el partido". **Cada tiempo
+tiene su propio mapa** y se reinicia al empezar el siguiente; los anteriores se conservan para el
+post-partido. La UI lo recibe normalizado 0..1 contra la celda más caliente de ese mapa
+(`heatCells`).
 
 ### La altura del bloque (1..5)
 

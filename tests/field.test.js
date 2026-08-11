@@ -565,6 +565,169 @@ function centroV(map) {
   assert(gol, "y el tiro libre directo se convierte de vez en cuando");
 }
 
+// ---------- EL RECORRIDO: la pelota CIRCULA, no se sienta en el mediocampo ----------
+// El bug que este bloque blinda: el target era un punto fijo y `vf` lo alcanzaba en dos
+// minutos para quedarse clavado ahí. Medido entonces: el pico del mapa cayó en el
+// mediocampo en 150 de 150 partidos, con ~75% del calor en una sola fila.
+{
+  const filaPct = (m, side = "mine") => {
+    const acc = [0, 0, 0, 0, 0];
+    for (const map of m.field.maps)
+      for (let h = 1; h <= E.LANES; h++) for (let v = 1; v <= E.ROWS; v++) acc[v - 1] += map[side][E.cellIdx(h, v)];
+    const t = acc.reduce((a, b) => a + b, 0) || 1;
+    return acc.map(x => 100 * x / t);
+  };
+  // 1. NINGUNA fila se queda con el mapa, y el fútbol llega a los dos tercios de verdad.
+  //    Se mide sobre el CONJUNTO y no partido a partido a propósito: que un partido salga
+  //    concentrado no es el bug —un equipo puede dominar noventa minutos en la misma
+  //    franja— el bug era que salieran concentrados TODOS, y siempre en la misma.
+  let picos = [0, 0, 0, 0, 0], sumaAlta = 0, peor = 0;
+  const N = 40, medio = [0, 0, 0, 0, 0];
+  for (let i = 0; i < N; i++) {
+    const p = filaPct(jugar());
+    picos[p.indexOf(Math.max(...p))]++;
+    sumaAlta += p[3] + p[4];
+    peor = Math.max(peor, Math.max(...p));
+    p.forEach((x, j) => medio[j] += x / N);
+  }
+  assert(Math.max(...medio) < 40, "ninguna altura se queda con el mapa (era ~75% en el mediocampo)",
+    medio.map(x => x.toFixed(0)).join("/"));
+  assert(peor < 75, "y ni el partido más concentrado se juega en una sola franja", peor.toFixed(0) + "%");
+  assert(picos[2] < N * 0.8, "el pico del mapa NO es siempre el mediocampo (el bug que abrió el rediseño)",
+    `mediocampo ${picos[2]}/${N}`);
+  assert(sumaAlta / N > 25, "y el último tercio recibe fútbol de verdad, no las sobras", (sumaAlta / N).toFixed(1) + "%");
+
+  // 2. La altura CONTINUA tampoco se sale de la cancha (antes solo se recortaba `v`).
+  for (const alt of [1, 5]) {
+    const m = nuevo();
+    m.my.altura = alt;
+    m.my.filo = { id: "contra", nivel: 5, etapa: 1, rasgos: [], mult: {}, xp: {} };
+    derivar(m, 90);
+    assert(m.field.vf >= 1 && m.field.vf <= E.ROWS, `con bloque ${alt} la altura continua sigue dentro`, m.field.vf);
+  }
+}
+
+// ---------- EL PARTIDO EMPUJA EL TERRITORIO (el espejo de oppReaction, para MI lado) ----------
+{
+  const m = nuevo();
+  const reset = () => { m.min = 0; m.gMy = 0; m.gOpp = 0; m.mm = E.newMomentum(); m.my.lineup.concat(m.oppLineup).forEach(p => { p.expulsado = false; }); };
+
+  reset(); m.min = 45;
+  assert(Math.abs(E.matchPush(m)) < 0.15, "0-0 y partido parejo: el territorio no se mueve solo", E.matchPush(m).toFixed(2));
+
+  // El DOMINIO empuja: si lo tengo contra su arco, la pelota vive arriba.
+  reset(); m.min = 45;
+  for (let i = 0; i < 10; i++) m.mm.bars.push({ min: 35 + i, val: 30, half: 45, marks: [] });
+  const dominando = E.matchPush(m);
+  assert(dominando > 0.5, "diez minutos ahogándolo empujan el territorio hacia su arco", dominando.toFixed(2));
+  reset(); m.min = 45;
+  for (let i = 0; i < 10; i++) m.mm.bars.push({ min: 35 + i, val: -30, half: 45, marks: [] });
+  assert(E.matchPush(m) < -0.5, "y al revés: el que sufre juega lejos del arco rival", E.matchPush(m).toFixed(2));
+
+  // La URGENCIA pesa con el reloj, igual que en oppReaction.
+  reset(); m.min = 10; m.gOpp = 2;
+  assert(Math.abs(E.matchPush(m)) < 0.15, "al minuto 10 un 0-2 todavía no vuelca a nadie");
+  reset(); m.min = 80; m.gOpp = 2;
+  const tarde = E.matchPush(m);
+  assert(tarde > 0.5, "a los 80 y dos abajo, el equipo se vuelca entero", tarde.toFixed(2));
+
+  // …y es ASIMÉTRICA: el que golea administra, pero NO se esconde en su área. Con el
+  // freno simétrico, golear dejaba el mapa abajo — lo contrario de una transmisión.
+  reset(); m.min = 80; m.gMy = 3;
+  const goleando = E.matchPush(m);
+  assert(goleando < 0, "el que administra una goleada baja un cambio", goleando.toFixed(2));
+  assert(Math.abs(goleando) < tarde, "pero se agacha MUCHO menos de lo que se vuelca el que pierde",
+    `${goleando.toFixed(2)} vs ${tarde.toFixed(2)}`);
+
+  // Las ROJAS mandan acá también.
+  reset(); m.min = 50; m.oppLineup[1].expulsado = true;
+  assert(E.matchPush(m) > 0.3, "con uno más, el equipo vive en campo rival", E.matchPush(m).toFixed(2));
+}
+
+// ---------- LA GOLEADA SE VE EN EL MAPA (lo que el PO pidió, por acumulación) ----------
+{
+  const tercio = m => {
+    let alto = 0, todo = 0;
+    for (const map of m.field.maps)
+      for (let h = 1; h <= E.LANES; h++) for (let v = 1; v <= E.ROWS; v++) {
+        const w = map.mine[E.cellIdx(h, v)];
+        todo += w; if (v >= 4) alto += w;
+      }
+    return todo ? 100 * alto / todo : 0;
+  };
+  const goleadas = [], ajustados = [];
+  for (let i = 0; i < 120; i++) {
+    const m = jugar("BRA", "MAR");
+    (m.gMy - m.gOpp >= 3 ? goleadas : ajustados).push(tercio(m));
+  }
+  const prom = a => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length);
+  assert(goleadas.length >= 10 && ajustados.length >= 10, "hay muestra de las dos clases de partido",
+    `${goleadas.length} goleadas · ${ajustados.length} ajustados`);
+  assert(prom(goleadas) > prom(ajustados) + 3,
+    "el partido goleado se juega en el ÚLTIMO TERCIO, no en el medio puro",
+    `goleada ${prom(goleadas).toFixed(1)}% vs ajustado ${prom(ajustados).toFixed(1)}%`);
+}
+
+// ---------- EL EJE HORIZONTAL VIVE: el dibujo decide cuánta banda hay ----------
+{
+  const bandaPct = m => {
+    const map = m.field.maps[0];
+    let banda = 0, todo = 0;
+    for (let h = 1; h <= E.LANES; h++) for (let v = 1; v <= E.ROWS; v++)
+      for (const s of ["mine", "opp"]) { const w = map[s][E.cellIdx(h, v)]; todo += w; if (h !== 2) banda += w; }
+    return todo ? 100 * banda / todo : 0;
+  };
+  const conDibujo = (def, med, del) => {
+    const m = nuevo();
+    const puestos = ["POR", ...Array(def).fill("DEF"), ...Array(med).fill("MED"), ...Array(del).fill("DEL")];
+    m.my.lineup.forEach((p, i) => { p.posJugada = puestos[i]; });
+    derivar(m, 90);
+    return m;
+  };
+  const ancho = bandaPct(conDibujo(1, 3, 1)), neutro = bandaPct(conDibujo(2, 2, 1)), angosto = bandaPct(conDibujo(3, 1, 1));
+  assert(ancho > neutro && neutro > angosto,
+    "el 1-3-1 juega por afuera y el 3-1-1 embuda al centro (antes los tres dibujaban IGUAL)",
+    `${angosto.toFixed(1)}% < ${neutro.toFixed(1)}% < ${ancho.toFixed(1)}%`);
+  assert(ancho - angosto > 10, "y la diferencia se ve en el mapa, no es un decimal", (ancho - angosto).toFixed(1));
+  // El reparto entre las dos bandas es parejo: un partido no carga siempre el mismo lado.
+  const m = conDibujo(2, 2, 1);
+  const lado = h => { let s = 0; for (let v = 1; v <= E.ROWS; v++) s += m.field.maps[0].mine[E.cellIdx(h, v)] + m.field.maps[0].opp[E.cellIdx(h, v)]; return s; };
+  assert(Math.abs(lado(1) - lado(3)) <= Math.max(lado(1), lado(3)) * 0.35,
+    "y las dos bandas se reparten parejo", `${lado(1)} vs ${lado(3)}`);
+}
+
+// ---------- CADA IDENTIDAD DIBUJA SU PROPIO MAPA ----------
+// Con un solo dial salían de a pares: Press == Posesión y Contra == Bloque, mapa por mapa.
+// Lo que separa a una Contra de un Bloque no es la altura, es cuánto VIAJA la pelota.
+{
+  const conFilo = id => {
+    const m = nuevo();
+    m.my.filo = { id, nivel: 5, etapa: 1, rasgos: [], mult: {}, xp: {} };
+    derivar(m, 90);
+    return m;
+  };
+  const centros = {};
+  for (const id of ["press", "posesion", "contra", "bloque"]) centros[id] = centroV(conFilo(id).field.maps[0].mine);
+  assert(centros.press > centros.posesion && centros.posesion > centros.contra && centros.contra > centros.bloque,
+    "las CUATRO identidades nacen a alturas distintas (ninguna comparte mapa con otra)",
+    Object.entries(centros).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(" · "));
+  // Y el largo del viaje las separa aunque compartan altura: la Contra cruza la cancha
+  // entera, así que reparte su calor por más zonas que nadie.
+  const zonas = m => {
+    const raw = [];
+    for (let v = 1; v <= E.ROWS; v++) { let s = 0; for (let h = 1; h <= E.LANES; h++) s += m.field.maps[0].mine[E.cellIdx(h, v)]; raw.push(s); }
+    const t = raw.reduce((a, b) => a + b, 0) || 1;
+    return raw.filter(x => x / t > 0.08).length;     // cuántas alturas reciben fútbol de verdad
+  };
+  assert(zonas(conFilo("contra")) > zonas(conFilo("press")),
+    "la Contra usa más cancha que el Press, que vive donde ya está", `${zonas(conFilo("contra"))} vs ${zonas(conFilo("press"))}`);
+  // El PUNTO NEUTRO: sin identidad, el viaje es el de siempre (ningún dial se mueve solo).
+  const sin = nuevo(); derivar(sin, 30);
+  const conNada = JSON.stringify(sin.field.maps[0]);
+  const sin2 = nuevo(); sin2.my.filo = null; derivar(sin2, 30);
+  assert(conNada === JSON.stringify(sin2.field.maps[0]), "un equipo sin identidad deriva exactamente como siempre");
+}
+
 // ---------- lo que se le sirve a la UI ----------
 {
   const m = jugar();

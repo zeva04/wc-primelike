@@ -71,14 +71,44 @@ const DRIFT_STEP = 0.8;
 const PHASE_MIN = 3;
 const TURNOVER_PULL = 0.7;
 
-/** Cuánto calor deja un minuto ambiente y cuánto un acto de una jugada REAL: la
- *  jugada pesa el triple porque es fútbol de verdad, no relleno de transmisión. */
-export const HEAT_TICK = 1, HEAT_ACT = 3;
+/* ── EL RECORRIDO: una posesión no ESTÁ en un sitio, VIAJA ─────────────────────
+   Hasta acá el target era un punto fijo y `vf` lo alcanzaba en dos minutos para
+   quedarse clavado ahí los otros ochenta y ocho. Con la deriva sin azar (la ley de
+   arriba), un atractor puntual no dibuja una nube: dibuja un punto. Medido antes de
+   tocarlo, sobre 150 partidos por escenario: el pico del mapa cayó en el mediocampo
+   en 150 de 150, con ~75% del calor en una sola fila, y golear movía el reparto 2.7pp
+   — o sea, nada.
 
-/* El ciclo de carriles de la deriva ambiente: ~50% centro y ~25% cada banda, sin
-   gastar azar (la ley de arriba). El desfase por partido lo pone `newField` desde
-   un dato que ya existe, para que dos partidos no dibujen la misma trenza. */
-const LANE_CYCLE = [2, 1, 2, 3, 2, 2, 1, 3, 2, 3];
+   Ahora cada fase es un RECORRIDO: la posesión nace atrás, progresa y muere en su
+   punto más alto, como una posesión de verdad. El target sigue siendo el CENTRO de
+   gravedad y el viaje se abre a los dos lados por igual, así el centro de masa medido
+   no se mueve y lo único que cambia es que el mapa deja de ser una mancha (misma
+   técnica del punto neutro que usan el bloque medio y la línea de dos).
+
+   El paso sigue siendo DRIFT_STEP, más chico que el tramo que el recorrido pide cada
+   minuto: la pelota PERSIGUE su objetivo sin alcanzarlo nunca del todo, y ese retraso
+   es el que la deja pasar por las alturas intermedias en vez de saltar entre extremos.
+   ───────────────────────────────────────────────────────────────────────────── */
+const PHASE_SPAN = 1.45;
+
+/** Cuánto calor deja un minuto ambiente y cuánto un acto de una jugada REAL. La jugada
+ *  pesa CINCO veces más porque el mapa contesta "dónde se jugó el partido", no "dónde
+ *  estuvo la pelota": con el relleno pesando 3 a 1 sobre las Key Sequences, el dibujo
+ *  era el de la circulación intrascendente y el fútbol de verdad quedaba tapado. Es un
+ *  dial de LECTURA — cambia lo que el mapa cuenta, no lo que el simulador decide. */
+export const HEAT_TICK = 1, HEAT_ACT = 5;
+
+/* ── EL EJE HORIZONTAL: el carril también lo decide el fútbol ──────────────────
+   Era un ciclo fijo de diez valores, idéntico en todos los partidos: un 1-3-1 y un
+   3-1-1 dibujaban exactamente el mismo mapa aunque `attackWidth`/`defenseWidth` ya
+   estuvieran calculados. Ahora el reparto sale de la AMPLITUD del dibujo (una línea
+   de tres llega a las bandas; una de uno, no) y de la ALTURA de la pelota: se ataca
+   por afuera y se define por adentro, así que dentro de las áreas el juego se cierra
+   al centro. Sin gastar azar: el mismo Bresenham que ya reparte la posesión, y la
+   banda concreta alterna con el contador que ya existía. */
+const WING_BASE = 0.52;   // cuánta banda hay con el dibujo NEUTRO (la línea de dos: ×1)
+const WING_WIDTH = 0.17;  // cuánto la mueve la amplitud, de punta a punta del dial
+const WING_BOX = 0.45;    // y cuánto se cierra el juego dentro de un área
 
 /** La altura de bloque BASE de cada identidad rival (la IA juega su idea). */
 const OPP_HEIGHT = { press: 4, posesion: 4, contra: 2, bloque: 2 };
@@ -104,7 +134,9 @@ export function newField(oppTeam, koRound = 0, laneSeed = 0) {
     maps: [newMap(45)],
     windows: 0,                // ventanas tácticas gastadas (mover el bloque en juego)
     _pos: 0.5,                 // acumulador del reparto de posesión (Bresenham por fases)
-    _lane: Math.abs(laneSeed) % LANE_CYCLE.length,
+    _phase: 0,                 // minuto en que nació la posesión en curso (el recorrido)
+    _wing: (Math.abs(laneSeed) % 7) / 7,   // acumulador del reparto de carriles (Bresenham)
+    _lane: Math.abs(laneSeed),             // qué banda toca cuando el reparto pide una
   };
 }
 
@@ -183,21 +215,101 @@ export function baseHeight(filo) {
   return clamp(base + conv, 1, 5);
 }
 
+/* ── EL PARTIDO EMPUJA EL TERRITORIO ──────────────────────────────────────────
+   El rival ya reaccionaba al partido (`oppReaction`, más arriba); MI lado no tenía el
+   espejo, y por eso el marcador no aparecía en ninguna parte del mapa. Faltan dos
+   fuerzas, y se miden por separado a propósito porque dicen cosas distintas:
+
+   · el DOMINIO es lo que ESTÁ pasando — el momentum que el juego ya deriva. Si lo tengo
+     contra su arco hace diez minutos, la pelota vive arriba. Nada nuevo que calibrar.
+   · la URGENCIA es lo que HACE FALTA — el marcador pesado por el reloj, igual que en
+     `oppReaction`: a los 20' un 0-1 se remonta caminando, a los 80' se juega en un área.
+
+   La URGENCIA es ASIMÉTRICA a propósito: el que pierde se vuelca entero, y el que gana
+   administra pero no se esconde. Con el freno simétrico, golear te dejaba el mapa ABAJO
+   —el que golea se replegaría hasta su área— que es justo lo contrario de lo que se ve
+   en una transmisión. Así, un partido goleado sale volcado al último tercio por
+   ACUMULACIÓN (goleé porque estuve setenta minutos arriba), que es una salida del
+   simulador y no una regla que pinte el mapa: la regla de oro del Momentum, otra vez.
+   ───────────────────────────────────────────────────────────────────────────── */
+const PUSH_DOMINIO = 1.0;    // alturas de empuje con el momentum a tope
+const PUSH_URGENCIA = 0.9;   // alturas de empuje yendo dos goles abajo sobre el final
+const PUSH_ADMIN = 0.30;     // …y cuánto se agacha el que administra (el freno asimétrico)
+const PUSH_ROJA = 0.5;       // lo que cuesta cada hombre de diferencia
+/* La tendencia de momentum que ya es "lo tengo contra su arco". MEDIDO, no elegido: la
+   distribución real de `momentumTrend(m, 10)` en partido tiene su p95 en 14.2, así que
+   un equipo que domina de verdad satura el canal y uno que empata no lo mueve. Puesto a
+   ojo en 40 —la escala nominal del gráfico, que llega a 100— el empuje entero valía
+   ±0.35 alturas y el marcador seguía sin aparecer en el mapa. */
+const MM_FULL = 14;
+
+/**
+ * Cuánto empuja MI equipo hacia el arco rival AHORA, en alturas (+) o cuánto lo empujan
+ * a él (−). Pura y sin azar, como todo el territorio.
+ */
+export function matchPush(m) {
+  const dom = clamp(momentumTrend(m, 10) / MM_FULL, -1, 1) * PUSH_DOMINIO;
+  const reloj = m.min >= 65 ? 1 : m.min >= 30 ? 0.5 : 0;
+  const dif = clamp((m.gOpp - m.gMy) / 2, -1, 1);   // + = voy perdiendo
+  const urgencia = reloj * dif * (dif > 0 ? PUSH_URGENCIA : PUSH_ADMIN);
+  const rojas = m.oppLineup.filter(p => p.expulsado).length - m.my.lineup.filter(p => p.expulsado).length;
+  return dom + urgencia + PUSH_ROJA * clamp(rojas, -2, 2);
+}
+
+/* ── LA IDENTIDAD DIBUJA SU PROPIO MAPA ───────────────────────────────────────
+   Dos diales, porque con uno solo las cuatro identidades salían de a pares: medido con
+   el empuje solo, el Press y la Posesión daban mapas IDÉNTICOS, y la Contra y el Bloque
+   también. Y es correcto que así fuera — lo que separa a una Contra de un Bloque no es
+   la altura (las dos esperan atrás), es CUÁNTO VIAJA la pelota cuando por fin sale.
+
+   · PUSH mueve la cuna: dónde nace el fútbol de esa idea.
+   · SPAN mueve el largo del recorrido: la Contra sale de su propio campo y muere en el
+     área rival de un tirón —el viaje más largo del juego, y su mapa se ve así: dos
+     manchas y poco medio—; el Press vive arriba y apenas se mueve; la Posesión progresa
+     despacio; el Bloque defiende abajo y revienta lejos.
+
+   Solo se le aplican al DT: la identidad del rival ya entra por su altura de bloque
+   (`baseHeight`), y sumarla acá sería contarle la misma idea dos veces.
+   ───────────────────────────────────────────────────────────────────────────── */
+const FILO_PUSH = { press: 0.55, posesion: 0.20, contra: -0.45, bloque: -0.60 };
+const FILO_SPAN = { press: 1.00, posesion: 1.20, contra: 2.10, bloque: 1.70 };
+
 /**
  * Dónde tiende a jugarse MI posesión: mi altura manda (un bloque muy alto ataca
  * desde tres cuartos; uno muy bajo construye desde su salida), mi ventaja de ataque
- * sobre su defensa empuja, y el bloque rival adelantado me obliga a nacer más atrás.
+ * sobre su defensa empuja, el bloque rival adelantado me obliga a nacer más atrás, mi
+ * IDENTIDAD mueve la cuna de mi fútbol y el PARTIDO en curso empuja o repliega.
  */
 function targetMine(m, mine, opp) {
   const edge = mine.atk / (mine.atk + opp.def) - 0.5;
-  return clamp(3 + 0.55 * (myHeight(m) - 3) + 3 * edge - 0.25 * (oppHeight(m) - 3), 1, ROWS);
+  return clamp(3 + 0.55 * (myHeight(m) - 3) + 3 * edge - 0.25 * (oppHeight(m) - 3)
+    + (FILO_PUSH[m.my?.filo?.id] ?? 0) + matchPush(m), 1, ROWS);
 }
 
 /** El espejo exacto para SU posesión: su altura lo adelanta hacia mi arco (v baja),
- *  su peligro empuja, y MI bloque alto lo pin­cha contra su propio campo (v sube). */
+ *  su peligro empuja, MI bloque alto lo pin­cha contra su propio campo (v sube) — y mi
+ *  empuje lo pincha igual: si lo tengo contra su arco, su pelota no sale de ahí. */
 function targetOpp(m, mine, opp) {
   const edge = opp.atk / (opp.atk + mine.def) - 0.5;
-  return clamp(3 - 0.55 * (oppHeight(m) - 3) - 3 * edge + 0.25 * (myHeight(m) - 3), 1, ROWS);
+  return clamp(3 - 0.55 * (oppHeight(m) - 3) - 3 * edge + 0.25 * (myHeight(m) - 3)
+    + matchPush(m), 1, ROWS);
+}
+
+/**
+ * El carril de este minuto. Cuánta banda hay lo deciden la AMPLITUD de quien tiene la
+ * pelota —la mía cuando ataco; cuando defiende el rival, mi cobertura al revés: el que
+ * deja las bandas libres las va a sufrir— y la ALTURA: dentro de un área el juego se
+ * cierra al centro. El reparto se resuelve con el mismo Bresenham que la posesión y la
+ * banda concreta alterna, así que no se gasta una sola tirada de azar.
+ */
+function driftLane(m) {
+  const f = m.field;
+  const w = f.side === "mine" ? attackWidth(m) : -defenseWidth(m);
+  const cierre = f.vf >= 4.3 || f.vf <= 1.7 ? WING_BOX : 1;
+  f._wing += clamp(WING_BASE + WING_WIDTH * w, 0.05, 0.80) * cierre;
+  if (f._wing < 1) return 2;
+  f._wing -= 1;
+  return f._lane++ % 2 ? 1 : LANES;
 }
 
 /**
@@ -215,15 +327,35 @@ export function tickField(m, mine, opp) {
   if (m.min % PHASE_MIN === 0 || m.min <= 1) {
     f._pos += m.flow().pos / 100;
     if (f._pos >= 1) { f._pos -= 1; f.side = "mine"; } else f.side = "opp";
+    f._phase = m.min;                     // y con la posesión nueva arranca su RECORRIDO
   }
-  // 2. ¿Hacia dónde tira? En el minuto del ROBO se agrega un tirón extra: el que
-  //    recupera saca la pelota de la zona donde se la quitó.
+  // 2. ¿Hacia dónde tira? El target es el centro de gravedad de ese fútbol; lo que la
+  //    pelota persigue es el punto del RECORRIDO que le toca a este minuto: la posesión
+  //    nace un tramo por detrás y muere un tramo por delante, hacia el arco del que la
+  //    tiene (que en el marco absoluto es +1 para mí y −1 para él). En el minuto del ROBO
+  //    se agrega un tirón extra: el que recupera saca la pelota de donde se la quitó.
   const target = f.side === "mine" ? targetMine(m, mine, opp) : targetOpp(m, mine, opp);
-  const paso = DRIFT_STEP + (f.side !== antes ? TURNOVER_PULL : 0);
-  f.vf += clamp(target - f.vf, -paso, paso);
+  const prog = clamp((m.min - f._phase) / Math.max(1, PHASE_MIN - 1), 0, 1);
+  const span = f.side === "mine" ? (FILO_SPAN[m.my?.filo?.id] ?? PHASE_SPAN) : PHASE_SPAN;
+  const objetivo = target + (f.side === "mine" ? 1 : -1) * span * (2 * prog - 1);
+  //    El objetivo NO se recorta contra los bordes y `vf` SÍ: un recorrido que apunta
+  //    más allá del área empuja la pelota hasta el fondo y la sostiene ahí, que es lo
+  //    que hace la diferencia entre una Contra —del propio campo al área rival de un
+  //    tirón— y un Bloque. Recortando el objetivo, los dos saturaban en el mismo sitio y
+  //    dibujaban el mismo mapa. Y acotar `vf` cierra de paso un agujero viejo: la altura
+  //    continua se iba fuera de la cancha (solo se recortaba `v`, su redondeo) y tardaba
+  //    minutos de más en volver.
+  //    El VIAJE es largo y rápido, o corto y pausado: las dos cosas son la misma, porque
+  //    recorrer más cancha en los mismos minutos ES ir más rápido. Sin escalar el paso, el
+  //    span quedaba saturado —la pelota avanza 0.8 por minuto apunte donde apunte, así que
+  //    apuntar más lejos no la llevaba más lejos— y la Contra dibujaba el mismo mapa que
+  //    el Bloque. Con el paso escalado, la Contra sale disparada y el Press mueve poco la
+  //    pelota porque ya está donde la quiere.
+  const paso = (DRIFT_STEP + (f.side !== antes ? TURNOVER_PULL : 0)) * (span / PHASE_SPAN);
+  f.vf = clamp(f.vf + clamp(objetivo - f.vf, -paso, paso), 1, ROWS);
   f.v = clamp(Math.round(f.vf), 1, ROWS);
-  // 3. El carril, por ciclo (sin azar: la ley de arriba).
-  f.h = LANE_CYCLE[f._lane++ % LANE_CYCLE.length];
+  // 3. El carril: la amplitud del dibujo y la altura de la pelota (sin azar, la ley).
+  f.h = driftLane(m);
   // 4. El calor del minuto va al mapa del que tiene la pelota.
   noteZone(m, f.side, HEAT_TICK);
   // 5. Y el minuto se cobra en piernas si el bloque está adelantado.
@@ -270,6 +402,7 @@ export function startHalfField(m, nominal) {
   f.h = 2; f.v = 3; f.vf = 3;
   f.side = "mine";
   f._pos = 0.5;
+  f._phase = m.min;   // el saque abre una posesión nueva: su recorrido empieza de cero
 }
 
 /* ── LA AMPLITUD: quién ocupa los carriles ────────
@@ -356,7 +489,9 @@ export function zoneWeight(type, v, h = 2) {
   return (ZONE_FALLOFF ** d) * lane;
 }
 
-/** Un carril de BANDA, alternando (sin gastar azar: la ley de la deriva). */
+/** Un carril de BANDA, alternando (sin gastar azar: la ley de la deriva). Comparte el
+ *  contador con la deriva a propósito: las dos fuentes de banda se turnan entre sí, así
+ *  un partido no carga siempre el mismo lado. */
 export const wingLane = m => (m.field ? (m.field._lane++ % 2 ? 1 : LANES) : 1);
 
 /** El carril OPUESTO al actual (el cambio de frente). Desde el centro, abre a una banda. */

@@ -193,3 +193,77 @@ Batería completa (`node tests/run-all.js`) verde.
    correcto (las jugadas interactivas reemplazaron a la simulación) pero el partido tiene ahora
    menos "ruido de fondo" de remates. Si se siente vacío, `AMBIENT_LINE` (relato puro, no toca
    el balance) es el dial gratis para compensarlo.
+
+---
+
+# 🔁 Post-sprint — El rediseño de la deriva (11-ago-2026)
+
+**Pedido del PO:** *"el mapa de calor casi siempre se llena en el medio campo. Mejora la
+simulación calculando dónde está el balón, hazlo circular por más espacios de juego; por
+ejemplo si un equipo golea a otro es más probable que el mapa sea el último tercio y no tanto
+el medio puro."*
+
+## Lo que la medición encontró (peor que "casi siempre")
+
+El pico del mapa cayó en el mediocampo **en 150 de 150 partidos**, en los tres escenarios
+(favorito, underdog y parejo). Con bloque medio, ~75% del calor en una sola fila.
+
+Tres causas, todas en `field.js`:
+
+1. **La deriva era un atractor puntual.** `targetMine` devolvía *un* número y
+   `vf += clamp(target − vf, ±0.8)` lo alcanzaba en dos minutos para quedarse clavado ahí los
+   otros ochenta y ocho. Con la deriva sin azar —la ley del sprint original— un atractor sin
+   ruido no es una nube: es un punto. Los ~90 ticks de relleno caían todos en la misma fila.
+2. **El marcador no estaba en la ecuación.** `gMy`/`gOpp` no aparecían en ninguna fórmula
+   territorial. El rival ya reaccionaba al partido (`oppReaction`, T4); **mi lado nunca tuvo el
+   espejo**. Por eso golear movía el mapa 2.7pp: ruido.
+3. **El carril era un ciclo fijo de diez valores**, idéntico en todos los partidos, aunque
+   `attackWidth`/`defenseWidth` ya estuvieran calculados desde el Eje Horizontal. Un 1-3-1 y un
+   3-1-1 dibujaban exactamente el mismo mapa.
+
+## Las 4 decisiones del PO
+
+| # | Decisión | Elegida | Por qué |
+|---|---|---|---|
+| 1 | Romper el punto fijo | **Recorrido de posesión** | Una posesión no ESTÁ en un sitio, VIAJA: nace atrás, progresa y muere en su punto más alto. Cero azar (la ley se respeta) y es lo que se parece al fútbol. Se descartó el ruido determinista (cosmético) y tirar `rnd()` (obligaría a recalibrar todo el balance). |
+| 2 | Qué vuelca el mapa | **Dominio en vivo + urgencia por marcador + filosofía** | Causal, no una regla que pinte el mapa. Se descartó el empujón directo por goleada: rompe la regla de oro del Momentum (*es una salida, nunca una regla*). La goleada sale arriba **por acumulación**. |
+| 3 | Eje horizontal | **Amplitud + zona** | `attackWidth`/`defenseWidth` ya existían sin usar. Contenido gratis: el dibujo por fin se ve en el mapa. |
+| 4 | Qué mide el mapa | **Dónde hubo FÚTBOL** (`HEAT_ACT` 3 → 5) | Dial de lectura, no de simulación: el mapa de una transmisión muestra dónde se jugó, no dónde estuvo la pelota. |
+
+## Gate
+
+| medida | antes | después | |
+|---|---|---|---|
+| calor en el mediocampo (v3) | 74.9% | **28.2%** | ✅ |
+| pico del mapa en v3 | **150/150** | 41/120 | ✅ el bug de origen |
+| último tercio: goleada +3 vs ajustado | +0.1pp | **+7.7pp** (underdog +10.4pp) | ✅ lo que el PO pidió |
+| banda: 1-3-1 vs 3-1-1 | idéntico | **46.7% vs 27.8%** | ✅ el dibujo se ve |
+| identidades con mapa propio | 0 de 4 | **4 de 4** | ✅ |
+| **campeón (azar) n=1500** | 3.7% | **3.5%** | ✅ 0.4 SE — ruido |
+| campeón por filosofía n=2500 | contra 3.9 · bloque 5.0 | contra **3.9** · bloque **5.2** | ✅ spread igual (1.4pp) |
+| `field.test` | 156 checks | **178 checks** | ✅ |
+
+Batería completa (`node tests/run-all.js`) verde, incluido el smoke de 300 runs.
+
+## Las tres lecciones
+
+1. **Un atractor sin ruido es un punto, no una nube.** La ley del azar cero (correcta, y no se
+   tocó) obliga a que la DISPERSIÓN sea estructural: si el relleno determinista converge a un
+   valor, converge a *un* valor. La forma la tiene que dar el modelo —el recorrido—, no el azar.
+2. **Medir el canal ANTES de elegir la constante.** `MM_FULL` se puso a ojo en 40 (la escala
+   nominal del gráfico de momentum, que llega a 100). El p95 real de `momentumTrend` es **14.2**:
+   el canal entero valía ±0.35 alturas. Mismo error, mismo remedio y misma lección que
+   [canales-que-muerden].
+3. **Dos identidades con la misma altura necesitan un segundo dial.** Press/Posesión y
+   Contra/Bloque salían idénticas mapa por mapa. El dial que faltaba era el LARGO del viaje —y
+   tuvo que escalar el paso, porque un span más largo con el paso fijo queda saturado: recorrer
+   más cancha en los mismos minutos ES ir más rápido.
+
+## Puntos abiertos
+
+1. **El caso "parejo" contra un rival de bloque muy alto** (ej. URU press nv2 vs ARG) aplasta su
+   mapa contra v2 (~42%): su target cae a ~1.9 y el recorrido satura contra el suelo de la
+   cancha. Es coherente (un equipo que ahoga la salida rival juega ahí), pero es el único
+   escenario donde queda una concentración parecida a la vieja.
+2. **`FILO_SPAN` de la Contra (2.10) es el valor más extremo** del sistema. Con n=2500 no mueve
+   el balance (3.9% vs 3.9% de baseline), pero es el primer dial a mirar si la Contra deriva.
