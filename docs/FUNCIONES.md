@@ -591,7 +591,7 @@ La Concentración es una **carpeta** desde el 30-jul-2026 (889 líneas contra un
 | Módulo | Responsabilidad |
 |---|---|
 | `hub/index.js` | La **composición** de la pantalla, el cableado y `pasarDia`. Guarda el estado que no debe morir en un repintado: qué panel está abierto y en cuál de sus dos caras está la hoja de confirmación. Registra `hub`. |
-| `hub/complex.js` | **El complejo**: los 6 edificios isométricos dibujados en SVG, el plano y sus parcelas. |
+| `hub/complex.js` | **El complejo**: las 5 parcelas isométricas dibujadas en SVG (cuatro esquinas y el campo al centro), el plano, el cerco con su portón y la calle exterior. |
 | `hub/hud.js` | **El HUD** que flota sobre el mapa: las franjas de arriba, la columna derecha (Mi equipo, rival, grupo) y la barra de acción. |
 | `hub/panels.js` | Lo que abre un edificio que **pide otra elección**: los 5 focos del campo, las 4 filosofías de la sala de video. |
 | `hub/confirm.js` | **La hoja de confirmación** de la Acción del Día: qué va a pasar (con las barras de Mi equipo y los cuadrados que se moverán titilando) y, ya aplicada, qué pasó. |

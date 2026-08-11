@@ -416,10 +416,16 @@ export function nodePos(tree, id) {
  * Transform de la cámara. Un rasgo se encuadra a la IZQUIERDA (la ficha vive a la
  * derecha); el post-it, que no lleva ficha porque se lee en el propio papel, va
  * CENTRADO y con más zoom.
+ *
+ * Con la ficha abierta la pizarra queda partida 2:1 — el riel ocupa el tercio
+ * derecho (`.tb-rail`, index.html) —, así que el rasgo se centra en los DOS
+ * TERCIOS que quedan a la izquierda: 2/3 ÷ 2 = 1/3 del ancho total. El número
+ * sale de la proporción, no del ojo: si el riel cambia de ancho, este factor
+ * cambia con él.
  */
 export function camTransform(pos, zoom = 2.4, center = false) {
   if (!pos) return "translate(0,0) scale(1)";
-  const tx = VB.w * (center ? 0.5 : 0.29) - zoom * pos.x;
-  const ty = VB.h * (center ? 0.5 : 0.46) - zoom * pos.y;
+  const tx = VB.w * (center ? 0.5 : 1 / 3) - zoom * pos.x;
+  const ty = VB.h * 0.5 - zoom * pos.y;
   return `translate(${tx.toFixed(1)},${ty.toFixed(1)}) scale(${zoom})`;
 }

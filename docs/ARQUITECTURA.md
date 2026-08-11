@@ -144,7 +144,7 @@ js/
       draw.js                  ← sorteo de grupos (~50)
       hub/                     ── la Concentración, partida por responsabilidad ──
         index.js               ← la composición de la pantalla y el paso del día (~320)
-        complex.js             ← el complejo isométrico: los 6 edificios y el plano (~445)
+        complex.js             ← el complejo isométrico: las 5 parcelas y el plano (~480)
         hud.js                 ← las franjas de arriba, la columna derecha y la barra de acción (~355)
         panels.js              ← lo que abre un edificio que pide otra elección (focos, plan) (~120)
         confirm.js             ← la hoja de confirmación: qué va a pasar, y qué pasó (~245)

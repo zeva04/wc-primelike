@@ -44,7 +44,16 @@ import { barraOportunidad, cabecera, franjaAnfitriones, lineaDias, columnaDerech
 import { panelFocos, panelPlan } from "./panels.js";
 import { hojaPrevia, hojaResultado, animarHoja, fotoAntes } from "./confirm.js";
 
-/** Qué edificio ejecuta qué. `accion` resuelve en el clic; `panel` pide otra elección. */
+/**
+ * Qué edificio ejecuta qué. `accion` resuelve en el clic; `panel` pide otra elección;
+ * `inerte` es la parcela que todavía no decide nada.
+ *
+ * La Enfermería y la Sala de Scouting salieron del complejo el 10-ago-2026: no
+ * abrían una decisión del día, solo navegaban a la Gestión de plantilla y al
+ * Informe del rival, que están a un clic en la columna derecha (`#btn-squad`,
+ * `#btn-scout`). Un edificio que duplica un botón ocupa una parcela y no agrega
+ * ninguna elección.
+ */
 const EDIFICIOS = {
   campo: { titulo: "Campo de entrenamiento", grupo: "entrenar", panel: "focos",
     tip: "Sesión con foco: sube una stat del plantel hasta el próximo partido, a costa de energía." },
@@ -54,10 +63,8 @@ const EDIFICIOS = {
     tip: "Jornada de recuperación: el plantel entero recupera energía." },
   asado: { titulo: "Patio · asado", accion: "bonding",
     tip: "Jornada de integración: sube la moral del grupo, cansa un poco las piernas." },
-  scouting: { titulo: "Sala de scouting", libre: true,
-    tip: "Leé el informe del rival. Mirar nunca gasta el día." },
-  enfermeria: { titulo: "Enfermería", libre: true,
-    tip: "Parte médico, sanciones y el estado real de la plantilla." },
+  estacionamiento: { titulo: "Estacionamiento", inerte: true,
+    tip: "El micro del plantel, parado junto al portón. Por ahora no hay nada que decidir acá." },
 };
 
 // Qué panel hay abierto (null = ninguno). Vive fuera del render porque un re-pintado
@@ -131,6 +138,9 @@ function estadoDeParcelas(isMatchDay) {
 
   return PLOTS.map(def => {
     const e = EDIFICIOS[def.id];
+    // La parcela INERTE no tiene estado que derivar: no gasta el día, no se apaga
+    // cuando ya decidiste y no se bloquea el día del partido. Está y punto.
+    if (e.inerte) return { def, st: { titulo: e.titulo, tip: e.tip, inerte: true } };
     // Una acción de referencia del edificio, para leerle el multiplicador del día.
     const ref = e.accion ? DAY_ACTIONS.find(x => x.id === e.accion) : DAY_ACTIONS.find(x => x.group === e.grupo);
     const mult = e.libre || !ref ? 1 : actionMult(run, ref);
@@ -270,14 +280,12 @@ export function renderHub(opts = {}) {
     renderHub();
   });
 
-  // LOS EDIFICIOS. Uno solo de los tres caminos: abrir panel, ejecutar la acción, o
-  // navegar (los gratis). El bloqueado no hace nada — su tooltip ya dijo por qué.
+  // LOS EDIFICIOS. Uno solo de los dos caminos: abrir panel o ejecutar la acción.
+  // El bloqueado no hace nada — su tooltip ya dijo por qué; el inerte tampoco.
   document.querySelectorAll("[data-plot]").forEach(el => el.onclick = () => {
     const id = el.dataset.plot;
     const e = EDIFICIOS[id];
-    if (el.hasAttribute("data-locked")) return;
-    if (id === "scouting") { showScoutReport(oppId); return; }
-    if (id === "enfermeria") { go("squad"); return; }
+    if (e.inerte || el.hasAttribute("data-locked")) return;
     if (el.hasAttribute("data-off")) return;            // ya decidiste: gastar el día otra vez, no
     if (e.panel) { panelAbierto = el.hasAttribute("data-mine") ? null : e.panel; renderHub(); return; }
     aplicar(e.accion);

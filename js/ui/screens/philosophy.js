@@ -20,7 +20,7 @@ import { dtProgress, DT_MAX } from "../../game/coach.js";
 import { traitTree, buyTrait, traitCost } from "../../game/traits.js";
 import { S } from "../session.js";
 import { register, go } from "../nav.js";
-import { screenFull, $, hudGauge } from "../components.js";
+import { screenFull, $, hudGauge, modal, closeModal } from "../components.js";
 import { showFiloChange } from "../filo-change.js";
 import { tacticBoard, nodePos, camTransform, markerColor, TIER_LABEL, NOTES_ID, notesBlocks } from "../board.js";
 
@@ -83,21 +83,21 @@ function traitCard(t, f, run, color) {
   // la ficha, la validación y el cobro dicen lo mismo sin tocar nada acá.
   const costo = traitCost(t);
   const precio = `<div class="flex items-baseline justify-between mb-2.5">
-    <span class="chalk-hand text-[14px] text-[#dff0e5]/55">Costo del rasgo</span>
-    <span class="text-[13px] font-black tracking-wide" style="color:${ink}">${costo} PI</span>
+    <span class="chalk-hand text-[15.5px] text-[#dff0e5]/55">Costo del rasgo</span>
+    <span class="text-[14.5px] font-black tracking-wide" style="color:${ink}">${costo} PI</span>
   </div>`;
 
   const accion = t.owned
     ? `<div class="tb-plate">${MAGNETS}
-        <div class="text-[10.5px] font-black uppercase tracking-[.18em]" style="color:${ink}">✓ Ya es parte de tu fútbol</div>
-        ${isMaster ? `<p class="chalk-hand text-[13.5px] text-amber-200/90 leading-snug mt-2">📰 La prensa le puso nombre a tu estilo: muy pocos DTs llegaron a jugar así.</p>` : ""}
+        <div class="text-[12px] font-black uppercase tracking-[.18em]" style="color:${ink}">✓ Ya es parte de tu fútbol</div>
+        ${isMaster ? `<p class="chalk-hand text-[15px] text-amber-200/90 leading-snug mt-2">📰 La prensa le puso nombre a tu estilo: muy pocos DTs llegaron a jugar así.</p>` : ""}
       </div>`
     : t.buyable
       ? `<button data-buy="${t.id}" class="tb-cta" style="--ink:${ink}">${MAGNETS}
           ${isMaster ? "👑 CONSAGRAR LA DOCTRINA" : "INCORPORAR LA IDEA"}</button>`
       : `<div class="tb-plate">${MAGNETS}
-          <div class="chalk-hand text-[14px] text-[#dff0e5]/55 mb-2">Para dibujarla te falta</div>
-          <ul class="space-y-1.5">${t.faltas.map(x => `<li class="text-[11.5px] text-[#dff0e5]/75 flex gap-2">
+          <div class="chalk-hand text-[15.5px] text-[#dff0e5]/55 mb-2">Para dibujarla te falta</div>
+          <ul class="space-y-1.5">${t.faltas.map(x => `<li class="text-[13px] text-[#dff0e5]/75 flex gap-2">
             <span style="color:${ink}">·</span><span>${x}</span></li>`).join("")}</ul>
         </div>`;
 
@@ -106,9 +106,9 @@ function traitCard(t, f, run, color) {
   // simplemente no dibuja la placa (nada se rompe si mañana entra un rasgo nuevo).
   const efecto = t.efecto?.length
     ? `<div class="tb-fx mt-4" style="--ink:${ink}">
-        <div class="text-[9px] font-black uppercase tracking-[.22em] mb-2.5" style="color:${ink}">En el partido</div>
+        <div class="text-[10.5px] font-black uppercase tracking-[.22em] mb-2.5" style="color:${ink}">En el partido</div>
         <ul class="space-y-2.5">${t.efecto.map(([v, txt]) => `<li>
-          <span class="tb-val is-${fxKind(v)}">${v}</span><span class="text-[12px] leading-snug text-[#dff0e5]/80">${txt}</span>
+          <span class="tb-val is-${fxKind(v)}">${v}</span><span class="text-[13.5px] leading-snug text-[#dff0e5]/80">${txt}</span>
         </li>`).join("")}</ul>
       </div>`
     : "";
@@ -122,19 +122,19 @@ function traitCard(t, f, run, color) {
 
   return `<button id="tb-close" class="absolute top-2.5 right-4 chalk-hand text-[24px] leading-none text-white/30 hover:text-white/80 cursor-pointer">×</button>
 
-    <div class="text-[9px] font-black uppercase tracking-[.22em]" style="color:${ink}a6">
+    <div class="text-[10.5px] font-black uppercase tracking-[.22em]" style="color:${ink}a6">
       ${TIER_LABEL[t.tier]}${RAMA_LABELS[t.rama] ? ` · ${RAMA_LABELS[t.rama].label}` : " · converge los 3 carriles"}
     </div>
     <div class="flex items-center gap-3 mt-2.5">
-      <span class="text-[32px] leading-none">${t.icon}</span>
-      <h2 class="text-[17px] font-black leading-tight" style="color:${t.owned ? "#eef7f1" : ink}">${t.nombre}</h2>
+      <span class="text-[34px] leading-none">${t.icon}</span>
+      <h2 class="text-[19px] font-black leading-tight" style="color:${t.owned ? "#eef7f1" : ink}">${t.nombre}</h2>
     </div>
 
     <div class="tb-chalkline my-3.5"></div>
 
     <div class="tb-body">
-      <p class="text-[11.5px] leading-relaxed text-[#dff0e5]/65">${t.desc}</p>
-      <p class="chalk-hand text-[14px] leading-snug mt-3" style="color:${ink}bb">“${t.momento}”</p>
+      <p class="text-[13px] leading-relaxed text-[#dff0e5]/65">${t.desc}</p>
+      <p class="chalk-hand text-[15.5px] leading-snug mt-3" style="color:${ink}bb">“${t.momento}”</p>
       ${efecto}
       ${gate}
     </div>
@@ -167,7 +167,42 @@ function notesCard(f, adv, deep, deepOwned, etapa, color) {
       <span style="color:${TONE[b.tone][1]}">${b.txt}</span></p>`).join("")}`;
 }
 
-function renderPhilosophy(opts = {}, selected = null) {
+/**
+ * EL ACUSE DE LA COMPRA. Gastar un PI es irreversible y hasta acá el único
+ * aviso era que la ficha cambiaba de botón a "✓ Ya es parte de tu fútbol" —
+ * un cambio que ocurre debajo del dedo, en el mismo píxel donde se hizo click,
+ * y que se pierde. El modal frena el flujo un segundo y repite las tres cosas
+ * que importan: el ícono, el nombre y QUÉ HACE EN EL PARTIDO — los mismos
+ * valores de `t.efecto` que se leían en la ficha, con su mismo código de color
+ * (fxKind), para que lo comprado y lo prometido se vean idénticos.
+ *
+ * `onDone` lo dispara "Continuar": ahí recién la cámara sale del zoom.
+ */
+function showTraitAcquired(t, ink, onDone) {
+  const efecto = t.efecto?.length
+    ? `<ul class="space-y-2.5 text-left mt-5 tb-fx" style="--ink:${ink}">
+        ${t.efecto.map(([v, txt]) => `<li>
+          <span class="tb-val is-${fxKind(v)}">${v}</span><span class="text-[12px] leading-snug text-slate-300">${txt}</span>
+        </li>`).join("")}</ul>`
+    : "";
+  const m = modal(`
+    <div class="text-center">
+      <div class="text-[10px] font-black uppercase tracking-[.22em] text-slate-400">Rasgo adquirido</div>
+      <div class="text-[46px] leading-none mt-4">${t.icon}</div>
+      <h3 class="text-xl font-black mt-3" style="color:${ink}">${t.nombre}</h3>
+    </div>
+    ${efecto}
+    <button id="tb-ack" class="btn-primary w-full mt-6">Continuar</button>
+  `, "max-w-sm");
+  m.querySelector("#tb-ack").onclick = () => { closeModal(); onDone(); };
+}
+
+/**
+ * `ready` es el enganche interno para el re-pintado de después de una compra:
+ * la pantalla nueva devuelve su propio `close()` para que quien la pidió pueda
+ * sacar la cámara del zoom cuando el jugador cierre el acuse.
+ */
+function renderPhilosophy(opts = {}, selected = null, ready = null) {
   const run = S.run;
   // ARBOLES NAVEGABLES: las 4 filosofías progresan a la vez, así
   // que la pizarra muestra la que estés MIRANDO (`opts.view`), no solo la que juegas.
@@ -331,7 +366,16 @@ function renderPhilosophy(opts = {}, selected = null) {
     const x = $("#tb-close");
     if (x) x.onclick = close;
     const buy = card.querySelector("[data-buy]");
-    if (buy) buy.onclick = () => { if (buyTrait(run, buy.dataset.buy)) renderPhilosophy(opts, id); };
+    // Comprar re-pinta PRIMERO (PI gastado, nodo encendido, ficha ya en "✓") y recién
+    // encima abre el acuse: al cerrarlo no queda nada por actualizar detrás, así que
+    // el zoom out sale de una pizarra que ya dice la verdad. Ese `close` es el de la
+    // pantalla NUEVA — por eso viaja por `ready` y no se toma del scope de esta.
+    if (buy) buy.onclick = () => {
+      const t = tree.find(x => x.id === buy.dataset.buy);
+      if (!buyTrait(run, buy.dataset.buy)) return;
+      const ink = t.tier === "master" ? "#fbbf24" : color;   // el oro de la consagración
+      renderPhilosophy(opts, id, (api) => showTraitAcquired(t, ink, api.close));
+    };
   }
 
   // Un solo listener en el SVG: si el click no cayó dentro de un nodo, se cierra.
@@ -347,6 +391,7 @@ function renderPhilosophy(opts = {}, selected = null) {
     if (g) open(g.dataset.node); else close();
   });
   if (selected) open(selected, true);
+  ready?.({ close });
 
   $("#btn-filo").onclick = () => {
     if (opts.onboarding) go("start-run", run.teamId);          // rehace la run: cero estado a medias
