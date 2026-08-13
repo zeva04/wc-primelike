@@ -35,6 +35,7 @@ import { oxidState } from "../../../game/oxidation.js";
 import { S } from "../../session.js";
 import { register, go } from "../../nav.js";
 import { screenStage, $, closeModal, modalOpen, toast, momentoChip } from "../../components.js";
+import { autoguardar } from "../../save.js";
 import { mountPitch } from "../../pitch.js";
 import { showScoutReport, showOppChooser } from "./rival.js";
 import { alturaPicker, wireAlturaPicker, showCanje } from "./team.js";
@@ -92,7 +93,14 @@ function pasarDia() {
   const res = advanceDay(S.run);
   if (!res) { renderHub(); return; }
   panelAbierto = confirmando = resultado = null;
+  // EL AUTOGUARDADO (decisión PO): la ranura se escribe al terminar cada día, y este
+  // es el único sitio del juego donde un día termina — lo llama tanto el botón del
+  // hub como la vuelta del partido (`autoAdvance`), así que un partido jugado queda
+  // guardado por el mismo caño. Va ANTES de repintar: si el navegador rechaza la
+  // escritura (cuota llena, modo privado), el aviso sale sobre la pantalla ya nueva.
+  const guardado = S.slot == null || autoguardar();
   renderHub();
+  if (!guardado) toast("⚠️ No se pudo guardar la partida: el navegador rechazó la escritura.");
   // Bible §4.4: el día arranca con el Daily (informa); el evento llega después (transforma)
   // showDaily NO cierra su propio modal: el que encadena decide. Los dos modales que
   // siguen abren el suyo (y `modal()` cierra el anterior); los otros dos caminos —día de

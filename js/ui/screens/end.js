@@ -11,6 +11,7 @@ import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, closeModal } from "../components.js";
 import { TROPHY_SVG } from "../theme.js";
 import { saveHistoryEntry } from "../../storage/history.js";
+import { autoguardar } from "../save.js";
 import { stopTimer } from "./match/index.js";
 
 // Datos del desenlace actual (para re-render al volver desde el Diario sin re-guardar)
@@ -34,12 +35,17 @@ function endRun(champion, abandoned = false) {
     desc: champion ? "La copa vuelve a casa. Leyenda absoluta." : `${me.name} llegó hasta: ${stageLabel}.`,
   });
 
+  const date = new Date().toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" });
   saveHistoryEntry({
-    date: new Date().toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" }),
+    date,
     teamId: run.teamId, champion, stageLabel,
     pg: run.stats.pg, pe: run.stats.pe, pp: run.stats.pp,
     gf: run.stats.gf, gc: run.stats.gc, topScorer: topTxt,
   });
+  // La ranura NO se libera (decisión PO): se queda mostrando el desenlace hasta que
+  // el jugador la reemplace, para que el trofeo se vea al abrir el juego. El
+  // Historial 📜 guarda el registro aparte y ese sí es para siempre.
+  autoguardar({ champion, abandoned, stageLabel, date });
   lastEnd = { champion, abandoned, me, topTxt, stageLabel };
   renderEndScreen();
 }
@@ -73,13 +79,16 @@ function renderEndScreen() {
       <div class="mt-8 flex gap-3 justify-center flex-wrap">
         <button id="btn-again" class="btn-primary">🔄 Jugar otra vez</button>
         <button id="btn-endjournal" class="px-5 py-2.5 rounded-xl border border-amber-500/60 text-amber-300 hover:bg-amber-500/10 font-semibold cursor-pointer">📖 Revivir la campaña</button>
-        <button id="btn-menu" class="px-5 py-2.5 rounded-xl border border-slate-600 hover:bg-slate-700 font-semibold cursor-pointer">Menú principal</button>
+        <button id="btn-menu" class="px-5 py-2.5 rounded-xl border border-slate-600 hover:bg-slate-700 font-semibold cursor-pointer">🗂️ Mis partidas</button>
       </div>
     </div>
   `);
+  // "Jugar otra vez" arranca una copa nueva EN LA MISMA RANURA y con el mismo equipo.
+  // La ranura no se pisa todavía: el desenlace sobrevive hasta que el sorteo se
+  // confirme (ui/screens/draw), así que arrepentirse a mitad de camino no lo borra.
   $("#btn-again").onclick = () => go("start-run", S.run.teamId);
   $("#btn-endjournal").onclick = () => go("journal", "end-screen");
-  $("#btn-menu").onclick = () => go("menu");
+  $("#btn-menu").onclick = () => go("saves", { view: "ranuras" });
 }
 
 register("end-run", endRun);

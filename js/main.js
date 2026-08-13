@@ -2,13 +2,16 @@
    Punto de entrada del juego (composición, nada más).
 
    Cada pantalla se registra en ui/nav al importarse; aquí solo
-   se validan los datos y se abre el menú. Los <script
-   type="module"> corren con el DOM ya parseado: sin
-   DOMContentLoaded.
+   se validan los datos y se abre la PORTADA (el título y las
+   tres ranuras de partida guardada; el menú de selección de
+   equipo pasó a ser el segundo paso, dentro de una ranura
+   nueva). Los <script type="module"> corren con el DOM ya
+   parseado: sin DOMContentLoaded.
    ============================================================ */
 import { WC_DATA } from "../data/teams.js";
 import { go } from "./ui/nav.js";
 // Pantallas: el import las registra en nav (orden irrelevante)
+import "./ui/screens/saves.js";
 import "./ui/screens/menu.js";
 import "./ui/screens/history.js";
 import "./ui/screens/identity.js";
@@ -36,7 +39,7 @@ if (!WC_DATA || !WC_DATA.teams || !WC_DATA.teams.length) {
   // import es DINÁMICO y va detrás de dos llaves —origen local y el parámetro— así que
   // en cualquier otro sitio el archivo ni se descarga. Ver js/dev/deeplink.js.
   const { bootDeepLink } = await import("./dev/deeplink.js");
-  if (!bootDeepLink()) go("menu");
+  if (!bootDeepLink()) go("saves");
 } else {
-  go("menu");
+  go("saves");
 }

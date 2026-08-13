@@ -29,34 +29,18 @@ import { oxidState } from "../../../game/oxidation.js";
 import { RARITIES } from "../../../content/daily/rarities.js";
 import { EVENT_THEMES } from "../../../content/daily/themes.js";
 import { S } from "../../session.js";
+import { pxFlag } from "../../components.js";
 import { pxIcon } from "../../pixicons.js";
+
+// `pxFlag` vivía acá y se mudó a ui/components.js el 12-ago-2026: la pantalla de
+// ranuras de partida guardada también la necesita, y una pantalla no importa de
+// otra. Se re-exporta para no romper a quien ya la pedía a este módulo.
+export { pxFlag };
 
 /* Las rarezas traen su color como CLASE de Tailwind (`text-amber-400`), que acá no
    sirve: el kit pixel pinta con `style` para poder mezclar con los tokens px-*. Este
    es el mismo orden de rareza traducido a hex. */
 const RAREZA_HEX = { comun: "#94a3b8", infrecuente: "#34d399", rara: "#a78bfa", legendaria: "#fbbf24" };
-
-/**
- * LA BANDERA del equipo, en su marco del kit.
- *
- * Usa la bandera de verdad (`data/flags/<iso>.png`, la misma que el resto del
- * juego). La versión anterior no dibujaba una bandera: apilaba tres franjas con los
- * colores de la CAMISETA (shirt · blanco · accent). Con Argentina daba celeste,
- * blanco y celeste —o sea, acertaba por casualidad— y por eso el bug sobrevivió a
- * todas las capturas; con Brasil daba amarillo, blanco y verde.
- *
- * La imagen va SUAVIZADA a propósito, contra la regla del kit: los PNG son de
- * 160×105 y a 32px de ancho el escalado nearest-neighbour tira cuatro de cada cinco
- * píxeles — las estrellas de Brasil o el escudo de México desaparecen. Lo que sí
- * mantiene el kit es el MARCO: borde duro de 2px y sombra sólida sin blur.
- */
-export function pxFlag(team, w = 32, h = 22) {
-  const marco = `width:${w}px;height:${h}px;border:2px solid var(--wc-black);box-shadow:2px 2px 0 var(--px-shadow);flex-shrink:0`;
-  if (!team?.iso) return `<div style="${marco};background:var(--px-line)"></div>`;
-  return `<div style="${marco};overflow:hidden">
-    <img src="data/flags/${team.iso}.png" alt="${team.name}" title="${team.name}"
-      style="width:100%;height:100%;object-fit:cover;display:block;image-rendering:auto"></div>`;
-}
 
 /* ── 1 · La Oportunidad del día ─────────────────────────────────────────────── */
 

@@ -475,11 +475,13 @@ entre pantallas es `go("nombre", ...args)` — así no hay imports circulares (�
 | Módulo | Contiene |
 |---|---|
 | `ui/nav.js` | registro de pantallas: `register(name, fn)` / `go(name, ...args)` |
-| `ui/session.js` | `S`: run, match, matchCtx, selectedLineup, timer, paused, speed, feedRendered |
-| `ui/components.js` | §2-3: stars, energía, banderas, dorsales, toast, modal, screenShell, `$`, `app` |
+| `ui/session.js` | `S`: run, **slot**, match, matchCtx, selectedLineup, timer, paused, speed, feedRendered |
+| `ui/save.js` | §0: la ranura de la sesión — `autoguardar`, `cargarRanura`, `usar/soltar/borrarRanura` |
+| `ui/components.js` | §2-3: stars, energía, banderas (`flagImg`, `pxFlag`), dorsales, toast, modal, screenShell, `$`, `app` |
 | `ui/pitch.js` | La cancha 8-bit reutilizable (§6b): césped, fichas del once, banco y arrastre. La comparten Gestión de Plantilla y el partido |
 | `ui/sprites.js` | §2: spriteSvg, rivalLook, nameHash |
 | `ui/theme.js` | §2: applyTeamColors, trofeo y balón SVG |
+| `storage/saves.js` + `ui/screens/saves.js` | §0: LA PORTADA — las 3 ranuras en `localStorage` / el título y su pantalla |
 | `ui/screens/menu.js` | §4: carrusel (la regla de dificultad vive en `game/ratings`) |
 | `storage/history.js` + `ui/screens/history.js` | §5: persistencia / pantalla |
 | `ui/screens/identity.js` | §6 (`start-run`) |
@@ -525,6 +527,33 @@ Los helpers `app()` y `$()` viven en `ui/components.js`.
 | `closeModal()` / `modalOpen()` | Cierra el modal activo · dice si hay uno abierto (lo usa `pasarDia` como guarda anti doble-día). |
 | `screenShell(inner, maxW?)` | Reemplaza la pantalla completa. `maxW` por defecto `max-w-5xl`; Gestión de Plantilla usa `max-w-6xl` (cancha + panel). |
 
+### 0. La portada y la memoria de partida — `storage/saves.js` + `ui/save.js` + `ui/screens/saves.js`
+
+La raíz del juego (12-ago-2026). Tres ranuras, una copa por ranura; elegir equipo pasó a
+ser el segundo paso, dentro de una ranura nueva.
+
+**Por qué localStorage y no un archivo**: un `.js` no se puede escribir desde la página
+(`data/teams.js` es un módulo que el navegador importa y edita el PO a mano). Lo que
+genera el jugador va a `localStorage`, que guarda strings → **JSON serializado**. Esto es
+gratis porque ARQUITECTURA §3.1 ya obliga a que `run` sea JSON-izable.
+
+| Función | Qué hace |
+|---|---|
+| `getSlots()` / `readSlot(i)` (storage) | Las 3 ranuras, siempre en un array de largo `SLOTS`. Una ranura de otra versión (o con la forma rota) vuelve como `{incompatible:true}` y **sin su run**: nadie puede intentar pintarla. |
+| `writeSlot(i, run, fin)` / `clearSlot(i)` (storage) | Escriben/vacían. `fin` marca la partida terminada; devuelve `false` si el navegador rechazó la escritura. |
+| `autoguardar(fin)` (ui/save) | Escribe `S.run` en `S.slot`. **Se llama en tres sitios y solo tres**: `draw` (nace la ranura), `hub/pasarDia` (cada día que cierra) y `end` (el desenlace). Sin ranura activa es un no-op — el deep-link de desarrollo no pisa partidas. |
+| `cargarRanura(i)` (ui/save) | Rehidrata `S` y resetea `selectedLineup`/`formation`: guardaban REFERENCIAS al `squad` viejo, y el que sale de `JSON.parse` es un árbol de objetos nuevo. |
+| `renderSaves(opts)` (`saves`) | El título (un velo sobre las ranuras, no otra pantalla) y las tarjetas. `opts.view="ranuras"` entra directo; `opts.demo` inyecta ranuras sintéticas para verificar la pantalla sin tocar el disco. |
+
+**Cadencia (decisión PO)**: se guarda al terminar cada día y en ningún otro momento. Lo que
+pasa DENTRO de un día no está guardado hasta que el día termina. Como la instancia `Match`
+no es serializable, cerrar la pestaña a mitad de partido devuelve al hub del día del
+partido, con el once puesto: se re-juega, no se retoma.
+
+**La barra de progreso mide la RUTA** (`knockout.RUTA_PARTIDOS` = 3 fechas de grupos + 5
+rondas KO = 8), no los días: una run dura 41-48 días según lo que sortee cada ventana y ese
+total no se sabe de antemano.
+
 ### 4. Menú principal — `ui/screens/menu.js`
 | Función | Qué hace |
 |---|---|
@@ -545,7 +574,7 @@ equipo y posiciona el carrusel sin iniciar la partida.
 |---|---|
 | `startRun(teamId)` (identity.js, `start-run`) | Crea la run, aplica colores y muestra la elección de identidad. |
 | `renderChooseIdentity()` (identity.js) | Pantalla previa al sorteo (F1, decisión PO #1: se elige apenas confirmado el equipo, ANTES de ver el grupo): confirma equipo o vuelve a `menu`, y 4 cards de identidad en grilla 2×2 con aristas, lema, fortaleza, advertencia de counter y el rasgo de Consolidada. "Confirmar" queda deshabilitado hasta elegir; aplica con `choosePhilosophy` y sigue a `draw`. |
-| `renderDraw()` (draw.js, `draw`) | Pantalla de sorteo con los 12 grupos (la identidad ya quedó fijada). "Comenzar la aventura" lleva a `hub`. |
+| `renderDraw()` (draw.js, `draw`) | Pantalla de sorteo con los 12 grupos (la identidad ya quedó fijada). "Comenzar la aventura" **escribe la ranura** (`autoguardar`, §0 — es el primer punto en que la run está completa) y lleva a `hub`. |
 
 ### 6c. La pantalla de Identidad y LA PIZARRA DEL DT — `ui/screens/philosophy.js` + `ui/board.js`
 
@@ -700,7 +729,7 @@ piel y la gramática espacial; ni una regla de juego se movió. Tres cosas nueva
 ### 12. Init — `js/main.js`
 | Función | Qué hace |
 |---|---|
-| (cuerpo del módulo) | Importa todas las pantallas (se auto-registran en nav), valida `WC_DATA` y abre el menú con `go("menu")`. Los módulos corren con el DOM listo: sin `DOMContentLoaded`. |
+| (cuerpo del módulo) | Importa todas las pantallas (se auto-registran en nav), valida `WC_DATA` y abre **la portada** con `go("saves")` — el menú de equipos dejó de ser la raíz. Los módulos corren con el DOM listo: sin `DOMContentLoaded`. |
 
 ---
 

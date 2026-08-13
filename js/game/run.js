@@ -85,6 +85,11 @@ export function newRun(myTeamId) {
     scorers: {},               // goleadores del torneo ajenos {"teamId|name": {teamId,name,goles}} (escribe game/scorers)
     assists: {},               // asistidores del torneo ajenos {"teamId|name": {teamId,name,asistencias}} (escribe game/assists)
     stats: { pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, tarjetas: 0, eventos: 0, penalesAtajados: 0, oppOfrecidas: 0, oppAprovechadas: 0 },
+    // Los marcadores propios, uno por partido jugado, en orden (escribe game/flow).
+    // `stats` guarda los TOTALES; esto es el detalle, y existe porque la ranura de
+    // partida guardada muestra "los últimos" resultados: sacarlos del Diario obligaría
+    // a parsear el título de una entrada narrativa, que es texto, no dato.
+    misResultados: [],         // [{oppId, gf, gc, stage, day, pens?: {gf,gc}}]
     champion: false,
     journal: [],               // Diario de Campaña: la memoria narrativa de la run
   };

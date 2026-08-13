@@ -6,6 +6,8 @@
 
 export const S = {
   run: null,            // estado de la run actual (Engine.newRun)
+  slot: null,           // ranura de guardado a la que pertenece esa run (0..2) o null si no hay ninguna
+                        // (deep-link de desarrollo). La escribe ui/save.js; nadie más la toca.
   match: null,          // partido interactivo en curso (Engine.Match)
   matchCtx: null,       // contexto del partido: {team, lineup, bench, mentalidad, buffs}
   selectedLineup: [],   // titulares elegidos (refs al plantel), ORDENADOS por los slots de la formación

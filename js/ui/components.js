@@ -54,6 +54,28 @@ export function flagImg(team, cls = "w-6 h-4") {
   return `<img src="data/flags/${team.iso}.png" alt="${team.name}" title="${team.name}" class="flag-img ${cls}">`;
 }
 
+/**
+ * LA BANDERA en el marco del KIT PIXEL (hub, partido, ranuras de partida).
+ *
+ * Usa la bandera de verdad (`data/flags/<iso>.png`, la misma que `flagImg`). La
+ * versión original de esto no dibujaba una bandera: apilaba tres franjas con los
+ * colores de la CAMISETA (shirt · blanco · accent). Con Argentina daba celeste,
+ * blanco y celeste —o sea, acertaba por casualidad— y por eso el bug sobrevivió a
+ * todas las capturas; con Brasil daba amarillo, blanco y verde.
+ *
+ * La imagen va SUAVIZADA a propósito, contra la regla del kit: los PNG son de
+ * 160×105 y a 32px de ancho el escalado nearest-neighbour tira cuatro de cada cinco
+ * píxeles — las estrellas de Brasil o el escudo de México desaparecen. Lo que sí
+ * mantiene el kit es el MARCO: borde duro de 2px y sombra sólida sin blur.
+ */
+export function pxFlag(team, w = 32, h = 22) {
+  const marco = `width:${w}px;height:${h}px;border:2px solid var(--wc-black);box-shadow:2px 2px 0 var(--px-shadow);flex-shrink:0`;
+  if (!team?.iso) return `<div style="${marco};background:var(--px-line)"></div>`;
+  return `<div style="${marco};overflow:hidden">
+    <img src="data/flags/${team.iso}.png" alt="${team.name}" title="${team.name}"
+      style="width:100%;height:100%;object-fit:cover;display:block;image-rendering:auto"></div>`;
+}
+
 /** Bandera + nombre de un equipo en línea. */
 export function teamChip(team, extra = "") {
   return `<span class="inline-flex items-center gap-1.5 ${extra}">${flagImg(team, "w-6 h-4")}<span>${team.name}</span></span>`;

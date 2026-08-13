@@ -443,6 +443,11 @@
     .px-day-now { height: 80px; background: #2e2415; border-color: var(--wc-gold); box-shadow: 3px 3px 0 var(--px-shadow-soft), inset 0 0 0 2px var(--wc-gold-dark); animation: pxBlink 1.1s steps(2, end) infinite; }
     .px-day-match { height: 70px; background: #33270f; border-color: var(--px-warn); box-shadow: 3px 3px 0 var(--px-shadow-soft); }
     @keyframes pxBlink { 0%, 100% { border-color: var(--wc-gold); } 50% { border-color: var(--wc-gold-dark); } }
+    /* Las dos variantes que pide la portada (ui/screens/saves): el latido de OPACIDAD
+       del "clic para continuar" —el de arriba late en el borde, que ahí no sirve— y el
+       latido ROJO de la cabecera que confirma un borrado. */
+    @keyframes pxBlinkText { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+    @keyframes pxBlinkBad { 0%, 100% { border-color: var(--px-bad); } 50% { border-color: #7f1d1d; } }
 
     /* ── El PANEL que abre un edificio (focos, pizarra). Entra sobre el mapa, no
        navega: la decisión del día se toma sin salir del complejo. ── */

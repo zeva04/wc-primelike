@@ -56,6 +56,13 @@ function renderMenu() {
   //   12px      contexto: figura, continentes, nombre del jugador
   //   10px      etiquetas duras: dorsal, posición, anfitriones
   screenFull(`
+    <!-- El menú dejó de ser la raíz del juego: se llega desde una RANURA vacía de la
+         portada (ui/screens/saves). Por eso hay salida hacia atrás — sin ella, elegir
+         mal la ranura no tenía vuelta. Va a las ranuras directo, no al título: quien
+         está eligiendo equipo ya pasó la portada. -->
+    <button id="btn-slots" data-tip="Volver a elegir ranura"
+      class="tip absolute top-4 left-5 z-20 h-11 px-4 rounded-xl border border-slate-700 bg-slate-900/70 backdrop-blur text-sm font-bold
+             hover:border-[var(--wc-gold)] hover:bg-slate-800/80 cursor-pointer transition-all">← Mis partidas</button>
     <button id="btn-history" data-tip="Historial de Partidas"
       class="tip absolute top-4 right-5 z-20 w-11 h-11 rounded-xl border border-slate-700 bg-slate-900/70 backdrop-blur text-xl leading-none
              hover:border-[var(--wc-gold)] hover:bg-slate-800/80 cursor-pointer transition-all">📜</button>
@@ -162,7 +169,8 @@ function renderMenu() {
   };
   document.querySelectorAll(".car-dot").forEach(b => b.onclick = () => { menuSel = b.dataset.team; renderMenu(); });
   $("#btn-start").onclick = () => go("start-run", menuSel);
-  $("#btn-history").onclick = () => go("history");
+  $("#btn-slots").onclick = () => go("saves", { view: "ranuras" });
+  $("#btn-history").onclick = () => go("history", "menu");
 }
 
 register("menu", renderMenu);

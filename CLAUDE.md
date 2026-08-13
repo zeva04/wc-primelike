@@ -36,8 +36,13 @@ http://localhost:8347/?dev=hub&team=ARG&filo=press&nivel=4&node=campo
 http://localhost:8347/?dev=partido&team=ARG&filo=contra&nivel=3&min=67&dec=1
 ```
 
+```
+http://localhost:8347/?dev=saves&team=ARG&filo=contra&nivel=3&demo=1
+```
+
 Los parámetros están documentados en [js/dev/deeplink.js](js/dev/deeplink.js): `dev` `team`
-`filo` `view` `nivel` `pi` `traits` `node` `onb` `anim` `dia` `min` `dec` `en` `moral` `oxid`.
+`filo` `view` `nivel` `pi` `traits` `node` `onb` `anim` `dia` `min` `dec` `en` `moral` `oxid`
+`demo`.
 `node` abre lo que esa pantalla pueda abrir — la ficha de un rasgo en la pizarra, un edificio
 en el hub. `dia=partido` salta al día del partido. Solo funciona servido en local; en cualquier
 otro origen el módulo ni se descarga.
@@ -47,6 +52,12 @@ días sin entrenar). Sin ellos, una run recién montada está al 100% de energí
 50 y sin óxido — o sea, en el único punto donde media pantalla del hub no tiene nada que
 mostrar: la hoja de confirmación de Recuperar promete "+15" sobre un tanque lleno y no dibuja
 ni una barra. Si vas a mirar algo que dependa del estado, montalo cansado.
+
+**`demo`** es solo de `dev=saves` (la portada de ranuras) y existe por el mismo motivo:
+esa pantalla no se puede verificar vacía —sus tarjetas de "en curso", "terminada" y "libre"
+necesitan partidas adentro— y sembrarlas en `localStorage` **borraría las del jugador**. Con
+`demo=1` (dos copas en curso) o `demo=fin` (campeón y eliminado) las ranuras viven en
+memoria y el disco no se toca.
 
 **`dev=partido`** no es una pantalla de `ui/nav` (el partido necesita un once y un rival: el
 deep-link los deriva como el hub). Recién montado está 0-0 al minuto 0 y con el relato, el
@@ -103,11 +114,36 @@ automatización de navegador de una forma que **no se recupera sola**:
 
 ---
 
-## Dos pantallas van por su cuenta: el hub y el partido
+## La partida se guarda sola, y solo al cerrar el día
 
-La Concentración Mundialista (`js/ui/screens/hub/`) y el partido en vivo
-(`js/ui/screens/match/`) no siguen las reglas del resto de la UI, y es a propósito
-(rediseños del 6 y el 7-ago-2026, adaptados de diseños de Claude Design):
+El juego arranca en **la portada** (`js/ui/screens/saves.js`): el título y tres ranuras. El
+menú de selección de equipo dejó de ser la raíz — es el segundo paso, dentro de una ranura
+nueva.
+
+El guardado va a `localStorage` como JSON (`js/storage/saves.js`), porque un `.js` no se
+puede escribir desde la página. La regla §4.2 de ARQUITECTURA prohíbe que `game/**` importe
+`storage/`, así que **el motor no sabe que existe el guardado**: el puente es
+[js/ui/save.js](js/ui/save.js) y son tres llamadas en todo el juego — `draw` (nace la
+ranura), `hub/pasarDia` (cada día que cierra) y `end` (el desenlace).
+
+Dos consecuencias que conviene tener presentes antes de tocar nada:
+
+- **Lo que pasa DENTRO de un día no está guardado hasta que el día termina.** Es la cadencia
+  que eligió el PO. Si algún día molesta, la palanca es agregar llamadas a `autoguardar()`,
+  no cambiar el formato.
+- **La instancia `Match` no es serializable** (deuda declarada en ARQUITECTURA §3.1). Como
+  el último guardado de un día de partido es el instante *antes* de salir a la cancha,
+  cerrar la pestaña al minuto 67 devuelve al hub con el once puesto: se re-juega, no se
+  retoma. No es un bug pendiente, es el contrato.
+
+---
+
+## Tres pantallas van por su cuenta: la portada, el hub y el partido
+
+La portada (`js/ui/screens/saves.js`), la Concentración Mundialista
+(`js/ui/screens/hub/`) y el partido en vivo (`js/ui/screens/match/`) no siguen las reglas
+del resto de la UI, y es a propósito (rediseños del 6, el 7 y el 12-ago-2026, adaptados de
+diseños de Claude Design):
 
 - **Lienzo FIJO de 1440×900**, escalado entero con `transform` (`screenStage` en
   `ui/components.js`). No reflowea: es pixel art y un layout elástico obligaría a escalar en

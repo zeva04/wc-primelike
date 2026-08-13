@@ -40,6 +40,12 @@ export function closeMatch(run, match) {
   if (won) run.stats.pg++; else if (drew) run.stats.pe++; else run.stats.pp++;
   run.stats.gf += res.gMy; run.stats.gc += res.gOpp;
   run.stats.penalesAtajados += match.stats.penalesAtajados;
+  // El marcador, como DATO (no solo como línea del diario): lo lee la ranura de
+  // partida guardada para dibujar los últimos resultados de la campaña.
+  (run.misResultados ||= []).push({
+    oppId: match.oppTeam.id, gf: res.gMy, gc: res.gOpp, stage: run.stage, day: run.day,
+    ...(res.pens ? { pens: { gf: res.pens.myGoals, gc: res.pens.oppGoals } } : {}),
+  });
 
   const stageTxt = run.stage === "groups" ? `Fase de grupos · Fecha ${run.matchday + 1}` : STAGE_LABEL[run.stage];
   const scorersTxt = match.scorers.map(s => `${s.name} ${s.clock ?? s.min}'`).join(", ");

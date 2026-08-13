@@ -134,11 +134,13 @@ js/
       themes.js                ← EVENT_THEMES (4 temáticas) (~10)
       daily-flavor.js          ← DAILY_FLAVOR: los titulares de color (~20)
   ui/
-    session.js                 ← estado de sesión: run, match, matchCtx, selectedLineup (~30)
-    components.js              ← starsHtml, energyBar, posBadge, flagImg, numTag, toast, modal, screenShell (~100)
+    session.js                 ← estado de sesión: run, slot, match, matchCtx, selectedLineup (~30)
+    save.js                    ← la ranura de la sesión: autoguardar, cargarRanura, borrarRanura (~70)
+    components.js              ← starsHtml, energyBar, posBadge, flagImg, pxFlag, numTag, toast, modal, screenShell (~120)
     sprites.js                 ← spriteSvg, rivalLook, nameHash, pools (~95)
     theme.js                   ← applyTeamColors, TROPHY_SVG, BALL_SVG (~45)
     screens/                   ── una pantalla = un archivo ──
+      saves.js                 ← LA PORTADA: el título y las 3 ranuras de partida guardada (~330)
       menu.js                  ← carrusel + dificultad (~120)
       history.js               ← historial de runs (~45)
       draw.js                  ← sorteo de grupos (~50)
@@ -164,6 +166,7 @@ js/
       end.js                   ← desenlace + estadísticas (~95)
   storage/
     history.js                 ← localStorage wc26_history (~30)
+    saves.js                   ← localStorage wc26_saves: las 3 ranuras (~90)
 tests/                         ── EN EL REPO, se acabó el scratchpad ──
   smoke.js                     ← runs completas sin UI (--smart, --all)
   teams.validate.js            ← esquema, dorsales, sprites duplicados
@@ -243,12 +246,14 @@ Formato: **propósito · contiene · NUNCA debe contener**.
 | `game/match/incidents.js` | Incidencias | faltas, tarjetas, lesiones en juego | Fórmulas de gol |
 | `game/match/shootout.js` | Tanda de penales | start/shoot/check-end | Nada fuera de la tanda |
 | `content/*` | **Lo que el PO edita**: tablas de contenido | datos + flavor + `effect(run)` que solo usa core | Reglas de sistemas, imports de game/ui, DOM |
-| `ui/session.js` | Estado de sesión de la UI | refs a run/match/matchCtx/selectedLineup/timer | Reglas de juego, persistencia |
+| `ui/session.js` | Estado de sesión de la UI | refs a run/match/matchCtx/selectedLineup/timer + `slot` (la ranura de esa run) | Reglas de juego, persistencia |
+| `ui/save.js` | **Quién guarda y cuándo**: el puente sesión↔ranura que la regla §4.2 obliga a poner del lado de la UI | autoguardar (al cerrar el día), cargarRanura (rehidrata `S`), usar/soltar/borrarRanura | Formato del almacén (eso es storage/saves), reglas de juego |
 | `ui/components.js` | Piezas visuales reutilizables | stars, energía, banderas, toast, modal, shell | Conocimiento de pantallas específicas |
 | `ui/sprites.js` | Arte procedural | spriteSvg, rivalLook, hash, pools | Reglas (p.ej. quién es "figura") |
 | `ui/theme.js` | Identidad visual | applyTeamColors, SVG de trofeo/balón | Layout de pantallas |
 | `ui/screens/*` | Una pantalla cada uno | render de SU pantalla + sus handlers | Reglas de juego, localStorage directo, cálculo de probabilidades |
-| `storage/history.js` | Persistencia | get/save historial (y futuro: save de run) | Formateo visual, reglas |
+| `storage/history.js` | Persistencia del historial | get/save historial | Formateo visual, reglas |
+| `storage/saves.js` | Persistencia de la PARTIDA | getSlots/readSlot/writeSlot/clearSlot sobre `wc26_saves`, versionado del formato | Cuándo guardar (lo decide `ui/save.js`), formateo visual, reglas |
 | `main.js` | Composición | valida WC_DATA importada, monta menú | Todo lo demás |
 
 ### 3.1 Mapa de propiedad del estado `run` (quién escribe qué)
@@ -284,6 +289,7 @@ Este mapa es ley: si un módulo escribe un campo que no le pertenece, es un bug 
 | `peleaEntre`, `filtrador` | efectos de `content/daily/conflicts` (NOMBRES, no referencias — regla de serialización) | el propio conflicto al aplicar la opción elegida |
 | `journal` | `journal.js` (todos anotan vía addJournal) | ui/journal |
 | `stats`, `champion` | `flow.js` | ui/end |
+| `misResultados` | `flow.js` (`closeMatch` empuja el marcador de cada partido propio) | ui/screens/saves (los "últimos" de la ranura) |
 
 ✅ Los campos muertos (`lineup`, `extraPos`, `mentalidad`, `lastResults`, `eliminated`, `bracket`, `prepDone`) ya no existen, y `koMatches`/`lastWinners` nacen en `newRun` como `null`: la forma del estado es estable.
 
@@ -425,7 +431,7 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
 | **Conflictos en cadena** | calendar, content/daily/conflicts | calendar (dayPlan multi-acto), content/daily/conflicts (formato cadena), run.js (estado de cadenas) | match/**, tournament |
 | Logros | journal (ya es el log de momentos) | NUEVOS: game/achievements.js, content/achievements.js + hook en flow.endRun + sección en end.js | resto |
 | Sonido | screens que emiten momentos | NUEVO: ui/audio.js + llamadas desde screens | game/** (el motor no suena) |
-| Guardar run a mitad | storage/history, run.js (@typedef) | NUEVO: storage/save.js + botón en hub | game/** (run ya es serializable por la regla §3.1) |
+| ~~Guardar run a mitad~~ ✅ **HECHO** (12-ago-2026) | storage/saves, ui/save, screens/saves | — | game/** (la run ya era serializable por §3.1, y el sprint lo DEMOSTRÓ con `tests/saves.test.js`) |
 
 **Regla de 3 pasos para cualquier feature**: (1) ¿es contenido? → `content/`, listo. (2) ¿es regla de un sistema existente? → ese archivo de `game/`. (3) ¿es un sustantivo nuevo? → módulo nuevo + hook en `flow.js` + (opcional) content + screen. Si una feature necesita tocar más de 4 archivos, detente y revisa este documento: o la feature está mal partida, o la arquitectura tiene un hueco — y se corrige el doc primero.
 
@@ -509,6 +515,39 @@ La prueba de fuego de esta arquitectura: **¿sé de inmediato qué leer, qué to
     rutas relativas necesitan un `../` más — y `ui.validate` no lo detecta (solo parsea). Los
     404 aparecen recién al cargar la pantalla en el navegador; el paso de verificación real de
     una mudanza de UI es abrirla, no que la batería esté verde.
+
+- **12-ago-2026 — SPRINT DE LA MEMORIA DE PARTIDA** (la deuda "Guardar run a mitad" de §7,
+  saldada). El juego deja de arrancar en el menú de equipos: la raíz pasa a ser LA PORTADA
+  (`ui/screens/saves.js`), con el título y tres ranuras. Elegir equipo es ahora el segundo
+  paso, dentro de una ranura.
+  - **La pregunta del PO era "¿JSON o .js?" y no era de gusto**: un `.js` no se puede
+    escribir desde la página (`data/teams.js` es un módulo que el navegador IMPORTA y que
+    edita el PO a mano). Lo que genera el jugador va a `localStorage`, que guarda strings →
+    **JSON serializado**, mismo camino que `storage/history.js`. Un archivo en disco pediría
+    descargar y subir a mano cada partida: eso es "exportar", no "guardar".
+  - **La regla §4.2 decidió el diseño**: `game/**` no puede importar `storage/`, así que el
+    motor no sabe que existe el guardado. El puente vive en `ui/save.js` y son TRES llamadas
+    en todo el juego — `draw` (nace la ranura), `hub/pasarDia` (cada día que cierra) y
+    `end` (el desenlace). El PO eligió esa cadencia: al terminar cada día y en ningún otro
+    momento. Consecuencia declarada y aceptada: lo que pase DENTRO de un día no está
+    guardado hasta que el día termina.
+  - **La instancia `Match` sigue sin ser serializable** (§3.1). Como el último guardado de un
+    día de partido es el instante ANTES de salir a la cancha, cerrar la pestaña al minuto 67
+    devuelve al hub con el once puesto: se re-juega, no se retoma. Es la única salida
+    honesta y ahora está escrita.
+  - **Campo nuevo en `run`**: `misResultados` (dueño: `flow.closeMatch`). Existe porque la
+    ranura muestra los últimos marcadores y hasta hoy esos números solo vivían como TEXTO
+    dentro del título de una entrada del diario.
+  - **La barra de progreso mide la RUTA, no los días** (decisión PO). El diseño traía "Día 14
+    de 26" y ese total no existe: una run dura 41-48 días según lo que sortee cada ventana.
+    El único total fijo son los 8 partidos de la copa (`knockout.RUTA_PARTIDOS`), y son
+    además lo que uno quiere saber mirando una ranura.
+  - **`tests/saves.test.js`** ejerce por primera vez la promesa de §3.1 de punta a punta: una
+    run real va a localStorage y vuelve idéntica campo por campo. Una función o un ciclo
+    metidos en `run` no rompen ningún test de motor — rompen el guardado, y se habrían
+    descubierto con la partida perdida.
+  - `pxFlag` se mudó de `hub/hud.js` a `ui/components.js`: la portada también la necesita y
+    una pantalla no importa de otra (queda un re-export en hud para no romper a nadie).
 
   Con esto **ninguna PANTALLA pasa el presupuesto de §6** (la mayor es `screens/squad.js`, 463).
   Queda un archivo sobre 500, con su motivo:

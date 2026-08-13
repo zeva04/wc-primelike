@@ -13,6 +13,17 @@ export function koRoundOf(stage) {
 }
 export const STAGE_LABEL = { groups: "Fase de grupos", r32: "16avos de final", r16: "Octavos de final", qf: "Cuartos de final", sf: "Semifinal", final: "FINAL" };
 
+/** Las 3 fechas de la fase de grupos. Es el largo de `run.rounds`, escrito con nombre. */
+export const FECHAS_GRUPO = 3;
+
+/**
+ * LA RUTA DE LA COPA: cuántos partidos separan el debut del título (3 de grupos + una
+ * ronda KO cada uno). Es el único total FIJO de una run — los días no lo son, porque
+ * cada ventana de preparación sortea su largo — y por eso la barra de progreso de una
+ * partida guardada (ui/screens/saves) mide esto y no días.
+ */
+export const RUTA_PARTIDOS = FECHAS_GRUPO + STAGE_ORDER.length;
+
 // La simulación de los cruces ajenos vive en tournament/world.js: el mundo los
 // juega día a día (playWorldDay) y flow cierra la ronda (finishKnockoutRound).
 

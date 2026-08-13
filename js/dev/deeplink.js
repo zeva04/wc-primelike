@@ -25,6 +25,7 @@
      ?dev=hub&team=ARG&filo=bloque
      ?dev=philosophy&filo=contra&view=posesion&traits=buen_pie,tercer_hombre
      ?dev=partido&team=ARG&filo=contra&nivel=3&min=67
+     ?dev=saves&team=ARG&filo=contra&nivel=3&demo=1
 
    | parámetro | qué hace                                                        |
    |-----------|-----------------------------------------------------------------|
@@ -44,6 +45,7 @@
    | `dia`     | `partido` salta al día del partido (el hub cambia de cara ahí).   |
    | `min`     | en `partido`, adelanta el reloj hasta ese minuto — o `ht`.       |
    | `dec`     | en `partido`, sigue hasta que se abra una DECISIÓN (máx. 20' más). |
+   | `demo`    | en `saves`, siembra ranuras DE MENTIRA: `1` en curso, `fin` terminadas. |
 
    ── `dev=partido` ────────────────────────────────────────────────────────────
    No es una pantalla de `ui/nav`: el partido necesita un once y un rival, así que
@@ -102,6 +104,59 @@ function signal(ok, detail) {
   document.documentElement.setAttribute(ok ? "data-dev-ready" : "data-dev-error", detail);
   window.__devReady = ok;
   if (!ok) console.error(`[deeplink] ${detail}`);
+}
+
+/**
+ * RANURAS DE MENTIRA para mirar la portada (`?dev=saves&demo=1`).
+ *
+ * La pantalla de partidas guardadas no se puede verificar vacía: sus estados de
+ * tarjeta —en curso en grupos, en curso en eliminatoria, terminada y libre— solo
+ * existen con partidas adentro. Sembrarlas en localStorage sería la forma obvia y
+ * es justamente la prohibida: BORRARÍA las partidas del jugador. Estas viven en
+ * memoria y se le pasan a la pantalla como argumento; el disco no se toca.
+ *
+ *   demo=1    en curso en eliminatoria · en curso en grupos · libre
+ *   demo=fin  campeón · eliminado · libre
+ *
+ * `run` es la que el deep-link ya montó (con el equipo, la filosofía y el nivel que
+ * pida la URL); la segunda se sortea aparte para que las dos tarjetas no sean
+ * gemelas. Se les mueven CAMPOS DE ESTADO, no reglas: es el mismo truco que `en` o
+ * `moral`, montar la foto por el mismo camino que la partida real.
+ */
+function ranurasDemo(run, modo) {
+  const otroDelGrupo = (r) => r.groups[r.myGroupIdx].teamIds.find(id => id !== r.teamId);
+  const dia = 86400000;
+
+  // Ranura 0 — la run del link, ya metida en la eliminatoria.
+  run.day = 14;
+  run.stage = "r16";
+  run.matchday = 3;
+  run.koMatches = [[run.teamId, otroDelGrupo(run)]];
+  run.dtNivel = 5;
+  run.stats = { ...run.stats, pj: 4, pg: 3, pe: 1, pp: 0, gf: 7, gc: 3 };
+  run.misResultados = [
+    { oppId: otroDelGrupo(run), gf: 2, gc: 1, stage: "groups", day: 3 },
+    { oppId: otroDelGrupo(run), gf: 1, gc: 1, stage: "groups", day: 8 },
+    { oppId: otroDelGrupo(run), gf: 3, gc: 0, stage: "r32", day: 12 },
+  ];
+
+  // Ranura 1 — otra copa, todavía en la fase de grupos y sufriendo.
+  const otra = newRun(run.teamId === "MAR" ? "NED" : "MAR");
+  otra.day = 6;
+  otra.matchday = 1;
+  otra.dtNivel = 2;
+  otra.stats = { ...otra.stats, pj: 1, pg: 0, pe: 1, pp: 0, gf: 0, gc: 0 };
+  otra.misResultados = [{ oppId: otroDelGrupo(otra), gf: 0, gc: 0, stage: "groups", day: 5 }];
+  // Un empate de verdad en la tabla, para que la posición del grupo no salga de la nada.
+  otra.groups[otra.myGroupIdx].results.push({ a: otra.teamId, b: otroDelGrupo(otra), gA: 0, gB: 0 });
+  choosePhilosophy(otra, "bloque");
+
+  const terminadas = modo === "fin";
+  return [
+    { v: 1, savedAt: Date.now() - 3 * 3600000, run, fin: terminadas ? { champion: true, abandoned: false, stageLabel: "🏆 CAMPEÓN DEL MUNDO", date: "12 ago 2026" } : null },
+    { v: 1, savedAt: Date.now() - 3 * dia, run: otra, fin: terminadas ? { champion: false, abandoned: false, stageLabel: "Fase de grupos", date: "9 ago 2026" } : null },
+    null,
+  ];
 }
 
 export function bootDeepLink() {
@@ -164,6 +219,7 @@ export function bootDeepLink() {
     const opts = {};
     if (q.get("view")) opts.view = q.get("view");
     if (q.get("onb") === "1") opts.onboarding = true;
+    if (screen === "saves" && q.has("demo")) opts.demo = ranurasDemo(run, q.get("demo"));
     const node = q.get("node");
     go(screen, opts, node || null);
 

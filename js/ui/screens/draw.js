@@ -9,6 +9,7 @@ import { S } from "../session.js";
 import { register, go } from "../nav.js";
 import { screenShell, $, flagImg, teamChip } from "../components.js";
 import { BALL_SVG } from "../theme.js";
+import { autoguardar } from "../save.js";
 
 /** Pantalla de sorteo: los 12 grupos con el del usuario resaltado (la identidad ya quedó fijada). */
 function renderDraw() {
@@ -37,7 +38,12 @@ function renderDraw() {
       <button id="btn-continue" class="btn-primary">Comenzar la aventura →</button>
     </div>
   `);
-  $("#btn-continue").onclick = () => go("hub");
+  // Acá NACE la ranura. Es el primer punto en que la run está completa —equipo,
+  // identidad, primer rasgo y grupo sorteado— y es el comienzo del día 1, así que
+  // encaja con la regla "se escribe al terminar cada día" (ui/save.js). Antes de
+  // esto no hay nada que valga la pena guardar; después, la ranura ya existe y una
+  // pestaña cerrada no borra el sorteo.
+  $("#btn-continue").onclick = () => { autoguardar(); go("hub"); };
 }
 
 register("draw", renderDraw);
