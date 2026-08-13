@@ -3,6 +3,7 @@
    arte SVG propio (trofeo y balón; sin assets FIFA, que tienen
    derechos).
    ============================================================ */
+import { RARITIES } from "../content/daily/rarities.js";
 
 /** Vuelca los colores del equipo elegido a variables CSS globales (--team-*) que usan las clases tp-*. */
 export function applyTeamColors(team) {
@@ -11,6 +12,38 @@ export function applyTeamColors(team) {
   r.setProperty("--team-primary", c.primary);
   r.setProperty("--team-secondary", c.secondary);
   r.setProperty("--team-text", c.text);
+}
+
+/* ── LAS RAREZAS, en un color y no en una clase ──────────────────────────────
+   Hasta el 13-ago-2026 cada rareza guardaba su color COMO CLASE DE TAILWIND
+   (`color: "text-amber-400"`, `border: "border-amber-500/70"`) dentro de
+   content/daily/rarities.js. Dos cosas estaban mal con eso:
+
+     · content/ tiene prohibido el DOM (ARQUITECTURA §4.2) y una clase de un
+       framework de CSS es DOM. El PO edita ahí pesos y textos, no maquetación.
+     · el kit pixel no puede usar esas clases —pinta con `style` para mezclar con
+       los tokens px-*— así que el hub se había hecho su PROPIA tabla de hex, en
+       paralelo. Dos listas del mismo dato, y nada que las obligue a coincidir.
+
+   Ahora la rareza tiene UN color y cada kit lo expresa como sabe. El borde sale
+   del mismo hex con alfa en vez de un tono aparte: los bordes de antes iban de
+   `/60` a `/70` y de `slate-600` a `amber-500`, diferencias que nadie ve y que
+   solo existían porque eran clases sueltas escritas a mano. */
+export const RAREZA_HEX = {
+  comun: "#94a3b8", infrecuente: "#34d399", rara: "#a78bfa", legendaria: "#fbbf24",
+};
+
+/**
+ * La chapita de rareza de las pantallas del kit viejo (el modal del evento del
+ * día y el de la Oportunidad), que la dibujaban con el mismo markup copiado.
+ * @param {string} rareza  clave de RARITIES
+ * @param {string} prefijo texto antes de la etiqueta ("Oportunidad · ")
+ */
+export function chapaRareza(rareza, prefijo = "") {
+  const hex = RAREZA_HEX[rareza], label = RARITIES[rareza]?.label;
+  if (!label) return "";
+  return `<div class="inline-block px-2.5 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-widest mb-2"
+    style="color:${hex};border-color:${hex}99">${prefijo}${label}</div>`;
 }
 
 // Trofeo estilizado (inspirado en la Copa del Mundo, dibujo propio)

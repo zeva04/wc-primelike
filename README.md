@@ -10,7 +10,9 @@ El juego usa módulos ES, así que necesita un servidor estático local (el dobl
 npx http-server -p 8347 -c-1
 ```
 
-y abre `http://localhost:8347`. Requiere internet para cargar Tailwind CSS. Todo se juega con el mouse.
+y abre `http://localhost:8347`. **No requiere internet**: el CSS de Tailwind va congelado en
+`assets/tailwind.css` y la fuente Silkscreen auto-hospedada en `assets/fonts/`, así que el
+juego no hace ninguna petición externa. Todo se juega con el mouse.
 
 ## Documentación técnica
 
@@ -25,7 +27,10 @@ Tema basado en la identidad del Mundial 2026: paleta negro/blanco/dorado del emb
 ## Estructura
 
 ```
-index.html            → página principal (carga js/main.js como módulo ES)
+index.html            → página principal (3 hojas de estilo + js/main.js como módulo ES)
+css/base.css          → estilos del juego "viejo" (paleta, HUD, pizarra, animaciones)
+css/pxkit.css         → el kit pixel de la portada, el hub y el partido (clases px-*)
+assets/tailwind.css   → Tailwind CONGELADO (regenerar: node tools/congelar-css.js)
 js/main.js            → punto de entrada (composición, nada más)
 js/core/              → rng.js (ÚNICO punto de azar) · math.js
 js/data/teams-repo.js → consultas a la base de selecciones

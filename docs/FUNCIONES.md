@@ -679,7 +679,7 @@ Quién hace qué:
 piel y la gramática espacial; ni una regla de juego se movió. Tres cosas nuevas:
 
 - **Lienzo FIJO de 1440×900** escalado entero (`components.screenStage`), igual que la
-  Concentración, con el kit `px-*` del bloque "EL PARTIDO" en `index.html`. El partido
+  Concentración, con el kit `px-*` del bloque "EL PARTIDO" en `css/pxkit.css`. El partido
   dejó de reflowear y **dejó de tener layout de móvil** (decisión PO, misma que el hub).
 - **El mando es una columna**, siempre a la vista: la altura del bloque son cinco
   escalones que se clickean, no un modal que se abre. Desapareció `openHeightModal`.

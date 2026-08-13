@@ -14,7 +14,7 @@
      72px  la barra de acción
 
    La columna derecha (372px) arranca en x=1056 y el complejo termina en 1030: no
-   se pisan nunca. La regla del kit vive en index.html (clases px-*).
+   se pisan nunca. La regla del kit vive en css/pxkit.css (clases px-*).
    ============================================================ */
 import { teamRating, teamStars } from "../../../game/ratings.js";
 import { dayLabel } from "../../../game/calendar.js";
@@ -28,6 +28,7 @@ import { STAT_LABELS } from "../../../content/daily/day-actions.js";
 import { oxidState } from "../../../game/oxidation.js";
 import { RARITIES } from "../../../content/daily/rarities.js";
 import { EVENT_THEMES } from "../../../content/daily/themes.js";
+import { RAREZA_HEX } from "../../theme.js";
 import { S } from "../../session.js";
 import { pxFlag } from "../../components.js";
 import { pxIcon } from "../../pixicons.js";
@@ -37,10 +38,9 @@ import { pxIcon } from "../../pixicons.js";
 // otra. Se re-exporta para no romper a quien ya la pedía a este módulo.
 export { pxFlag };
 
-/* Las rarezas traen su color como CLASE de Tailwind (`text-amber-400`), que acá no
-   sirve: el kit pixel pinta con `style` para poder mezclar con los tokens px-*. Este
-   es el mismo orden de rareza traducido a hex. */
-const RAREZA_HEX = { comun: "#94a3b8", infrecuente: "#34d399", rara: "#a78bfa", legendaria: "#fbbf24" };
+/* Acá vivía una segunda tabla de hex, en paralelo a las clases de Tailwind que
+   guardaban las rarezas: el kit pixel pinta con `style` y no podía usar aquellas.
+   Desde el 13-ago-2026 hay un solo color por rareza, en ui/theme.js. */
 
 /* ── 1 · La Oportunidad del día ─────────────────────────────────────────────── */
 

@@ -8,7 +8,7 @@
    interrumpe al DT, no lo que él decide.
    ============================================================ */
 import { dayLabel } from "../../../game/calendar.js";
-import { RARITIES } from "../../../content/daily/rarities.js";
+import { chapaRareza } from "../../theme.js";
 import { addJournal } from "../../../game/journal.js";
 import { EVENT_THEMES } from "../../../content/daily/themes.js";
 import { S } from "../../session.js";
@@ -81,12 +81,11 @@ export function irASquadSiBaja(prev) {
 /** Muestra el evento inevitable del día (ya aplicado por el motor) y vuelve al hub. */
 export function showDayEvent(ev, bajasPre = 0) {
   S.run.stats.eventos++;
-  const rar = RARITIES[ev.rareza];
   const m = modal(`
     <div class="text-center">
       ${themeHeader(ev.tema)}
       <div class="text-5xl mb-2">${ev.icon}</div>
-      ${rar ? `<div class="inline-block px-2.5 py-0.5 rounded-full border ${rar.border} ${rar.color} text-[10px] font-black uppercase tracking-widest mb-2">${rar.label}</div>` : ""}
+      ${chapaRareza(ev.rareza)}
       <h2 class="text-xl font-black mb-2">${ev.title}</h2>
       <p class="text-sm mb-2 ${ev.tipo === "buff" ? "text-emerald-400" : "text-red-400"}">${ev.desc}</p>
       <p class="text-[10px] text-slate-500 mb-5">Los eventos son inevitables: el mundo del Mundial no espera a nadie.</p>

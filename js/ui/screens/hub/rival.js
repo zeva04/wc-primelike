@@ -7,7 +7,7 @@
 import { getTeam } from "../../../data/teams-repo.js";
 import { playerOverall } from "../../../game/ratings.js";
 import { applyDayAction } from "../../../game/day-action.js";
-import { RARITIES } from "../../../content/daily/rarities.js";
+import { chapaRareza } from "../../theme.js";
 import { buildOpponentReport } from "../../../game/scouting.js";
 import { S } from "../../session.js";
 import { flagImg, modal, closeModal, toast } from "../../components.js";
@@ -156,11 +156,10 @@ export function showScoutReport(oppId) {
  */
 export function showOppChooser(o) {
   const me = getTeam(S.run.teamId);
-  const rar = RARITIES[o.rareza];
   const m = modal(`
     <div class="text-center">
       <div class="text-5xl mb-2">${o.icon}</div>
-      <div class="inline-block px-2.5 py-0.5 rounded-full border ${rar.border} ${rar.color} text-[10px] font-black uppercase tracking-widest mb-2">Oportunidad · ${rar.label}</div>
+      ${chapaRareza(o.rareza, "Oportunidad · ")}
       <h2 class="text-xl font-black mb-1">${o.title}</h2>
       <p class="text-slate-300 text-sm mb-4">${o.desc}</p>
       <p class="text-xs font-bold tp-text mb-3">${o.choose.label}</p>

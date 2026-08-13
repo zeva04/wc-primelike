@@ -52,7 +52,7 @@ export function showCanje(key) {
  * los partidos siguientes (`run.altura`).
  */
 export function alturaPicker() {
-  return `<div class="alt-picker">
+  return `<div>
     <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">🧱 Nuestra altura del bloque</div>
     <div class="flex items-center justify-center gap-1 flex-wrap">
       ${HEIGHTS.map(h => `<button data-alt="${h.n}" title="${h.desc}"

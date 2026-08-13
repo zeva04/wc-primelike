@@ -1,0 +1,298 @@
+/* ============================================================
+   css/base — LOS ESTILOS PROPIOS DEL JUEGO "VIEJO".
+
+   Todo lo que NO es el kit pixel: las variables de la paleta oficial, el fondo
+   del Mundial, el HUD de las pantallas de gestión, la pizarra táctica, las
+   mini-pizarras del selector de identidad, la sesión táctica del hub y las
+   animaciones compartidas. Convive con las cards redondeadas de Tailwind.
+
+   La frontera con css/pxkit.css es FÍSICA a propósito (13-ago-2026): antes las
+   dos familias vivían en el mismo <style> de 600 líneas dentro de index.html y
+   la única señal de dónde terminaba una y empezaba la otra era un comentario.
+   Se verificó al partir que no hay una sola regla cruzada en ninguna dirección,
+   así que el orden de carga (base primero, pxkit después) no cambia nada hoy;
+   si alguna vez hiciera falta que una gane sobre la otra, eso ES la mezcla que
+   el kit prohíbe. Ver tests/css.test.js, que vigila que no vuelvan a mezclarse.
+   ============================================================ */
+:root {
+  /* Paleta oficial WC26: emblema negro/blanco/dorado + tricolor de anfitriones */
+  --wc-gold: #D4AF37;
+  --wc-gold-light: #F0D97D;
+  --wc-gold-dark: #8B6914;
+  --wc-red: #EA002A;    /* Canadá */
+  --wc-green: #007A33;  /* México */
+  --wc-blue: #0057B8;   /* EE.UU. */
+  --wc-black: #0B0B0E;
+  /* Colores del equipo elegido (los setea JS al iniciar una run) */
+  --team-primary: #D4AF37;
+  --team-secondary: #8B6914;
+  --team-text: #0f172a;
+}
+/* ---- EL FONDO DEL MUNDIAL (sprint de UX) ----
+   Negro de base con las tres manchas de los anfitriones (rojo/verde/azul)
+   difuminadas hasta mezclarse. Va en una capa fija propia: así el desenfoque
+   es UNA textura de pantalla y no se recalcula con cada render de una tab. */
+body { background: var(--wc-black); min-height: 100vh; }
+body::before {
+  content: ""; position: fixed; inset: -25%; z-index: -2; pointer-events: none;
+  background:
+    radial-gradient(closest-side circle at 16% 22%, rgba(0, 87, 184, .95), transparent 100%),
+    radial-gradient(closest-side circle at 82% 18%, rgba(234, 0, 42, .85), transparent 100%),
+    radial-gradient(closest-side circle at 68% 82%, rgba(0, 122, 51, .95), transparent 100%),
+    radial-gradient(closest-side circle at 22% 86%, rgba(234, 0, 42, .55), transparent 100%),
+    radial-gradient(closest-side circle at 50% 48%, rgba(0, 87, 184, .45), transparent 100%);
+  filter: blur(90px) saturate(1.25);
+  opacity: .8;
+}
+/* Viñeta: el color vive en el centro y los bordes vuelven al negro. */
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(ellipse 95% 85% at 50% 50%, transparent 45%, rgba(6, 6, 10, .72) 100%);
+}
+/* ---- EL HUD (sprint de UX): la barra de estado de las pantallas de gestión ----
+   UN solo componente de medidor repetido —etiqueta, número, barra, pie—; que sean
+   IDÉNTICOS en forma es lo que los vuelve comparables de un vistazo. Lo único que
+   cambia por medidor es el color, que entra por la variable --g. */
+.hud {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
+  padding: 9px 14px; border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  background: rgba(9, 11, 16, .72); backdrop-filter: blur(6px);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+.hud-sep { width: 1px; align-self: stretch; background: rgba(255, 255, 255, .09); }
+.hud-label { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .16em; color: var(--g); opacity: .85; }
+.hud-lvl { font-size: 17px; font-weight: 900; line-height: 1.15; }
+.hud-lvl small { font-size: 12px; font-weight: 800; color: #64748b; }
+.hud-bar { height: 5px; border-radius: 3px; background: rgba(0, 0, 0, .6); overflow: hidden; margin-top: 4px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); }
+.hud-bar > span { display: block; height: 100%; border-radius: 3px; transition: width .5s ease; background: linear-gradient(90deg, color-mix(in srgb, var(--g) 45%, transparent), var(--g)); }
+.hud-foot { font-size: 10px; font-weight: 700; color: #64748b; margin-top: 3px; }
+/* El multiplicador como BUFF: chip corto en el color del medidor, no prosa. */
+.hud-chip {
+  font-size: 10px; font-weight: 900; letter-spacing: .04em; padding: 2px 6px; border-radius: 5px;
+  color: var(--g); background: color-mix(in srgb, var(--g) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--g) 34%, transparent);
+}
+/* El recurso gastable: placa dorada propia. No es un dato más, es lo que se gasta. */
+.hud-res {
+  display: flex; align-items: center; gap: 9px; padding: 7px 12px; border-radius: 11px;
+  border: 1px solid rgba(212, 175, 55, .34);
+  background: linear-gradient(160deg, rgba(212, 175, 55, .17), rgba(212, 175, 55, .04));
+}
+.hud-btn {
+  font-size: 11px; font-weight: 800; padding: 7px 11px; border-radius: 10px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .04); color: #cbd5e1;
+  transition: all .14s ease;
+}
+.hud-btn:hover { border-color: rgba(255, 255, 255, .28); color: #fff; background: rgba(255, 255, 255, .09); }
+.hud-btn:disabled { cursor: not-allowed; opacity: .4; }
+/* Tooltip propio (el `title` nativo tarda 1s y no combina): data-tip + .tip */
+.tip { position: relative; }
+.tip::after {
+  content: attr(data-tip);
+  position: absolute; top: 50%; right: calc(100% + 10px); transform: translateY(-50%);
+  white-space: nowrap; padding: 5px 9px; border-radius: 7px;
+  background: rgba(8, 8, 12, .96); border: 1px solid rgba(212, 175, 55, .38);
+  color: #e9e9f0; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  opacity: 0; pointer-events: none; transition: opacity .14s ease;
+}
+.tip:hover::after { opacity: 1; }
+/* Variante para tooltips en medio de una barra: cae abajo, no al costado. */
+.tip-b::after { top: calc(100% + 8px); right: auto; left: 50%; transform: translateX(-50%); }
+.btn-primary {
+  padding: 0.65rem 1.5rem;
+  border-radius: 0.75rem;
+  font-weight: 800;
+  color: #0f172a;
+  background: linear-gradient(135deg, var(--wc-gold-light), var(--wc-gold));
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.35);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 25px rgba(212, 175, 55, 0.5); }
+.btn-primary:disabled { cursor: not-allowed; }
+/* Utilidades con los colores del equipo elegido */
+.tp-border { border-color: var(--team-primary) !important; }
+.tp-text { color: var(--team-primary) !important; }
+.tp-bg-soft { background: color-mix(in srgb, var(--team-primary) 14%, transparent) !important; }
+.tp-gradient { background: linear-gradient(135deg, var(--team-primary), var(--team-secondary)); color: var(--team-text); }
+.tp-ring { box-shadow: 0 0 0 2px color-mix(in srgb, var(--team-primary) 55%, transparent); }
+.tp-topbar { border-top: 4px solid var(--team-primary); }
+/* Barra tricolor de los anfitriones */
+.tricolor-bar {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--wc-red) 0%, var(--wc-red) 32%, var(--wc-green) 34%, var(--wc-green) 65%, var(--wc-blue) 67%, var(--wc-blue) 100%);
+}
+.gold-text {
+  background: linear-gradient(180deg, var(--wc-gold-light), var(--wc-gold) 55%, var(--wc-gold-dark));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.flag-img { object-fit: cover; border-radius: 3px; box-shadow: 0 1px 4px rgba(0,0,0,.5); outline: 1px solid rgba(255,255,255,.18); display: inline-block; vertical-align: middle; }
+/* Césped de Gestión de Plantilla: franjas de corte + viñeta de estadio */
+.pitch {
+  background:
+    repeating-linear-gradient(180deg, rgba(255,255,255,.055) 0 8%, transparent 8% 16%),
+    linear-gradient(180deg, #1e7a3a 0%, #17632f 55%, #114d25 100%);
+  box-shadow: inset 0 0 70px rgba(0,0,0,.55);
+  image-rendering: pixelated;
+}
+.pitch-line { border-color: rgba(255,255,255,.28); pointer-events: none; position: absolute; }
+/* ---- Pizarra táctica (pantalla de Identidad, ui/board.js) ----
+   Manuscrita SOLO en anotaciones (decisión de sprint): fuentes del sistema,
+   el juego funciona offline y no se traen webfonts. */
+.tb-hand, .chalk-hand {
+  font-family: "Ink Free", "Segoe Script", "Bradley Hand", "Brush Script MT", cursive;
+  letter-spacing: .2px;
+}
+#tb-cam { transition: transform .5s cubic-bezier(.22,.7,.2,1); }
+.tb-node { transition: opacity .25s ease; }
+.tb-node:hover circle:nth-of-type(3) { filter: brightness(1.25); }
+.tb-node text { paint-order: stroke; }
+/* La cámara con zoom apaga el resto de la pizarra: el foco es el rasgo abierto */
+#tb-svg.tb-zoomed .tb-node:not(.tb-sel) { opacity: .3; }
+/* El post-it de lejos solo dice "Notas del DT"; su contenido aparece al hacerle zoom
+   (mismo gesto que un papel garabateado: te acercas para leerlo). */
+.tb-note-body { opacity: 0; transition: opacity .28s ease .2s; }
+.tb-note-cover { opacity: 1; transition: opacity .18s ease; }
+.tb-note.tb-sel .tb-note-body { opacity: 1; }
+.tb-note.tb-sel .tb-note-cover { opacity: 0; }
+@keyframes tbpulse { 0%,100% { opacity: .18; transform: scale(1); } 50% { opacity: .6; transform: scale(1.09); } }
+.tb-pulse { animation: tbpulse 2.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+/* ---- El RIEL DEL PIZARRÓN: la ficha del rasgo (decisión PO: opción D) ----
+   No es una card flotante ni otro papel: es la franja del tablero reservada
+   para escribir, espejo del riel de "Los 5 principios" de la izquierda. Misma
+   superficie, misma línea de tiza de separación. Entra deslizándose y SIEMPRE
+   aterriza en el mismo sitio — a sangre, de alto completo. */
+.tb-rail {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  /* UN TERCIO exacto: la pizarra abierta se lee 2 (rasgo) : 1 (sus datos), y
+     camTransform() centra el nodo en los dos tercios de la izquierda con ese
+     mismo número. Si este ancho cambia, hay que mover el factor de allá. */
+  width: 33.3333%; min-width: 300px;
+  display: flex; flex-direction: column;
+  padding: 22px 22px 20px;
+  border-radius: 0 20px 20px 0;
+  border-left: 1px solid rgba(223, 240, 229, .16);
+  background: linear-gradient(205deg, #17482f 0%, #0f3320 48%, #0a2417 100%);
+  box-shadow: -26px 0 44px rgba(0, 0, 0, .5), inset 0 0 70px rgba(0, 0, 0, .35);
+  transform: translateX(101%); opacity: 0; pointer-events: none;
+  transition: transform .42s cubic-bezier(.22, .7, .2, 1), opacity .28s ease;
+}
+.tb-rail.open { transform: none; opacity: 1; pointer-events: auto; }
+.tb-chalkline { height: 1px; background: rgba(223, 240, 229, .18); }
+/* El CUERPO de la ficha (desc + momento + efecto) SCROLLEA: hay rasgos de tres
+   efectos y el bloque de compra tiene que seguir aterrizando en el mismo píxel.
+   La barra se disimula — es una pizarra, no un panel de sistema. */
+.tb-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.tb-body::-webkit-scrollbar { width: 4px; }
+.tb-body::-webkit-scrollbar-thumb { background: rgba(223, 240, 229, .18); border-radius: 2px; }
+/* LA PLACA DEL EFECTO: lo que el rasgo hace de verdad en el partido. Se separa del
+   relato con un filete del color del marcador — no es otra tiza más, es el dato. */
+.tb-fx { border-left: 2px solid var(--ink); padding: 2px 0 2px 12px; }
+/* El COLOR DEL VALOR es la leyenda que no hace falta escribir (ui/screens/philosophy
+   fxKind): el marcador de la filosofía = probabilidad de que algo pase · verde =
+   acierto (tuyo arriba o del rival abajo, las dos te favorecen) · ámbar = frecuencia
+   en el sorteo · placa MACIZA = jugada nueva, que no es un dial sino contenido. */
+.tb-val {
+  --c: var(--ink);
+  display: inline-block; margin-right: 7px; padding: 1px 6px 2px;
+  border-radius: 3px; border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  color: var(--c); font-size: 14px; font-weight: 900; letter-spacing: .01em;
+  white-space: nowrap; vertical-align: 1px;
+}
+/* El color solo no alcanza: el marcador del ⚡ Contragolpe ES ámbar, así que ahí
+   "30%" y "×1.67" caerían del mismo tinte. Por eso el TIPO también se lee en la
+   forma — la probabilidad lleva contorno (es un evento, tiene borde), el acierto y
+   la frecuencia van sin él (son diales, se derraman). */
+.tb-val.is-acc, .tb-val.is-freq { border-color: transparent; background: color-mix(in srgb, var(--c) 20%, transparent); }
+.tb-val.is-acc { --c: #86efac; }
+.tb-val.is-freq { --c: #fbbf24; }
+.tb-val.is-new { background: var(--ink); border-color: var(--ink); color: #0a2417; }
+/* La LETRA CHICA: dónde/cuándo existe el rasgo. Ámbar de advertencia, y separada
+   del relato por su propia línea de tiza — no compite con los efectos, los acota. */
+.tb-gate {
+  border-top: 1px dashed rgba(251, 191, 36, .35); padding-top: 10px;
+  display: flex; gap: 7px; align-items: flex-start;
+  color: #fcd34d; font-size: 12.5px; line-height: 1.45;
+}
+/* La ETIQUETA IMANTADA: lo funcional (requisitos, compra) es un objeto sujeto
+   al tablero — es lo único que puede permitirse alto contraste sobre la tiza. */
+.tb-plate {
+  position: relative; border-radius: 4px; padding: 16px 14px 13px;
+  border: 1px solid rgba(223, 240, 229, .16);
+  background: rgba(223, 240, 229, .055);
+}
+.tb-cta {
+  position: relative; width: 100%; border-radius: 4px; padding: 15px 12px 13px;
+  background: var(--ink); color: #0a2417;
+  font-weight: 900; font-size: 14px; letter-spacing: .03em; cursor: pointer;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, .45);
+  transition: transform .12s ease, filter .15s ease;
+}
+.tb-cta:hover { filter: brightness(1.12); transform: translateY(-1px); }
+.tb-magnet {
+  position: absolute; top: 6px; width: 7px; height: 7px; border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #f6f8f4, #9aa79c 62%, #59665c);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .55);
+}
+@media (max-width: 700px) { .tb-rail { width: 100%; border-radius: 20px; } }
+/* ---- Mini-pizarras del selector de identidad (ui/plays.js) ----
+   Cada filosofía es un pizarrón chico con su jugada firma dibujada. La no
+   elegida se apaga a tiza gris; la elegida se levanta y enciende su marcador. */
+.filo-board {
+  background: linear-gradient(205deg, #17482f 0%, #0f3320 48%, #0a2417 100%);
+  border: 1px solid rgba(223, 240, 229, .12);
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .45), inset 0 0 50px rgba(0, 0, 0, .3);
+  cursor: pointer;
+  transition: transform .22s cubic-bezier(.22, .7, .2, 1), border-color .2s ease, box-shadow .2s ease, opacity .25s ease;
+}
+.filo-board:hover { transform: translateY(-3px); border-color: rgba(223, 240, 229, .3); }
+/* Sin elección todavía, las cuatro conviven al mismo peso. Elegida una, las
+   otras se apagan: la comparación sigue ahí, pero el foco es inequívoco.
+   Se apagan con OPACITY, no con filter: un filtro CSS sobre SVG se rasteriza
+   en CPU y colgaba el renderer con cuatro canchas en pantalla. */
+.filo-pick .filo-board:not(.is-sel) { opacity: .34; }
+.filo-board.is-sel {
+  transform: translateY(-5px) scale(1.03);
+  border-color: var(--ink);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, .55), 0 0 0 1px var(--ink), inset 0 0 50px rgba(0, 0, 0, .25);
+}
+/* Las anotaciones solo existen en la elegida: reservarles hueco en las cuatro
+   dejaba media pantalla vacía antes de elegir. La fila del grid crece al
+   seleccionar — que es justo la lectura buscada, "la tarjeta se agranda". */
+.filo-annot { display: none; }
+.filo-board.is-sel .filo-annot { display: block; animation: fadein .3s ease; }
+
+/* ---- Sesión Táctica: los 5 principios como marcadores de tiza (hub) ----
+   Trae el idioma del pizarrón a la acción que construye identidad, SIN filtros
+   SVG (el hub ya renderiza mucho): tinte verde + fuente manuscrita + color por
+   principio bastan. Espejo del riel izquierdo de la pizarra grande. */
+.tac-board { background: linear-gradient(160deg, rgba(23,72,47,.42), rgba(10,36,23,.5)) !important; }
+.tac-mark {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 7px 3px 6px; border-radius: 10px;
+  border: 1px solid rgba(223,240,229,.1); background: rgba(2,20,12,.4);
+  transition: transform .14s ease, border-color .15s ease, background .15s ease;
+}
+.tac-mark:not(:disabled) { cursor: pointer; }
+.tac-mark:not(:disabled):hover { border-color: var(--pc); background: rgba(2,20,12,.72); transform: translateY(-2px); }
+.tac-mark.is-foco { border-color: var(--pc); box-shadow: inset 0 0 0 1px var(--pc); }
+.tac-mark:disabled { opacity: .5; }
+.tac-bar { width: 100%; height: 3px; border-radius: 2px; background: rgba(0,0,0,.45); overflow: hidden; }
+.tac-bar > span { display: block; height: 100%; border-radius: 2px; }
+.board-frame {
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 18px 50px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
+  overflow: hidden;
+}
+@keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.animate-fadein { animation: fadein 0.3s ease; }
+@keyframes pop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+.animate-pop { animation: pop 0.2s ease; }
+@keyframes floaty { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
+.animate-floaty { animation: floaty 5s ease-in-out infinite; }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #16161c; }
+::-webkit-scrollbar-thumb { background: #3f3f4a; border-radius: 4px; }

@@ -149,7 +149,7 @@ diseños de Claude Design):
   `ui/components.js`). No reflowea: es pixel art y un layout elástico obligaría a escalar en
   fracciones. En ventanas angostas quedan bandas negras; el móvil pediría un layout propio,
   que hoy **no existe**.
-- **Kit propio**, todas las clases `px-*` en `index.html`: bordes duros de 2px, sombras
+- **Kit propio**, todas las clases `px-*` en `css/pxkit.css`: bordes duros de 2px, sombras
   sólidas sin blur, grilla de 8px, Silkscreen solo en mayúsculas. No mezclar con las cards
   redondeadas de Tailwind que usa el resto del juego.
 - **Todo el arte se dibuja**, no se carga: los seis edificios isométricos
@@ -163,11 +163,33 @@ diseños de Claude Design):
   1440×`PLANO_H` anclado abajo, y la columna del HUD arranca en x=1056. `tests/hub.test.js`
   verifica que ninguna parcela se salga ni se solape — es lo que una captura no chequea.
 
-## Deuda técnica que conviene tener presente
+## El CSS: tres hojas, y Tailwind va ÚLTIMO
 
-`index.html` carga **Tailwind desde `cdn.tailwindcss.com`**. El README dice "sin
-dependencias" y hay un comentario en el CSS que dice que el juego funciona offline: las dos
-cosas son falsas hoy para los estilos. Sin red, la UI queda sin maquetar. Cambiarlo pide un
-paso de build, que es justo lo que el proyecto decidió no tener — está declarado acá para que
-la decisión sea consciente y no una sorpresa. (La fuente Silkscreen del hub **sí** va
-auto-hospedada en `assets/fonts/`, así que esa parte no depende de la red.)
+Hasta el 13-ago-2026 esto era una deuda declarada: `index.html` cargaba Tailwind desde
+`cdn.tailwindcss.com` —el compilador entero corriendo en el navegador— así que sin red la UI
+quedaba sin maquetar, y el JIT aplicaba las clases de forma asíncrona, lo que obligaba a
+esperar 50ms a ojo antes de medir cualquier layout. Ya no: el CSS está **congelado** en
+`assets/tailwind.css` y el juego no hace **ninguna** petición externa.
+
+```
+<link href="css/base.css">      todo lo que NO es el kit pixel
+<link href="css/pxkit.css">     el kit pixel (las clases px-*)
+<link href="assets/tailwind.css">  ← ÚLTIMO, y es a propósito
+```
+
+**El orden es al revés de lo que parece y no se toca.** Lo normal sería el framework primero
+y los overrides después; acá Tailwind va al final porque el CDN inyectaba su hoja DESPUÉS de
+nuestro `<style>`, o sea que toda la UI está escrita asumiendo que Tailwind gana los empates
+de especificidad. Con Tailwind primero, `.tip { position: relative }` de `base.css` le gana a
+`.absolute` y el menú entero se corre 68px hacia abajo. Es el tipo de cosa que no rompe nada
+visible en la pantalla que estás mirando.
+
+**Congelar no agrega un paso de build**: quien clona corre `npx http-server` y juega. El CSS
+se regenera A MANO con `node tools/congelar-css.js` (usa el CLI de Tailwind v3 clavado por
+versión, el mismo motor que servía el CDN) y solo hace falta cuando cambian las clases.
+`tests/css.test.js` es el que avisa: falla si una clase quedó sin hoja, si el congelado quedó
+corto, o si alguien mezcló el kit pixel con el redondeo de Tailwind en la misma caja.
+
+Deuda que queda abierta: no hay layout móvil (ver el lienzo fijo de arriba), y el kit viejo y
+el pixel siguen conviviendo — `match/squad.js` es todavía un modal redondeado dentro de una
+pantalla pixel.

@@ -239,7 +239,7 @@ function principlesBand(run, f) {
     const pct = techo ? Math.min(100, (100 * (xp - piso)) / (techo - piso)) : 100;
     const mine = p.id === f.id;
     const col = markerColor(p);
-    return `<g class="tb-filo" data-filo="${p.id}" style="cursor:pointer">
+    return `<g data-filo="${p.id}" style="cursor:pointer">
       <rect x="${x - 6}" y="${HEAD_Y - 16}" width="${CHIP_W - 8}" height="34" rx="5" fill="${mine ? col : "#000"}" opacity="${mine ? 0.14 : 0.001}"/>
       <text x="${x}" y="${HEAD_Y}" font-size="15">${p.icon}</text>
       <text x="${x + 21}" y="${HEAD_Y}" font-size="11.5" font-weight="${mine ? 800 : 600}"

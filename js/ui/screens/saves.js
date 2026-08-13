@@ -214,7 +214,7 @@ function tarjetaOcupada(i, rec) {
       ? `<div class="px-tag px-tag-gold" style="font-size:9px;padding:4px 8px">${etapaTxt(run)}</div>`
       : `<div class="px-tag" style="font-size:9px;padding:4px 8px;background:var(--px-panel-hi);color:#d4cee0;border-color:var(--px-line)">${etapaTxt(run)}</div>`;
 
-  return `<div data-slot="${i}" class="slot-card flex items-stretch cursor-pointer"
+  return `<div data-slot="${i}" class="flex items-stretch cursor-pointer"
       style="flex:1;min-height:0;background:var(--px-panel);border:2px solid var(--px-line);box-shadow:3px 3px 0 var(--px-shadow)">
     <div style="width:8px;background:${franja}"></div>
     ${identidad(n, me)}
@@ -252,7 +252,7 @@ function tarjetaOcupada(i, rec) {
 /** Una ranura vacía: la invitación a empezar. */
 function tarjetaLibre(i) {
   const n = String(i + 1).padStart(2, "0");
-  return `<div data-slot="${i}" class="slot-card flex items-stretch cursor-pointer"
+  return `<div data-slot="${i}" class="flex items-stretch cursor-pointer"
       style="flex:1;min-height:0;background:rgba(28,25,36,.6);border:2px dashed var(--px-line-off)">
     <div class="flex flex-col items-center justify-center gap-2.5" style="width:190px;padding:0 12px;border-right:2px solid var(--px-bg)">
       <div class="px" style="font-size:9px;letter-spacing:.14em;color:var(--px-faint)">Ranura ${n}</div>
@@ -275,7 +275,7 @@ function tarjetaLibre(i) {
  */
 function tarjetaIncompatible(i, rec) {
   const n = String(i + 1).padStart(2, "0");
-  return `<div data-slot="${i}" class="slot-card flex items-stretch cursor-pointer"
+  return `<div data-slot="${i}" class="flex items-stretch cursor-pointer"
       style="flex:1;min-height:0;background:rgba(28,25,36,.6);border:2px dashed var(--px-bad)">
     <div class="flex flex-col items-center justify-center gap-2.5" style="width:190px;padding:0 12px;border-right:2px solid var(--px-bg)">
       <div class="px" style="font-size:9px;letter-spacing:.14em;color:var(--px-faint)">Ranura ${n}</div>

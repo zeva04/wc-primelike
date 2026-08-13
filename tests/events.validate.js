@@ -19,7 +19,17 @@ const tierIds = Object.keys(RARITIES);
 assert(tierIds.length === 4, "hay 4 niveles de rareza");
 for (const [id, t] of Object.entries(RARITIES)) {
   assert(typeof t.weight === "number" && t.weight > 0, "peso positivo", id);
-  assert(t.label && t.color && t.border, "rareza con label/color/border", id);
+  assert(!!t.label, "rareza con label", id);
+  // El COLOR se fue a ui/theme.js el 13-ago-2026: era una clase de Tailwind viviendo
+  // en content/, que tiene prohibido el DOM (ARQUITECTURA §4.2). Se sigue exigiendo
+  // que EXISTA uno por rareza —si no, la chapita sale sin color— pero desde el otro
+  // lado de la frontera. Es lo único que este validador mira de la capa de UI, y por
+  // eso el import va acá abajo y no arriba con los del contenido.
+  assert(!t.color && !t.border, "la rareza ya no trae clases de CSS", id);
+}
+const { RAREZA_HEX } = await import("../js/ui/theme.js");
+for (const id of tierIds) {
+  assert(/^#[0-9a-f]{6}$/i.test(RAREZA_HEX[id] || ""), "la rareza tiene un color en ui/theme", id);
 }
 
 // ---------- PREP_EVENTS: esquema ----------

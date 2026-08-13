@@ -139,11 +139,12 @@ function renderMenu() {
     </div>
     </div>
   `);
-  // Tailwind CDN aplica sus clases de forma asíncrona (JIT en runtime), así que medir
-  // en el mismo tick del innerHTML da un layout todavía sin estilizar. setTimeout (no
-  // requestAnimationFrame: rAF se pausa en pestañas en segundo plano/automatizadas y
-  // el escalado nunca llegaba a aplicarse) le da el respiro para asentarse de verdad.
-  setTimeout(() => fitScaleUp("menu-content"), 50);
+  // Se mide en el mismo tick: el CSS ya está aplicado cuando esto corre. Acá vivía un
+  // `setTimeout(…, 50)` porque el CDN de Tailwind compilaba las clases en el navegador
+  // de forma asíncrona y el primer layout salía sin estilizar, así que había que
+  // esperar un rato a ojo. Con el CSS congelado (assets/tailwind.css) la hoja bloquea
+  // el render y el tamaño ya es el definitivo: el número mágico se fue con el CDN.
+  fitScaleUp("menu-content");
   document.querySelectorAll(".confed-tab").forEach(b => b.onclick = () => {
     menuConfed = b.dataset.confed;
     // Al cambiar de continente se abre con su primer equipo en orden alfabético
