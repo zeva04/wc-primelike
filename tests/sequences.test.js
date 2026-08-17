@@ -235,7 +235,33 @@ assert(E.sequenceType("no-existe") === undefined, "sequenceType devuelve undefin
   const total = porTerritorio + porVencimiento;
   assert(porTerritorio / total > 0.5, "la mayoría de las jugadas las dispara el TERRITORIO, no el vencimiento",
     `${(100 * porTerritorio / total).toFixed(0)}% territorio`);
-  assert(porVencimiento > 0, "el vencimiento sigue siendo la red: un partido trabado igual genera fútbol");
+  // "porVencimiento > 0" sobre 40 partidos era una moneda: el vencimiento es la red, no la
+  // regla — puede no tocarle a ningún partido de la muestra y el motor seguir sano (medido:
+  // ~1 de cada 3 corridas caía del lado malo, en master, sin tocar nada de acá). El bloque
+  // de abajo prueba que el vencimiento EXISTE como camino por MECANISMO, no por conteo.
+}
+
+// ---------- EL VENCIMIENTO ES UN CAMINO REAL (no una frecuencia a medir) ----------
+{
+  const m = makeMatch("MAR");
+  // Population lazy de m._seqPlan: la primera llamada arma el plan si todavía no existe.
+  m.min = 0;
+  E.maybeStartSequence(m);
+  const slot = m._seqPlan.slots[0];
+  // LA PELOTA CLAVADA EN EL MEDIOCAMPO: zonaViva = field.v !== 3, así que con v=3 fijo
+  // la ventana JAMÁS puede abrir por territorio, se juegue el minuto que se juegue.
+  m.field.v = 3; m.field.vf = 3;
+  m.seq = null; m.decision = null;
+  let disparoTemprano = false;
+  for (m.min = Math.ceil(slot.abre); m.min < slot.cierra; m.min++) {
+    m.field.v = 3; m.field.vf = 3; // por si algún tick lateral lo movió
+    if (E.maybeStartSequence(m)) { disparoTemprano = true; break; }
+    m.seq = null; m.decision = null;
+  }
+  assert(!disparoTemprano, "con la pelota clavada en el medio, la ventana NO abre antes de vencer");
+  m.min = slot.cierra;
+  const disparoAlVencer = E.maybeStartSequence(m);
+  assert(disparoAlVencer, "y al llegar `cierra` dispara igual: el vencimiento es la red, no depende del territorio");
 }
 
 // ---------- M2: el gating por nivel de las avanzadas, y sus desenlaces nuevos ----------

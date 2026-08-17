@@ -655,13 +655,20 @@ function centroV(map) {
       }
     return todo ? 100 * alto / todo : 0;
   };
+  // La clase "goleada" la define el MARCADOR FINAL, que es en sí mismo el producto de
+  // ~90 minutos random — no hay forma de aislar el mecanismo sin dejar de medir lo que
+  // el PO pidió (que la acumulación real lo muestre). Es un test estadístico de verdad,
+  // así que se lo trata como tal: N=120 medía un gap real de 2-9 puntos contra un piso
+  // de +3, y caía del lado malo ~1 de cada 6-10 corridas (medido: mínimo 2.37 en 20
+  // corridas de N=120). Con N=400 el piso medido sube a ~5 en 15 corridas — la muestra
+  // absorbe el ruido de qué partidos caen en cada bolsa, no el umbral.
   const goleadas = [], ajustados = [];
-  for (let i = 0; i < 120; i++) {
+  for (let i = 0; i < 400; i++) {
     const m = jugar("BRA", "MAR");
     (m.gMy - m.gOpp >= 3 ? goleadas : ajustados).push(tercio(m));
   }
   const prom = a => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length);
-  assert(goleadas.length >= 10 && ajustados.length >= 10, "hay muestra de las dos clases de partido",
+  assert(goleadas.length >= 30 && ajustados.length >= 30, "hay muestra de las dos clases de partido",
     `${goleadas.length} goleadas · ${ajustados.length} ajustados`);
   assert(prom(goleadas) > prom(ajustados) + 3,
     "el partido goleado se juega en el ÚLTIMO TERCIO, no en el medio puro",
