@@ -40,8 +40,13 @@ const KEY = "wc26_saves";
 /** Cuántas partidas en paralelo caben. Tres, y una copa por ranura. */
 export const SLOTS = 3;
 
-/** Versión del formato de ranura. Subirla invalida los guardados viejos a propósito. */
-export const SAVE_VERSION = 1;
+/** Versión del formato de ranura. Subirla invalida los guardados viejos a propósito.
+ *  v2 (13-ago-2026) — el rediseño del catálogo de RASGOS: dieciséis ids dejaron de
+ *  existir y `run.rasgos` los guarda crudos. Una ranura vieja traería rasgos que ya no
+ *  se pueden resolver (PI gastado en nada) y, peor, un árbol sin su RAÍZ, que ahora es
+ *  el requisito de las tres ramas: el candado nombraría un nodo que la run nunca podría
+ *  comprar. Decisión PO: se invalidan, no se migran. */
+export const SAVE_VERSION = 2;
 
 /** El almacén entero, o null si no hay/está corrupto. */
 function leerTodo() {

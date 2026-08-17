@@ -115,6 +115,13 @@ export const BUILDERS = {
       ...(hookOf(m, "squarePass") && familyOf(s.type) === "transicion"
         ? [{ label: "🎯 Pase atrás", hint: `La pisa y la devuelve al que entra de frente (Pase corto ${s.prot.stats.pase_corto})`, key: "pase_atras", risk: 2 }]
         : []),
+      // EL ZARPAZO (Press, intermedia): la jugada nueva de SU familia — el robo alto.
+      // No se controla: se remata en el mismo movimiento, antes de que el arquero
+      // termine de acomodarse. Es todo o nada, y por eso es la opción de más riesgo
+      // del acto.
+      ...(hookOf(m, "firstTime") && familyOf(s.type) === "recuperacion"
+        ? [{ label: "🐾 Rematar de primera", hint: "Sin control, en el mismo movimiento del robo: si la agarra bien el arquero no llega… y si no, se va a la tribuna", key: "primera", risk: 5 }]
+        : []),
     ],
   }),
 };
@@ -282,6 +289,24 @@ export function resolveCross(m, s, key, f) {
 
 
 export function resolveFinish(m, s, key, f) {
+  // EL ZARPAZO (Press): rematar de PRIMERA, sin controlar. Dos pasos, y el primero es
+  // el que la hace una apuesta: `p` de las veces la pelota le sale de la bota sin
+  // dirección y la jugada muere ahí, sin siquiera un remate al arco. Cuando la agarra
+  // bien, en cambio, el arquero no llegó a acomodarse y el remate vale como un regalo.
+  // No hay rebote posible: o sale limpio o se va a la tribuna.
+  if (key === "primera") {
+    const ft = hookOf(m, "firstTime");
+    if (!ft) return resolveSequenceAct(m, "rematar");
+    traitMoment(m, ft.traitId, [ft.texto]);
+    if (rnd() < ft.p) {
+      dtFail(m);
+      return closeSeq(m, "chance", `min ${m.clock()}' — ${s.prot.name} la agarra de primera y la manda a la tribuna. No la pensó… y se nota.`);
+    }
+    const shot = A.actShot(m, s.prot, { stat: s.finishStat || f.finishStat, bonus: s.bonus + f.finishBonus + ft.bonus });
+    if (shot.ok) { goalMine(m, s.prot, "¡DE PRIMERA! No la controló: la reventó apenas la robaron y el arquero ni se movió.", s.assistFrom || "open"); return closeSilent(m); }
+    dtFail(m);
+    return closeSeq(m, "chance", `min ${m.clock()}' — ${s.prot.name} remata de primera y ${pick(["el arquero manotea lo imposible", "se estrella en el palo", "pasa rozando el ángulo"])}. ¡Qué cerca!`);
+  }
   // FRÍOS: se cambia MI ocasión por la del rival. La jugada muere sin peligro y el
   // generador le descuenta una llegada al rival (sequences.maybeStartSequence). Es
   // una decisión honesta: resignás atacar para proteger el resultado.
@@ -349,10 +374,13 @@ export function resolveFinish(m, s, key, f) {
   }
   if (key === "asistir") {
     const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
-    // Superioridad Numérica: en la familia de la contra, el pase elige al MEJOR
-    // ubicado DE VERDAD (el de mejor Tiro), no a un corredor cualquiera.
-    const supUp = hookOf(m, "supportUpgrade");
-    const numeric = supUp && familyOf(s.type) === "transicion" && mates.length > 0;
+    // El pase elige al MEJOR ubicado DE VERDAD (el de mejor Tiro), no a un corredor
+    // cualquiera. Por FAMILIA, como sus hermanos (finishSupport, skipToFinish…): estaba
+    // clavado a la contra desde que su único dueño era del Contragolpe, y eso lo dejaba
+    // mudo para cualquier otro árbol — Pacientes (Press) elige bien tras el ROBO ALTO,
+    // que es otra jugada y el mismo gesto.
+    const supUp = hookOf(m, "supportUpgrade", familyOf(s.type));
+    const numeric = supUp && mates.length > 0;
     // ODISEA (costura cerrada): EL DESMARQUE. Sin Superioridad Numérica, el que recibe
     // el pase de gol no es el mejor ubicado: es el que ARRANCÓ. La velocidad pondera el
     // sorteo (mismo cuadrático sobre 70 que protStatW: vel 95 ×1.8, vel 55 ×0.6) sin

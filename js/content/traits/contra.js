@@ -1,209 +1,178 @@
 /* Rasgos de ⚡ CONTRAGOLPE — atacar el espacio.
-   Tres ramas: firma (profundiza lo propio) · respuesta (cubre el matchup débil)
-   · expansión (abre un fútbol lateral). El nivel de desbloqueo y el costo salen
-   del tier (ver TRAIT_LEVEL / TRAIT_COST en ./index.js).
-   `efecto` = lo que hace en el partido, leído del hook (convenciones en ./press.js). */
+   Forma v2: 1 raíz + 3 ramas × 3 tiers + 2 Masters (uno de Firma, uno que
+   converge Respuesta + Expansión). Convenciones de `efecto`, escala cerrada y
+   excepción de los multiplicadores `vsFilo`: documentadas en ./press.js. */
 
 export const TRAITS_CONTRA = [
-  /* Firma · la contra misma */
+  /* ── RAÍZ ───────────────────────────────────────────────────────────────── */
+  {
+    id: "punta_velocidad", filo: "contra", rama: "raiz", tier: "root", icon: "⚡",
+    nombre: "Punta de Velocidad",
+    desc: "El equipo se arma alrededor de una idea sola: cuando hay campo por delante, el que conduce arranca y no lo alcanza nadie.",
+    momento: "Los treinta metros corridos de una sola vez, sin que nadie le llegue.",
+    efecto: [["+5%", "de acierto al CONDUCIR la contra: el arranque al espacio se gana"]],
+    req: {}, pos: { x: 150, y: 372 },
+    hooks: { carryBonus: { bonus: 0.05,
+      texto: "Punta de velocidad: arrancó y la carrera ya estaba decidida a los diez metros." } },
+  },
+
+  /* ── FIRMA · la contra misma ─────────────────────────────────────────────── */
   {
     id: "primer_pase", filo: "contra", rama: "firma", tier: "basic", icon: "📡",
     nombre: "Primer Pase",
     desc: "El primer pase tras recuperar la pelota no se piensa: sale hacia adelante y sale bien. La contra nace ya lanzada.",
     momento: "El pase que sale en el mismo movimiento del robo.",
-    efecto: [["+5%", "de acierto en el PRIMER pase de la contra, el que la lanza"]],
-    req: {}, pos: { x: 190, y: 150 },
-    hooks: { transitionPass: { act: "first", bonus: 0.05,
+    efecto: [["+10%", "de acierto en el PRIMER pase de la contra, el que la lanza"]],
+    req: { previo: "punta_velocidad" }, pos: { x: 415, y: 165 },
+    hooks: { transitionPass: { act: "first", bonus: 0.10,
       texto: "El primer pase salió al toque: la contra nace lanzada, sin escala de seguridad." } },
   },
   {
-    id: "primera_marcha", filo: "contra", rama: "firma", tier: "intermediate", icon: "📈",
-    nombre: "Primera Marcha",
-    desc: "Ya en carrera, el equipo se entiende: los pases de la contra encuentran siempre al que va lanzado.",
-    momento: "Tres pases a toda velocidad sin que la pelota toque el piso dos veces.",
-    efecto: [["+5%", "de acierto en TODOS los pases de la contra (se apila con Primer Pase)"]],
-    req: { previo: "primer_pase" },
-    pos: { x: 450, y: 125 },
-    hooks: { transitionPass: { bonus: 0.05,
-      texto: "Primera marcha metida: la contra circula a toda velocidad y ningún pase se cae." } },
-  },
-  {
-    id: "ataque_espacio", filo: "contra", rama: "firma", tier: "intermediate", icon: "🏃",
-    nombre: "Ataque al Espacio",
-    desc: "Cuando uno arranca, arrancan tres: el que conduce siempre tiene a quién buscar en carrera.",
-    momento: "Tres contra dos y definición cruzada.",
-    efecto: [["+6%", "de acierto al buscar al desmarcado en el desenlace de la CONTRA"]],
-    req: { previo: "primer_pase" },
-    pos: { x: 450, y: 250 },
-    hooks: { finishSupport: { of: "transicion", bonus: 0.06,
-      texto: "Los desmarques al espacio parten a la defensa: hay dos camisetas libres esperando el pase." } },
-  },
-  {
-    id: "ataque_relampago", filo: "contra", rama: "firma", tier: "advanced", icon: "⚡",
+    id: "ataque_relampago", filo: "contra", rama: "firma", tier: "intermediate", icon: "🌩️",
     nombre: "Ataque Relámpago",
     desc: "Del robo al remate en el menor número de pases posible: la jugada se resuelve antes de que el rival vuelva a estar en su sitio.",
     momento: "Robo, pase, gol: ocho segundos.",
     efecto: [
-      ["30%", "de que la contra saltee los actos intermedios y se juegue a UNA (+5% de acierto)"],
+      ["30%", "de que la contra saltee los actos intermedios y se juegue a UNA (+10% de acierto)"],
       ["PROFUNDA", "la jugada firma del Contragolpe gana su tramo extra"],
     ],
-    req: { todos: ["primera_marcha", "ataque_espacio"] },
-    pos: { x: 700, y: 190 },
+    req: { previo: "primer_pase" }, pos: { x: 650, y: 165 },
     hooks: {
-      skipToFinish: { of: "transicion", p: 0.30, bonus: 0.05,
+      skipToFinish: { of: "transicion", p: 0.30, bonus: 0.10,
         intro: p => `¡Sin escalas! ${p.name} sale disparado: la contra se juega a UNA.` },
       deepContra: {},
     },
   },
   {
-    id: "duelista", filo: "contra", rama: "firma", tier: "master", icon: "👑",
+    id: "duelista", filo: "contra", rama: "firma", tier: "advanced", icon: "🏃",
     nombre: "Duelista",
-    desc: "En cada contra hay un jugador que se suelta solo: el equipo lo busca siempre, y el mano a mano es el desenlace natural.",
-    momento: "El delantero solo contra el arquero, otra vez.",
-    efecto: [["30%", "de que el desenlace de la CONTRA se acelere hasta el mano a mano (+7% de acierto)"]],
-    req: { previo: "ataque_relampago" },
-    pos: { x: 940, y: 130 },
-    hooks: { accelFinish: { of: "transicion", p: 0.30, bonus: 0.07,
-      intro: p => `¡${p.name} se suelta de la marca y ya no lo agarra nadie: MANO A MANO con el arquero!` } },
+    desc: "La contra ya está en marcha y el que la lleva no acepta el pase: encara al último defensor, se lo saca de encima y sigue. Lo que era una jugada de tres pasa a ser cosa de dos.",
+    momento: "El uno contra uno ganado a la carrera, en la última línea, con todo el estadio de pie.",
+    efecto: [["30%", "de que la contra YA LANZADA se salte su último pase: encara, gana el duelo y define él (+15%)"]],
+    req: { previo: "ataque_relampago" }, pos: { x: 885, y: 165 },
+    hooks: { accelFinish: { of: "transicion", p: 0.30, bonus: 0.15,
+      intro: p => `¡${p.name} encara al último y se lo lleva puesto! Ya no hay a quién pasarla: va él.` } },
   },
   {
-    id: "el_enjambre", filo: "contra", rama: "firma", tier: "master", icon: "👑",
+    id: "el_enjambre", filo: "contra", rama: "firma", tier: "master", icon: "🐝",
     nombre: "El Enjambre",
     desc: "La contra ya no la corren dos: la corren cinco. Cuando la pelota llega al área, la defensa rival no sabe a quién marcar.",
     momento: "Cuatro camisetas cruzando mediocampo a la vez.",
     efecto: [
-      ["+5%", "de acierto al buscar al MEJOR rematador real, no al más cercano"],
-      ["+6%", "de acierto cuando la contra llega en oleada a campo abierto"],
+      ["+10%", "de acierto cuando la contra llega en oleada a campo abierto"],
+      ["+5%", "de que le hagan FALTA al que conduce la contra: más tiros libres y más penales"],
     ],
-    req: { previo: "ataque_relampago" },
-    pos: { x: 940, y: 265 },
+    req: { previo: "duelista" }, pos: { x: 1092, y: 165 },
     hooks: {
-      supportUpgrade: { bonus: 0.05,
-        texto: "El enjambre llegó entero: el pase encuentra al mejor rematador completamente libre." },
-      avalancha: { bonus: 0.06,
+      avalancha: { bonus: 0.10,
         texto: "AVALANCHA a campo abierto: la contra llega en oleada y la defensa no sabe a quién marcar." },
+      // El segundo efecto que le faltaba al Master más pobre del catálogo. Y no es un
+      // bonus más: una falta CAMBIA el marcador (tiro libre, penal, tarjeta rival), así
+      // que se siente de una manera que un porcentaje de acierto no puede.
+      counterFouls: { plus: 0.05,
+        texto: "Con cinco encima no lo pueden frenar limpio: al que corre la contra hay que hacerle falta." },
     },
   },
 
-  /* Respuesta · el precio de correr, y cómo fabricarse la contra */
+  /* ── RESPUESTA · el precio de correr, y cómo fabricarse la contra ────────── */
   {
-    id: "anaerobicos", filo: "contra", rama: "respuesta", tier: "basic", icon: "🫁",
-    nombre: "Anaeróbicos",
-    desc: "El equipo está hecho para el esfuerzo explosivo: salir a apretar y volver a correr le cuesta menos que a cualquiera.",
-    momento: "La cuarta ráfaga de presión del partido, corrida igual que la primera.",
-    efecto: [["−15%", "de energía por cada botón de PRESIÓN que aprietes en el partido"]],
-    req: {}, pos: { x: 190, y: 395 },
-    hooks: { pressStamina: { factor: 0.85 } },
-  },
-  {
-    id: "defensa_intencionada", filo: "contra", rama: "respuesta", tier: "intermediate", icon: "🪖",
-    nombre: "Defensa Intencionada",
-    desc: "El despeje de cabeza deja de ser un manotazo de ahogado: el central cabecea buscando a un compañero, y ahí ya empezó la contra.",
-    momento: "El cabezazo del central que termina en gol treinta metros más allá.",
-    efecto: [["30%", "de que el córner rival defendido de cabeza encadene CONTRA mía (+4% de acierto)"]],
-    req: { previo: "anaerobicos" },
-    pos: { x: 430, y: 350 },
-    hooks: { chainOnDefendSp: { to: "transicion", p: 0.30, bonus: 0.04,
-      intro: p => `¡El despeje fue un PASE! ${p.name} la baja de cabeza y el equipo sale de contra con el rival entero arriba.` } },
+    id: "estoicos", filo: "contra", rama: "respuesta", tier: "basic", icon: "🗿",
+    nombre: "Estóicos",
+    desc: "Replegado, el equipo aguanta lo que le tiren: cede terreno sin ceder el área, y espera su momento.",
+    momento: "El rival estrellándose contra el bloque una y otra vez.",
+    efecto: [["+10%", "de acierto en el acto de CONTENER el ataque rival cuando estás replegado"]],
+    req: { previo: "punta_velocidad" }, pos: { x: 415, y: 372 },
+    hooks: { containBonus: { bonus: 0.10,
+      texto: "El bloque aguanta estoico: cortan la jugada sin despeinarse." } },
   },
   {
     id: "el_anzuelo", filo: "contra", rama: "respuesta", tier: "intermediate", icon: "🎣",
     nombre: "El Anzuelo",
     desc: "El equipo tiene la pelota en su propio campo y espera: el rival, aburrido de mirar, termina saliendo a buscarla — y eso es exactamente lo que se quería.",
     momento: "El rival dando dos pasos afuera de su bloque y el espacio a su espalda abierto de par en par.",
+    // ⚠ El ×1.67 NO se redondea a ×1.5: es 1 / celda de la matriz contra los que esperan
+    // (0.6 × 1.67 ≈ 1.00). Con ×1.5 la celda queda en 0.90 y el partido muerto sigue muerto.
     efecto: [
-      ["×1.20", "el rival sale a presionar tu salida más seguido: sobrevivirla YA es una contra"],
+      ["×1.25", "el rival sale a presionar tu salida más seguido: sobrevivirla YA es una contra"],
       ["×1.67", "más TRANSICIONES en tu sorteo, solo contra ⚡ Contragolpe y 🧱 Bloque bajo (el partido muerto)"],
-      ["30%", "de convertir la circulación-cebo en contra mía (+5% de acierto)"],
+      ["30%", "de convertir la circulación-cebo en contra mía (+10% de acierto)"],
     ],
-    req: { previo: "anaerobicos" },
-    pos: { x: 430, y: 455 },
+    req: { previo: "estoicos" }, pos: { x: 650, y: 372 },
     hooks: {
-      oppPoolMod: { weights: { salida_fondo: 1.20 } },
+      oppPoolMod: { weights: { salida_fondo: 1.25 } },
       poolMod: { vsFilo: ["contra", "bloque"], weights: { transicion: 1.67 } },
-      baitConvert: { vsFilo: ["contra", "bloque"], p: 0.30, bonus: 0.05,
+      baitConvert: { vsFilo: ["contra", "bloque"], p: 0.30, bonus: 0.10,
         texto: "¡Picaron el ANZUELO! El rival dio dos pasos afuera y el espacio a su espalda es una autopista." },
     },
   },
   {
-    id: "segundo_aire", filo: "contra", rama: "respuesta", tier: "advanced", icon: "💨",
-    nombre: "Segundo Aire",
-    desc: "En el tramo final del partido, cuando todos arrastran las piernas, los que corren la contra encuentran un aire que el rival ya no tiene.",
-    momento: "El minuto ochenta y cinco, y el que arranca la contra es el que más corrió.",
-    efecto: [["+8%", "de acierto al conducir la contra con menos de 50 de energía: cuando todos están fundidos"]],
-    req: { todos: ["defensa_intencionada", "el_anzuelo"] },
-    pos: { x: 680, y: 405 },
-    hooks: { tiredLegs: { under: 50, bonus: 0.08,
-      texto: "Piernas fundidas y ahí va igual: el segundo aire aparece justo cuando el rival ya no tiene ninguno." } },
-  },
-  {
-    id: "skiller", filo: "contra", rama: "respuesta", tier: "master", icon: "👑",
-    nombre: "Skiller",
-    desc: "Al que conduce la contra no lo frena nadie de pie: el rival tiene que elegir entre dejarlo pasar o cometerle la falta.",
-    momento: "La falta desesperada al borde del área, y el tiro libre es nuestro.",
-    efecto: [["+6%", "de que le hagan FALTA al que conduce la contra: más tiros libres y más penales"]],
-    req: { previo: "segundo_aire" },
-    pos: { x: 930, y: 405 },
-    hooks: { counterFouls: { plus: 0.06,
-      texto: "No lo pueden frenar limpio: al que corre la contra hay que hacerle falta." } },
+    // El cierre de la rama Respuesta: aguanto (Estóicos) → los invito (El Anzuelo) →
+    // SALGO. Reemplazó a Segundo Aire, que pedía llegar al partido con medio tanque —
+    // un estado de partido entero, no un momento, y muchas runs no lo veían nunca.
+    id: "salir_de_contra", filo: "contra", rama: "respuesta", tier: "advanced", icon: "🚪",
+    nombre: "Salir de Contra",
+    desc: "Defender no es el final de nada: en el instante en que la zaga toca la pelota, los de arriba ya arrancaron. El bloque no aguanta para sobrevivir, aguanta para salir.",
+    momento: "El corte del central y, tres segundos después, dos camisetas cruzando la mitad de cancha.",
+    efecto: [["30%", "de que CONTENER el ataque rival encadene contra mía sin pasar por armar (+10% de acierto)"]],
+    req: { previo: "el_anzuelo" }, pos: { x: 885, y: 372 },
+    hooks: { chainOnContain: { to: "transicion", p: 0.30, bonus: 0.10,
+      intro: p => `¡CONTUVIERON Y SALIERON! ${p.name} arranca con el rival todavía volcado en ataque.` } },
   },
 
-  /* Expansión · de dónde NACE la contra */
+  /* ── EXPANSIÓN · lo que un equipo de contra sabe hacer ADEMÁS de correr ──── */
   {
-    id: "estoicos", filo: "contra", rama: "expansion", tier: "basic", icon: "🗿",
-    nombre: "Estóicos",
-    desc: "Replegado, el equipo aguanta lo que le tiren: cede terreno sin ceder el área, y espera su momento.",
-    momento: "El rival estrellándose contra el bloque una y otra vez.",
-    efecto: [["+5%", "de acierto en el acto de CONTENER el ataque rival cuando estás replegado"]],
-    req: {}, pos: { x: 280, y: 600 },
-    hooks: { containBonus: { bonus: 0.05,
-      texto: "El bloque aguanta estoico: cortan la jugada sin despeinarse." } },
-  },
-  {
-    id: "balonazo", filo: "contra", rama: "expansion", tier: "intermediate", icon: "🌩️",
-    nombre: "Balonazo",
-    desc: "Una pelota que cruza el cielo del área propia es una contra en potencia: el equipo la disputa pensando ya en el arco de enfrente.",
-    momento: "El rechace del duelo aéreo que cae al pie y ya son cuatro corriendo.",
-    efecto: [["28%", "de que la segunda pelota de un duelo aéreo perdido lance la CONTRA (+4% de acierto)"]],
-    req: { previo: "estoicos" },
-    pos: { x: 500, y: 545 },
-    hooks: { chainOnDuelFail: { to: "transicion", p: 0.28, bonus: 0.04,
-      intro: p => `¡La segunda pelota fue nuestra! ${p.name} la engancha y sale disparado con el rival mal parado.` } },
-  },
-  {
-    id: "saque_rapido", filo: "contra", rama: "expansion", tier: "intermediate", icon: "⏱️",
+    // Bajó del Intermedio al básico cuando Segunda Pelota salió del catálogo: su cadena
+    // se veía en el 18% de los partidos contra el 6% de aquella, y encima aquella era el
+    // único básico del juego que no era un número simple.
+    id: "saque_rapido", filo: "contra", rama: "expansion", tier: "basic", icon: "⏱️",
     nombre: "Saque Rápido",
     desc: "Reventarla ya no es rendirse: el equipo reinicia antes de que el rival se acomode, y la jugada que parecía muerta sale corriendo para el otro lado.",
     momento: "El despeje que el rival mira caer mientras dos ya salieron corriendo.",
-    efecto: [["30%", "de que el despeje de una salida asfixiada reinicie rápido y sea CONTRA mía (+4% de acierto)"]],
-    req: { previo: "estoicos" },
-    pos: { x: 500, y: 648 },
-    hooks: { quickRestart: { p: 0.30, bonus: 0.04,
+    efecto: [["30%", "de que el despeje de una salida asfixiada reinicie rápido y sea CONTRA mía (+10% de acierto)"]],
+    req: { previo: "punta_velocidad" }, pos: { x: 415, y: 578 },
+    hooks: { quickRestart: { p: 0.30, bonus: 0.10,
       intro: p => `¡SAQUE RÁPIDO! La reiniciaron antes de que el rival volviera: ${p.name} ya está corriendo.` } },
   },
   {
-    id: "pase_atras", filo: "contra", rama: "expansion", tier: "advanced", icon: "🎯",
+    // LA SEGUNDA JUGADA NUEVA DEL CONTRA, y la única del catálogo que le enseña al árbol
+    // a hacer LO CONTRARIO de su fantasía: frenar. Es la decisión que un equipo de contra
+    // toma cuando llega dos contra cuatro — y la que separa al que corre del que sabe
+    // correr. Cuesta un toque (la jugada no avanza) y puede morir en el intento.
+    id: "la_pausa", filo: "contra", rama: "expansion", tier: "intermediate", icon: "✋",
+    nombre: "La Pausa",
+    desc: "Llegar primero no siempre es llegar mejor. El que conduce levanta la cabeza, ve que atrás vienen tres, y aguanta la pelota hasta que la contra deja de ser una carrera y pasa a ser un ataque.",
+    momento: "El que iba lanzado frenando en seco, esperando, y recién entonces soltándola.",
+    efecto: [
+      ["NUEVA", "desbloquea LA PAUSA al conducir la contra: frenar para que lleguen los de atrás (+15% de acierto)"],
+      ["25%", "de que la defensa se acomode mientras esperás y la contra se apague: frenar se paga"],
+    ],
+    req: { previo: "saque_rapido" }, pos: { x: 650, y: 578 },
+    hooks: { pauseCounter: { p: 0.25, bonus: 0.15,
+      texto: "LA PAUSA: frena, levanta la cabeza y espera. Cuando la suelta ya no son dos contra cuatro." } },
+  },
+  {
+    id: "pase_atras", filo: "contra", rama: "expansion", tier: "advanced", icon: "🔙",
     nombre: "Pase Atrás",
-    desc: "Desbloquea la jugada Pase Atrás: llegado al área, el que conduce no remata — la pisa y la devuelve para el que entra de frente al arco.",
+    desc: "Llegado al área, el que conduce no remata: la pisa y la devuelve para el que entra de frente al arco.",
     momento: "La pisada en el área chica y el compañero entrando solo a empujarla.",
     efecto: [
       ["NUEVA", "desbloquea PASE ATRÁS como opción del desenlace de la contra"],
-      ["+14%", "de acierto respecto de rematar — pero es un pase de verdad: perderlo abre contra rival"],
+      ["+15%", "de acierto respecto de rematar — pero es un pase de verdad: perderlo abre contra rival"],
     ],
-    req: { todos: ["balonazo", "saque_rapido"] },
-    pos: { x: 720, y: 600 },
-    hooks: { squarePass: { bonus: 0.14,
+    req: { previo: "la_pausa" }, pos: { x: 885, y: 578 },
+    hooks: { squarePass: { bonus: 0.15,
       texto: "La pisa y la devuelve atrás: el que llega la empuja de frente al arco." } },
   },
+
+  /* ── MASTER de convergencia (Respuesta + Expansión) ──────────────────────── */
   {
-    id: "sin_escalas", filo: "contra", rama: "expansion", tier: "master", icon: "👑",
+    id: "sin_escalas", filo: "contra", rama: "convergencia", tier: "master", icon: "🛣️",
     nombre: "Sin Escalas",
-    desc: "A veces no hay jugada: hay un pase y un jugador solo contra el arquero. El equipo entero juega esperando ese momento.",
-    momento: "Un pase, cincuenta metros, y el nueve de cara al arquero.",
-    efecto: [["14%", "de que la contra NAZCA resuelta: sin actos intermedios y con el mano a mano de desenlace (+12% de acierto)"]],
-    req: { previo: "pase_atras" },
-    pos: { x: 940, y: 600 },
-    hooks: { oneOnOne: { p: 0.14, bonus: 0.12,
+    desc: "A veces no hay jugada que contar. Hay una pelota que sale del área propia y cae cincuenta metros más allá, y cuando el relato empieza ya está todo decidido.",
+    momento: "El pase único, de área a área, y el nueve girando de cara al arquero antes de que nadie reaccione.",
+    efecto: [["20%", "de que la contra NO EXISTA como jugada: un solo pase y arranca YA de cara al arquero (+15%)"]],
+    req: { alguno: ["salir_de_contra", "pase_atras"] }, pos: { x: 1092, y: 475 },
+    hooks: { oneOnOne: { p: 0.20, bonus: 0.15,
       intro: p => `¡SIN ESCALAS! Un solo pase y ${p.name} quedó MANO A MANO con el arquero: no hubo jugada, hubo puñalada.` } },
   },
 ];

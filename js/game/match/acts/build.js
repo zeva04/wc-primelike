@@ -22,7 +22,7 @@ import { moveBall, setBall, ADVANCE, BOX_MINE, otherLane } from "../field.js";
 import { buildActDecision, resolveSequenceAct } from "../sequence-acts.js";
 import { passTo, dtOk, dtFail, desmarqueW } from "./common.js";
 import { escalate, closeSeq, closeSilent, maybeCounter, chainSetPiece, advFoulSetPiece, foulGeography } from "./chains.js";
-import { oppShotBlockMalus } from "./block.js";
+import { oppShotBlockMalus, noteBlockSave } from "./block.js";
 
 /** Los constructores de decisión de esta familia (los monta buildActDecision).
  *
@@ -73,6 +73,12 @@ export const BUILDERS = {
     options: [
       { label: "🏃 Conducir al espacio", hint: `Puede ganar una falta (Aura ${s.prot.stats.aura})`, key: "conducir", risk: 3 },
       { label: "🎯 Pase al pie", hint: `Rápido y seguro (Pase corto ${s.prot.stats.pase_corto})`, key: "pase", risk: 1 },
+      // LA PAUSA (Contra): la jugada nueva que le enseña al árbol a hacer LO CONTRARIO de
+      // su fantasía. Una sola vez por secuencia — es un recurso, no una forma de no jugar
+      // nunca — y solo en la familia de la contra: frenar una circulación no significa nada.
+      ...(hookOf(m, "pauseCounter") && !s.pausaUsed && familyOf(s.type) === "transicion"
+        ? [{ label: "✋ La pausa", hint: "Frena y espera a los que llegan: el ataque queda mucho mejor… si la defensa no se acomoda antes", key: "pausa", risk: 3 }]
+        : []),
     ],
   }),
   press: (m, s) => ({
@@ -113,7 +119,12 @@ export function resolveBuild(m, s, key, f) {
   // ocasiones que reemplaza), no la cadena de actos — si no, tres actos multiplican el
   // fallo y el scoring se derrumba (medido en A1).
   if (key === "filtrado") {
-    const r = A.actPass(m, s.prot, { hard: true });
+    // PASE DE RIESGO (Posesión, básica de Expansión): el pase que ROMPE LÍNEAS llega
+    // más seguido. Muerde en el acierto del pase, no en el perfil del remate: lo que
+    // compra el DT es que el filtrado no se pierda.
+    const rp = hookOf(m, "riskPass");
+    const r = A.actPass(m, s.prot, { hard: true, bonus: rp?.bonus || 0 });
+    if (rp && r.ok && rnd() < 0.25) traitMoment(m, rp.traitId, [rp.texto]);
     if (!r.ok) {
       // Buscar al Hombre Libre: el filtrado interceptado puede RECICLARSE (una
       // vez por secuencia): la posesión no muere — aparece el desmarcado, la pelota
@@ -144,6 +155,22 @@ export function resolveBuild(m, s, key, f) {
     m.seq = { type: t, prot: s.prot, actIdx: 0, bonus: s.bonus + bait.bonus, assistFrom: s.assistFrom };
     buildActDecision(m);
     return false;
+  }
+  // BUEN PIE (Posesión, básica de Firma): el pase de seguridad deja de ser un trámite —
+  // cada uno que se completa deja el ataque un poco mejor perfilado. Es un ACTO REPETIDO
+  // (puede sonar dos o tres veces en la misma circulación): por eso vive en el escalón
+  // más bajo de la escala y no en el del desenlace.
+  const sp = key === "seguro" ? hookOf(m, "safePass") : null;
+  if (sp) {
+    s.bonus += sp.bonus;
+    if (!s.safePassTold) { s.safePassTold = true; traitMoment(m, sp.traitId, [sp.texto]); }
+  }
+  // EL CARRUSEL (Posesión, Master): circular deja de ser para atacar y pasa a ser para
+  // VACIARLOS — cada pase completado le come piernas al rival que corre detrás.
+  const pd = hookOf(m, "passDrain");
+  if (pd) {
+    for (const p of m.oppLineup) if (!p.expulsado && !p.lesionado) p.energia = Math.max(0, (p.energia ?? 100) - pd.per);
+    if (rnd() < 0.06) traitMoment(m, pd.traitId, [pd.texto]);
   }
   // El pase MUEVE la pelota: el seguro progresa un tramo, el filtrado rompe una línea
   // entera (T4 — "cada acto modifica la ubicación del balón").
@@ -188,6 +215,7 @@ export function resolveBuildout(m, s, key, f) {
     if (sh) {
       const shot = A.actOppShot(m, sh, mine, { bonus: 0.10 + oppShotBlockMalus(m) });
       if (shot.ok) { goalOpp(m, sh); return closeSilent(m); }
+      noteBlockSave(m);   // el regalo que el bloque termina salvando también es su trabajo
       return closeSeq(m, "chance", `min ${m.clock()}' — ${sh.name} remata el regalo pero ${mine.por ? mine.por.name : "el arquero"} la saca.`);
     }
     return closeSilent(m);
@@ -213,7 +241,13 @@ export function resolveSwitch(m, s, key, f) {
     passTo(m, s);
     return escalate(m);
   }
-  const r = A.actPass(m, s.prot, { hard: true });   // la diagonal larga ES un pase de riesgo
+  // OSCILADORES (Posesión, avanzada): mover el balón de un lado al otro hasta que la
+  // presión se parta es LITERALMENTE esta jugada. Su otro efecto —el ×1.39 de la matriz—
+  // solo existe contra el High Press; este aplica en los cuatro cruces, y es lo que hace
+  // que el nodo sirva en un partido cualquiera.
+  const os = hookOf(m, "switchPass");
+  const r = A.actPass(m, s.prot, { hard: true, bonus: os?.bonus || 0 });   // la diagonal larga ES un pase de riesgo
+  if (os && r.ok) traitMoment(m, os.traitId, [os.texto]);
   if (!r.ok) return maybeCounter(m, `min ${m.clock()}' — ${f.switchFail}`, true);
   setBall(m, { h: destino });
   // La recibe el que ESPERABA abierto del otro lado: pesa el que llega lanzado.
@@ -231,6 +265,22 @@ export function resolveSwitch(m, s, key, f) {
 
 
 export function resolveCarry(m, s, key, f) {
+  // LA PAUSA (Contra): frenar la contra para que lleguen los de atrás. Mismo patrón que
+  // el Retroceso de La Trampa —la jugada NO avanza, se paga un toque— pero acá el precio
+  // se cobra en riesgo y no en territorio: mientras esperás, la defensa puede terminar de
+  // acomodarse y la contra se apaga sin remate. El recurso se marca ANTES de tirar: si
+  // sale mal, se gastó igual.
+  if (key === "pausa") {
+    const pc = hookOf(m, "pauseCounter");
+    if (!pc) return resolveSequenceAct(m, "pase");
+    s.pausaUsed = true;
+    if (rnd() < pc.p)
+      return closeSeq(m, "event", `min ${m.clock()}' — ${s.prot.name} aguanta la pelota esperando a los suyos, pero la defensa de ${m.oppTeam.name} llegó entera. La contra se apagó.`);
+    s.bonus += pc.bonus;
+    traitMoment(m, pc.traitId, [pc.texto]);
+    buildActDecision(m);   // el MISMO acto se vuelve a jugar, ya sin la opción gastada
+    return false;
+  }
   // SEGUNDO AIRE (Contra, avanzada): conducir la contra con el tanque vacío deja de
   // ser una condena — el que corre fundido llega igual. SKILLER (Master): al que
   // conduce la contra no lo frenan limpio, así que la falta rival es más probable.
@@ -238,9 +288,15 @@ export function resolveCarry(m, s, key, f) {
   const tiredBonus = legs && familyOf(s.type) === "transicion" && (s.prot.energia ?? 100) < legs.under ? legs.bonus : 0;
   const sk = hookOf(m, "counterFouls");
   const foulPlus = sk && familyOf(s.type) === "transicion" ? sk.plus : 0;
+  // PUNTA DE VELOCIDAD (raíz del Contragolpe): el arranque al espacio se gana. Es el
+  // nodo más simple del árbol — un número sobre un momento nombrable (conducir la
+  // contra), no un bonus a la stat de velocidad de nadie.
+  const cb = hookOf(m, "carryBonus");
+  const dashBonus = cb && familyOf(s.type) === "transicion" ? cb.bonus : 0;
   if (key === "conducir") {
     const r = A.actDribble(m, s.prot, { foulPlus,
-      bonus: tiredBonus + (s.type.advFor === "contra" && s.actIdx === 1 ? s.type.adv.carryEase : 0) });
+      bonus: tiredBonus + dashBonus + (s.type.advFor === "contra" && s.actIdx === 1 ? s.type.adv.carryEase : 0) });
+    if (dashBonus && r.ok && rnd() < 0.2) traitMoment(m, cb.traitId, [cb.texto]);
     if (tiredBonus && rnd() < 0.3) traitMoment(m, legs.traitId, [legs.texto]);
     if (r.foul && sk && foulPlus && rnd() < 0.4) traitMoment(m, sk.traitId, [sk.texto]);
     if (r.foul) {
@@ -328,7 +384,11 @@ export function resolvePress(m, s, key, f) {
   const { mine } = m.powers();
   const total = key === "total";
   const caza = s.type.id === "caceria"; // la avanzada del Press
-  const r = A.actContain(m, mine, { press: total, bonus: 0.10 });
+  // PRESIÓN INTENSIFICADA (Press, básica): saltar sobre el que recibe deja de ser un
+  // recurso y pasa a ser la primera opción — el acto de presionar acierta más.
+  const pb = hookOf(m, "pressBonus");
+  const r = A.actContain(m, mine, { press: total, bonus: 0.10 + (pb?.bonus || 0) });
+  if (pb && r.ok && rnd() < 0.2) traitMoment(m, pb.traitId, [pb.texto]);
   if (!r.ok) {
     // Cacería total: el rival que la rompe, un % de las veces la rompe CON FALTA —
     // amarilla (acumula) + tiro libre encadenado. El % profundo era el rasgo F2 de

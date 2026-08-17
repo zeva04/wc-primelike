@@ -11,6 +11,41 @@ import { noteMomentum, markMomentum } from "./match-momentum.js";
 import { statLine, playedPos } from "../ratings.js";
 import { rollInjury, fatigueInjuryMult } from "../medical.js";
 
+/**
+ * AMONESTA a un jugador MÍO: acumula, y la segunda lo expulsa (con el rescate del arquero
+ * si el que se va estaba en el arco). Es el ÚNICO sitio donde mi equipo recibe una
+ * amarilla, y por eso lo comparten la falta ambiente de acá abajo y la FALTA TÁCTICA del
+ * árbol de rasgos: si mañana cambia la acumulación o la suspensión de torneo, se toca una
+ * sola vez y las dos la respetan.
+ *
+ * Devuelve `true` si el partido queda esperando una decisión (el expulsado era el arquero).
+ */
+export function bookMine(m, p, texto) {
+  p.amarillaPartido = (p.amarillaPartido || 0) + 1;
+  m.stats.tarjetas++;
+  if (p.amarillaPartido >= 2) {
+    p.expulsado = true;
+    // Quedarse con uno menos ENTREGA el partido: es de lo poco que mueve el momentum
+    // sin ser una jugada (el gráfico tiene que explicar el quiebre que viene después).
+    noteMomentum(m, "roja", "opp"); markMomentum(m, "🟥");
+    m.log("card", `min ${m.clock()}' — 🟥 Segunda amarilla y EXPULSIÓN de ${p.name}.`);
+    // playedPos, NO p.pos: si el expulsado es el arquero de EMERGENCIA (un jugador de
+    // campo que ya estaba parado en el arco), su `p.pos` natural sigue siendo DEF/MED/DEL
+    // — chequear eso lo dejaba pasar como si fuera un jugador de campo cualquiera, y el
+    // arco se quedaba vacío por segunda vez sin que nada lo reparara.
+    return playedPos(p) === "POR" ? forceGkReplacement(m) : false;
+  }
+  // La amarilla solo NARRA (PO: el popup de "protegerlo" se eliminó — cambiar al
+  // amonestado es una decisión que el DT toma solo, desde la Gestión de plantilla en vivo).
+  markMomentum(m, "🟨");
+  m.log("card", `min ${m.clock()}' — 🟨 ${texto}`);
+  // Si venía apercibido del torneo, esta amarilla lo suspende para el próximo partido
+  if ((p.amarillas || 0) >= 1) {
+    m.log("card", `⚠️ ${p.name} estaba apercibido: acumula su segunda amarilla del torneo y se perderá el PRÓXIMO partido.`);
+  }
+  return false;
+}
+
 /** Falta aleatoria: puede derivar en amarilla, roja, o la decisión de proteger a un amonestado. */
 export function foulEvent(m) {
   const againstMe = rnd() < 0.5;
@@ -42,27 +77,7 @@ export function foulEvent(m) {
       // nada lo reparara.
       return playedPos(p) === "POR" ? forceGkReplacement(m) : false;
     }
-    p.amarillaPartido = (p.amarillaPartido || 0) + 1;
-    m.stats.tarjetas++;
-    if (p.amarillaPartido >= 2) {
-      p.expulsado = true;
-      noteMomentum(m, "roja", "opp"); markMomentum(m, "🟥");
-      m.log("card", `min ${m.clock()}' — 🟥 Segunda amarilla y EXPULSIÓN de ${p.name}.`);
-      // playedPos, NO p.pos (bug fix,): si el expulsado es el arquero de
-      // EMERGENCIA (un jugador de campo que ya estaba parado en el arco), su `p.pos`
-      // natural sigue siendo DEF/MED/DEL — chequear eso lo dejaba pasar como si fuera un
-      // jugador de campo cualquiera, y el arco se quedaba vacío por segunda vez sin que
-      // nada lo reparara.
-      return playedPos(p) === "POR" ? forceGkReplacement(m) : false;
-    }
-    // La amarilla solo NARRA (PO el popup de "protegerlo" se eliminó — cambiar al
-    // amonestado es una decisión que el DT toma solo, desde la Gestión de plantilla en vivo).
-    markMomentum(m, "🟨");
-    m.log("card", `min ${m.clock()}' — 🟨 Amarilla para ${p.name}. Queda condicionado: otra falta y se va.`);
-    // Si venía apercibido del torneo, esta amarilla lo suspende para el próximo partido
-    if ((p.amarillas || 0) >= 1) {
-      m.log("card", `⚠️ ${p.name} estaba apercibido: acumula su segunda amarilla del torneo y se perderá el PRÓXIMO partido.`);
-    }
+    return bookMine(m, p, `Amarilla para ${p.name}. Queda condicionado: otra falta y se va.`);
   } else {
     m.log("plain", `min ${m.clock()}' — Falta de ${p.name}, el árbitro cobra pero no amonesta.`);
   }

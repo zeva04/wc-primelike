@@ -22,7 +22,7 @@ import { SEQUENCE_TYPES, ADVANCED_BY_FILO } from "../../content/match/sequences.
 import { FIRMA_TYPE, FILO_LEVELS, FILO_ETAPAS, getPhilosophy, filoOfType, xpLevelOf, XP_INTENCION, XP_ACIERTO, counterEdge } from "../../content/identity/philosophies.js";
 import { rivalFilo } from "../philosophy.js";
 import { buildActDecision } from "./sequence-acts.js";
-import { hookOf, hasTrait, traitHooks, traitMoment } from "./trait-hooks.js";
+import { hookOf, hooksOf, hasTrait, traitHooks, traitMoment } from "./trait-hooks.js";
 import { pressOn, PRESS_POOL } from "./press.js";
 import { noteCorner as noteCornerStat } from "./stats.js";
 import { setBall, myHeight, oppHeight, HEIGHT_DEFAULT, zoneWeight, originOf, attackWidth, defenseWidth } from "./field.js";
@@ -577,10 +577,17 @@ export function startSequence(m, type) {
       m.seq.oneOnOne = true;
       traitIntro = oo.intro;
     } else {
-      const sk = hookOf(m, "skipToFinish", fam); // Ataque Relámpago: la contra se juega a una
+      // EL ATAJO AL DESENLACE, y su regla de acumulación. Una misma rama puede tener DOS
+      // dueños del mismo atajo, uno superlativo del otro (Directo saltea la recuperación
+      // el 30% de las veces; Mordedura Fatal, su Master, el 50%). La FRECUENCIA la manda
+      // el mejor —comprar el Master hace que pase más seguido— pero la CALIDAD se SUMA:
+      // medido, con el desempate a secas el básico caía a 0% de participación y quedaba
+      // como un Punto de Identidad gastado en nada apenas se completaba su propia rama.
+      const skAll = hooksOf(m, "skipToFinish").filter(h => (h.of ?? h.seq) === fam);
+      const sk = skAll.length ? skAll.reduce((a, b) => ((b.p ?? 0) > (a.p ?? 0) ? b : a)) : null;
       if (sk && rnd() < sk.p) {
         m.seq.actIdx = 1;
-        m.seq.bonus += sk.bonus;
+        m.seq.bonus += skAll.reduce((acc, h) => acc + (h.bonus || 0), 0);
         traitIntro = sk.intro;
         // Tres Toques (Press, T2): el salto gana calidad y SU voz.
         const up = hookOf(m, "skipUpgrade");

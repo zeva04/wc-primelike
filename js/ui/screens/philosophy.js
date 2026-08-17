@@ -23,6 +23,7 @@ import { register, go } from "../nav.js";
 import { screenFull, $, hudGauge, modal, closeModal } from "../components.js";
 import { showFiloChange } from "../filo-change.js";
 import { tacticBoard, nodePos, camTransform, markerColor, TIER_LABEL, NOTES_ID, notesBlocks } from "../board.js";
+import { traitIcon } from "../traiticons.js";
 
 const MAGNETS = `<span class="tb-magnet" style="left:9px"></span><span class="tb-magnet" style="right:9px"></span>`;
 
@@ -126,7 +127,7 @@ function traitCard(t, f, run, color) {
       ${TIER_LABEL[t.tier]}${RAMA_LABELS[t.rama] ? ` · ${RAMA_LABELS[t.rama].label}` : " · converge los 3 carriles"}
     </div>
     <div class="flex items-center gap-3 mt-2.5">
-      <span class="text-[34px] leading-none">${t.icon}</span>
+      ${traitIcon(t.id, 32) || `<span class="text-[34px] leading-none">${t.icon}</span>`}
       <h2 class="text-[19px] font-black leading-tight" style="color:${t.owned ? "#eef7f1" : ink}">${t.nombre}</h2>
     </div>
 
@@ -188,7 +189,7 @@ function showTraitAcquired(t, ink, onDone) {
   const m = modal(`
     <div class="text-center">
       <div class="text-[10px] font-black uppercase tracking-[.22em] text-slate-400">Rasgo adquirido</div>
-      <div class="text-[46px] leading-none mt-4">${t.icon}</div>
+      <div class="mt-4 flex justify-center">${traitIcon(t.id, 48) || `<span class="text-[46px] leading-none">${t.icon}</span>`}</div>
       <h3 class="text-xl font-black mt-3" style="color:${ink}">${t.nombre}</h3>
     </div>
     ${efecto}

@@ -14,6 +14,8 @@
    ============================================================ */
 import { PLOTS, PLANO_H, ACCESOS, CALZADAS, ENTRADAS, CALLE_Y, ORIGEN_DY, plotHtml, complexGround } from "../js/ui/screens/hub/complex.js";
 import { pxIcon, PX_ICON_NAMES } from "../js/ui/pixicons.js";
+import { traitIcon, traitIconG, TRAIT_ICON_IDS } from "../js/ui/traiticons.js";
+import { TRAITS } from "../js/content/traits/index.js";
 import { pxFlag } from "../js/ui/screens/hub/hud.js";
 import { WC_DATA } from "../data/teams.js";
 import fs from "node:fs";
@@ -122,6 +124,30 @@ for (const f of ["js/ui/screens/hub/hud.js", "js/ui/screens/hub/panels.js", "js/
 }
 for (const name of usados) assert(PX_ICON_NAMES.includes(name), "el icono que pide el hub existe", name);
 assert(usados.size >= 12, "se detectaron los iconos del hub", `solo ${usados.size}`);
+
+/* ── Los iconos de RASGO (fase visual del catálogo v2) ──────────────────────── */
+// Mismo riesgo que arriba, multiplicado por cuatro: son 48 y se piden POR ID, así que
+// renombrar un rasgo en el catálogo deja su nodo mudo en la pizarra sin romper nada.
+// El invariante es una biyección: ningún rasgo sin dibujo, ningún dibujo sin rasgo.
+{
+  const faltan = TRAITS.filter(t => !TRAIT_ICON_IDS.includes(t.id)).map(t => t.id);
+  assert(!faltan.length, "todo rasgo del catálogo tiene su icono dibujado", faltan.join(" · "));
+  const ids = new Set(TRAITS.map(t => t.id));
+  const sobran = TRAIT_ICON_IDS.filter(id => !ids.has(id));
+  assert(!sobran.length, "y no queda ningún icono huérfano (rasgo que ya no existe)", sobran.join(" · "));
+  assert(traitIcon("incomodar", 32).startsWith("<svg"), "traitIcon dibuja el icono de un rasgo conocido");
+  assert(traitIcon("no_existe") === "", "un rasgo sin dibujo devuelve vacío: la pizarra cae al emoji, no se rompe");
+  assert(traitIconG("incomodar", 100, 100, 26).startsWith("<g"), "traitIconG entrega un grupo ya posicionado para el tablero");
+  // El emoji NO muere: sigue siendo lo que se lee en el relato del partido y el diario,
+  // que son texto plano. Si alguien lo borra del catálogo, esas dos superficies quedan mudas.
+  assert(TRAITS.every(t => t.icon && t.icon.length <= 4), "todo rasgo conserva su emoji para el relato y el diario");
+  // Toda grilla es de 16 de ancho: una fila corta desplaza el dibujo entero.
+  for (const id of TRAIT_ICON_IDS) {
+    const svg = traitIcon(id, 16);
+    const xs = [...svg.matchAll(/x="(\d+)"/g)].map(m => +m[1]);
+    assert(xs.length && Math.max(...xs) <= 15, "el icono no se sale de la grilla de 16", id);
+  }
+}
 
 /* ── La red vial ────────────────────────────────────────────────────────────── */
 

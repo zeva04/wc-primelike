@@ -69,7 +69,7 @@ const FOCUS = !!args.focus;
 // para cuando de verdad duele. Los dos se miden porque la diferencia ES el hallazgo.
 const COUNTER = !!args.counter;
 const COUNTER_HUIR = args.counter === "huir";
-const TIER_ORDER = { master: 3, advanced: 2, intermediate: 1, basic: 0 };
+const TIER_ORDER = { master: 4, advanced: 3, intermediate: 2, basic: 1, root: 0 };
 if (SMART && ACTION) { console.error("--smart y --action son excluyentes: el greedy ya decide la acción del día"); process.exit(1); }
 if (COUNTER && !SMART) { console.error("--counter necesita --smart: es el mismo DT greedy, con contra-elección"); process.exit(1); }
 
@@ -236,12 +236,13 @@ function playRun(teamId) {
   assert(run.identityPoints === 1, "elegir filosofía acredita el PI inicial", run.identityPoints);
   {
     const opciones = E.traitTree(run).filter(t => t.buyable);
-    // 3 en casi todas; 4 en el Bloque bajo, cuya Firma abre con dos básicos que
-    // convergen (rediseño del 30-jul-2026).
-    const basicos = E.traitsOf(run.filoId, "basic").length;
-    assert(opciones.length === basicos, "los básicos de la filosofía están comprables al inicio", `${opciones.length}/${basicos}`);
-    const elegido = opciones[Math.floor(Math.random() * opciones.length)];
-    assert(E.buyTrait(run, elegido.id), "el 1-de-3 del inicio se compra", elegido.id);
+    // UNA sola: la RAÍZ (rediseño del catálogo v2, 13-ago-2026). El árbol tiene una
+    // entrada obligatoria y los tres básicos cuelgan de ella — el 1-de-3 se corre al
+    // segundo PI, ya dentro de la run.
+    assert(opciones.length === 1 && opciones[0].tier === "root",
+      "al inicio lo único comprable es la raíz de la filosofía", opciones.map(t => t.id).join());
+    const elegido = opciones[0];
+    assert(E.buyTrait(run, elegido.id), "la raíz se compra con el PI inicial", elegido.id);
     assert(run.identityPoints === 0 && E.activeTraitIds(run).length === 1, "la compra cobra el PI");
   }
   let alive = true, champion = false, guard = 0;

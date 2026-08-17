@@ -16,6 +16,7 @@ import { TRAITS_BLOQUE } from "./bloque.js";
 
 /** Puntos de Identidad que cuesta incorporar un rasgo, por tier. */
 export const TRAIT_COST = {
+  root: 1,
   basic: 1,
   intermediate: 1,
   advanced: 1,
@@ -24,17 +25,25 @@ export const TRAIT_COST = {
 
 /** Nivel de SU filosofía que exige cada tier para desbloquearse. */
 export const TRAIT_LEVEL = {
+  root: 1,
   basic: 1,
   intermediate: 3,
   advanced: 6,
   master: 10,
 };
 
-/** Etiquetas de rama para la UI. */
+/**
+ * Etiquetas de rama para la UI. Desde el rediseño v2 hay dos "ramas" que no son
+ * ramas: la RAÍZ (el nodo del que cuelgan las tres, sin requisito previo) y la
+ * CONVERGENCIA (el segundo Master, al que se llega desde Respuesta o Expansión).
+ * Las dos viven acá para que la ficha del riel no tenga que inventar su rótulo.
+ */
 export const RAMA_LABELS = {
+  raiz: { label: "Raíz", desc: "la declaración de identidad" },
   firma: { label: "Firma", desc: "profundiza tu fútbol" },
   respuesta: { label: "Respuesta", desc: "cubre tu matchup débil" },
   expansion: { label: "Expansión", desc: "abre un fútbol lateral" },
+  convergencia: { label: "Convergencia", desc: "junta Respuesta y Expansión" },
 };
 
 /** Completa cada rasgo con los diales de su tier (sin pisar lo que declare). */

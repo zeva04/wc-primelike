@@ -62,6 +62,13 @@ export function traitHooks(m) {
  * este filtro ganaba siempre el primero comprado y el otro rasgo quedaba mudo.
  * Pasando la familia se devuelve EL de esa jugada; sin ella, el primero (los hooks
  * que no son de jugada — backPass, iceGame, wall… — siguen igual).
+ *
+ * Cuando DOS rasgos declaran el mismo hook para la misma jugada (uno superlativo del
+ * otro: Directo saltea la recuperación el 30% de las veces y su Master el 50%), esto no
+ * alcanza y el sitio tiene que resolver la acumulación a mano con `hooksOf` — la
+ * frecuencia la manda el mejor, la calidad se suma. Ver el atajo al desenlace en
+ * sequences.startSequence: es el único caso hasta hoy, y devolver "el mejor" a secas
+ * dejaba al básico aportando CERO.
  */
 export function hookOf(m, name, family) {
   const list = traitHooks(m)[name];

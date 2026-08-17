@@ -23,7 +23,8 @@ import { moveBall, setBall, ADVANCE, BOX_MINE, defenseWidth, inWing } from "../f
 import { buildActDecision, resolveSequenceAct } from "../sequence-acts.js";
 import { dtOk, dtFail } from "./common.js";
 import { escalate, closeSeq, closeSilent, chainOppCorner, LASTMAN_FROM_CONTAIN } from "./chains.js";
-import { oppShotBlockMalus, noteOppDead, clearChanceGuarded } from "./block.js";
+import { oppShotBlockMalus, noteOppDead, noteBlockSave, clearChanceGuarded } from "./block.js";
+import { bookMine } from "../incidents.js";
 
 /** Los constructores de decisión de esta familia (los monta buildActDecision). */
 export const BUILDERS = {
@@ -48,6 +49,14 @@ export const BUILDERS = {
       ...(hookOf(m, "clearBall")
         ? [{ label: "🚀 Reventar el balón", hint: "Mata la jugada sin remate: el rival empieza de nuevo desde atrás… o se lleva un córner", key: "reventar", risk: 1 }]
         : []),
+      // FALTA TÁCTICA (Press, avanzada): la SEGUNDA manera de matar un ataque rival, y
+      // paga con otra moneda que la del Bloque. Reventar el balón arriesga un córner;
+      // esto no falla nunca — pero es amarilla segura, y la segunda te deja con diez.
+      // Una sola vez por partido: a la siguiente el árbitro ya está avisado, y sin ese
+      // tope el árbol compraría once ataques rivales muertos por once tarjetas.
+      ...(hookOf(m, "tacticalFoul") && !m._tacticalUsed
+        ? [{ label: "🟨 Cortarla con falta", hint: "Mata el ataque SIEMPRE, sin remate… al precio de una amarilla. Una vez por partido", key: "falta", risk: 3 }]
+        : []),
     ],
   }),
 };
@@ -63,7 +72,12 @@ export function resolvePlayout(m, s, key, f) {
     if (qr && chainMine(m, "transicion", { bonus: qr.bonus, intro: qr.intro, buildDecision: buildActDecision })) return false;
     return out;
   }
-  const r = A.actPass(m, s.prot, { hard: true });
+  // CABEZA FRÍA (Posesión, básica de Respuesta): con dos encima y el arco propio a la
+  // espalda, la pelota sale jugada igual. El momento es EXACTAMENTE el que la filosofía
+  // sufre — por eso vive en la rama Respuesta y no en la Firma.
+  const cf = hookOf(m, "playoutBonus");
+  const r = A.actPass(m, s.prot, { hard: true, bonus: cf?.bonus || 0 });
+  if (cf && r.ok && rnd() < 0.3) traitMoment(m, cf.traitId, [cf.texto]);
   if (!r.ok) {
     // El Tercer Hombre: la salida rota puede RESCATARSE — el desmarcado aparece
     // a tiempo y el regalo letal no existe (la posesión se pierde sin sangre). La
@@ -76,6 +90,7 @@ export function resolvePlayout(m, s, key, f) {
     const { mine } = m.powers();
     const shot = A.actOppShot(m, s.shooter, mine, { bonus: 0.12 + oppShotBlockMalus(m) });
     if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
+    noteBlockSave(m);
     return closeSeq(m, "chance", `min ${m.clock()}' — ${s.shooter.name} remata el regalo pero ${mine.por ? mine.por.name : "el arquero"} responde. Se salvaron.`);
   }
   m.log("event", `min ${m.clock()}' — ${f.playoutOk(s.prot)}`);
@@ -93,6 +108,22 @@ export function resolvePlayout(m, s, key, f) {
 
 
 export function resolveContain(m, s, key, f) {
+  // FALTA TÁCTICA (Press): el ataque rival se corta de raíz. No hay tirada — cortar con
+  // falta SIEMPRE funciona, que es exactamente por qué existe en el fútbol real; lo que
+  // se paga es la tarjeta. El que la comete es un DEF o MED (el que llegó tarde), y la
+  // amarilla va por el mismo camino que cualquier otra (incidents.bookMine): acumula, y
+  // la segunda deja al equipo con diez.
+  if (key === "falta") {
+    const tf = hookOf(m, "tacticalFoul");
+    if (!tf || m._tacticalUsed) return resolveSequenceAct(m, "contener");
+    m._tacticalUsed = true;
+    const zaga = m.activeMine().filter(p => ["DEF", "MED"].includes(playedPos(p)));
+    const autor = zaga.length ? pick(zaga) : m.activeMine().filter(p => p.pos !== "POR")[0];
+    traitMoment(m, tf.traitId, [tf.texto]);
+    noteOppDead(m);   // el ataque rival murió: alimenta la frustración como cualquier otro
+    closeSeq(m, "event", `min ${m.clock()}' — 🟨 ${autor.name} lo baja antes de que la jugada exista. Falta, y el ataque de ${m.oppTeam.name} se acabó.`);
+    return autor ? bookMine(m, autor, `${autor.name} se come la amarilla a propósito: cortó el ataque y lo sabe.`) : false;
+  }
   // PELOTAZO (Bloque): REVENTAR EL BALÓN. La jugada rival muere sin remate — el precio
   // es doble: se resigna todo lo que la contención podía dar (la fortaleza que convierte,
   // la contra que encadena) y `p` de las veces el despeje apurado sale al córner.
@@ -194,7 +225,7 @@ export function resolveClear(m, s, key, f) {
   if (r.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
   const out = closeSeq(m, "chance", `min ${m.clock()}' — ${s.shooter.name} remata pero ${pick([`ataja ${mine.por ? mine.por.name : "el arquero"}`, "se va afuera", "la bloquea la zaga"])}.`);
   if (malus && rnd() < 0.4) traitMoment(m, jl.traitId, [jl.texto]); // el momento se narra a veces (sin spamear)
-  else noteOppDead(m);
+  else { noteBlockSave(m); noteOppDead(m); }   // …y si no habló ése, habla el trabajo del bloque
   return out;
 }
 

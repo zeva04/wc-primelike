@@ -6,7 +6,7 @@
    consultan tres familias de actos —el repliegue, el córner en
    contra y la salida asfixiada— y no depende de ninguna.
    ============================================================ */
-import { rnd } from "../../../core/rng.js";
+import { rnd, pick } from "../../../core/rng.js";
 import { hookOf, traitMoment } from "../trait-hooks.js";
 
 // Actos que se resuelven SOLOS, sin pedir decisión al DT (desenlaces): el remate rival de una
@@ -39,6 +39,33 @@ export function noteOppDead(m) {
    salida asfixiada. `aerial` suma el dominio aéreo solo donde se cabecea. */
 export function oppShotBlockMalus(m, { aerial = false } = {}) {
   return frustMalus(m) + wallMalus(m) + boxMalus(m) + firstChanceMalus(m) + (aerial ? aerialMalus(m) : 0);
+}
+
+/**
+ * LA VOZ DEL TRABAJO DEFENSIVO. Los tres nodos de acá arriba traían su `texto` escrito en
+ * el catálogo desde siempre y NADIE lo imprimía: solo sumaban su malus y se iban en
+ * silencio. Medido: Área Blindada, Muralla y Dominio Aéreo aparecían en el 0.0% de los
+ * partidos — el jugador compraba "−15% a todo remate rival" y no veía una sola línea en
+ * noventa minutos. Es el mismo agujero que tenía El Rondo con el desgaste, y la misma
+ * ley: un efecto que el relato no puede narrar NO SE SIENTE, por mucho que se mida.
+ *
+ * Se llama cuando el remate rival FALLA, que es el instante en que el trabajo se cobra, y
+ * habla UNO SOLO — el más específico de los que estén activos, porque tres voces sobre el
+ * mismo despeje serían tres rasgos peleándose por el mismo micrófono. Con freno (`p`)
+ * para que la solidez siga siendo un rumor de fondo y no un locutor.
+ */
+export function noteBlockSave(m, { aerial = false } = {}) {
+  if (rnd() >= 0.3) return;
+  const cands = [
+    aerial ? hookOf(m, "aerialDef") : null,
+    hookOf(m, "boxShield"),
+    m.gMy >= m.gOpp ? hookOf(m, "wall") : null,   // la muralla solo existe con el marcador a salvo
+  ].filter(h => h?.texto);
+  // AL AZAR entre los activos, no el primero de la lista. Con la lista ordenada por
+  // especificidad, un DT que tuviera los tres oía SIEMPRE al mismo y los otros dos
+  // seguían mudos: medido, la Muralla marcaba 0.0% igual que antes del arreglo. El que
+  // habla se sortea, así que a lo largo del partido se escuchan los tres.
+  if (cands.length) { const h = pick(cands); traitMoment(m, h.traitId, [h.texto]); }
 }
 
 /** MURALLA (avanzada, ESTADO): mientras el marcador no vaya en contra —empatado O

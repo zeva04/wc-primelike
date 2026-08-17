@@ -11,7 +11,7 @@
    mismo patrón que sequences ↔ sequence-acts): nada se usa en la
    evaluación del módulo, solo dentro de las funciones.
    ============================================================ */
-import { pick } from "../../../core/rng.js";
+import { rnd, pick } from "../../../core/rng.js";
 import { hookOf, rollChain, chainMine, traitMoment } from "../trait-hooks.js";
 import * as A from "../actions.js";
 import { goalMine, goalOpp } from "../chances.js";
@@ -19,7 +19,7 @@ import { BOX_OPP, inWing } from "../field.js";
 import { buildActDecision } from "../sequence-acts.js";
 import { dtOk, dtFail } from "./common.js";
 import { closeSeq, closeSilent, maybeRebound } from "./chains.js";
-import { oppShotBlockMalus, noteOppDead } from "./block.js";
+import { oppShotBlockMalus, noteOppDead, noteBlockSave } from "./block.js";
 
 /** Los constructores de decisión de esta familia (los monta buildActDecision). */
 export const BUILDERS = {
@@ -27,11 +27,21 @@ export const BUILDERS = {
     const mates = m.activeMine().filter(p => p !== s.prot && p.pos !== "POR");
     s.target = mates.sort((a, b) => (b.stats.cabezazo || 0) - (a.stats.cabezazo || 0))[0] || s.prot;
     const corner = inWing(m);
+    // ESTRATEGIA ENSAYADA (Bloque): la pizarra de la semana no siempre sale, pero cuando
+    // sale se ve ANTES de elegir — la variante se sortea al construir la decisión, no al
+    // resolverla, para que el DT decida sabiendo que esta es LA jugada que entrenaron.
+    // Se sortea una sola vez por secuencia (el rebote vuelve a abrir el acto).
+    const sv = hookOf(m, "setpieceVariant");
+    if (s.ensayada === undefined) s.ensayada = !!sv && rnd() < sv.p;
     return {
-      title: corner
-        ? `🎯 min ${m.clock()}' — Córner a favor: lo tira ${s.prot.name}`
-        : `🎯 min ${m.clock()}' — Tiro libre frontal: ${s.prot.name} se para detrás de la pelota`,
-      text: corner ? "El área se llena de camisetas. ¿Qué ensayaron en la semana?" : "Hay barrera, y el arco de frente. ¿Qué ensayaron en la semana?",
+      title: s.ensayada
+        ? `🎭 min ${m.clock()}' — ${corner ? "Córner" : "Tiro libre"} ENSAYADO: ${s.prot.name} levanta el brazo y todos saben qué viene`
+        : corner
+          ? `🎯 min ${m.clock()}' — Córner a favor: lo tira ${s.prot.name}`
+          : `🎯 min ${m.clock()}' — Tiro libre frontal: ${s.prot.name} se para detrás de la pelota`,
+      text: s.ensayada
+        ? "Es la jugada que trabajaron toda la semana: el rival la ve venir y no llega igual."
+        : corner ? "El área se llena de camisetas. ¿Qué ensayaron en la semana?" : "Hay barrera, y el arco de frente. ¿Qué ensayaron en la semana?",
       options: [
         ...(corner ? [] : [{ label: "🎯 Tiro libre directo al arco", hint: `Tiro ${s.prot.stats.tiro} — de frente hay ángulo: es la opción más peligrosa`, key: "directo", risk: 4 }]),
         { label: `📡 Centro al área para ${s.target.name}`, hint: corner
@@ -60,8 +70,10 @@ export function resolveSetpiece(m, s, key, f) {
   // Pelota Parada Ensayada: la pizarra entra en acción — ambas opciones llegan
   // mejor ensayadas (bonus de situación) y el momento se narra una vez por jugada.
   const sr = hookOf(m, "setpieceRehearsed");
-  const srB = sr ? sr.bonus : 0;
+  const sv = s.ensayada ? hookOf(m, "setpieceVariant") : null;   // la variante ya se sorteó en el builder
+  const srB = (sr ? sr.bonus : 0) + (sv ? sv.bonus : 0);
   if (sr && !s.rehearsedTold) { s.rehearsedTold = true; traitMoment(m, sr.traitId, [sr.texto]); }
+  if (sv && !s.variantTold) { s.variantTold = true; traitMoment(m, sv.traitId, [sv.texto]); }
   // EL TIRO LIBRE DIRECTO (Eje Horizontal): solo existe de frente al arco, y vale más
   // cuanto más cerca se cobra. Es la opción más peligrosa del balón parado frontal —
   // y la que no existe desde el córner, donde no hay ángulo que valga.
@@ -110,11 +122,13 @@ export function resolveDefendSp(m, s, key, f) {
     dtFail(m);
     const shot = A.actOppShot(m, s.shooter, mine, { stat: "cabezazo", bonus: 0.08 + oppShotBlockMalus(m, { aerial: true }) });
     if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
+    noteBlockSave(m, { aerial: true });
     return closeSeq(m, "chance", `min ${m.clock()}' — ¡${s.shooter.name} cabecea SOLO pero ${mine.por ? mine.por.name : "el arquero"} la saca de milagro!`);
   }
   const shot = A.actOppShot(m, s.shooter, mine, { stat: "cabezazo", bonus: -0.05 + oppShotBlockMalus(m, { aerial: true }) }); // área poblada
   if (shot.ok) { goalOpp(m, s.shooter); return closeSilent(m); }
   m.log("chance", `min ${m.clock()}' — la zona aguanta: el cabezazo de ${s.shooter.name} ${pick(["se va desviado", "muere en las manos del arquero", "lo saca la defensa"])}.`);
+  noteBlockSave(m, { aerial: true });
   noteOppDead(m);
   if (chainDS()) return false;
   return closeSilent(m);

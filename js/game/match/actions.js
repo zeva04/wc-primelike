@@ -34,10 +34,10 @@ function oppR(m) { return teamRating(m.oppTeam) / 20; }
  * pase de circulación lo mide `pase_corto`. Es el primer sitio del motor donde el split
  * ya significa algo, y el patrón que va a seguir el resto en la segunda mitad del sprint.
  */
-export function actPass(m, from, { hard = false } = {}) {
+export function actPass(m, from, { hard = false, bonus = 0 } = {}) {
   const base = hard ? 0.58 : 0.38;
   const key = hard ? "pase_largo" : "pase_corto";
-  const p = clamp(base + effStat(from, key, m.my.buffs) * (hard ? 0.06 : 0.11), 0.2, 0.92);
+  const p = clamp(base + effStat(from, key, m.my.buffs) * (hard ? 0.06 : 0.11) + bonus, 0.2, 0.92);
   const ok = rnd() < p;
   notePass(m, "mine", ok);   // el pase que el DT eligió también entra al panel de stats
   // Match Momentum: el pase SEGURO no mueve la aguja (pesa 0) y el filtrado que sale la

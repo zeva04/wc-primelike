@@ -80,12 +80,18 @@ const LASTMAN_FROM_COUNTER = 1.0;  // TODA contra con el equipo partido es un ma
  */
 export function maybeRebound(m, failText) {
   const s = m.seq;
-  if (s.rebounded || rnd() >= REBOUND_CHANCE) return closeSeq(m, "chance", failText);
+  // LA SEGUNDA OLA (Bloque): en TU balón parado el área está llena de centrales, así que
+  // el rechace vuelve a caer adentro mucho más seguido — y el segundo remate NO es el
+  // rebote sucio de siempre: lo caza alguien que ya estaba ahí esperándolo, no el que
+  // pasaba cerca. Solo en el balón parado A FAVOR: es la única jugada donde suben todos.
+  const sw = s.type.id === "balon_parado" ? hookOf(m, "secondWave") : null;
+  if (s.rebounded || rnd() >= (sw ? sw.p : REBOUND_CHANCE)) return closeSeq(m, "chance", failText);
   s.rebounded = true;
   m.log("chance", failText);
+  if (sw) traitMoment(m, sw.traitId, [sw.texto]);
   const pool = m.activeMine().filter(p => p.pos !== "POR");
   const p2 = m._weightedPick(pool, pool.map(p => playedPos(p) === "DEL" ? 3 : 1));
-  const shot = A.actShot(m, p2, { bonus: -0.03 });
+  const shot = A.actShot(m, p2, { bonus: -0.03 + (sw ? sw.bonus : 0) });
   if (shot.ok) { goalMine(m, p2, "¡REBOTE y gol! Cazó la pelota viva en el área."); return closeSilent(m); }
   return closeSeq(m, "chance", `min ${m.clock()}' — ¡el rebote le queda a ${p2.name}! pero su remate ${pick(["lo tapa el arquero", "se va por arriba", "muere en la zaga"])}.`);
 }

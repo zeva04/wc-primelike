@@ -336,20 +336,30 @@ function presentDecision() {
   showDecision();
 }
 
-const KEYS = ["A", "B", "C", "D"];
+// Las teclas del acto. Sobran a propósito: el árbol AGREGA opciones a los actos (hoy la
+// contención llega a cuatro con una build 🦁+🧱) y quedarse sin letra pintaría una tecla
+// `undefined` en el nodo, que es de los bugs que no rompen nada y se ven feísimo.
+const KEYS = ["A", "B", "C", "D", "E", "F"];
 
 /**
- * Muestra la decisión pendiente. DOS caminos, y la frontera es cuántas opciones hay:
+ * Muestra la decisión pendiente. DOS caminos, y la frontera es QUÉ CLASE de decisión es:
  *
- *   ≤3 opciones → la TARJETA dentro del relato (el caso normal: secuencias, penal en
- *     contra, último hombre). El partido nunca se tapa, que es la idea del rediseño.
- *   más → el modal de siempre. Esas decisiones son una LISTA DE JUGADORES (elegir
- *     pateador, quién sale por la roja al arquero, quién se pone los guantes): en
- *     columnas no entran, y no son una apuesta táctica sino un nombre.
+ *   una APUESTA TÁCTICA (el acto de una jugada) → la TARJETA dentro del relato. El
+ *     partido nunca se tapa, que es la idea del rediseño.
+ *   una LISTA DE JUGADORES (elegir pateador, quién sale por la roja al arquero, quién
+ *     se pone los guantes) → el modal. No entran en columnas, y no son una apuesta
+ *     táctica sino un nombre.
+ *
+ * La frontera ERA "más de 3 opciones", y funcionó mientras un acto tuvo tres como
+ * máximo. Dejó de alcanzar cuando el árbol empezó a AGREGAR opciones al mismo acto: un
+ * DT híbrido 🦁+🧱 llega a la contención con cuatro (contener · presionar · reventar el
+ * balón · cortarla con falta) y el conteo lo mandaba al modal — o sea, comprar dos
+ * rasgos tapaba el partido. Ahora se pregunta por la clase, que es lo que el rediseño
+ * quiso decir, y la grilla se parte en dos filas cuando hacen falta.
  */
 function showDecision() {
   const d = S.match.decision;
-  if (d.options.length > 3) { showDecisionModal(d); return; }
+  if (d.options.length > 3 && d.id !== "sequence") { showDecisionModal(d); return; }
   const acto = actProgress(S.match);
   // El ×1.5 del Plan de Partido, dicho EN EL MOMENTO en que se cobra: la XP de una
   // secuencia va a la filosofía DUEÑA DE SU TIPO (filoOfType), declarada o no, así que
@@ -372,7 +382,9 @@ function showDecision() {
             ${plan ? `<span class="px-tag px-tag-gold" title="Plan de Partido: esta idea rinde más experiencia hoy">×${PLAN_XP_MULT} XP</span>` : ""}
           </span>
         </div>
-        <div class="flex items-stretch" style="gap:9px">
+        <!-- Hasta tres opciones, una fila (es la lectura más rápida). La cuarta parte la
+             grilla en 2×2 en vez de estrujar cuatro columnas en el ancho del relato. -->
+        <div class="grid items-stretch" style="gap:9px;grid-template-columns:repeat(${d.options.length > 3 ? 2 : d.options.length}, 1fr)">
           ${d.options.map((o, i) => `
             <button data-i="${i}" class="dec-opt px-dec-opt">
               <div class="flex items-center gap-2">
@@ -423,7 +435,7 @@ function chooseOption(i) {
 function onDecisionKey(e) {
   if (!document.getElementById("dec-slot")) return;
   const d = S.match?.decision;
-  if (!d || !d.options.length || d.options.length > 3) return;
+  if (!d || !d.options.length || d.options.length > KEYS.length) return;
   const k = e.key.toUpperCase();
   const i = KEYS.indexOf(k) >= 0 ? KEYS.indexOf(k) : "123".indexOf(k);
   if (i < 0 || i >= d.options.length) return;

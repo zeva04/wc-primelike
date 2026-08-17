@@ -26,6 +26,7 @@
    y devuelve SVG. No lee estado ni toca el DOM.
    ============================================================ */
 import { PHILOSOPHIES, FILO_LEVELS, filoLevelOf, filoPointsOf } from "../content/identity/philosophies.js";
+import { traitIconG } from "./traiticons.js";
 
 /* ---------- Geometría (viewBox 1200×700) ---------- */
 /* Con 19 rasgos el tablero se satura, así que el espacio está peleado: los 5 principios
@@ -62,7 +63,7 @@ export const PRINCIPLE_COLORS = {
 };
 export const markerColor = (f) => PRINCIPLE_COLORS[f.firma] || CHALK;
 
-export const TIER_LABEL = { basic: "básico", intermediate: "intermedio", advanced: "avanzado", master: "master" };
+export const TIER_LABEL = { root: "raíz", basic: "básico", intermediate: "intermedio", advanced: "avanzado", master: "master" };
 
 /* ---------- Helpers de dibujo ---------- */
 
@@ -101,20 +102,30 @@ function arrow(a, b, bend, color, on) {
 /* LA FORMA DICE LA RAMA: se eliminaron las etiquetas "Firma /
    Respuesta / Expansión" de la cancha — la silueta del nodo lo revela, y el
    nombre de la rama solo aparece en el riel al enfocarlo.
+     ◇ rombo     Raíz       — la piedra fundacional, de la que cuelga todo
      ○ círculo   Firma      — el jugador, tu marca propia
      ▢ cuadrado  Respuesta  — el bloque, la zona, lo que se planta
      △ triángulo Expansión  — el cono, la punta que abre el campo
-     ★ estrella  Master
+     ★ estrella  Convergencia — el Master que junta dos ramas
    Y EL TRAZO DICE LA PROFUNDIDAD: el marcador engorda por tier, como si el DT
    hubiera repasado la línea. */
-const SHAPE_BY_RAMA = { firma: "circle", respuesta: "square", expansion: "triangle", master: "star" };
-const TIER_STROKE = { basic: 2.1, intermediate: 3.1, advanced: 4.2, master: 4.4 };
-// Desplazamientos propios de cada silueta: dónde cae el ícono y dónde el sello ✓.
+const SHAPE_BY_RAMA = { raiz: "diamond", firma: "circle", respuesta: "square", expansion: "triangle", convergencia: "star" };
+const TIER_STROKE = { root: 3.4, basic: 2.1, intermediate: 3.1, advanced: 4.2, master: 4.4 };
+/* Desplazamientos propios de cada silueta:
+     `icon`  dónde cae la línea base del EMOJI (la red, para un rasgo sin dibujo)
+     `badge` dónde se clava el sello ✓
+     `px`    cuánto lado, en múltiplos del radio, le cabe al ICONO DIBUJADO adentro —
+             y `pxDy` cuánto hay que bajarlo. No es un número de gusto: es el cuadrado
+             que entra en cada figura. En el círculo entra r·√2; en el cuadrado, casi
+             todo; en el ROMBO solo su semidiagonal; y en el TRIÁNGULO manda el
+             inradio, que es la mitad del circunradio — por eso es el más chico y el
+             único que además hay que bajar, porque su masa no está en el centro. */
 const SHAPE_TUNE = {
-  circle: { icon: 9, badge: [0.72, -0.72] },
-  square: { icon: 9, badge: [0.86, -0.86] },
-  triangle: { icon: 14, badge: [0.74, -0.20] },
-  star: { icon: 11, badge: [0.60, -0.60] },
+  circle: { icon: 9, badge: [0.72, -0.72], px: 1.30, pxDy: 0 },
+  square: { icon: 9, badge: [0.86, -0.86], px: 1.30, pxDy: 0 },
+  triangle: { icon: 14, badge: [0.74, -0.20], px: 0.92, pxDy: 0.22 },
+  star: { icon: 11, badge: [0.60, -0.60], px: 1.02, pxDy: 0 },
+  diamond: { icon: 9, badge: [0.66, -0.66], px: 1.08, pxDy: 0 },
 };
 
 /** Emite la silueta pedida como un elemento SVG con los atributos dados. */
@@ -125,6 +136,13 @@ function shapeEl(kind, x, y, r, attrs) {
     return `<rect x="${(x - s).toFixed(1)}" y="${(y - s).toFixed(1)}" width="${(s * 2).toFixed(1)}" height="${(s * 2).toFixed(1)}" rx="5" ${attrs}/>`;
   }
   if (kind === "star") return `<path d="${starPath(x, y, r, r * 0.62)}" stroke-linejoin="round" ${attrs}/>`;
+  // El rombo de la RAÍZ: un cuadrado girado 45°, un pelo más grande para que el ícono
+  // entre (su ancho útil es la diagonal, no el lado).
+  if (kind === "diamond") {
+    const d = r * 1.16;
+    return `<path d="M${x} ${(y - d).toFixed(1)} L${(x + d).toFixed(1)} ${y} L${x} ${(y + d).toFixed(1)} L${(x - d).toFixed(1)} ${y} Z"
+      stroke-linejoin="round" ${attrs}/>`;
+  }
   // Triángulo equilátero apuntando arriba, bajado un pelo para centrar su masa.
   // El circunradio va holgado (1.34) porque el inradio —lo que de verdad encierra
   // al ícono— es la MITAD: con 1.16 el emoji se salía por los lados de la base.
@@ -156,8 +174,12 @@ function node(t, x, y, r, color, isMaster, selected) {
     ${shapeEl(kind, x, y, r, `fill="none" stroke="${ring}" stroke-width="${sw}"
       opacity="${st === "lock" ? 0.5 : 0.95}" ${st === "lock" ? 'stroke-dasharray="4 6"' : ""}`)}
     ${st === "owned" ? shapeEl(kind, x, y, r - 7, `fill="none" stroke="${ink}" stroke-width="1.2" opacity=".5"`) : ""}
-    <text x="${x}" y="${y + tune.icon}" text-anchor="middle" font-size="${isMaster ? 30 : 26}"
-      opacity="${st === "lock" ? 0.42 : 1}">${t.icon}</text>
+    ${/* EL ÍCONO DIBUJADO, encuadrado en el hueco que le deja SU silueta (SHAPE_TUNE.px).
+          El emoji queda de red: un rasgo sin arte todavía se ve, no se convierte en un
+          nodo mudo. */
+      traitIconG(t.id, x, y + r * tune.pxDy, r * tune.px, st === "lock" ? 0.42 : 1)
+      || `<text x="${x}" y="${y + tune.icon}" text-anchor="middle" font-size="${isMaster ? 30 : 26}"
+      opacity="${st === "lock" ? 0.42 : 1}">${t.icon}</text>`}
     ${lines.map((l, i) => `<text x="${x}" y="${y + r + 20 + i * 14}" text-anchor="middle" font-size="${isMaster ? 13 : 11.5}"
       font-weight="700" fill="${nameFill}" opacity="${st === "lock" ? 0.75 : 1}">${esc(l)}</text>`).join("")}
     ${t.owned ? `<g><circle cx="${x + r * bx}" cy="${y + r * by}" r="9" fill="${BOARD_BG}"/>

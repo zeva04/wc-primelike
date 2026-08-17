@@ -117,7 +117,11 @@ export class Match {
     this.subsLeft = 3;
     this.phase = "regular";    // regular | extra | pens | done
     this.pens = null;
-    this.stats = { misTiros: 0, oppTiros: 0, decisiones: 0, penalesAtajados: 0 };
+    // `tarjetas` faltaba en este objeto desde siempre: los tres sitios que hacen
+    // `m.stats.tarjetas++` (la falta ambiente, el último hombre y ahora la falta táctica)
+    // venían escribiendo NaN en silencio. No lo destapó nadie porque hoy nada lo LEE —
+    // el acumulado del torneo vive aparte, en game/discipline.
+    this.stats = { misTiros: 0, oppTiros: 0, decisiones: 0, penalesAtajados: 0, tarjetas: 0 };
     // Panel de estadísticas del partido (match/stats.js): pases y córners, que el motor
     // no llevaba. Los tiros siguen en `stats` y la posesión la deriva `flow`.
     this.tally = newTally();
@@ -241,7 +245,17 @@ export class Match {
     // El rival se cansa mientras juega (medical.drainOppEnergy): llega al 90' cerca de
     // 58 de energía. El Rondo (Posesión) acelera el drenaje — el rondo son ELLOS
     // corriendo. Va ANTES de powers para que el tick ya lo cobre en sus duelos.
-    drainOppEnergy(this.oppLineup, MIN_PER_TICK, hookOf(this, "oppStamina")?.factor || 1);
+    const stam = hookOf(this, "oppStamina");
+    drainOppEnergy(this.oppLineup, MIN_PER_TICK, stam?.factor || 1);
+    // …y CUANDO SE COBRA, se dice. El desgaste era el único efecto del juego que existía
+    // de verdad y no se veía nunca: vivía en el tanque del rival, que el jugador no mira.
+    // Se narra UNA vez por partido, en el minuto en que el rival ya arrastra las piernas
+    // — que es el momento que el rasgo promete, no el promedio que lo produce.
+    if (stam?.texto && !this._stamTold) {
+      const vivos = this.oppLineup.filter(p => !p.expulsado && !p.lesionado);
+      const media = vivos.reduce((a, p) => a + (p.energia ?? 100), 0) / Math.max(1, vivos.length);
+      if (media < 70) { this._stamTold = true; traitMoment(this, stam.traitId, [stam.texto]); }
+    }
     // Y MI equipo también. Va acá, al lado del rival, porque es el mismo hecho: el
     // partido se juega con las piernas y las piernas se vacían mientras corre.
     this._drainMine();
